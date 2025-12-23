@@ -976,17 +976,23 @@ class ConfigManager {
 			// ✅ 13. Inicializar drag handle
 			const dragHandle = document.getElementById('dragHandle');
 			if (dragHandle) {
-				window.RendererAPI.initDragHandle(dragHandle);
-			}
-
-			// ✅ 14. Registrar listeners de erro global
-			this.registerErrorHandlers();
-
-			console.log('✅ Controller inicializado com sucesso');
-		} catch (error) {
-			console.error('❌ Erro ao inicializar controller:', error);
+			window.RendererAPI.initDragHandle(dragHandle, document);
 		}
+
+		// ✅ 14. Registrar listeners de erro global
+		this.registerErrorHandlers();
+
+		// ✅ 15. Registrar UIElements no renderer
+		this.registerUIElements();
+
+		// ✅ 16. Registrar callbacks do renderer
+		this.registerRendererCallbacks();
+
+		console.log('✅ Controller inicializado com sucesso');
+	} catch (error) {
+		console.error('❌ Erro ao inicializar controller:', error);
 	}
+}
 
 	restoreTheme() {
 		try {
@@ -1125,12 +1131,10 @@ class ConfigManager {
 				if (isEnabled) {
 					window.RendererAPI.updateMockBadge(true);
 					window.RendererAPI.resetInterviewState();
-					window.RendererAPI.updateStatus('🧪 Mock de entrevista ATIVO');
 					window.RendererAPI.startMockInterview();
 				} else {
 					window.RendererAPI.updateMockBadge(false);
 					window.RendererAPI.resetInterviewState();
-					window.RendererAPI.updateStatus('Mock desativado');
 					await window.RendererAPI.restartAudioPipeline();
 				}
 			});
@@ -1162,12 +1166,12 @@ class ConfigManager {
 		}
 
 		// Questions click handling
-		const questionsHistory = document.getElementById('questionsHistory');
-		if (questionsHistory) {
-			questionsHistory.addEventListener('click', e => {
+		const questionsHistoryBox = document.getElementById('questionsHistory');
+		if (questionsHistoryBox) {
+			questionsHistoryBox.addEventListener('click', e => {
 				const questionBlock = e.target.closest('.question-block');
 				if (questionBlock) {
-					const questionId = questionBlock.id;
+					const questionId = questionBlock.dataset.qid || questionBlock.id;
 					window.RendererAPI.handleQuestionClick(questionId);
 				}
 			});
@@ -1227,6 +1231,278 @@ class ConfigManager {
 				stack: e.reason?.stack || null,
 			});
 		});
+	}
+
+	// 🔥 NOVO: Registrar UIElements para que renderer.js possa ler valores
+	registerUIElements() {
+		const elements = {
+			inputSelect: document.getElementById('audio-input-device'),
+			outputSelect: document.getElementById('audio-output-device'),
+			listenBtn: document.getElementById('listenBtn'),
+			statusText: document.getElementById('status'),
+			transcriptionBox: document.getElementById('conversation'),
+			currentQuestionBox: document.getElementById('currentQuestion'),
+			currentQuestionTextBox: document.getElementById('currentQuestionText'),
+			questionsHistoryBox: document.getElementById('questionsHistory'),
+			answersHistoryBox: document.getElementById('answersHistory'),
+			askBtn: document.getElementById('askGptBtn'),
+			inputVu: document.getElementById('micVu'),
+			outVu: document.getElementById('outVu'),
+			mockToggle: document.getElementById('mockToggle'),
+			mockBadge: document.getElementById('mockBadge'),
+			interviewModeSelect: document.getElementById('interviewModeSelect'),
+			btnClose: document.getElementById('btnClose'),
+			btnToggleClick: document.getElementById('btnToggleClick'),
+			dragHandle: document.getElementById('dragHandle'),
+			darkToggle: document.getElementById('darkModeToggle'),
+			opacitySlider: document.getElementById('opacityRange'),
+		};
+
+		window.RendererAPI.registerUIElements(elements);
+		console.log('✅ UIElements registrados no renderer');
+	}
+
+	// 🔥 NOVO: Registrar callbacks do renderer para atualizar DOM
+	registerRendererCallbacks() {
+		// Transcrição
+		window.RendererAPI.onUIChange('onTranscriptAdd', (data) => {
+			const { author, text, timeStr, elementId } = data;
+			const transcriptionBox = document.getElementById(elementId || 'conversation');
+			if (!transcriptionBox) {
+				console.warn(`⚠️ Elemento de transcrição não encontrado: ${elementId || 'conversation'}`);
+				return;
+			}
+
+			const div = document.createElement('div');
+			div.className = 'transcript-item';
+			
+			// Se for placeholder (texto = "..."), marca para ser atualizado depois
+			if (text === '...') {
+				div.setAttribute('data-is-placeholder', 'true');
+			}
+			
+			div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
+			transcriptionBox.appendChild(div);
+			console.log(`✅ Transcrição adicionada: ${author} - ${text}`);
+		});
+
+		// Status
+		window.RendererAPI.onUIChange('onStatusUpdate', (data) => {
+			const { message } = data;
+			const statusText = document.getElementById('status');
+			if (statusText) statusText.innerText = message;
+		});
+
+		// Input Volume
+		window.RendererAPI.onUIChange('onInputVolumeUpdate', (data) => {
+			const { percent } = data;
+			const inputVu = document.getElementById('micVu');
+			if (inputVu) inputVu.style.width = percent + '%';
+		});
+
+		// Output Volume
+		window.RendererAPI.onUIChange('onOutputVolumeUpdate', (data) => {
+			const { percent } = data;
+			const outputVu = document.getElementById('outputVu');
+			if (outputVu) outputVu.style.width = percent + '%';
+		});
+
+		// Mock Badge
+		window.RendererAPI.onUIChange('onMockBadgeUpdate', (data) => {
+			const { visible } = data;
+			const mockBadge = document.getElementById('mockBadge');
+			if (mockBadge) {
+				visible ? mockBadge.classList.remove('hidden') : mockBadge.classList.add('hidden');
+			}
+		});
+
+		// Listen Button Toggle
+		window.RendererAPI.onUIChange('onListenButtonToggle', (data) => {
+			const { isRunning, buttonText } = data;
+			const listenBtn = document.getElementById('listenBtn');
+			if (listenBtn) listenBtn.innerText = buttonText;
+		});
+
+		// Clear All Selections
+		window.RendererAPI.onUIChange('onClearAllSelections', () => {
+			const currentQuestionBox = document.getElementById('currentQuestion');
+			if (currentQuestionBox) currentQuestionBox.classList.remove('selected-question');
+
+			const questionsHistoryBox = document.getElementById('questionsHistory');
+			if (questionsHistoryBox) {
+				questionsHistoryBox.querySelectorAll('.selected-question').forEach(el => {
+					el.classList.remove('selected-question');
+				});
+			}
+		});
+
+		// Scroll to Question
+		window.RendererAPI.onUIChange('onScrollToQuestion', (data) => {
+			const { questionId } = data;
+			const questionsHistoryBox = document.getElementById('questionsHistory');
+			if (!questionsHistoryBox) return;
+
+			const el = questionsHistoryBox.querySelector(`.question-block[data-qid="${questionId}"]`);
+			if (el) {
+				el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			}
+		});
+
+		// Pergunta Atual
+		window.RendererAPI.onUIChange('onCurrentQuestionUpdate', (data) => {
+			const { text, isSelected } = data;
+			const currentQuestionBox = document.getElementById('currentQuestion');
+			if (!currentQuestionBox) return;
+
+			// Procura por span dentro do elemento (pode ser currentQuestionText)
+			const textEl = currentQuestionBox.querySelector('span') || currentQuestionBox;
+			if (textEl) textEl.innerText = text;
+
+			if (isSelected) {
+				currentQuestionBox.classList.add('selected-question');
+			} else {
+				currentQuestionBox.classList.remove('selected-question');
+			}
+		});
+
+		// Histórico de Perguntas
+		window.RendererAPI.onUIChange('onQuestionsHistoryUpdate', (data) => {
+			const questionsHistoryBox = document.getElementById('questionsHistory');
+			if (!questionsHistoryBox) return;
+
+			questionsHistoryBox.innerHTML = '';
+			data.forEach(q => {
+				const div = document.createElement('div');
+				div.className = 'question-block';
+				div.dataset.qid = q.id;
+				if (q.isSelected) div.classList.add('selected-question');
+				if (q.isAnswered) div.classList.add('answered');
+				if (q.isIncomplete) div.classList.add('incomplete');
+				div.innerHTML = `<span>${q.text}</span>`;
+				questionsHistoryBox.appendChild(div);
+			});
+		});
+
+		// Resposta GPT
+		window.RendererAPI.onUIChange('onAnswerAdd', (data) => {
+			const { questionId, action, html, questionText } = data;
+
+			if (action === 'clearActive') {
+				const answersHistoryBox = document.getElementById('answersHistory');
+				if (answersHistoryBox) {
+					answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => {
+						el.classList.remove('active');
+					});
+				}
+			} else if (action === 'new') {
+				// Cria um novo bloco de resposta vazio
+				const answersHistoryBox = document.getElementById('answersHistory');
+				if (!answersHistoryBox) return;
+
+				const wrapper = document.createElement('div');
+				wrapper.className = 'answer-block active';
+				wrapper.dataset.questionId = questionId;
+				wrapper.innerHTML = `
+					<div class="answer-header">
+						<span class="answer-question">${questionText}</span>
+						<span class="answer-time">${new Date().toLocaleTimeString()}</span>
+					</div>
+					<div class="answer-content">⏳ Aguardando resposta...</div>
+				`;
+				answersHistoryBox.appendChild(wrapper);
+			} else if (action === 'showExisting') {
+				const answersHistoryBox = document.getElementById('answersHistory');
+				if (!answersHistoryBox) return;
+
+				const existingAnswer = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+				if (existingAnswer) {
+					answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => el.classList.remove('active'));
+					existingAnswer.classList.add('active');
+					existingAnswer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+				}
+			} else if (html) {
+				// Atualiza resposta
+				const answersHistoryBox = document.getElementById('answersHistory');
+				if (!answersHistoryBox) return;
+
+				let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+				if (!wrapper) {
+					wrapper = document.createElement('div');
+					wrapper.className = 'answer-block active';
+					wrapper.dataset.questionId = questionId;
+					wrapper.innerHTML = `
+						<div class="answer-header">
+							<span class="answer-question">${questionText}</span>
+							<span class="answer-time">${new Date().toLocaleTimeString()}</span>
+						</div>
+						<div class="answer-content"></div>
+					`;
+					answersHistoryBox.appendChild(wrapper);
+				}
+
+				const answerContent = wrapper.querySelector('.answer-content');
+				if (answerContent) answerContent.innerHTML = html;
+				wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+			}
+		});
+
+		// Stream Chunk
+		window.RendererAPI.onUIChange('onAnswerStreamChunk', (data) => {
+			const { questionId, accum } = data;
+			const answersHistoryBox = document.getElementById('answersHistory');
+			if (!answersHistoryBox) return;
+
+			let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+			if (wrapper) {
+				const answerContent = wrapper.querySelector('.answer-content');
+				if (answerContent) answerContent.innerText = accum;
+			}
+		});
+
+		// Placeholder Fulfill (para atualizar placeholders de áudio)
+		window.RendererAPI.onUIChange('onPlaceholderFulfill', (data) => {
+			const { speaker, text, stopStr, startStr, recordingDuration, latency, total } = data;
+			const transcriptionBox = document.getElementById('conversation');
+			if (!transcriptionBox) return;
+
+			// Encontra e atualiza o último placeholder
+			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+			if (placeholders.length === 0) return;
+
+			const lastPlaceholder = placeholders[placeholders.length - 1];
+			lastPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
+			lastPlaceholder.removeAttribute('data-is-placeholder');
+
+			// Adiciona metadados
+			const meta = document.createElement('div');
+			meta.style.fontSize = '0.8em';
+			meta.style.color = '#888';
+			meta.style.marginTop = '2px';
+			meta.style.marginBottom = '2px';
+			meta.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
+			lastPlaceholder.parentNode.insertBefore(meta, lastPlaceholder.nextSibling);
+		});
+
+		// Clear Transcription
+		window.RendererAPI.onUIChange('onTranscriptionCleared', () => {
+			const transcriptionBox = document.getElementById('conversation');
+			if (transcriptionBox) transcriptionBox.innerHTML = '';
+		});
+
+		// Clear Answers
+		window.RendererAPI.onUIChange('onAnswersCleared', () => {
+			const answersHistoryBox = document.getElementById('answersHistory');
+			if (answersHistoryBox) answersHistoryBox.innerHTML = '';
+		});
+
+		// Mode Select Update
+		window.RendererAPI.onUIChange('onModeSelectUpdate', (data) => {
+			const { mode } = data;
+			const interviewModeSelect = document.getElementById('interviewModeSelect');
+			if (interviewModeSelect) interviewModeSelect.value = mode;
+		});
+
+		console.log('✅ Callbacks do renderer registrados');
 	}
 }
 
