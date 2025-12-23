@@ -1578,45 +1578,9 @@ function applyOpacity(value) {
 }
 
 /* ===============================
-   ATALHOS
+   ATALHOS GLOBAIS - MOVED TO CONFIG-MANAGER
 =============================== */
-
-window.addEventListener(
-	'keydown',
-	e => {
-		if (e.ctrlKey && e.shiftKey && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
-			e.preventDefault();
-			e.stopPropagation();
-
-			const all = getNavigableQuestionIds();
-			if (all.length === 0) return;
-
-			let index = all.indexOf(selectedQuestionId);
-
-			if (index === -1) {
-				index = e.key === 'ArrowUp' ? all.length - 1 : 0;
-			} else {
-				index += e.key === 'ArrowUp' ? -1 : 1;
-				index = Math.max(0, Math.min(index, all.length - 1));
-			}
-
-			selectedQuestionId = all[index];
-
-			clearAllSelections();
-
-			renderQuestionsHistory();
-			renderCurrentQuestion();
-
-			if (APP_CONFIG.MODE_DEBUG) {
-				statusText.innerText =
-					e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
-				console.log('📌 Atalho Selecionou:', selectedQuestionId);
-				return;
-			}
-		}
-	},
-	true, // 👈 MUITO IMPORTANTE (capture phase)
-);
+// Listeners registrados via config-manager.js
 
 /* ===============================
    MOCK / DEBUG
@@ -1725,345 +1689,241 @@ marked.setOptions({
 	breaks: true,
 });
 
-if (darkToggle) {
-	darkToggle.addEventListener('change', () => {
-		const isDark = darkToggle.checked;
-
-		document.body.classList.toggle('dark', isDark);
-		localStorage.setItem('theme', isDark ? 'dark' : 'light');
-
-		console.log('🌙 Dark mode:', isDark);
-	});
-}
-
-opacitySlider.addEventListener('input', e => {
-	applyOpacity(e.target.value);
-});
-
-if (btnClose) {
-	btnClose.addEventListener('click', () => {
-		console.log('❌ Botão Fechar clicado (top bar)');
-		ipcRenderer.send('APP_CLOSE');
-	});
-}
-
-inputSelect.addEventListener('change', async () => {
-	window.configManager.saveDevices(); // ← Chama função do config-manager
-	stopInputMonitor();
-	if (!inputSelect.value) return;
-	await startInput();
-});
-
-outputSelect.addEventListener('change', async () => {
-	window.configManager.saveDevices(); // ← Chama função do config-manager
-	stopOutputMonitor();
-	if (!outputSelect.value) return;
-	await startOutput();
-});
-
-mockToggle.addEventListener('change', async () => {
-	APP_CONFIG.MODE_DEBUG = mockToggle.checked;
-
-	if (APP_CONFIG.MODE_DEBUG) {
-		mockBadge.classList.remove('hidden');
-		resetInterviewState(); // 👈 LIMPA TUDO
-		mockInterviewRunning = false;
-		statusText.innerText = '🧪 Mock de entrevista ATIVO';
-		startMockInterview();
-	} else {
-		mockBadge.classList.add('hidden');
-		statusText.innerText = 'Mock desativado';
-		resetInterviewState(); // 👈 OPCIONAL (ver abaixo)
-
-		// 🔥 REINICIA PIPELINE DE ÁUDIO
-		await restartAudioPipeline();
-	}
-});
-
-if (interviewModeSelect) {
-	interviewModeSelect.addEventListener('change', () => {
-		CURRENT_MODE = interviewModeSelect.value === MODES.INTERVIEW ? MODES.INTERVIEW : MODES.NORMAL;
-		try {
-			localStorage.setItem('appMode', CURRENT_MODE);
-		} catch (err) {
-			console.warn('⚠️ não foi possível salvar modo:', err);
-		}
-		console.log('🎯 Modo atual:', CURRENT_MODE);
-		resetInterviewRuntimeState();
-		// Se estamos entrando em modo ENTREVISTA, garante que qualquer CURRENT existente
-		// seja preservado no histórico (evita perder pergunta ao alternar de NORMAL -> INTERVIEW)
-		if (CURRENT_MODE === MODES.INTERVIEW && currentQuestion.text) {
-			console.log(
-				'🔀 Mudança para INTERVIEW: promovendo CURRENT existente para histórico antes de iniciar entrevistas',
-			);
-			promoteCurrentToHistory(currentQuestion.text, document.createElement('div'));
-		}
-	});
-}
-
-listenBtn.addEventListener('click', listenToggleBtn);
-askBtn.addEventListener('click', askGpt);
-
-// 🔥 Event listener para atualizar status quando API key for salva
-ipcRenderer.on('API_KEY_UPDATED', (_, success) => {
-	if (success) {
-		console.log('✅ API key atualizada com sucesso no main process');
-		statusText.innerText = '✅ API key configurada com sucesso';
-
-		// Resetar status após alguns segundos
-		setTimeout(() => {
-			if (statusText.innerText.includes('API key configurada')) {
-				statusText.innerText = isRunning ? 'Status: ouvindo...' : 'Status: parado';
-			}
-		}, 3000);
-	} else {
-		console.error('❌ Falha ao atualizar API key no main process');
-		statusText.innerText = '❌ Erro ao configurar API key';
-	}
-});
-
-ipcRenderer.on('CMD_TOGGLE_AUDIO', listenToggleBtn);
-ipcRenderer.on('CMD_ASK_GPT', askGpt);
+/* ===============================
+   EVENT LISTENERS MOVED TO CONFIG-MANAGER
+   darkToggle, opacitySlider, btnClose listeners
+=============================== */
 
 /* ===============================
-   DRAG AND DROP DA JANELA
+   EVENT LISTENERS MOVED TO CONFIG-MANAGER
+   (renderrer.js é agora apenas Services)
 =============================== */
-if (dragHandle) {
-	// Use pointer events to better catch drag start across platforms.
-	dragHandle.addEventListener('pointerdown', async event => {
-		console.log('🪟 Drag iniciado (pointerdown)');
 
-		isDraggingWindow = true;
-		dragHandle.classList.add('drag-active');
+/* ===============================
+   DRAG AND DROP DA JANELA - MOVED TO CONFIG-MANAGER
+=============================== */
+// Drag logic agora está em config-manager.js
+// Mantém as funções abaixo como utilities públicas:
 
-		// tenta capturar o pointer para garantir eventos mesmo fora do elemento
-		const _pid = event.pointerId;
-		try {
-			dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
-		} catch (err) {
-			console.warn('setPointerCapture falhou:', err);
-		}
+/* ===============================
+   DOMContentLoaded - INITIALIZATION MOVED TO CONFIG-MANAGER
+=============================== */
+// Controllers now handle DOMContentLoaded initialization
+// renderer.js kept only for direct utility calls if needed
 
-		// tenta iniciar arraste nativo (macOS). Se não funcionar usaremos um
-		// fallback que move a janela por IPC conforme o ponteiro.
-		setTimeout(() => ipcRenderer.send('START_WINDOW_DRAG'), 40);
+/* ===============================
+   CLICK-THROUGH - MOVED TO CONFIG-MANAGER
+=============================== */
 
-		// Captura estado inicial para o fallback de movimentação
-		const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || { x: 0, y: 0 };
-		const startCursor = { x: event.screenX, y: event.screenY };
+/* ===============================
+   GLOBAL ERROR HANDLING - MOVED TO CONFIG-MANAGER
+=============================== */
 
-		let lastAnimation = 0;
+/* ===============================
+   PUBLIC API FOR CONFIG-MANAGER
+   (Funções que o Controller chama)
+=============================== */
 
-		function onPointerMove(ev) {
-			// throttle via rAF/tempo
-			const now = performance.now();
-			if (now - lastAnimation < 16) return;
-			lastAnimation = now;
+// Exporta funções públicas que o controller pode chamar
+const RendererAPI = {
+	// Áudio
+	startInput,
+	stopInput: stopInputMonitor,
+	startOutput,
+	stopOutput: stopOutputMonitor,
+	restartAudioPipeline,
 
-			const dx = ev.screenX - startCursor.x;
-			const dy = ev.screenY - startCursor.y;
+	// Entrevista
+	listenToggleBtn,
+	askGpt,
+	resetInterviewState,
+	startMockInterview,
 
-			const nextX = startBounds.x + dx;
-			const nextY = startBounds.y + dy;
+	// Modo
+	changeMode: (mode) => {
+		CURRENT_MODE = mode;
+	},
+	getMode: () => CURRENT_MODE,
 
-			ipcRenderer.send('MOVE_WINDOW_TO', { x: nextX, y: nextY });
-		}
+	// Questions
+	handleQuestionClick,
+	closeCurrentQuestion,
 
-		function onPointerUp(ev) {
-			// remove listeners do próprio elemento
+	// UI
+	applyOpacity,
+	updateStatus: (text) => {
+		statusText.innerText = text;
+	},
+	updateMockBadge: (show) => {
+		show ? mockBadge.classList.remove('hidden') : mockBadge.classList.add('hidden');
+	},
+	setMockToggle: (checked) => {
+		mockToggle.checked = checked;
+		APP_CONFIG.MODE_DEBUG = checked;
+	},
+	setModeSelect: (mode) => {
+		if (interviewModeSelect) interviewModeSelect.value = mode;
+	},
+
+	// Drag
+	initDragHandle: (dragHandle) => {
+		if (!dragHandle) return;
+		dragHandle.addEventListener('pointerdown', async event => {
+			console.log('🪟 Drag iniciado (pointerdown)');
+			isDraggingWindow = true;
+			dragHandle.classList.add('drag-active');
+
+			const _pid = event.pointerId;
 			try {
-				dragHandle.removeEventListener('pointermove', onPointerMove);
-				dragHandle.removeEventListener('pointerup', onPointerUp);
-			} catch (err) {}
-
-			if (dragHandle.classList.contains('drag-active')) {
-				dragHandle.classList.remove('drag-active');
+				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
+			} catch (err) {
+				console.warn('setPointerCapture falhou:', err);
 			}
 
-			// tenta liberar pointer capture
-			try {
-				dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
-			} catch (err) {}
+			setTimeout(() => ipcRenderer.send('START_WINDOW_DRAG'), 40);
 
-			isDraggingWindow = false;
-		}
+			const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || { x: 0, y: 0 };
+			const startCursor = { x: event.screenX, y: event.screenY };
+			let lastAnimation = 0;
 
-		dragHandle.addEventListener('pointermove', onPointerMove);
-		dragHandle.addEventListener('pointerup', onPointerUp, { once: true });
+			function onPointerMove(ev) {
+				const now = performance.now();
+				if (now - lastAnimation < 16) return;
+				lastAnimation = now;
 
-		// impede o evento de propagar para aplicações abaixo enquanto tratamos o drag
-		event.stopPropagation();
-	});
+				const dx = ev.screenX - startCursor.x;
+				const dy = ev.screenY - startCursor.y;
 
-	// pointerup captura fim do arraste/touch
-	document.addEventListener('pointerup', () => {
-		if (!dragHandle.classList.contains('drag-active')) return;
+				ipcRenderer.send('MOVE_WINDOW_TO', { x: startBounds.x + dx, y: startBounds.y + dy });
+			}
 
-		console.log('🪟 Drag finalizado (pointerup)');
-		dragHandle.classList.remove('drag-active');
-		isDraggingWindow = false;
-	});
+			function onPointerUp(ev) {
+				try {
+					dragHandle.removeEventListener('pointermove', onPointerMove);
+					dragHandle.removeEventListener('pointerup', onPointerUp);
+				} catch (err) {}
 
-	// Caso o usuário mova o cursor para fora enquanto pressiona (drag cancel)
-	dragHandle.addEventListener('pointercancel', () => {
-		if (dragHandle.classList.contains('drag-active')) {
+				if (dragHandle.classList.contains('drag-active')) {
+					dragHandle.classList.remove('drag-active');
+				}
+
+				try {
+					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
+				} catch (err) {}
+
+				isDraggingWindow = false;
+			}
+
+			dragHandle.addEventListener('pointermove', onPointerMove);
+			dragHandle.addEventListener('pointerup', onPointerUp, { once: true });
+			event.stopPropagation();
+		});
+
+		document.addEventListener('pointerup', () => {
+			if (!dragHandle.classList.contains('drag-active')) return;
+			console.log('🪟 Drag finalizado (pointerup)');
 			dragHandle.classList.remove('drag-active');
 			isDraggingWindow = false;
-		}
-	});
-}
-
-/* ===============================
-   DOMContentLoaded
-=============================== */
-window.addEventListener('DOMContentLoaded', async () => {
-	APP_CONFIG = await ipcRenderer.invoke('GET_APP_CONFIG');
-
-	mockToggle.checked = APP_CONFIG.MODE_DEBUG;
-
-	if (APP_CONFIG.MODE_DEBUG) {
-		mockBadge.classList.remove('hidden');
-	}
-
-	if (APP_CONFIG.MODE_DEBUG) {
-		statusText.innerText = '🧪 Mock de entrevista ATIVO';
-		startMockInterview();
-	}
-
-	// restaura tema salvo (LIGHT | DARK)
-	try {
-		const savedTheme = localStorage.getItem('theme');
-		if (savedTheme === 'dark') {
-			document.body.classList.add('dark');
-			if (darkToggle) darkToggle.checked = true;
-		}
-	} catch (err) {
-		console.warn('⚠️ não foi possível restaurar tema:', err);
-	}
-
-	// restaura Opacidade salva
-	try {
-		const savedOpacity = localStorage.getItem('overlayOpacity');
-		if (savedOpacity) {
-			opacitySlider.value = savedOpacity;
-			applyOpacity(savedOpacity);
-		} else {
-			// ✅ Se não houver valor salvo, aplica o valor DEFAULT do slider
-			applyOpacity(opacitySlider.value || 0.75);
-		}
-	} catch (err) {
-		console.warn('⚠️ não foi possível restaurar tema:', err);
-		applyOpacity(opacitySlider.value || 0.75);
-	}
-
-	// restaura modo salvo (NORMAL | INTERVIEW)
-	try {
-		const savedMode = localStorage.getItem('appMode') || MODES.NORMAL;
-		CURRENT_MODE = savedMode === MODES.INTERVIEW ? MODES.INTERVIEW : MODES.NORMAL;
-		if (interviewModeSelect) interviewModeSelect.value = CURRENT_MODE;
-		console.log('🔁 modo restaurado:', CURRENT_MODE);
-	} catch (err) {
-		console.warn('⚠️ não foi possível restaurar modo:', err);
-	}
-
-	// ✅ Solicita permissão de áudio
-	await navigator.mediaDevices.getUserMedia({ audio: true });
-
-	// ✅ Config-manager carrega e restaura dispositivos
-	await window.configManager.loadDevices();
-	window.configManager.restoreDevices();
-
-	// ✅ Inicia monitoramento se dispositivos estão selecionados
-	if (inputSelect.value) {
-		stopInputMonitor();
-		startInput();
-	}
-
-	if (outputSelect.value) {
-		stopOutputMonitor();
-		startOutput();
-	}
-
-	syncApiKeyOnStart();
-
-	// 🔥 CLICK-THROUGH: Inicializa estado e listeners
-	await initClickThrough();
-});
-
-// *******************************************************
-// 🔥 CLICK-THROUGH: Função de inicialização
-async function initClickThrough() {
-	const btnToggle = document.getElementById('btnToggleClick');
-	if (!btnToggle) {
-		console.warn('⚠️ btnToggleClick não encontrado');
-		return;
-	}
-
-	// Recupera estado salvo ou usa padrão (desativado)
-	let enabled = false;
-	try {
-		const saved = localStorage.getItem('clickThroughEnabled');
-		enabled = saved === 'true';
-	} catch (err) {
-		console.warn('⚠️ Erro ao recuperar estado do click-through:', err);
-	}
-
-	// Aplica estado inicial
-	await setClickThrough(enabled);
-	updateClickThroughButton(enabled);
-
-	// Listener do botão
-	btnToggle.addEventListener('click', async () => {
-		enabled = !enabled;
-		await setClickThrough(enabled);
-		updateClickThroughButton(enabled);
-		localStorage.setItem('clickThroughEnabled', enabled.toString());
-		console.log('🖱️ Click-through alternado:', enabled);
-	});
-
-	// 🔥 Detecta entrada/saída de zonas interativas
-	document.querySelectorAll('.interactive-zone').forEach(el => {
-		el.addEventListener('mouseenter', () => {
-			ipcRenderer.send('SET_INTERACTIVE_ZONE', true);
 		});
-		el.addEventListener('mouseleave', () => {
-			ipcRenderer.send('SET_INTERACTIVE_ZONE', false);
+
+		dragHandle.addEventListener('pointercancel', () => {
+			if (dragHandle.classList.contains('drag-active')) {
+				dragHandle.classList.remove('drag-active');
+				isDraggingWindow = false;
+			}
 		});
-	});
+	},
+
+	// Click-through
+	setClickThrough: (enabled) => {
+		ipcRenderer.send('SET_CLICK_THROUGH', enabled);
+	},
+	updateClickThroughButton: (enabled, btnToggle) => {
+		if (!btnToggle) return;
+		btnToggle.style.opacity = enabled ? '0.5' : '1';
+		btnToggle.title = enabled
+			? 'Click-through ATIVO (clique para desativar)'
+			: 'Click-through INATIVO (clique para ativar)';
+		console.log('🎨 Botão atualizado - opacity:', btnToggle.style.opacity);
+	},
+
+	// API Key
+	setAppConfig: (config) => {
+		APP_CONFIG = config;
+	},
+	getAppConfig: () => APP_CONFIG,
+
+	// Keyboard shortcuts
+	registerKeyboardShortcuts: () => {
+		window.addEventListener(
+			'keydown',
+			e => {
+				if (e.ctrlKey && e.shiftKey && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
+					e.preventDefault();
+					e.stopPropagation();
+
+					const all = getNavigableQuestionIds();
+					if (all.length === 0) return;
+
+					let index = all.indexOf(selectedQuestionId);
+					if (index === -1) {
+						index = e.key === 'ArrowUp' ? all.length - 1 : 0;
+					} else {
+						index += e.key === 'ArrowUp' ? -1 : 1;
+						index = Math.max(0, Math.min(index, all.length - 1));
+					}
+
+					selectedQuestionId = all[index];
+					clearAllSelections();
+					renderQuestionsHistory();
+					renderCurrentQuestion();
+
+					if (APP_CONFIG.MODE_DEBUG) {
+						statusText.innerText =
+							e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
+						console.log('📌 Atalho Selecionou:', selectedQuestionId);
+						return;
+					}
+				}
+			},
+			true,
+		);
+	},
+
+	// IPC Listeners
+	onApiKeyUpdated: (callback) => {
+		ipcRenderer.on('API_KEY_UPDATED', callback);
+	},
+	onToggleAudio: (callback) => {
+		ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
+	},
+	onAskGpt: (callback) => {
+		ipcRenderer.on('CMD_ASK_GPT', callback);
+	},
+	onGptStreamChunk: (callback) => {
+		ipcRenderer.on('GPT_STREAM_CHUNK', callback);
+	},
+	onGptStreamEnd: (callback) => {
+		ipcRenderer.on('GPT_STREAM_END', callback);
+	},
+	sendRendererError: (error) => {
+		try {
+			console.error('RENDERER ERROR', error.error || error.message || error);
+			ipcRenderer.send('RENDERER_ERROR', {
+				message: String(error.message || error),
+				stack: error.error?.stack || null,
+			});
+		} catch (err) {
+			console.error('Falha ao enviar RENDERER_ERROR', err);
+		}
+	},
+};
+
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports = RendererAPI;
 }
 
-// 🔥 CLICK-THROUGH: Ativa/desativa no main process
-async function setClickThrough(enabled) {
-	ipcRenderer.send('SET_CLICK_THROUGH', enabled);
+// 🔥 Expor globalmente para que config-manager possa acessar
+if (typeof window !== 'undefined') {
+	window.RendererAPI = RendererAPI;
 }
-
-// 🔥 CLICK-THROUGH: Atualiza visual do botão
-function updateClickThroughButton(enabled) {
-	const btnToggle = document.getElementById('btnToggleClick');
-	if (!btnToggle) return;
-
-	btnToggle.style.opacity = enabled ? '0.5' : '1';
-	btnToggle.title = enabled
-		? 'Click-through ATIVO (clique para desativar)'
-		: 'Click-through INATIVO (clique para ativar)';
-
-	console.log('🎨 Botão atualizado - opacity:', btnToggle.style.opacity);
-}
-
-// *******************************************************
-
-// captura erros globais e envia ao main para facilitar debugging
-window.addEventListener('error', e => {
-	try {
-		console.error('RENDERER ERROR', e.error || e.message || e);
-		ipcRenderer.send('RENDERER_ERROR', { message: String(e.message || e), stack: e.error?.stack || null });
-	} catch (err) {
-		console.error('Falha ao enviar RENDERER_ERROR', err);
-	}
-});
-window.addEventListener('unhandledrejection', e => {
-	try {
-		console.error('UNHANDLED REJECTION', e.reason);
-		ipcRenderer.send('RENDERER_ERROR', { message: String(e.reason), stack: e.reason?.stack || null });
-	} catch (err) {}
-});
