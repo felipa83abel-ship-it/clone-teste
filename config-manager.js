@@ -11,6 +11,9 @@ const _ipc =
 		? require('electron').ipcRenderer
 		: null;
 
+// 🔥 NOVO: RendererAPI será definido globalmente após renderer.js carregar
+// (não precisa fazer require pois renderer.js é carregado primeiro no index.html)
+
 class ConfigManager {
 	constructor() {
 		this.config = this.loadConfig();
@@ -218,7 +221,25 @@ class ConfigManager {
 		}
 	}
 
-	// Mostra feedback visual de salvamento
+	// 🔥 Sincroniza API key ao iniciar
+	async syncApiKeyOnStart() {
+		try {
+			const statusText = document.getElementById('status');
+			const openaiKey = await _ipc.invoke('GET_API_KEY', 'openai');
+
+			if (openaiKey && openaiKey.length > 10) {
+				console.log('✅ Chave OpenAI encontrada - cliente inicializado');
+				if (statusText) statusText.innerText = 'Status: pronto';
+				await _ipc.invoke('initialize-api-client', openaiKey);
+			} else {
+				console.warn('⚠️ Nenhuma chave OpenAI configurada');
+				if (statusText) statusText.innerText = 'Status: aguardando configuração de API';
+			}
+		} catch (error) {
+			console.error('❌ Erro ao sincronizar API key:', error);
+		}
+	}
+
 	showSaveFeedback() {
 		const feedback = document.createElement('div');
 		feedback.className = 'save-feedback';
@@ -895,11 +916,336 @@ class ConfigManager {
 			console.log(`🔐 Config ${keyPath} atualizada localmente.`);
 		}
 	}
+
+	/* ===============================
+	   🔥 CONTROLLER INITIALIZATION
+	   All UI interactions and renderer service calls
+	=============================== */
+
+	async initializeController() {
+		try {
+			// ✅ 1. Obter APP_CONFIG
+			const appConfig = await _ipc.invoke('GET_APP_CONFIG');
+			window.RendererAPI.setAppConfig(appConfig);
+
+			// ✅ 2. Restaurar tema
+			this.restoreTheme();
+
+			// ✅ 3. Restaurar opacidade
+			this.restoreOpacity();
+
+			// ✅ 4. Restaurar modo (NORMAL | INTERVIEW)
+			this.restoreMode();
+
+			// ✅ 5. Solicitar permissão de áudio
+			await navigator.mediaDevices.getUserMedia({ audio: true });
+
+			// ✅ 6. Carregar e restaurar dispositivos de áudio
+			await this.loadDevices();
+			this.restoreDevices();
+
+			// ✅ 7. Iniciar áudio se dispositivos selecionados
+			const inputSelect = document.getElementById('audio-input-device');
+			const outputSelect = document.getElementById('audio-output-device');
+
+			if (inputSelect?.value) {
+				window.RendererAPI.stopInput();
+				await window.RendererAPI.startInput();
+			}
+
+			if (outputSelect?.value) {
+				window.RendererAPI.stopOutput();
+				await window.RendererAPI.startOutput();
+			}
+
+			// ✅ 8. Sincronizar API key
+			await this.syncApiKeyOnStart();
+
+			// ✅ 9. Inicializar Click-through
+			await this.initClickThroughController();
+
+			// ✅ 10. Registrar listeners de eventos DOM
+			this.registerDOMEventListeners();
+
+			// ✅ 11. Registrar listeners de IPC
+			this.registerIPCListeners();
+
+			// ✅ 12. Registrar atalhos de teclado
+			window.RendererAPI.registerKeyboardShortcuts();
+
+			// ✅ 13. Inicializar drag handle
+			const dragHandle = document.getElementById('dragHandle');
+			if (dragHandle) {
+				window.RendererAPI.initDragHandle(dragHandle);
+			}
+
+			// ✅ 14. Registrar listeners de erro global
+			this.registerErrorHandlers();
+
+			console.log('✅ Controller inicializado com sucesso');
+		} catch (error) {
+			console.error('❌ Erro ao inicializar controller:', error);
+		}
+	}
+
+	restoreTheme() {
+		try {
+			const darkToggle = document.getElementById('darkModeToggle');
+			const savedTheme = localStorage.getItem('theme');
+
+			if (savedTheme === 'dark') {
+				document.body.classList.add('dark');
+				if (darkToggle) darkToggle.checked = true;
+			}
+
+			if (darkToggle) {
+				darkToggle.addEventListener('change', () => {
+					const isDark = darkToggle.checked;
+					document.body.classList.toggle('dark', isDark);
+					localStorage.setItem('theme', isDark ? 'dark' : 'light');
+					console.log('🌙 Dark mode:', isDark);
+				});
+			}
+		} catch (err) {
+			console.warn('⚠️ Erro ao restaurar tema:', err);
+		}
+	}
+
+	restoreOpacity() {
+		try {
+			const opacitySlider = document.getElementById('opacityRange');
+			if (!opacitySlider) return;
+
+			const savedOpacity = localStorage.getItem('overlayOpacity');
+			if (savedOpacity) {
+				opacitySlider.value = savedOpacity;
+				window.RendererAPI.applyOpacity(savedOpacity);
+			} else {
+				window.RendererAPI.applyOpacity(opacitySlider.value || 0.75);
+			}
+
+			opacitySlider.addEventListener('input', e => {
+				window.RendererAPI.applyOpacity(e.target.value);
+			});
+		} catch (err) {
+			console.warn('⚠️ Erro ao restaurar opacidade:', err);
+		}
+	}
+
+	restoreMode() {
+		try {
+			const interviewModeSelect = document.getElementById('interviewModeSelect');
+			const savedMode = localStorage.getItem('appMode') || 'NORMAL';
+
+			window.RendererAPI.changeMode(savedMode);
+			if (interviewModeSelect) {
+				interviewModeSelect.value = savedMode;
+
+				interviewModeSelect.addEventListener('change', () => {
+					const newMode = interviewModeSelect.value;
+					window.RendererAPI.changeMode(newMode);
+					localStorage.setItem('appMode', newMode);
+					console.log('🎯 Modo alterado:', newMode);
+				});
+			}
+
+			console.log('🔁 Modo restaurado:', savedMode);
+		} catch (err) {
+			console.warn('⚠️ Erro ao restaurar modo:', err);
+		}
+	}
+
+	async initClickThroughController() {
+		try {
+			const btnToggle = document.getElementById('btnToggleClick');
+			if (!btnToggle) return;
+
+			let enabled = false;
+			try {
+				const saved = localStorage.getItem('clickThroughEnabled');
+				enabled = saved === 'true';
+			} catch (err) {
+				console.warn('⚠️ Erro ao recuperar click-through state:', err);
+			}
+
+			await window.RendererAPI.setClickThrough(enabled);
+			window.RendererAPI.updateClickThroughButton(enabled, btnToggle);
+
+			btnToggle.addEventListener('click', async () => {
+				enabled = !enabled;
+				await window.RendererAPI.setClickThrough(enabled);
+				window.RendererAPI.updateClickThroughButton(enabled, btnToggle);
+				localStorage.setItem('clickThroughEnabled', enabled.toString());
+				console.log('🖱️ Click-through alternado:', enabled);
+			});
+
+			document.querySelectorAll('.interactive-zone').forEach(el => {
+				el.addEventListener('mouseenter', () => {
+					_ipc.send('SET_INTERACTIVE_ZONE', true);
+				});
+				el.addEventListener('mouseleave', () => {
+					_ipc.send('SET_INTERACTIVE_ZONE', false);
+				});
+			});
+		} catch (err) {
+			console.warn('⚠️ Erro ao inicializar click-through:', err);
+		}
+	}
+
+	registerDOMEventListeners() {
+		// Input select
+		const inputSelect = document.getElementById('audio-input-device');
+		if (inputSelect) {
+			inputSelect.addEventListener('change', async () => {
+				this.saveDevices();
+				window.RendererAPI.stopInput();
+				if (!inputSelect.value) return;
+				await window.RendererAPI.startInput();
+			});
+		}
+
+		// Output select
+		const outputSelect = document.getElementById('audio-output-device');
+		if (outputSelect) {
+			outputSelect.addEventListener('change', async () => {
+				this.saveDevices();
+				window.RendererAPI.stopOutput();
+				if (!outputSelect.value) return;
+				await window.RendererAPI.startOutput();
+			});
+		}
+
+		// Mock toggle
+		const mockToggle = document.getElementById('mockToggle');
+		if (mockToggle) {
+			mockToggle.addEventListener('change', async () => {
+				const isEnabled = mockToggle.checked;
+				window.RendererAPI.setAppConfig({ ...window.RendererAPI.getAppConfig(), MODE_DEBUG: isEnabled });
+
+				if (isEnabled) {
+					window.RendererAPI.updateMockBadge(true);
+					window.RendererAPI.resetInterviewState();
+					window.RendererAPI.updateStatus('🧪 Mock de entrevista ATIVO');
+					window.RendererAPI.startMockInterview();
+				} else {
+					window.RendererAPI.updateMockBadge(false);
+					window.RendererAPI.resetInterviewState();
+					window.RendererAPI.updateStatus('Mock desativado');
+					await window.RendererAPI.restartAudioPipeline();
+				}
+			});
+		}
+
+		// Listen button
+		const listenBtn = document.getElementById('listenBtn');
+		if (listenBtn) {
+			listenBtn.addEventListener('click', () => {
+				window.RendererAPI.listenToggleBtn();
+			});
+		}
+
+		// Ask GPT button
+		const askBtn = document.getElementById('askGptBtn');
+		if (askBtn) {
+			askBtn.addEventListener('click', () => {
+				window.RendererAPI.askGpt();
+			});
+		}
+
+		// Close button
+		const btnClose = document.getElementById('btnClose');
+		if (btnClose) {
+			btnClose.addEventListener('click', () => {
+				console.log('❌ Botão Fechar clicado');
+				_ipc.send('APP_CLOSE');
+			});
+		}
+
+		// Questions click handling
+		const questionsHistory = document.getElementById('questionsHistory');
+		if (questionsHistory) {
+			questionsHistory.addEventListener('click', e => {
+				const questionBlock = e.target.closest('.question-block');
+				if (questionBlock) {
+					const questionId = questionBlock.id;
+					window.RendererAPI.handleQuestionClick(questionId);
+				}
+			});
+		}
+	}
+
+	registerIPCListeners() {
+		// API Key updated
+		window.RendererAPI.onApiKeyUpdated((_, success) => {
+			const statusText = document.getElementById('status');
+			if (success) {
+				console.log('✅ API key atualizada com sucesso');
+				if (statusText) statusText.innerText = '✅ API key configurada com sucesso';
+
+				setTimeout(() => {
+					if (statusText && statusText.innerText.includes('API key configurada')) {
+						const listenBtn = document.getElementById('listenBtn');
+						const isRunning = listenBtn?.innerText === 'Stop';
+						statusText.innerText = isRunning ? 'Status: ouvindo...' : 'Status: parado';
+					}
+				}, 3000);
+			}
+		});
+
+		// Toggle audio (global shortcut)
+		window.RendererAPI.onToggleAudio(() => {
+			window.RendererAPI.listenToggleBtn();
+		});
+
+		// Ask GPT (global shortcut)
+		window.RendererAPI.onAskGpt(() => {
+			window.RendererAPI.askGpt();
+		});
+
+		// GPT Stream chunks
+		window.RendererAPI.onGptStreamChunk((_,  token) => {
+			// Handled in renderer service
+		});
+
+		// GPT Stream end
+		window.RendererAPI.onGptStreamEnd(() => {
+			// Handled in renderer service
+		});
+	}
+
+	registerErrorHandlers() {
+		window.addEventListener('error', e => {
+			window.RendererAPI.sendRendererError({
+				message: String(e.message || e),
+				stack: e.error?.stack || null,
+			});
+		});
+
+		window.addEventListener('unhandledrejection', e => {
+			window.RendererAPI.sendRendererError({
+				message: String(e.reason),
+				stack: e.reason?.stack || null,
+			});
+		});
+	}
 }
 
 // 🔥 MODIFICADO: Remove inicialização antiga de API key
 document.addEventListener('DOMContentLoaded', async () => {
 	console.log('🚀 Inicializando ConfigManager...');
+
+	// 🔥 Espera pela disponibilidade de RendererAPI (carregado via renderer.js)
+	let attempts = 0;
+	while (!window.RendererAPI && attempts < 50) {
+		await new Promise(resolve => setTimeout(resolve, 100));
+		attempts++;
+	}
+
+	if (!window.RendererAPI) {
+		console.error('❌ RendererAPI não foi carregado após timeout');
+		return;
+	}
+
 	window.configManager = new ConfigManager();
 
 	// 🔥 NOVO: Aguarda verificação inicial das API keys
@@ -909,4 +1255,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 	window.configManager.updateModelStatusUI();
 
 	console.log('✅ ConfigManager inicializado com sucesso');
+
+	// ======================================================
+	// 🔥 CONTROLLER INITIALIZATION
+	// All event listeners and renderer service calls
+	// ======================================================
+
+	await window.configManager.initializeController();
 });
