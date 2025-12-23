@@ -1,0 +1,27 @@
+{
+	"name": "askme",
+	"version": "1.0.0",
+	"description": "",
+	"main": "main.js",
+	"scripts": {
+		"start": "cross-env NODE_ENV=development electron .",
+		"build": "cross-env NODE_ENV=production electron .",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC",
+	"type": "commonjs",
+	"devDependencies": {
+		"cross-env": "^10.1.0",
+		"electron": "^39.2.7",
+		"electron-reload": "^2.0.0-alpha.1"
+	},
+	"dependencies": {
+		"electron-store": "^11.0.2",
+		"highlight.js": "^11.11.1",
+		"marked": "^17.0.1",
+		"openai": "^6.10.0",
+		"wav": "^1.0.2"
+	}
+}

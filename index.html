@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>AskMe</title>
+    <link rel="stylesheet" href="./styles.css">
+    <!-- Ícones Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+
+<body>
+
+    <!-- MENU LATERAL -->
+    <nav id="sideMenu" class="side-menu interactive-zone">
+
+        <!-- DRAG HANDLE -->
+        <div id="dragHandle" class="menu-header">
+            <span class="menu-icon material-icons">open_with</span>
+            <span class="menu-item-text none">Drag Handle</span>
+        </div>
+
+        <div id="btnToggleClick" class="menu-header">
+            <span class="menu-icon material-icons">swipe</span>
+            <span class="menu-item-text none">Click-through</span>
+        </div>
+
+        <ul class="menu-items">
+            <li class="menu-item active" data-tab="home">
+                <span class="menu-item-icon material-icons">home</span>
+                <span class="menu-item-text none">Inicio</span>
+            </li>
+            <li class="menu-item" data-tab="api-models">
+                <span class="menu-item-icon material-icons">api</span>
+                <span class="menu-item-text none">API e Modelos</span>
+            </li>
+            <li class="menu-item" data-tab="audio-screen">
+                <span class="menu-item-icon material-icons">mic</span>
+                <span class="menu-item-text none">Áudio e Tela</span>
+            </li>
+            <li class="menu-item" data-tab="privacy">
+                <span class="menu-item-icon material-icons">security</span>
+                <span class="menu-item-text none">Privacidade</span>
+            </li>
+            <li class="menu-item" data-tab="other">
+                <span class="menu-item-icon material-icons">more_horiz</span>
+                <span class="menu-item-text none">Outros</span>
+            </li>
+            <li class="menu-item" data-tab="info">
+                <span class="menu-item-icon material-icons">info</span>
+                <span class="menu-item-text none">v1.0.0</span>
+            </li>
+        </ul>
+
+        <div id="btnClose" class="menu-footer danger">
+            <span class="menu-item-icon material-icons">power_settings_new</span>
+            <span class="menu-item-text none">Sair</span>
+        </div>
+    </nav>
+
+    <!-- 🔝 TOP BAR -->
+    <div id="topBar">
+        <div class="top-bar-title">AskMe</div>
+
+        <!-- MOCK BADGE -->
+        <div id="mockBadge" class="mock-badge hidden">
+            🧪 MODO MOCK ATIVADO!!!
+        </div>
+
+        <!-- 🔎 CONTROLE DE OPACIDADE DO OVERLAY -->
+        <div class="opacity-control interactive-zone">
+            <!-- <span class="menu-icon material-icons">opacity</span> -->
+            <input type="range" id="opacityRange" min="0.1" max="1" step="0.01" value="0.75" />
+        </div>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL -->
+    <div id="mainContent">
+
+        <div id="configSections">
+
+            <!-- HOME -->
+            <section id="home" class="config-section active">
+
+                <div class="config-form">
+                    <div class="form-group">
+                        <span id="status">Status: parado</span>
+                    </div>
+
+                    <div class="form-group config-home">
+                        <!-- PERGUNTAS (ESQUERDA) -->
+                        <div id="questions">
+
+                            <button id="listenBtn" class="btn-activate">Começar a Ouvir... (Ctrl+d)</button>
+
+                            <div id="transcriptionContainer">
+                                <strong>Transcrição</strong>
+                                <div id="conversation"></div>
+                            </div>
+
+                            <div
+                                style="border-bottom: 1px solid #ccc;min-height: 32px;display: flex;justify-content: space-around;align-items: center; color: rgb(var(--text-main-rgb));">
+                                <strong>❔ Perguntas Consolidadas</strong>
+                            </div>
+
+                            <div id="currentQuestion">
+                                <span id="currentQuestionText"></span>
+                            </div>
+
+                            <div id="questionsHistory"></div>
+                        </div>
+
+                        <!-- RESPOSTAS (DIREITA) -->
+                        <div id="answers">
+                            <div
+                                style="border-bottom: 1px solid #ccc; height: 32px;display: flex;justify-content: space-between;align-items: center;padding:0 8px; color: rgb(var(--text-main-rgb));">
+
+                                <strong>🤖 Respostas GPT</strong>
+
+                                <button id="askGptBtn" class="btn-ask-gpt">
+                                    <span class="material-icons">forward</span>
+                                    Gerar resposta (Ctrl+Enter)
+                                </button>
+                            </div>
+
+                            <div id="answersHistory"></div>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+
+            <!-- API e Modelos -->
+            <section id="api-models" class="config-section">
+                <h2><span class="material-icons">api</span> API e Modelos</h2>
+
+                <div class="config-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="openai">OpenAI</button>
+                        <button class="tab-button" data-tab="google">Google</button>
+                        <button class="tab-button" data-tab="openrouter">OpenRouter</button>
+                        <button class="tab-button" data-tab="custom">Custom API</button>
+                    </div>
+
+                    <div class="tab-content">
+                        <!-- OpenAI Tab -->
+                        <div id="openai" class="tab-pane active">
+                            <div class="config-form">
+                                <div class="form-group">
+                                    <label>Status do Modelo:</label>
+                                    <div class="model-status">
+                                        <span class="status-badge active">Ativo</span>
+                                        <button class="btn-activate" data-model="openai">Desativar</button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="openai-api-key">Chave da API:</label>
+                                    <div class="input-with-action">
+                                        <input type="password" id="openai-api-key" placeholder="Insira sua API key"
+                                            class="api-key-input" autocomplete="off" data-has-key="false">
+                                        <button class="btn-toggle-visibility" data-target="openai-api-key">
+                                            <span class="material-icons">visibility</span>
+                                        </button>
+                                        <!-- 🔥 NOVO: Botão para deletar API key -->
+                                        <button class="btn-delete-api-key" data-provider="openai"
+                                            title="Remover API key">
+                                            <span class="material-icons">delete</span>
+                                        </button>
+                                    </div>
+                                    <small>🔒 Sua chave é armazenada de forma criptografada localmente. Não é possível
+                                        copiar ou visualizar a chave após salvar.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="openai-transcription-model">Modelo de Transcrição (STT):</label>
+                                    <input type="text" id="openai-transcription-model" value="whisper-1"
+                                        placeholder="Ex: whisper-1">
+                                    <small>Modelo usado para converter áudio em texto (Speech-to-Text).</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="openai-response-model">Modelo de Resposta (GPT):</label>
+                                    <input type="text" id="openai-response-model" value="gpt-4o-mini"
+                                        placeholder="Ex: gpt-4o-mini, gpt-4, gpt-3.5-turbo">
+                                    <small>Modelo usado para gerar respostas às perguntas.</small>
+                                </div>
+
+                                <div class="action-buttons">
+                                    <button class="btn-save" data-section="openai">
+                                        <span class="material-icons">save</span>
+                                        Salvar Configurações
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Google Tab -->
+                        <div id="google" class="tab-pane">
+                            <div class="config-form">
+                                <div class="form-group">
+                                    <label>Status do Modelo:</label>
+                                    <div class="model-status">
+                                        <span class="status-badge inactive">Inativo</span>
+                                        <button class="btn-activate" data-model="google">Ativar</button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="google-api-key">Chave da API:</label>
+                                    <div class="input-with-action">
+                                        <input type="password" id="google-api-key" placeholder="Insira sua API key"
+                                            class="api-key-input" autocomplete="off" data-has-key="false">
+                                        <button class="btn-toggle-visibility" data-target="google-api-key">
+                                            <span class="material-icons">visibility</span>
+                                        </button>
+                                        <!-- 🔥 NOVO: Botão para deletar API key -->
+                                        <button class="btn-delete-api-key" data-provider="google"
+                                            title="Remover API key">
+                                            <span class="material-icons">delete</span>
+                                        </button>
+                                    </div>
+                                    <small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
+                                </div>
+
+                                <!-- 🔥 NOVO: Campo de modelo de transcrição -->
+                                <div class="form-group">
+                                    <label for="google-transcription-model">Modelo de Transcrição (STT):</label>
+                                    <input type="text" id="google-transcription-model" value=""
+                                        placeholder="Ex: chirp (se disponível)">
+                                    <small>Deixe vazio se o Google não oferecer modelo de transcrição
+                                        específico.</small>
+                                </div>
+
+                                <!-- 🔥 MODIFICADO: Campo de modelo de resposta -->
+                                <div class="form-group">
+                                    <label for="google-response-model">Modelo de Resposta:</label>
+                                    <input type="text" id="google-response-model" value="gemini-pro"
+                                        placeholder="Ex: gemini-pro, gemini-1.5-pro">
+                                    <small>Modelo Gemini usado para gerar respostas.</small>
+                                </div>
+
+                                <div class="action-buttons">
+                                    <button class="btn-save" data-section="google">
+                                        <span class="material-icons">save</span>
+                                        Salvar Configurações
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- OpenRouter Tab -->
+                        <div id="openrouter" class="tab-pane">
+                            <div class="config-form">
+                                <div class="form-group">
+                                    <label>Status do Modelo:</label>
+                                    <div class="model-status">
+                                        <span class="status-badge inactive">Inativo</span>
+                                        <button class="btn-activate" data-model="openrouter">Ativar</button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="openrouter-api-key">Chave da API:</label>
+                                    <div class="input-with-action">
+                                        <input type="password" id="openrouter-api-key" placeholder="Insira sua API key"
+                                            class="api-key-input" autocomplete="off" data-has-key="false">
+                                        <button class="btn-toggle-visibility" data-target="openrouter-api-key">
+                                            <span class="material-icons">visibility</span>
+                                        </button>
+                                        <!-- 🔥 NOVO: Botão para deletar API key -->
+                                        <button class="btn-delete-api-key" data-provider="openrouter"
+                                            title="Remover API key">
+                                            <span class="material-icons">delete</span>
+                                        </button>
+                                    </div>
+                                    <small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="openrouter-transcription-model">Modelo de Transcrição (STT):</label>
+                                    <input type="text" id="openrouter-transcription-model" value=""
+                                        placeholder="Ex: openai/whisper-large-v3">
+                                    <small>Modelo de transcrição disponível via OpenRouter (se aplicável).</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="openrouter-response-model">Modelo de Resposta:</label>
+                                    <input type="text" id="openrouter-response-model" value=""
+                                        placeholder="Ex: anthropic/claude-3-opus">
+                                    <small>Modelo usado para gerar respostas via OpenRouter.</small>
+                                </div>
+
+                                <div class="action-buttons">
+                                    <button class="btn-save" data-section="openrouter">
+                                        <span class="material-icons">save</span>
+                                        Salvar Configurações
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Custom API Tab -->
+                        <div id="custom" class="tab-pane">
+                            <div class="config-form">
+                                <div class="form-group">
+                                    <label>Status do Modelo:</label>
+                                    <div class="model-status">
+                                        <span class="status-badge inactive">Inativo</span>
+                                        <button class="btn-activate" data-model="custom">Ativar</button>
+                                    </div>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="custom-api-key">Chave da API:</label>
+                                    <div class="input-with-action">
+                                        <input type="password" id="custom-api-key" placeholder="Insira sua API key"
+                                            class="api-key-input" autocomplete="off" data-has-key="false">
+                                        <button class="btn-toggle-visibility" data-target="custom-api-key">
+                                            <span class="material-icons">visibility</span>
+                                        </button>
+                                        <!-- 🔥 NOVO: Botão para deletar API key -->
+                                        <button class="btn-delete-api-key" data-provider="custom"
+                                            title="Remover API key">
+                                            <span class="material-icons">delete</span>
+                                        </button>
+                                    </div>
+                                    <small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="custom-endpoint">Endpoint da API:</label>
+                                    <input type="text" id="custom-endpoint" value=""
+                                        placeholder="Ex: https://api.exemplo.com/v1">
+                                    <small>URL base da sua API customizada.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="custom-transcription-model">Modelo de Transcrição (STT):</label>
+                                    <input type="text" id="custom-transcription-model" value=""
+                                        placeholder="Ex: whisper-model">
+                                    <small>Modelo de transcrição da sua API customizada.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="custom-response-model">Modelo de Resposta:</label>
+                                    <input type="text" id="custom-response-model" value=""
+                                        placeholder="Ex: custom-gpt-model">
+                                    <small>Modelo de resposta da sua API customizada.</small>
+                                </div>
+
+                                <div class="action-buttons">
+                                    <button class="btn-save" data-section="custom">
+                                        <span class="material-icons">save</span>
+                                        Salvar Configurações
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Áudio e Tela -->
+            <section id="audio-screen" class="config-section">
+                <h2><span class="material-icons">mic</span> Áudio e Tela</h2>
+
+                <div class="config-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-button active" data-tab="audio-config">Áudio</button>
+                        <button class="tab-button" data-tab="screen-config">Captura de Tela</button>
+                    </div>
+
+                    <div class="tab-content">
+                        <div id="audio-config" class="tab-pane active">
+                            <div class="config-form">
+                                <!-- 🎤 SELEÇÃO DE DISPOSITIVO DE ENTRADA -->
+                                <div class="form-group">
+                                    <label for="audio-input-device">Dispositivo de Entrada (Microfone):</label>
+                                    <select id="audio-input-device" class="device-select"></select>
+                                    <small>Selecione o microfone ou fonte de áudio para captura de entrada.</small>
+                                </div>
+
+                                <!-- 📊 VU METER DE ENTRADA -->
+                                <div class="form-group">
+                                    <label>Nível de Volume (Entrada):</label>
+                                    <div class="vu-meter">
+                                        <div id="micVu" class="vu-fill"></div>
+                                    </div>
+                                    <small>Indicador visual do volume capturado pelo dispositivo de entrada.</small>
+                                </div>
+
+                                <!-- 🔊 SELEÇÃO DE DISPOSITIVO DE SAÍDA -->
+                                <div class="form-group">
+                                    <label for="audio-output-device">Dispositivo de Saída (VoiceMeeter/Output):</label>
+                                    <select id="audio-output-device" class="device-select"></select>
+                                    <small>Selecione a fonte de áudio de saída (ex: VoiceMeeter Output) para monitorar
+                                        outros participantes.</small>
+                                </div>
+
+                                <!-- 📊 VU METER DE SAÍDA -->
+                                <div class="form-group">
+                                    <label>Nível de Volume (Saída):</label>
+                                    <div class="vu-meter">
+                                        <div id="outVu" class="vu-fill"></div>
+                                    </div>
+                                    <small>Indicador visual do volume capturado do dispositivo de saída.</small>
+                                </div>
+
+                                <!-- ✅ DETECÇÃO AUTOMÁTICA (mantido do código original) -->
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="auto-detect-devices">
+                                        Detectar dispositivos automaticamente
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="screen-config" class="tab-pane">
+                            <div class="config-form">
+                                <div class="form-group">
+                                    <label for="screenshot-hotkey">Atalho para Screenshot:</label>
+                                    <input type="text" id="screenshot-hotkey" value="Ctrl+Shift+S" readonly
+                                        class="hotkey-input">
+                                    <button class="btn-record-hotkey">Gravar Atalho</button>
+                                </div>
+
+                                <div class="form-group">
+                                    <label>
+                                        <input type="checkbox" id="exclude-app-from-screenshot">
+                                        Excluir esta aplicação das capturas de tela
+                                    </label>
+                                    <small>Quando ativado, o app será invisível para screenshots de outros
+                                        aplicativos.</small>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="screenshot-format">Formato da Imagem:</label>
+                                    <select id="screenshot-format">
+                                        <option value="png">PNG (maior qualidade)</option>
+                                        <option value="jpg">JPG (menor tamanho)</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Privacidade -->
+            <section id="privacy" class="config-section">
+                <h2><span class="material-icons">security</span> Privacidade</h2>
+
+                <div class="config-form">
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="hide-from-screen-capture">
+                            Ocultar aplicativo de capturas de tela
+                        </label>
+                        <small>Quando ativado, outras aplicações não conseguirão capturar esta janela.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="disable-telemetry">
+                            Desativar telemetria anônima
+                        </label>
+                        <small>Impede o envio de dados de uso para melhorias no produto.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-clear-data">
+                            Limpar dados automaticamente ao fechar
+                        </label>
+                        <small>Remove áudios e transcrições temporárias ao encerrar o app.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="data-retention-days">Retenção de Dados:</label>
+                        <select id="data-retention-days">
+                            <option value="1">1 dia</option>
+                            <option value="7" selected>7 dias</option>
+                            <option value="30">30 dias</option>
+                            <option value="0">Nunca excluir</option>
+                        </select>
+                    </div>
+
+                    <button class="btn-save" data-section="privacy">
+                        <span class="material-icons">save</span>
+                        Salvar Configurações de Privacidade
+                    </button>
+                </div>
+            </section>
+
+            <!-- Outros -->
+            <section id="other" class="config-section">
+                <h2><span class="material-icons">more_horiz</span> Outras Configurações</h2>
+
+                <div class="config-form">
+
+                    <div class="form-group">
+                        <!-- Modo (combobox) abaixo do mock -->
+                        <label for="interviewModeSelect">Modo Perguntas:</label>
+                        <select id="interviewModeSelect" class="interactive-zone">
+                            <option value="NORMAL">Padrão</option>
+                            <option value="INTERVIEW" selected>Entrevista</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="language">Idioma da Interface:</label>
+                        <select id="language">
+                            <option value="pt-BR" selected>Português (Brasil)</option>
+                            <option value="en-US">English (US)</option>
+                            <option value="es-ES">Español</option>
+                        </select>
+                    </div>
+
+                    <!-- <div class="form-group">
+                        <label for="theme">Tema:</label>
+                        <select id="theme">
+                            <option value="auto">Automático (sistema)</option>
+                            <option value="light">Claro</option>
+                            <option value="dark">Escuro</option>
+                        </select>
+                    </div> -->
+
+                    <div class="form-group" style="display:flex; gap:16px;">
+                        <!-- 🌙 TOGGLE DARK MODE -->
+                        <div class="controls-mock interactive-zone">
+                            <label>Dark Mode</label>
+                            <label class="switch">
+                                <input type="checkbox" id="darkModeToggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+
+                        <!-- Modo Mock -->
+                        <div class="controls-mock interactive-zone">
+                            <label>Modo Mock</label>
+                            <label class="switch">
+                                <input type="checkbox" id="mockToggle">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto-update">
+                            Buscar atualizações automaticamente
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="log-level">Nível de Log:</label>
+                        <select id="log-level">
+                            <option value="error">Somente erros</option>
+                            <option value="warn">Avisos e erros</option>
+                            <option value="info" selected>Informacional</option>
+                            <option value="debug">Debug (detalhado)</option>
+                        </select>
+                    </div>
+
+                    <!-- <div class="action-buttons">
+                        <button class="btn-export-config">
+                            <span class="material-icons">download</span>
+                            Exportar Configurações
+                        </button>
+                        <button class="btn-import-config">
+                            <span class="material-icons">upload</span>
+                            Importar Configurações
+                        </button>
+                        <button class="btn-reset-config danger">
+                            <span class="material-icons">delete</span>
+                            Restaurar Padrões
+                        </button>
+                    </div> -->
+                </div>
+
+                <!-- <div id="controls">
+                    <div class="controls-top">
+
+                        <div class="controls-mock">
+                           
+                        </div>
+                    </div>
+                </div> -->
+
+            </section>
+
+            <!-- Info -->
+            <section id="info" class="config-section">
+                <h2><span class="material-icons">info</span> Info</h2>
+
+                <div class="config-form">
+
+                    <div class="form-group">
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <script src="./config-manager.js"></script>
+    <script src="./renderer.js"></script>
+</body>
+
+</html>
