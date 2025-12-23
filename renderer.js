@@ -93,30 +93,80 @@ let lastInputPlaceholderEl = null;
 let lastOutputPlaceholderEl = null;
 
 /* ===============================
-   ELEMENTOS UI
+   CALLBACKS / OBSERVERS SYSTEM
+   renderer.js é "cego" para DOM
+   config-manager.js se inscreve em mudanças
 =============================== */
 
-const inputSelect = document.getElementById('audio-input-device');
-const outputSelect = document.getElementById('audio-output-device');
-const listenBtn = document.getElementById('listenBtn');
-const statusText = document.getElementById('status');
-const transcriptionBox = document.getElementById('conversation');
-const currentQuestionBox = document.getElementById('currentQuestion');
-const currentQuestionTextBox = document.getElementById('currentQuestionText');
-const questionsHistoryBox = document.getElementById('questionsHistory');
-const answersHistoryBox = document.getElementById('answersHistory');
-const askBtn = document.getElementById('askGptBtn');
-const inputVu = document.getElementById('micVu');
-const outVu = document.getElementById('outVu');
-const mockToggle = document.getElementById('mockToggle');
-const mockBadge = document.getElementById('mockBadge');
-const interviewModeSelect = document.getElementById('interviewModeSelect');
-const btnClose = document.getElementById('btnClose');
-const btnToggleClick = document.getElementById('btnToggleClick');
-const interactiveZones = document.querySelectorAll('.interactive-zone');
-const dragHandle = document.getElementById('dragHandle');
-const darkToggle = document.getElementById('darkModeToggle');
-const opacitySlider = document.getElementById('opacityRange');
+const UICallbacks = {
+	onTranscriptAdd: null,
+	onCurrentQuestionUpdate: null,
+	onQuestionsHistoryUpdate: null,
+	onAnswerAdd: null,
+	onStatusUpdate: null,
+	onInputVolumeUpdate: null,
+	onOutputVolumeUpdate: null,
+	onMockBadgeUpdate: null,
+	onDOMElementsReady: null, // callback para pedir elementos ao config-manager
+	onListenButtonToggle: null,
+	onAnswerSelected: null,
+	onClearAllSelections: null,
+	onScrollToQuestion: null,
+	onTranscriptionCleared: null,
+	onAnswersCleared: null,
+	onAnswerStreamChunk: null,
+	onModeSelectUpdate: null,
+	onPlaceholderFulfill: null,
+};
+
+// Função para config-manager se inscrever em eventos
+function onUIChange(eventName, callback) {
+	if (UICallbacks.hasOwnProperty(eventName)) {
+		UICallbacks[eventName] = callback;
+		console.log(`📡 UI callback registrado: ${eventName}`);
+	}
+}
+
+// Dispara um callback com dados
+function emitUIChange(eventName, data) {
+	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
+		UICallbacks[eventName](data);
+	}
+}
+
+/* ===============================
+   ELEMENTOS UI - Solicitado por callback
+   (config-manager.js fornece esses elementos)
+=============================== */
+
+let UIElements = {
+	inputSelect: null,
+	outputSelect: null,
+	listenBtn: null,
+	statusText: null,
+	transcriptionBox: null, // Mantido para compatibilidade, mas pode receber 'conversation'
+	currentQuestionBox: null,
+	currentQuestionTextBox: null,
+	questionsHistoryBox: null,
+	answersHistoryBox: null,
+	askBtn: null,
+	inputVu: null,
+	outVu: null,
+	mockToggle: null,
+	mockBadge: null,
+	interviewModeSelect: null,
+	btnClose: null,
+	btnToggleClick: null,
+	dragHandle: null,
+	darkToggle: null,
+	opacitySlider: null,
+};
+
+// config-manager.js chama isso para registrar elementos
+function registerUIElements(elements) {
+	UIElements = { ...UIElements, ...elements };
+	console.log('✅ UI Elements registrados no renderer');
+}
 
 /* ===============================
    MODO / ORQUESTRADOR
@@ -281,10 +331,13 @@ function getNavigableQuestionIds() {
 }
 
 function findAnswerByQuestionId(questionId) {
-	return answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+	// Rastreia respostas internamente (não acessa DOM)
+	// Mantém um mapa de questionId -> answerData
+	// Por enquanto, retorna null se não encontrado
+	return null;
 }
 
-function promoteCurrentToHistory(text, wrapper) {
+function promoteCurrentToHistory(text) {
 	console.log('📚 promovendo pergunta para histórico:', text);
 
 	// evita duplicação no histórico: se a última entrada é igual (normalizada), não adiciona
@@ -301,21 +354,6 @@ function promoteCurrentToHistory(text, wrapper) {
 			selectedQuestionId = prevSelected;
 		}
 
-		// Se recebemos um wrapper (resposta em construção), associa-o ao item
-		// existente do histórico para evitar que cliques futuros reenviem o mesmo
-		try {
-			if (wrapper && wrapper.dataset) {
-				wrapper.dataset.questionId = last.id;
-				// se já existe uma resposta antiga vinculada a esse questionId, remove-a
-				const existingAnswer = findAnswerByQuestionId(last.id);
-				if (existingAnswer && existingAnswer !== wrapper) {
-					existingAnswer.remove();
-				}
-			}
-		} catch (err) {
-			console.warn('⚠️ falha ao associar wrapper ao histórico (skip promotion)', err);
-		}
-
 		renderQuestionsHistory();
 		renderCurrentQuestion();
 		return;
@@ -328,8 +366,6 @@ function promoteCurrentToHistory(text, wrapper) {
 		text,
 		createdAt: currentQuestion.createdAt || Date.now(),
 	});
-
-	wrapper.dataset.questionId = newId;
 
 	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
 	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
@@ -414,15 +450,15 @@ function isEndingPhrase(text) {
 =============================== */
 
 async function startAudio() {
-	if (!inputSelect.value && !outputSelect.value) {
-		statusText.innerText = 'Status: selecione um dispositivo';
+	if (!UIElements.inputSelect?.value && !UIElements.outputSelect?.value) {
+		updateStatusMessage('Status: selecione um dispositivo');
 		return;
 	}
 
 	audioContext = new AudioContext();
 
-	if (inputSelect.value) await startInput();
-	if (outputSelect.value) await startOutput();
+	if (UIElements.inputSelect?.value) await startInput();
+	if (UIElements.outputSelect?.value) await startOutput();
 }
 
 async function stopAudio() {
@@ -438,7 +474,7 @@ async function restartAudioPipeline() {
 	stopOutputMonitor();
 
 	// 🔥 reinicia pipeline, mas NÃO liga escuta
-	if (inputSelect.value || outputSelect.value) {
+	if (UIElements.inputSelect?.value || UIElements.outputSelect?.value) {
 		await startAudio();
 	}
 }
@@ -450,11 +486,11 @@ async function restartAudioPipeline() {
 async function startInput() {
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
-		addTranscript(YOU, text);
+		addTranscript('Você', text);
 		return;
 	}
 
-	if (!inputSelect.value) return;
+	if (!UIElements.inputSelect?.value) return;
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
@@ -464,7 +500,7 @@ async function startInput() {
 	if (inputStream) return;
 
 	inputStream = await navigator.mediaDevices.getUserMedia({
-		audio: { deviceId: { exact: inputSelect.value } },
+		audio: { deviceId: { exact: UIElements.inputSelect.value } },
 	});
 
 	const source = audioContext.createMediaStreamSource(inputStream);
@@ -518,7 +554,9 @@ function updateInputVolume() {
 	inputAnalyser.getByteFrequencyData(inputData);
 	const avg = inputData.reduce((a, b) => a + b, 0) / inputData.length;
 	const percent = Math.min(100, Math.round((avg / 80) * 100));
-	inputVu.style.width = percent + '%';
+
+	// 🔥 Emite evento em vez de atualizar DOM diretamente
+	emitUIChange('onInputVolumeUpdate', { percent });
 
 	if (avg > INPUT_SPEECH_THRESHOLD && inputRecorder && isRunning) {
 		if (!inputSpeaking) {
@@ -557,7 +595,7 @@ function stopInputMonitor() {
 
 	inputAnalyser = null;
 	inputData = null;
-	inputVu.style.width = '0%';
+	emitUIChange('onInputVolumeUpdate', { percent: 0 });
 }
 
 /* ===============================
@@ -567,11 +605,11 @@ function stopInputMonitor() {
 async function startOutput() {
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
-		addTranscript(OTHER, text);
+		addTranscript('Outros', text);
 		return;
 	}
 
-	if (!outputSelect.value) return;
+	if (!UIElements.outputSelect?.value) return;
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
@@ -581,7 +619,7 @@ async function startOutput() {
 	if (outputStream) return;
 
 	outputStream = await navigator.mediaDevices.getUserMedia({
-		audio: { deviceId: { exact: outputSelect.value } },
+		audio: { deviceId: { exact: UIElements.outputSelect.value } },
 	});
 
 	const source = audioContext.createMediaStreamSource(outputStream);
@@ -635,7 +673,9 @@ function updateOutputVolume() {
 	outputAnalyser.getByteFrequencyData(outputData);
 	const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
 	const percent = Math.min(100, Math.round((avg / 60) * 100));
-	outVu.style.width = percent + '%';
+
+	// 🔥 Emite evento em vez de atualizar DOM diretamente
+	emitUIChange('onOutputVolumeUpdate', { percent });
 
 	if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
 		if (!outputSpeaking) {
@@ -674,7 +714,7 @@ function stopOutputMonitor() {
 
 	outputAnalyser = null;
 	outputData = null;
-	outVu.style.width = '0%';
+	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
 }
 
 /* ===============================
@@ -838,7 +878,7 @@ async function transcribeInput() {
 	console.log('timing: ipc_stt_roundtrip', Date.now() - tSend, 'ms');
 	if (!text || isGarbageSentence(text)) return;
 
-	// Se existia um placeholder (timestamp do stop), atualiza esse placeholder com o texto final e latência
+	// Se existia um placeholder (timestamp do stop), calcula métricas e emite evento para atualizar
 	if (lastInputPlaceholderEl && lastInputPlaceholderEl.dataset) {
 		const stop = lastInputPlaceholderEl.dataset.stopAt
 			? Number(lastInputPlaceholderEl.dataset.stopAt)
@@ -853,17 +893,16 @@ async function transcribeInput() {
 		const startStr = new Date(start).toLocaleTimeString();
 		const stopStr = new Date(stop).toLocaleTimeString();
 
-		// linha principal: usa o horário do stop como carimbo final
-		lastInputPlaceholderEl.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${YOU}:</strong> ${text}`;
-
-		// linha secundária (metadados) discreta com start-stop e métricas
-		const meta = document.createElement('div');
-		meta.style.fontSize = '0.8em';
-		meta.style.color = '#888';
-		meta.style.marginTop = '2px';
-		meta.style.marginBottom = '2px';
-		meta.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
-		lastInputPlaceholderEl.appendChild(meta);
+		// Emite para config-manager atualizar o placeholder com texto final e métricas
+		emitUIChange('onPlaceholderFulfill', {
+			speaker: YOU,
+			text,
+			stopStr,
+			startStr,
+			recordingDuration,
+			latency,
+			total,
+		});
 
 		lastInputPlaceholderEl = null;
 		lastInputStopAt = null;
@@ -912,17 +951,16 @@ async function transcribeOutput() {
 		const startStr = new Date(start).toLocaleTimeString();
 		const stopStr = new Date(stop).toLocaleTimeString();
 
-		// linha principal: usa o horário do stop como carimbo final
-		lastOutputPlaceholderEl.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${OTHER}:</strong> ${text}`;
-
-		// linha secundária (metadados) discreta com start-stop e métricas
-		const metaOut = document.createElement('div');
-		metaOut.style.fontSize = '0.8em';
-		metaOut.style.color = '#888';
-		metaOut.style.marginTop = '2px';
-		metaOut.style.marginBottom = '2px';
-		metaOut.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
-		lastOutputPlaceholderEl.appendChild(metaOut);
+		// Emite para config-manager atualizar o placeholder com texto final e métricas
+		emitUIChange('onPlaceholderFulfill', {
+			speaker: OTHER,
+			text,
+			stopStr,
+			startStr,
+			recordingDuration,
+			latency,
+			total,
+		});
 
 		lastOutputPlaceholderEl = null;
 		lastOutputStopAt = null;
@@ -964,7 +1002,7 @@ function handleSpeech(author, text) {
 			console.log(
 				'ℹ️ Questão anterior finalizada — promovendo para a história e continuando a processar o novo discurso.',
 			);
-			promoteCurrentToHistory(currentQuestion.text, document.createElement('div'));
+			promoteCurrentToHistory(currentQuestion.text);
 		}
 
 		if (currentQuestion.text && now - currentQuestion.lastUpdate > QUESTION_IDLE_TIMEOUT) {
@@ -1077,7 +1115,7 @@ function closeCurrentQuestion() {
 	} else {
 		// MODO NORMAL — não pergunta automaticamente ao GPT; promove para histórico e libera CURRENT
 		console.log('🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT');
-		promoteCurrentToHistory(currentQuestion.text, document.createElement('div'));
+		promoteCurrentToHistory(currentQuestion.text);
 	}
 }
 
@@ -1134,7 +1172,7 @@ async function syncApiKeyOnStart() {
 		if (status.initialized) {
 			console.log('✅ Cliente OpenAI já inicializado no main process');
 		} else {
-			statusText.innerText = '❌ API key não configurada. Configure em "API e Modelos" → OpenAI';
+			updateStatusMessage('❌ API key não configurada. Configure em "API e Modelos" → OpenAI');
 			console.log('⚠️ Cliente OpenAI não inicializado - Usuário precisa configurar uma chave');
 		}
 	} catch (err) {
@@ -1149,7 +1187,7 @@ async function askGpt() {
 	const text = getSelectedQuestionText();
 
 	if (!text || text.trim().length < 5) {
-		statusText.innerText = '⚠️ Pergunta vazia ou incompleta';
+		updateStatusMessage('⚠️ Pergunta vazia ou incompleta');
 		return;
 	}
 
@@ -1160,32 +1198,27 @@ async function askGpt() {
 	if (ModeController.isInterviewMode() && !isCurrent) {
 		const existingAnswer = findAnswerByQuestionId(questionId);
 		if (existingAnswer) {
-			answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => el.classList.remove('active'));
-			existingAnswer.classList.add('active');
-			existingAnswer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			statusText.innerText = '📌 Essa pergunta já foi respondida';
+			emitUIChange('onAnswerAdd', {
+				questionId,
+				action: 'showExisting',
+			});
+			updateStatusMessage('📌 Essa pergunta já foi respondida');
 			return;
 		}
 	}
 
 	// limpa destaque
-	answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => el.classList.remove('active'));
+	emitUIChange('onAnswerAdd', {
+		questionId,
+		action: 'clearActive',
+	});
 
-	const wrapper = document.createElement('div');
-	wrapper.className = 'answer-block';
-	wrapper.dataset.questionId = questionId;
-	wrapper.innerHTML = `
-		<div class="answer-question">
-			❓ ${text}
-		</div>
-		<div class="answer-content">
-			🤖 Respondendo...
-		</div>
-	`;
-
-	wrapper.classList.add('active');
-	answersHistoryBox.appendChild(wrapper);
-	wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+	// 🔥 Apenas emite que precisa adicionar novo answer - config-manager cria DOM
+	emitUIChange('onAnswerAdd', {
+		questionId,
+		action: 'new',
+		text,
+	});
 
 	// log temporario para testar a aplicação só remover depois
 	console.log('🤖 askGpt chamado | questionId:', selectedQuestionId);
@@ -1209,13 +1242,13 @@ async function askGpt() {
 
 	// 🧪 DEBUG
 	if (APP_CONFIG.MODE_DEBUG) {
-		statusText.innerText = '🧪 Pergunta enviada ao GPT (modo teste)';
+		updateStatusMessage('🧪 Pergunta enviada ao GPT (modo teste)');
 
 		const mock = getMockGptAnswer(text);
-		renderGptAnswer(wrapper, mock);
+		renderGptAnswer(null, mock);
 
 		if (isCurrent && gptRequestedTurnId === interviewTurnId) {
-			promoteCurrentToHistory(text, wrapper);
+			promoteCurrentToHistory(text);
 			resetInterviewTurnState();
 		}
 
@@ -1230,8 +1263,6 @@ async function askGpt() {
 		const gptStartAt = ENABLE_INTERVIEW_TIMING_DEBUG ? Date.now() : null;
 		let streamedText = '';
 
-		const answerContent = wrapper.querySelector('.answer-content');
-
 		console.log('⏳ enviando para o GPT via stream...');
 		ipcRenderer.invoke('ask-gpt-stream', [
 			{ role: 'system', content: SYSTEM_PROMPT },
@@ -1240,7 +1271,11 @@ async function askGpt() {
 
 		const onChunk = (_, token) => {
 			streamedText += token;
-			answerContent.innerText = streamedText;
+			emitUIChange('onAnswerStreamChunk', {
+				questionId,
+				token,
+				accum: streamedText,
+			});
 			console.log('🟢 GPT_STREAM_CHUNK recebido (token parcial)', token);
 		};
 
@@ -1249,6 +1284,7 @@ async function askGpt() {
 			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
 			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
 
+			let finalText = streamedText;
 			if (ENABLE_INTERVIEW_TIMING_DEBUG && gptStartAt) {
 				const endAt = Date.now();
 				const elapsed = endAt - gptStartAt;
@@ -1256,7 +1292,7 @@ async function askGpt() {
 				const startTime = new Date(gptStartAt).toLocaleTimeString();
 				const endTime = new Date(endAt).toLocaleTimeString();
 
-				answerContent.innerText +=
+				finalText +=
 					`\n\n⏱️ GPT iniciou: ${startTime}` + `\n⏱️ GPT finalizou: ${endTime}` + `\n⏱️ Resposta em ${elapsed}ms`;
 			}
 
@@ -1268,17 +1304,18 @@ async function askGpt() {
 
 			// 🔒 FECHAMENTO ATÔMICO DO CICLO
 			if (isCurrent && wasRequestedForThisTurn) {
-				promoteCurrentToHistory(text, wrapper);
-				resetInterviewTurnState();
-			} else {
-				resetInterviewTurnState();
+			const finalHtml = marked.parse(finalText);
+			renderGptAnswer(questionId, finalHtml);
+			promoteCurrentToHistory(text);
+			resetInterviewTurnState();
+		} else {
+			const finalHtml = marked.parse(finalText);
 			}
 
 			// marca a pergunta como respondida no histórico (streaming path)
 			try {
-				const qid = wrapper?.dataset?.questionId;
-				if (qid && qid !== CURRENT_QUESTION_ID) {
-					const q = questionsHistory.find(x => x.id === qid);
+				if (questionId !== CURRENT_QUESTION_ID) {
+					const q = questionsHistory.find(x => x.id === questionId);
 					if (q) {
 						q.answered = true;
 						renderQuestionsHistory();
@@ -1302,7 +1339,7 @@ async function askGpt() {
 	]);
 
 	console.log('✅ resposta do GPT recebida (batch)');
-	renderGptAnswer(wrapper, res);
+	renderGptAnswer(questionId, res);
 
 	const wasRequestedForThisTurn = gptRequestedTurnId === interviewTurnId;
 
@@ -1312,18 +1349,15 @@ async function askGpt() {
 		'wasRequestedForThisTurn:',
 		wasRequestedForThisTurn,
 	);
-
 	if (isCurrent && wasRequestedForThisTurn) {
-		promoteCurrentToHistory(text, wrapper);
-		// após promover para o histórico, marca a pergunta como respondida
+		promoteCurrentToHistory(text);
+		// após promover para o histórico, a pergunta já está no histórico e resposta vinculada
 		try {
-			const qid = wrapper.dataset.questionId;
-			if (qid && qid !== CURRENT_QUESTION_ID) {
-				const q = questionsHistory.find(x => x.id === qid);
-				if (q) {
-					q.answered = true;
-					renderQuestionsHistory();
-				}
+			// Encontra a última pergunta adicionada (que acabamos de promover)
+			const q = questionsHistory[questionsHistory.length - 1];
+			if (q) {
+				q.answered = true;
+				renderQuestionsHistory();
 			}
 		} catch (err) {
 			console.warn('⚠️ falha ao marcar pergunta como respondida (batch):', err);
@@ -1349,22 +1383,39 @@ function addTranscript(author, text, time) {
 		timeStr = new Date().toLocaleTimeString();
 	}
 
-	const div = document.createElement('div');
-	div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
-	transcriptionBox.appendChild(div);
+	// 🔥 Apenas EMITE o evento com os dados
+	// config-manager.js é responsável por adicionar ao DOM
+	const transcriptData = {
+		author,
+		text,
+		timeStr,
+		elementId: 'conversation',
+	};
 
-	// 🔥 garante scroll após render
-	requestAnimationFrame(() => {
-		const container = transcriptionBox.parentElement;
-		container.scrollTop = container.scrollHeight;
-	});
+	emitUIChange('onTranscriptAdd', transcriptData);
 
-	return div;
+	// Retorna um objeto proxy que simula um elemento DOM para compatibilidade
+	// Usado quando a transcrição é um placeholder que será atualizado depois
+	const placeholderProxy = {
+		dataset: { 
+			startAt: typeof time === 'number' ? time : Date.now(), 
+			stopAt: null 
+		},
+		// Permite que código posterior trate como elemento DOM
+		classList: {
+			add: () => {},
+			remove: () => {},
+			contains: () => false,
+			toggle: () => false,
+		}
+	};
+
+	return placeholderProxy;
 }
 
 function renderCurrentQuestion() {
 	if (!currentQuestion.text) {
-		currentQuestionTextBox.innerText = '';
+		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
 		return;
 	}
 
@@ -1375,69 +1426,48 @@ function renderCurrentQuestion() {
 		label = `⏱️ ${time} — ${label}`;
 	}
 
-	currentQuestionTextBox.innerText = label;
-
-	currentQuestionBox.classList.toggle('selected-question', selectedQuestionId === CURRENT_QUESTION_ID);
-	currentQuestionBox.onclick = () => {
-		handleQuestionClick(CURRENT_QUESTION_ID);
+	// 🔥 Apenas EMITE dados - config-manager aplica ao DOM
+	const questionData = {
+		text: label,
+		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
+		rawText: currentQuestion.text,
+		createdAt: currentQuestion.createdAt,
 	};
+
+	emitUIChange('onCurrentQuestionUpdate', questionData);
 }
 
 function renderQuestionsHistory() {
-	questionsHistoryBox.innerHTML = '';
-
-	[...questionsHistory].reverse().forEach(q => {
-		const d = document.createElement('div');
-		d.className = 'question-block';
-
+	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
+	const historyData = [...questionsHistory].reverse().map(q => {
 		let label = q.text;
 		if (ENABLE_INTERVIEW_TIMING_DEBUG && q.createdAt) {
 			const time = new Date(q.createdAt).toLocaleTimeString();
 			label = `⏱️ ${time} — ${label}`;
 		}
 
-		// marca visual para perguntas incompletas
-		if (q.incomplete) {
-			d.innerText = label + ' (incompleta)';
-		} else {
-			d.innerText = label;
-		}
-
-		// aplica classe visual para perguntas já respondidas
-		if (q.answered) {
-			d.classList.add('answered');
-		}
-		d.dataset.qid = q.id;
-		d.addEventListener('click', () => {
-			handleQuestionClick(q.id);
-		});
-
-		if (q.id === selectedQuestionId) {
-			d.classList.add('selected-question');
-		}
-
-		questionsHistoryBox.appendChild(d);
+		return {
+			id: q.id,
+			text: label,
+			isIncomplete: q.incomplete,
+			isAnswered: q.answered,
+			isSelected: q.id === selectedQuestionId,
+		};
 	});
+
+	emitUIChange('onQuestionsHistoryUpdate', historyData);
 
 	scrollToSelectedQuestion();
 }
 
 function clearAllSelections() {
-	// limpa seleção do CURRENT
-	currentQuestionBox.classList.remove('selected-question');
-
-	// limpa seleção do histórico
-	questionsHistoryBox.querySelectorAll('.selected-question').forEach(el => el.classList.remove('selected-question'));
+	// Emite evento para o controller limpar as seleções visuais
+	emitUIChange('onClearAllSelections', {});
 }
 
 function scrollToSelectedQuestion() {
-	const el = questionsHistoryBox.querySelector(`.question-block[data-qid="${selectedQuestionId}"]`);
-
-	if (!el) return;
-
-	el.scrollIntoView({
-		behavior: 'smooth',
-		block: 'nearest',
+	emitUIChange('onScrollToQuestion', {
+		questionId: selectedQuestionId,
 	});
 }
 
@@ -1460,27 +1490,32 @@ function getSelectedQuestionText() {
 	return '';
 }
 
-function renderGptAnswer(container, markdownText) {
-	// tenta encurtar a resposta para 1-2 sentenças, preservando blocos de código
+function renderGptAnswer(questionId, markdownText) {
+	// 🔥 Renderiza markdown e retorna HTML - config-manager aplica ao DOM
 	const short = shortenAnswer(markdownText, 2);
 	const html = marked.parse(short);
-	const questionBlock = container.querySelector('.answer-question');
 
-	container.innerHTML = `
-		${questionBlock.outerHTML}
-		<div class="gpt-answer">
-			${html}
-		</div>
-	`;
+	// Encontra texto da pergunta no histórico ou na pergunta atual
+	let questionText = '';
+	if (questionId === CURRENT_QUESTION_ID) {
+		questionText = currentQuestion?.text || '';
+	} else {
+		const q = questionsHistory.find(x => x.id === questionId);
+		questionText = q?.text || '';
+	}
 
-	// 👇 garante foco na resposta final
-	container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+	const answerData = {
+		questionText,
+		questionId,
+		html,
+	};
+
+	emitUIChange('onAnswerAdd', answerData);
 
 	// marca a pergunta como respondida no histórico (se vinculada)
 	try {
-		const qid = container.dataset.questionId;
-		if (qid && qid !== CURRENT_QUESTION_ID) {
-			const q = questionsHistory.find(x => x.id === qid);
+		if (questionId && questionId !== CURRENT_QUESTION_ID) {
+			const q = questionsHistory.find(x => x.id === questionId);
 			if (q) {
 				q.answered = true;
 				renderQuestionsHistory();
@@ -1496,8 +1531,9 @@ function resetInterviewState() {
 	questionsHistory = [];
 	selectedQuestionId = null;
 
-	transcriptionBox.innerHTML = '';
-	answersHistoryBox.innerHTML = '';
+	// Emit eventos para limpar UI
+	emitUIChange('onTranscriptionCleared', {});
+	emitUIChange('onAnswersCleared', {});
 
 	clearAllSelections();
 	renderQuestionsHistory();
@@ -1505,14 +1541,21 @@ function resetInterviewState() {
 }
 
 async function listenToggleBtn() {
-	if (!isRunning && !inputSelect.value && !outputSelect.value) {
-		statusText.innerText = 'Status: selecione ao menos um dispositivo';
+	if (!isRunning && !UIElements.inputSelect?.value && !UIElements.outputSelect?.value) {
+		updateStatusMessage('Status: selecione ao menos um dispositivo');
 		return;
 	}
 
 	isRunning = !isRunning;
-	listenBtn.innerText = isRunning ? 'Stop' : 'Start';
-	statusText.innerText = isRunning ? 'Status: ouvindo...' : 'Status: parado';
+	const buttonText = isRunning ? 'Stop' : 'Start';
+	const statusMsg = isRunning ? 'Status: ouvindo...' : 'Status: parado';
+
+	emitUIChange('onListenButtonToggle', {
+		isRunning,
+		buttonText,
+	});
+
+	updateStatusMessage(statusMsg);
 	isRunning ? startAudio() : stopAudio();
 }
 
@@ -1527,12 +1570,12 @@ function handleQuestionClick(questionId) {
 		const existingAnswer = findAnswerByQuestionId(questionId);
 
 		if (existingAnswer) {
-			answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => el.classList.remove('active'));
+			emitUIChange('onAnswerSelected', {
+				answerId: questionId,
+				shouldScroll: true,
+			});
 
-			existingAnswer.classList.add('active');
-			existingAnswer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-
-			statusText.innerText = '📌 Essa pergunta já foi respondida';
+			updateStatusMessage('📌 Essa pergunta já foi respondida');
 			return;
 		}
 	}
@@ -1541,7 +1584,7 @@ function handleQuestionClick(questionId) {
 	if (questionId !== CURRENT_QUESTION_ID) {
 		const q = questionsHistory.find(q => q.id === questionId);
 		if (q && q.incomplete) {
-			statusText.innerText = '⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT';
+			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
 			return;
 		}
@@ -1552,7 +1595,7 @@ function handleQuestionClick(questionId) {
 		selectedQuestionId === CURRENT_QUESTION_ID &&
 		gptAnsweredTurnId === interviewTurnId
 	) {
-		statusText.innerText = '⛔ GPT já respondeu esse turno';
+		updateStatusMessage('⛔ GPT já respondeu esse turno');
 		console.log('⛔ GPT já respondeu esse turno');
 		return;
 	}
@@ -1575,6 +1618,11 @@ function applyOpacity(value) {
 
 	// logs temporários para debug
 	console.log('🎚️ Opacity change | app:', value, '| topBar:', topbarOpacity);
+}
+
+// 🔥 Novo: atualizar status sem tocar em DOM
+function updateStatusMessage(message) {
+	emitUIChange('onStatusUpdate', { message });
 }
 
 /* ===============================
@@ -1751,23 +1799,21 @@ const RendererAPI = {
 
 	// UI
 	applyOpacity,
-	updateStatus: (text) => {
-		statusText.innerText = text;
-	},
 	updateMockBadge: (show) => {
-		show ? mockBadge.classList.remove('hidden') : mockBadge.classList.add('hidden');
+		emitUIChange('onMockBadgeUpdate', { visible: show });
 	},
 	setMockToggle: (checked) => {
 		mockToggle.checked = checked;
 		APP_CONFIG.MODE_DEBUG = checked;
 	},
 	setModeSelect: (mode) => {
-		if (interviewModeSelect) interviewModeSelect.value = mode;
+		emitUIChange('onModeSelectUpdate', { mode });
 	},
 
 	// Drag
-	initDragHandle: (dragHandle) => {
+	initDragHandle: (dragHandle, documentElement) => {
 		if (!dragHandle) return;
+		const doc = documentElement || document; // fallback para document global
 		dragHandle.addEventListener('pointerdown', async event => {
 			console.log('🪟 Drag iniciado (pointerdown)');
 			isDraggingWindow = true;
@@ -1819,7 +1865,7 @@ const RendererAPI = {
 			event.stopPropagation();
 		});
 
-		document.addEventListener('pointerup', () => {
+		doc.addEventListener('pointerup', () => {
 			if (!dragHandle.classList.contains('drag-active')) return;
 			console.log('🪟 Drag finalizado (pointerup)');
 			dragHandle.classList.remove('drag-active');
@@ -1879,8 +1925,8 @@ const RendererAPI = {
 					renderCurrentQuestion();
 
 					if (APP_CONFIG.MODE_DEBUG) {
-						statusText.innerText =
-							e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
+						const msg = e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
+						updateStatusMessage(msg);
 						console.log('📌 Atalho Selecionou:', selectedQuestionId);
 						return;
 					}
