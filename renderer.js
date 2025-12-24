@@ -1304,25 +1304,24 @@ async function askGpt() {
 
 			// 🔒 FECHAMENTO ATÔMICO DO CICLO
 			if (isCurrent && wasRequestedForThisTurn) {
-			const finalHtml = marked.parse(finalText);
-			renderGptAnswer(questionId, finalHtml);
-			promoteCurrentToHistory(text);
-			resetInterviewTurnState();
-		} else {
-			const finalHtml = marked.parse(finalText);
-			}
+				const finalHtml = marked.parse(finalText);
+				renderGptAnswer(questionId, finalHtml);
+				promoteCurrentToHistory(text);
+				resetInterviewTurnState();
+			} else if (questionId !== CURRENT_QUESTION_ID) {
+				const finalHtml = marked.parse(finalText);
+				renderGptAnswer(questionId, finalHtml);
 
-			// marca a pergunta como respondida no histórico (streaming path)
-			try {
-				if (questionId !== CURRENT_QUESTION_ID) {
+				// marca a pergunta como respondida no histórico (streaming path)
+				try {
 					const q = questionsHistory.find(x => x.id === questionId);
 					if (q) {
 						q.answered = true;
 						renderQuestionsHistory();
 					}
+				} catch (err) {
+					console.warn('⚠️ falha ao marcar pergunta como respondida (stream):', err);
 				}
-			} catch (err) {
-				console.warn('⚠️ falha ao marcar pergunta como respondida (stream):', err);
 			}
 		};
 
@@ -1638,6 +1637,9 @@ function startMockInterview() {
 	if (mockInterviewRunning) return;
 	mockInterviewRunning = true;
 
+	// 🔥 Emite atualização do mock badge
+	emitUIChange('onMockBadgeUpdate', { visible: true });
+
 	const mockQuestions = [
 		'O que é JVM e para que serve',
 		'Qual a diferença entre JDK e JRE',
@@ -1803,7 +1805,9 @@ const RendererAPI = {
 		emitUIChange('onMockBadgeUpdate', { visible: show });
 	},
 	setMockToggle: (checked) => {
-		mockToggle.checked = checked;
+		if (UIElements.mockToggle) {
+			UIElements.mockToggle.checked = checked;
+		}
 		APP_CONFIG.MODE_DEBUG = checked;
 	},
 	setModeSelect: (mode) => {
@@ -1891,6 +1895,14 @@ const RendererAPI = {
 			? 'Click-through ATIVO (clique para desativar)'
 			: 'Click-through INATIVO (clique para ativar)';
 		console.log('🎨 Botão atualizado - opacity:', btnToggle.style.opacity);
+	},
+
+	// UI Registration
+	registerUIElements: (elements) => {
+		registerUIElements(elements);
+	},
+	onUIChange: (eventName, callback) => {
+		onUIChange(eventName, callback);
 	},
 
 	// API Key
