@@ -1246,8 +1246,8 @@ class ConfigManager {
 			questionsHistoryBox: document.getElementById('questionsHistory'),
 			answersHistoryBox: document.getElementById('answersHistory'),
 			askBtn: document.getElementById('askGptBtn'),
-			inputVu: document.getElementById('micVu'),
-			outVu: document.getElementById('outVu'),
+			inputVu: document.getElementById('inputVu'),
+			outputVu: document.getElementById('outputVu'),
 			mockToggle: document.getElementById('mockToggle'),
 			mockBadge: document.getElementById('mockBadge'),
 			interviewModeSelect: document.getElementById('interviewModeSelect'),
@@ -1296,7 +1296,7 @@ class ConfigManager {
 		// Input Volume
 		window.RendererAPI.onUIChange('onInputVolumeUpdate', (data) => {
 			const { percent } = data;
-			const inputVu = document.getElementById('micVu');
+			const inputVu = document.getElementById('inputVu');
 			if (inputVu) inputVu.style.width = percent + '%';
 		});
 

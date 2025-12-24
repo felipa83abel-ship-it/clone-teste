@@ -151,7 +151,7 @@ let UIElements = {
 	answersHistoryBox: null,
 	askBtn: null,
 	inputVu: null,
-	outVu: null,
+	outputVu: null,
 	mockToggle: null,
 	mockBadge: null,
 	interviewModeSelect: null,
