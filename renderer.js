@@ -76,6 +76,10 @@ let outputPartialChunks = [];
 let outputPartialTimer = null;
 let outputPartialText = '';
 
+// 🔥 NOVO: IDs para rastrear e parar os loops de animation
+let inputVolumeAnimationId = null;
+let outputVolumeAnimationId = null;
+
 /* 🧠 PERGUNTAS */
 let currentQuestion = { text: '', lastUpdate: 0, finalized: false };
 let questionsHistory = [];
@@ -99,6 +103,7 @@ let lastOutputPlaceholderEl = null;
 =============================== */
 
 const UICallbacks = {
+	onError: null, // 🔥 NOVO: Para mostrar erros de validação
 	onTranscriptAdd: null,
 	onCurrentQuestionUpdate: null,
 	onQuestionsHistoryUpdate: null,
@@ -129,8 +134,12 @@ function onUIChange(eventName, callback) {
 
 // Dispara um callback com dados
 function emitUIChange(eventName, data) {
+	//console.log(`📡 DEBUG: emitUIChange('${eventName}', ${typeof data === 'object' ? JSON.stringify(data) : data})`);
 	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
+		//console.log(`✅ DEBUG: Callback encontrado para '${eventName}', disparando...`);
 		UICallbacks[eventName](data);
+	} else {
+		console.warn(`⚠️ DEBUG: Nenhum callback registrado para '${eventName}'`);
 	}
 }
 
@@ -217,22 +226,6 @@ const ModeController = {
 /* ===============================
    HELPERS PUROS
 =============================== */
-
-// 🔥 NOVO: Mostra mensagem de erro visual (mesmo estilo do config-manager)
-function showError(message) {
-	const error = document.createElement('div');
-	error.className = 'save-feedback';
-	error.style.background = '#dc3545';
-	error.innerHTML = `
-        <span class="material-icons">error</span>
-        ${message}
-    `;
-	document.body.appendChild(error);
-
-	setTimeout(() => {
-		error.remove();
-	}, 3000);
-}
 
 function finalizeQuestion(t) {
 	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
@@ -503,18 +496,18 @@ async function restartAudioPipeline() {
 async function startInputVolumeMonitoring() {
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🎤 Monitoramento de volume entrada (modo teste)...');
-		return;
+		return Promise.resolve();
 	}
 
 	if (!UIElements.inputSelect?.value) {
 		console.log('⚠️ Nenhum dispositivo input selecionado');
-		return;
+		return Promise.resolve();
 	}
 
 	// 🔥 NOVO: Se já tem stream ativa, não faz nada
 	if (inputStream && inputAnalyser) {
 		console.log('ℹ️ Monitoramento de volume entrada já ativo');
-		return;
+		return Promise.resolve();
 	}
 
 	if (!audioContext) {
@@ -547,18 +540,18 @@ async function startInputVolumeMonitoring() {
 async function startOutputVolumeMonitoring() {
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🔊 Monitoramento de volume saída (modo teste)...');
-		return;
+		return Promise.resolve();
 	}
 
 	if (!UIElements.outputSelect?.value) {
 		console.log('⚠️ Nenhum dispositivo output selecionado');
-		return;
+		return Promise.resolve();
 	}
 
 	// 🔥 NOVO: Se já tem stream ativa, não faz nada
 	if (outputStream && outputAnalyser) {
 		console.log('ℹ️ Monitoramento de volume saída já ativo');
-		return;
+		return Promise.resolve();
 	}
 
 	if (!audioContext) {
@@ -657,7 +650,11 @@ async function startInput() {
 }
 
 function updateInputVolume() {
-	if (!inputAnalyser) return;
+	// 🔥 Se não há analyser, para o loop
+	if (!inputAnalyser) {
+		inputVolumeAnimationId = null;
+		return;
+	}
 
 	inputAnalyser.getByteFrequencyData(inputData);
 	const avg = inputData.reduce((a, b) => a + b, 0) / inputData.length;
@@ -692,10 +689,16 @@ function updateInputVolume() {
 		}, INPUT_SILENCE_TIMEOUT);
 	}
 
-	requestAnimationFrame(updateInputVolume);
+	inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
 }
 
 function stopInputMonitor() {
+	// 🔥 Para o loop de animation
+	if (inputVolumeAnimationId) {
+		cancelAnimationFrame(inputVolumeAnimationId);
+		inputVolumeAnimationId = null;
+	}
+
 	if (inputStream) {
 		inputStream.getTracks().forEach(t => t.stop());
 		inputStream = null;
@@ -704,6 +707,7 @@ function stopInputMonitor() {
 	inputAnalyser = null;
 	inputData = null;
 	emitUIChange('onInputVolumeUpdate', { percent: 0 });
+	return Promise.resolve();
 }
 
 /* ===============================
@@ -712,8 +716,7 @@ function stopInputMonitor() {
 
 async function startOutput() {
 	if (APP_CONFIG.MODE_DEBUG) {
-		const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
-		addTranscript('Outros', text);
+		console.log('🔊 Iniciando monitoramento de saída de áudio (modo teste)...');
 		return;
 	}
 
@@ -776,7 +779,11 @@ async function startOutput() {
 }
 
 function updateOutputVolume() {
-	if (!outputAnalyser) return;
+	// 🔥 Se não há analyser, para o loop
+	if (!outputAnalyser) {
+		outputVolumeAnimationId = null;
+		return;
+	}
 
 	outputAnalyser.getByteFrequencyData(outputData);
 	const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
@@ -811,10 +818,16 @@ function updateOutputVolume() {
 		}, OUTPUT_SILENCE_TIMEOUT);
 	}
 
-	requestAnimationFrame(updateOutputVolume);
+	outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
 }
 
 function stopOutputMonitor() {
+	// 🔥 Para o loop de animation
+	if (outputVolumeAnimationId) {
+		cancelAnimationFrame(outputVolumeAnimationId);
+		outputVolumeAnimationId = null;
+	}
+
 	if (outputStream) {
 		outputStream.getTracks().forEach(t => t.stop());
 		outputStream = null;
@@ -823,6 +836,7 @@ function stopOutputMonitor() {
 	outputAnalyser = null;
 	outputData = null;
 	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+	return Promise.resolve();
 }
 
 /* ===============================
@@ -1674,22 +1688,29 @@ function hasActiveModel() {
 }
 
 async function listenToggleBtn() {
-	// 🔥 NOVO: Valida se existe modelo ativo
+	console.log('🔥 DEBUG: listenToggleBtn() chamado!');
+	
+	// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
 	const { active: hasModel, model: activeModel } = hasActiveModel();
+	console.log(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`);
 	
 	if (!isRunning && !hasModel) {
-		showError('Ative um modelo de IA antes de começar a ouvir');
-		console.warn('❌ Nenhum modelo ativo para iniciar escuta');
+		const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
+		console.warn(`⚠️ ${errorMsg}`);
+		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
+		emitUIChange('onError', errorMsg);
 		return;
 	}
 	
-	// 🔥 NOVO: Valida se há pelo menos um dispositivo de áudio selecionado
-	const hasInputDevice = UIElements.inputSelect?.value;
+	// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
 	const hasOutputDevice = UIElements.outputSelect?.value;
+	console.log(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`);
 	
-	if (!isRunning && !hasInputDevice && !hasOutputDevice) {
-		showError('Selecione ao menos um dispositivo de áudio');
-		console.warn('❌ Nenhum dispositivo de áudio selecionado');
+	if (!isRunning && !hasOutputDevice) {
+		const errorMsg = 'Selecione um dispositivo de áudio (saída) para ouvir a reunião';
+		console.warn(`⚠️ ${errorMsg}`);
+		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
+		emitUIChange('onError', errorMsg);
 		return;
 	}
 
