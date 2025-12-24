@@ -490,16 +490,23 @@ async function startInputVolumeMonitoring() {
 		return;
 	}
 
-	if (!UIElements.inputSelect?.value) return;
+	if (!UIElements.inputSelect?.value) {
+		console.log('⚠️ Nenhum dispositivo input selecionado');
+		return;
+	}
+
+	// 🔥 NOVO: Se já tem stream ativa, não faz nada
+	if (inputStream && inputAnalyser) {
+		console.log('ℹ️ Monitoramento de volume entrada já ativo');
+		return;
+	}
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
 	}
 
-	// Evita recriar stream se já existe
-	if (inputStream) return;
-
 	try {
+				console.log('🔄 Iniciando stream de áudio (input)...');
 		inputStream = await navigator.mediaDevices.getUserMedia({
 			audio: { deviceId: { exact: UIElements.inputSelect.value } },
 		});
@@ -511,11 +518,12 @@ async function startInputVolumeMonitoring() {
 		inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
 		source.connect(inputAnalyser);
 
-		console.log('✅ Monitoramento de volume de entrada iniciado');
-		updateInputVolume();
+		console.log('✅ Monitoramento de volume de entrada iniciado com sucesso');
+		updateInputVolume(); // 🔥 Inicia o loop de atualização
 	} catch (error) {
 		console.error('❌ Erro ao iniciar monitoramento de volume de entrada:', error);
-		stopInputMonitor();
+		inputStream = null;
+		inputAnalyser = null;
 	}
 }
 
@@ -526,15 +534,22 @@ async function startOutputVolumeMonitoring() {
 		return;
 	}
 
-	if (!UIElements.outputSelect?.value) return;
+	if (!UIElements.outputSelect?.value) {
+		console.log('⚠️ Nenhum dispositivo output selecionado');
+		return;
+	}
+
+	// 🔥 NOVO: Se já tem stream ativa, não faz nada
+	if (outputStream && outputAnalyser) {
+		console.log('ℹ️ Monitoramento de volume saída já ativo');
+		return;
+	}
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
 	}
 
-	// Evita recriar stream
-	if (outputStream) return;
-
+			console.log('🔄 Iniciando stream de áudio (output)...');
 	try {
 		outputStream = await navigator.mediaDevices.getUserMedia({
 			audio: { deviceId: { exact: UIElements.outputSelect.value } },
@@ -547,11 +562,12 @@ async function startOutputVolumeMonitoring() {
 		outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
 		source.connect(outputAnalyser);
 
-		console.log('✅ Monitoramento de volume de saída iniciado');
-		updateOutputVolume();
+		console.log('✅ Monitoramento de volume de saída iniciado com sucesso');
+		updateOutputVolume(); // 🔥 Inicia o loop de atualização
 	} catch (error) {
 		console.error('❌ Erro ao iniciar monitoramento de volume de saída:', error);
-		stopOutputMonitor();
+		outputStream = null;
+		outputAnalyser = null;
 	}
 }
 

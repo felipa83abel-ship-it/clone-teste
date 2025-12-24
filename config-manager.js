@@ -443,19 +443,29 @@ class ConfigManager {
 
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
 					if (input.id === 'audio-input-device') {
-						window.RendererAPI.stopInput();
+						// 🔥 Limpa streams antigas
+						window.RendererAPI.stopInput().catch(err => {
+							console.warn('⚠️ Erro ao parar input monitor:', err);
+						});
+						
+						// 🔥 Reinicia monitoramento com novo dispositivo
 						setTimeout(() => {
 							window.RendererAPI.startInputVolumeMonitoring().catch(err => {
 								console.error('❌ Erro ao reiniciar monitoramento input:', err);
 							});
-						}, 100);
+						}, 150);
 					} else if (input.id === 'audio-output-device') {
-						window.RendererAPI.stopOutput();
+						// 🔥 Limpa streams antigas
+						window.RendererAPI.stopOutput().catch(err => {
+							console.warn('⚠️ Erro ao parar output monitor:', err);
+						});
+						
+						// 🔥 Reinicia monitoramento com novo dispositivo
 						setTimeout(() => {
 							window.RendererAPI.startOutputVolumeMonitoring().catch(err => {
 								console.error('❌ Erro ao reiniciar monitoramento output:', err);
 							});
-						}, 100);
+						}, 150);
 					}
 				});
 			}
@@ -1004,6 +1014,9 @@ class ConfigManager {
 			// ✅ 6. Carregar e restaurar dispositivos de áudio
 			await this.loadDevices();
 			this.restoreDevices();
+			// 🔥 NOVO: Registrar UIElements ANTES de iniciar monitoramento
+			this.registerUIElements();
+
 
 			// ✅ 7. 🔥 NOVO: Iniciar MONITORAMENTO de volume (sem gravar)
 			// Isso permite que o usuário veja a oscilação de volume desde o início
@@ -1011,10 +1024,12 @@ class ConfigManager {
 			const outputSelect = document.getElementById('audio-output-device');
 
 			if (inputSelect?.value) {
+								console.log('📊 Iniciando monitoramento de volume (input) com dispositivo:', inputSelect.value);
 				await window.RendererAPI.startInputVolumeMonitoring();
 			}
 
 			if (outputSelect?.value) {
+								console.log('📊 Iniciando monitoramento de volume (output) com dispositivo:', outputSelect.value);
 				await window.RendererAPI.startOutputVolumeMonitoring();
 			}
 
@@ -1041,9 +1056,6 @@ class ConfigManager {
 
 		// ✅ 14. Registrar listeners de erro global
 		this.registerErrorHandlers();
-
-		// ✅ 15. Registrar UIElements no renderer
-		this.registerUIElements();
 
 		// ✅ 16. Registrar callbacks do renderer
 		this.registerRendererCallbacks();
