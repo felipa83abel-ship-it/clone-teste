@@ -218,6 +218,22 @@ const ModeController = {
    HELPERS PUROS
 =============================== */
 
+// 🔥 NOVO: Mostra mensagem de erro visual (mesmo estilo do config-manager)
+function showError(message) {
+	const error = document.createElement('div');
+	error.className = 'save-feedback';
+	error.style.background = '#dc3545';
+	error.innerHTML = `
+        <span class="material-icons">error</span>
+        ${message}
+    `;
+	document.body.appendChild(error);
+
+	setTimeout(() => {
+		error.remove();
+	}, 3000);
+}
+
 function finalizeQuestion(t) {
 	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
 }
@@ -1631,37 +1647,49 @@ function resetInterviewState() {
 	renderCurrentQuestion();
 }
 
-// 🔥 NOVO: Verifica se existe um modelo de IA ativo
+// 🔥 NOVO: Verifica se existe um modelo de IA ativo e retorna o nome do modelo
 function hasActiveModel() {
 	if (!window.configManager) {
 		console.warn('⚠️ ConfigManager não inicializado ainda');
-		return false;
+		return { active: false, model: null };
 	}
 	
 	const config = window.configManager.config;
 	if (!config || !config.api) {
 		console.warn('⚠️ Config ou api não disponível');
-		return false;
+		return { active: false, model: null };
 	}
 	
-	// Verifica se algum modelo está ativo
-	const hasEnabled = Object.keys(config.api).some(key => {
-		if (key === 'activeProvider') return false;
-		return config.api[key] && config.api[key].enabled === true;
-	});
+	// Verifica se algum modelo está ativo e retorna o nome
+	const providers = ['openai', 'google', 'openrouter', 'custom'];
+	for (const provider of providers) {
+		if (config.api[provider] && config.api[provider].enabled === true) {
+			console.log(`✅ Modelo ativo encontrado: ${provider}`);
+			return { active: true, model: provider };
+		}
+	}
 	
-	return hasEnabled;
+	console.warn('⚠️ Nenhum modelo ativo encontrado');
+	return { active: false, model: null };
 }
 
 async function listenToggleBtn() {
 	// 🔥 NOVO: Valida se existe modelo ativo
-	if (!isRunning && !hasActiveModel()) {
-		updateStatusMessage('Status: ative um modelo de IA antes de começar a ouvir');
+	const { active: hasModel, model: activeModel } = hasActiveModel();
+	
+	if (!isRunning && !hasModel) {
+		showError('Ative um modelo de IA antes de começar a ouvir');
+		console.warn('❌ Nenhum modelo ativo para iniciar escuta');
 		return;
 	}
 	
-	if (!isRunning && !UIElements.inputSelect?.value && !UIElements.outputSelect?.value) {
-		updateStatusMessage('Status: selecione ao menos um dispositivo');
+	// 🔥 NOVO: Valida se há pelo menos um dispositivo de áudio selecionado
+	const hasInputDevice = UIElements.inputSelect?.value;
+	const hasOutputDevice = UIElements.outputSelect?.value;
+	
+	if (!isRunning && !hasInputDevice && !hasOutputDevice) {
+		showError('Selecione ao menos um dispositivo de áudio');
+		console.warn('❌ Nenhum dispositivo de áudio selecionado');
 		return;
 	}
 
@@ -1675,6 +1703,7 @@ async function listenToggleBtn() {
 	});
 
 	updateStatusMessage(statusMsg);
+	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
 	isRunning ? startAudio() : stopAudio();
 }
 

@@ -96,6 +96,7 @@ class ConfigManager {
 	async checkApiKeysStatus() {
 		try {
 			const providers = ['openai', 'google', 'openrouter', 'custom'];
+			let foundActiveProvider = false;
 
 			for (const provider of providers) {
 				// 🔥 CORRIGIDO: Aguarda a promessa corretamente
@@ -107,22 +108,28 @@ class ConfigManager {
 					console.log(`✅ Chave de ${provider} carregada com sucesso (length: ${savedKey.length})`);
 					this.updateApiKeyFieldStatus(provider, true);
 
-					// 🔥 NOVO: Atualiza estado do modelo se for OpenAI
-					if (provider === 'openai') {
-						this.config.api.openai.enabled = true;
-						this.config.api.activeProvider = 'openai';
-						this.updateModelStatusUI();
+					// 🔥 NOVO: Se ainda não encontrou um provider ativo, ativa este
+					if (!foundActiveProvider && this.config.api[provider]) {
+						console.log(`🟢 Ativando provider ${provider} (primeira chave encontrada)`);
+						this.config.api[provider].enabled = true;
+						this.config.api.activeProvider = provider;
+						foundActiveProvider = true;
 					}
 				} else {
 					console.log(`⚠️ Nenhuma chave salva para ${provider}`);
 					this.updateApiKeyFieldStatus(provider, false);
 
 					// 🔥 NOVO: Desativa modelo se não houver chave
-					if (provider === 'openai') {
-						this.config.api.openai.enabled = false;
-						this.updateModelStatusUI();
+					if (this.config.api[provider]) {
+						this.config.api[provider].enabled = false;
 					}
 				}
+			}
+			
+			// 🔥 NOVO: Se encontrou um provider ativo, atualiza UI
+			if (foundActiveProvider) {
+				this.updateModelStatusUI();
+				this.saveConfig();
 			}
 		} catch (error) {
 			console.error('❌ Erro ao verificar status das API keys:', error);
@@ -199,7 +206,18 @@ class ConfigManager {
 			if (result?.success) {
 				console.log(`✅ API key de ${provider} removida com sucesso`);
 				this.updateApiKeyFieldStatus(provider, false);
-				this.showSaveFeedback(`API key de ${provider} removida`);
+				
+				// 🔥 NOVO: Se o modelo estava ativo, desativa automaticamente
+				if (this.config.api[provider] && this.config.api[provider].enabled === true) {
+					console.log(`🔴 Desativando modelo ${provider} pois sua chave foi removida`);
+					this.config.api[provider].enabled = false;
+					this.config.api.activeProvider = null; // Limpa provider ativo
+					this.updateModelStatusUI();
+					this.saveConfig();
+					this.showSaveFeedback(`API key de ${provider} removida - Modelo desativado`);
+				} else {
+					this.showSaveFeedback(`API key de ${provider} removida`);
+				}
 			} else {
 				this.showError(`Erro ao remover API key de ${provider}`);
 			}
@@ -1215,7 +1233,8 @@ class ConfigManager {
 		// Listen button
 		const listenBtn = document.getElementById('listenBtn');
 		if (listenBtn) {
-			listenBtn.addEventListener('click', () => {
+			listenBtn.addEventListener('click', (e) => {
+				e.stopPropagation(); // 🔥 NOVO: Previne propagação para listeners de classe
 				window.RendererAPI.listenToggleBtn();
 			});
 		}

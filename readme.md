@@ -1,0 +1,283 @@
+# AskMe - Assistente de Entrevistas com IA
+
+> Clone do Perssua - Sistema de transcrição de áudio e assistente GPT para entrevistas técnicas
+
+![Versão](https://img.shields.io/badge/versão-1.0.0-blue)
+![Electron](https://img.shields.io/badge/Electron-39.2.7-47848F?logo=electron)
+![Node](https://img.shields.io/badge/Node-18%2B-339933?logo=node.js)
+![License](https://img.shields.io/badge/license-ISC-green)
+
+---
+
+## 📋 Índice
+
+- [Sobre o Projeto](#sobre-o-projeto)
+- [Funcionalidades Principais](#funcionalidades-principais)
+- [Requisitos](#requisitos)
+- [Instalação](#instalação)
+- [Execução](#execução)
+- [Estrutura do Projeto](#estrutura-do-projeto)
+- [Documentação Adicional](#documentação-adicional)
+- [Troubleshooting](#troubleshooting)
+
+---
+
+## 🎯 Sobre o Projeto
+
+**AskMe** é uma aplicação desktop construída com Electron que funciona como assistente de entrevistas técnicas. Utiliza:
+
+- **Transcrição de áudio** via OpenAI Whisper (Speech-to-Text)
+- **Respostas inteligentes** via GPT (OpenAI, Google Gemini, OpenRouter ou API customizada)
+- **Monitoramento em tempo real** de áudio de entrada (microfone) e saída (VoiceMeeter/speaker)
+- **Interface overlay** com transparência e always-on-top
+- **Armazenamento seguro** de API keys via `electron-store` (criptografado)
+
+### Modos de Operação
+
+1. **Modo Normal** → Transcrição manual, perguntas consolidadas por clique
+2. **Modo Entrevista** → Detecção automática de perguntas, respostas GPT em streaming
+
+---
+
+## ✨ Funcionalidades Principais
+
+- ✅ Transcrição de áudio em tempo real (Whisper)
+- ✅ Respostas GPT com streaming (modo entrevista)
+- ✅ Suporte a múltiplos providers de IA (OpenAI, Google, OpenRouter, Custom)
+- ✅ Armazenamento seguro de API keys (criptografado)
+- ✅ Monitoramento de volume de áudio (VU meters)
+- ✅ Interface overlay transparente e sempre visível
+- ✅ Dark mode automático
+- ✅ Drag & drop da janela (frameless)
+- ✅ Click-through control (passar cliques através da janela)
+- ✅ Atalhos de teclado globais
+- ✅ Histórico de perguntas e respostas
+
+📄 **[Ver lista completa de funcionalidades →](FEATURES.md)**
+
+---
+
+## 📦 Requisitos
+
+### Sistema Operacional
+- Windows 10/11 (recomendado)
+- macOS 10.15+ (suporte parcial)
+- Linux (não testado)
+
+### Software
+```
+Node.js  → versão 18.x ou superior
+npm      → versão 8.x ou superior
+```
+
+### Hardware
+- **Microfone** (para captura de entrada)
+- **VoiceMeeter** ou similar (opcional, para captura de saída/outros participantes)
+- **RAM** → Mínimo 4GB (recomendado 8GB)
+- **Processador** → Multi-core (transcrição de áudio é intensiva)
+
+### APIs Necessárias
+- **OpenAI API Key** (obrigatória para Whisper + GPT)
+- **Google API Key** (opcional, para Gemini)
+- **OpenRouter API Key** (opcional)
+
+> ⚠️ **Importante:** Sem uma API key válida, a aplicação não conseguirá transcrever áudio nem gerar respostas.
+
+---
+
+## 🚀 Instalação
+
+### 1. Clone o repositório
+```bash
+git clone https://github.com/seu-usuario/askme.git
+cd askme
+```
+
+### 2. Instale as dependências
+```bash
+npm install
+```
+
+### 3. Verifique a instalação
+```bash
+npm list
+```
+
+**Dependências esperadas:**
+```
+askme@1.0.0
+├── electron@39.2.7
+├── electron-store@11.0.2
+├── highlight.js@11.11.1
+├── marked@17.0.1
+├── openai@6.10.0
+└── wav@1.0.2
+```
+
+---
+
+## ▶️ Execução
+
+### Modo Desenvolvimento
+```bash
+npm start
+```
+- Hot reload habilitado via `electron-reload`
+- Console aberto com `Ctrl+Shift+I`
+- Logs detalhados no terminal
+
+### Modo Produção
+```bash
+npm run build
+```
+- Sem hot reload
+- Console desabilitado
+- Otimizações de performance
+
+### Atalhos de Teclado
+
+| Atalho | Ação |
+|--------|------|
+| `Ctrl+D` | Iniciar/parar escuta de áudio |
+| `Ctrl+Enter` | Enviar pergunta selecionada ao GPT |
+| `Ctrl+Shift+I` | Abrir DevTools (apenas desenvolvimento) |
+| `Ctrl+Shift+↑/↓` | Navegar entre perguntas (futuro) |
+
+---
+
+## 📁 Estrutura do Projeto
+
+```
+askme/
+├── main.js              # Processo principal (Electron)
+├── renderer.js          # Serviços de transcrição e GPT
+├── config-manager.js    # Gerenciador de configurações e UI
+├── index.html           # Interface principal
+├── styles.css           # Estilos e temas
+├── package.json         # Dependências e scripts
+├── README.md            # Este arquivo
+├── FEATURES.md          # Lista detalhada de funcionalidades
+└── TEST_GUIDE.md        # Guia de testes manuais
+```
+
+### Arquivos Principais
+
+#### `main.js`
+- Criação da janela Electron (frameless, transparent, always-on-top)
+- IPC handlers (transcrição, GPT, API keys)
+- Armazenamento seguro via `electron-store`
+- Atalhos globais
+
+#### `renderer.js`
+- Captura de áudio (input/output via MediaRecorder)
+- Transcrição via OpenAI Whisper
+- Respostas GPT (batch e streaming)
+- Gerenciamento de perguntas/respostas
+- Sistema de callbacks para UI
+
+#### `config-manager.js`
+- Gerenciamento de configurações (API keys, dispositivos, tema)
+- Controle de UI (DOM manipulation)
+- Inicialização de controllers
+- Event listeners
+
+#### `index.html`
+- Interface com menu lateral
+- Seções: Home, API e Modelos, Áudio e Tela, Privacidade, Outros
+- Dark mode toggle
+- VU meters para volume
+
+---
+
+## 📚 Documentação Adicional
+
+- 📋 **[Funcionalidades Detalhadas →](FEATURES.md)**
+  - Lista completa de recursos por seção
+  - Capturas de tela (futuro)
+  - Exemplos de uso
+
+- 🧪 **[Guia de Testes →](TEST_GUIDE.md)**
+  - Testes manuais passo a passo
+  - Cenários de validação
+  - Checklist de funcionalidades
+  - Troubleshooting específico
+
+---
+
+## 🔧 Troubleshooting
+
+### Aplicação não inicia
+```bash
+# Limpar node_modules e reinstalar
+rm -rf node_modules package-lock.json
+npm install
+npm start
+```
+
+### API key não funciona
+1. Verifique se a chave tem 10+ caracteres
+2. Confirme se clicou em "Salvar Configurações"
+3. Clique em "Ativar" no modelo desejado
+4. Verifique o console (F12) para erros
+
+### Áudio não captura
+1. Verifique permissões de microfone no sistema
+2. Selecione um dispositivo em "Áudio e Tela"
+3. Teste o volume (barra deve oscilar)
+4. Reinicie a aplicação se necessário
+
+### Volume não oscila
+- O monitoramento inicia automaticamente ao selecionar dispositivo
+- Não é necessário clicar "Começar a Ouvir" para ver o volume
+- Se não funcionar, troque de dispositivo e aguarde 2 segundos
+
+### Transcrição não acontece
+1. Confirme que o modelo está ativo (badge "Ativo")
+2. Verifique se clicou em "Começar a Ouvir"
+3. Faça barulho próximo ao microfone
+4. Aguarde alguns segundos (transcrição tem latência)
+
+### Janela não move
+- O drag handle está no topo do menu lateral
+- Cursor deve virar "grab" ao passar o mouse
+- Se não funcionar, reabra a aplicação
+
+---
+
+## 🤝 Contribuindo
+
+Contribuições são bem-vindas! Para mudanças importantes:
+
+1. Abra uma issue primeiro para discutir o que você gostaria de mudar
+2. Fork o projeto
+3. Crie uma branch (`git checkout -b feature/NovaFuncionalidade`)
+4. Commit suas mudanças (`git commit -m 'Adiciona nova funcionalidade'`)
+5. Push para a branch (`git push origin feature/NovaFuncionalidade`)
+6. Abra um Pull Request
+
+---
+
+## 📝 Licença
+
+Este projeto está sob a licença ISC. Veja o arquivo `LICENSE` para mais detalhes.
+
+---
+
+## 📞 Suporte
+
+- 🐛 **Issues:** [GitHub Issues](https://github.com/seu-usuario/askme/issues)
+- 📧 **Email:** seu-email@exemplo.com
+- 💬 **Discord:** [Link do servidor]
+
+---
+
+## 🎯 Roadmap
+
+- [ ] Suporte a múltiplos idiomas (i18n)
+- [ ] Exportação de transcrições em TXT/JSON
+- [ ] Integração com mais providers (Claude, Cohere)
+- [ ] Modo de captura de tela (screenshots)
+- [ ] Sistema de plugins/extensões
+- [ ] Testes automatizados
+
+
