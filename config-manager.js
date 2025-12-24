@@ -314,7 +314,16 @@ class ConfigManager {
 
 		// 🔥 CORRIGIDO: Campos de API key - comportamento ao focar
 		document.querySelectorAll('.api-key-input').forEach(input => {
-			// 🔥 Quando o campo recebe foco e está mascarado, oferece opção de editar
+			// 🔥 Ao digitar (input event), marca campo como tendo conteúdo
+			input.addEventListener('input', e => {
+				const hasContent = e.target.value && e.target.value.trim().length > 0;
+				if (hasContent && !e.target.value.includes('••••')) {
+					// Usuário está digitando uma nova chave - manter visível
+					e.target.type = 'text';
+				}
+			});
+
+			// 🔥 Quando o campo recebe foco
 			input.addEventListener('focus', async e => {
 				const hasKey = e.target.getAttribute('data-has-key') === 'true';
 				const isMasked = e.target.value.includes('••••');
@@ -322,21 +331,29 @@ class ConfigManager {
 				if (hasKey && isMasked) {
 					// 🔥 OPÇÃO 1: Limpa para permitir nova chave
 					e.target.value = '';
+					e.target.type = 'text'; // 🔥 NOVO: Inicia em texto para não mascarar entrada
 					e.target.placeholder = 'Insira uma nova API key (ou cancele para manter a atual)';
 					console.log(`📝 Campo limpo para edição - provider: ${e.target.id}`);
+				} else if (!hasKey && e.target.value === '') {
+					// 🔥 NOVO: Campo vazio sem chave salva - inicia em texto para entrada clara
+					e.target.type = 'text';
 				}
 			});
 
 			// 🔥 Ao sair do campo sem alterar, restaura máscara
 			input.addEventListener('blur', e => {
 				const hasKey = e.target.getAttribute('data-has-key') === 'true';
+				const isEmpty = e.target.value === '' || e.target.value.trim() === '';
 
-				if (hasKey && e.target.value === '') {
+				if (hasKey && isEmpty) {
 					// 🔥 Usuário cancelou edição - restaura máscara
 					e.target.value = '••••••••••••••••••••••••••';
 					e.target.type = 'password';
 					e.target.placeholder = 'API key configurada (clique para alterar)';
 					console.log(`🔒 Máscara restaurada após cancelamento`);
+				} else if (!isEmpty && !hasKey && e.target.value.length > 0 && !e.target.value.includes('••••')) {
+					// 🔥 NOVO: Usuário digitou uma nova chave - manter visível até salvar
+					console.log(`📝 Novo valor digitado - aguardando salvar`);
 				}
 			});
 
@@ -372,10 +389,13 @@ class ConfigManager {
 					return;
 				}
 
-				// 🔥 Se estiver mascarado, busca chave real do secure store
-				if (input.getAttribute('data-has-key') === 'true' && input.value.includes('•')) {
-					const provider = targetId.replace('-api-key', ''); // 'openai-api-key' -> 'openai'
+				const provider = targetId.replace('-api-key', ''); // 'openai-api-key' -> 'openai'
+				const hasKey = input.getAttribute('data-has-key') === 'true';
+				const isMasked = input.value.includes('•');
+				const hasNewValue = input.value && input.value.trim().length > 0 && !isMasked;
 
+				// 🔥 CASO 1: Campo tem chave salva E está mascarado → busca do store
+				if (hasKey && isMasked) {
 					try {
 						const realKey = await _ipc.invoke('GET_API_KEY', provider);
 
@@ -383,19 +403,29 @@ class ConfigManager {
 							input.value = realKey;
 							input.type = 'text';
 							button.innerHTML = '<span class="material-icons">visibility_off</span>';
-							console.log(`👁️ Mostrando chave de ${provider}`);
+							console.log(`👁️ Mostrando chave salva de ${provider}`);
 						} else {
 							console.warn(`⚠️ Chave de ${provider} não encontrada no store`);
 						}
 					} catch (error) {
 						console.error(`❌ Erro ao recuperar chave de ${provider}:`, error);
 					}
-				} else {
-					// 🔥 Se estiver visível, oculta novamente
-					input.value = '••••••••••••••••••••••••••';
+				}
+				// 🔥 CASO 2: Usuário está digitando uma chave nova (visível, sem •) → mascara
+				else if (hasNewValue && input.type === 'text') {
 					input.type = 'password';
 					button.innerHTML = '<span class="material-icons">visibility</span>';
-					console.log(`🔒 Ocultando chave`);
+					console.log(`🔒 Ocultando chave digitada`);
+				}
+				// 🔥 CASO 3: Chave nova está mascarada → mostra novamente
+				else if (hasNewValue && input.type === 'password') {
+					input.type = 'text';
+					button.innerHTML = '<span class="material-icons">visibility_off</span>';
+					console.log(`👁️ Mostrando chave digitada`);
+				}
+				// 🔥 CASO 4: Campo vazio ou mascara de placeholder → não faz nada
+				else {
+					console.log(`⚠️ Campo em estado indefinido - ignorando clique`);
 				}
 			});
 		});
@@ -410,6 +440,23 @@ class ConfigManager {
 			if (input.id && !input.classList.contains('api-key-input')) {
 				input.addEventListener('change', () => {
 					this.saveField(input.id, input.value);
+
+					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
+					if (input.id === 'audio-input-device') {
+						window.RendererAPI.stopInput();
+						setTimeout(() => {
+							window.RendererAPI.startInputVolumeMonitoring().catch(err => {
+								console.error('❌ Erro ao reiniciar monitoramento input:', err);
+							});
+						}, 100);
+					} else if (input.id === 'audio-output-device') {
+						window.RendererAPI.stopOutput();
+						setTimeout(() => {
+							window.RendererAPI.startOutputVolumeMonitoring().catch(err => {
+								console.error('❌ Erro ao reiniciar monitoramento output:', err);
+							});
+						}, 100);
+					}
 				});
 			}
 		});
@@ -554,8 +601,22 @@ class ConfigManager {
 	}
 
 	async toggleModel(model) {
-		// 🔥 CORRIGIDO: Verifica se existe chave salva ANTES de ativar
+		// 🔥 NOVO: Detecta se é ativação ou desativação
+		const isCurrentlyActive = this.config.api[model]?.enabled === true;
+		
 		try {
+			if (isCurrentlyActive) {
+				// 🔥 DESATIVAÇÃO: Permite sempre, sem exigir chave
+				this.config.api[model].enabled = false;
+				
+				console.log(`✅ Modelo ${model} desativado com sucesso`);
+				this.showSaveFeedback(`Modelo ${model} desativado`);
+				this.updateModelStatusUI();
+				this.saveConfig();
+				return;
+			}
+			
+			// 🔥 ATIVAÇÃO: Exige chave válida
 			const savedKey = await _ipc.invoke('GET_API_KEY', model);
 
 			if (!savedKey || savedKey.length < 10) {
@@ -589,8 +650,8 @@ class ConfigManager {
 				await _ipc.invoke('initialize-api-client', savedKey);
 			}
 		} catch (error) {
-			console.error(`❌ Erro ao ativar modelo ${model}:`, error);
-			this.showError(`Erro ao ativar modelo: ${error.message}`);
+			console.error(`❌ Erro ao alternar modelo ${model}:`, error);
+			this.showError(`Erro ao alternar modelo: ${error.message}`);
 		}
 	}
 
@@ -944,18 +1005,17 @@ class ConfigManager {
 			await this.loadDevices();
 			this.restoreDevices();
 
-			// ✅ 7. Iniciar áudio se dispositivos selecionados
+			// ✅ 7. 🔥 NOVO: Iniciar MONITORAMENTO de volume (sem gravar)
+			// Isso permite que o usuário veja a oscilação de volume desde o início
 			const inputSelect = document.getElementById('audio-input-device');
 			const outputSelect = document.getElementById('audio-output-device');
 
 			if (inputSelect?.value) {
-				window.RendererAPI.stopInput();
-				await window.RendererAPI.startInput();
+				await window.RendererAPI.startInputVolumeMonitoring();
 			}
 
 			if (outputSelect?.value) {
-				window.RendererAPI.stopOutput();
-				await window.RendererAPI.startOutput();
+				await window.RendererAPI.startOutputVolumeMonitoring();
 			}
 
 			// ✅ 8. Sincronizar API key
