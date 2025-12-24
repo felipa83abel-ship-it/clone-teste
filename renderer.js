@@ -483,6 +483,82 @@ async function restartAudioPipeline() {
    AUDIO - INPUT (VOCÊ)
 =============================== */
 
+// 🔥 NOVO: Inicia apenas monitoramento de volume (sem gravar)
+async function startInputVolumeMonitoring() {
+	if (APP_CONFIG.MODE_DEBUG) {
+		console.log('🎤 Monitoramento de volume entrada (modo teste)...');
+		return;
+	}
+
+	if (!UIElements.inputSelect?.value) return;
+
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
+
+	// Evita recriar stream se já existe
+	if (inputStream) return;
+
+	try {
+		inputStream = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: UIElements.inputSelect.value } },
+		});
+
+		const source = audioContext.createMediaStreamSource(inputStream);
+
+		inputAnalyser = audioContext.createAnalyser();
+		inputAnalyser.fftSize = 256;
+		inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
+		source.connect(inputAnalyser);
+
+		console.log('✅ Monitoramento de volume de entrada iniciado');
+		updateInputVolume();
+	} catch (error) {
+		console.error('❌ Erro ao iniciar monitoramento de volume de entrada:', error);
+		stopInputMonitor();
+	}
+}
+
+// 🔥 NOVO: Inicia apenas monitoramento de volume para output (sem gravar)
+async function startOutputVolumeMonitoring() {
+	if (APP_CONFIG.MODE_DEBUG) {
+		console.log('🔊 Monitoramento de volume saída (modo teste)...');
+		return;
+	}
+
+	if (!UIElements.outputSelect?.value) return;
+
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
+
+	// Evita recriar stream
+	if (outputStream) return;
+
+	try {
+		outputStream = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: UIElements.outputSelect.value } },
+		});
+
+		const source = audioContext.createMediaStreamSource(outputStream);
+
+		outputAnalyser = audioContext.createAnalyser();
+		outputAnalyser.fftSize = 256;
+		outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
+		source.connect(outputAnalyser);
+
+		console.log('✅ Monitoramento de volume de saída iniciado');
+		updateOutputVolume();
+	} catch (error) {
+		console.error('❌ Erro ao iniciar monitoramento de volume de saída:', error);
+		stopOutputMonitor();
+	}
+}
+
+/* ===============================
+   AUDIO - INPUT (VOCÊ)
+=============================== */
+
 async function startInput() {
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
@@ -1539,7 +1615,35 @@ function resetInterviewState() {
 	renderCurrentQuestion();
 }
 
+// 🔥 NOVO: Verifica se existe um modelo de IA ativo
+function hasActiveModel() {
+	if (!window.configManager) {
+		console.warn('⚠️ ConfigManager não inicializado ainda');
+		return false;
+	}
+	
+	const config = window.configManager.config;
+	if (!config || !config.api) {
+		console.warn('⚠️ Config ou api não disponível');
+		return false;
+	}
+	
+	// Verifica se algum modelo está ativo
+	const hasEnabled = Object.keys(config.api).some(key => {
+		if (key === 'activeProvider') return false;
+		return config.api[key] && config.api[key].enabled === true;
+	});
+	
+	return hasEnabled;
+}
+
 async function listenToggleBtn() {
+	// 🔥 NOVO: Valida se existe modelo ativo
+	if (!isRunning && !hasActiveModel()) {
+		updateStatusMessage('Status: ative um modelo de IA antes de começar a ouvir');
+		return;
+	}
+	
 	if (!isRunning && !UIElements.inputSelect?.value && !UIElements.outputSelect?.value) {
 		updateStatusMessage('Status: selecione ao menos um dispositivo');
 		return;
@@ -1776,12 +1880,16 @@ marked.setOptions({
 
 // Exporta funções públicas que o controller pode chamar
 const RendererAPI = {
-	// Áudio
+	// Áudio - Gravação
 	startInput,
 	stopInput: stopInputMonitor,
 	startOutput,
 	stopOutput: stopOutputMonitor,
 	restartAudioPipeline,
+
+	// 🔥 NOVO: Áudio - Monitoramento de volume
+	startInputVolumeMonitoring,
+	startOutputVolumeMonitoring,
 
 	// Entrevista
 	listenToggleBtn,
