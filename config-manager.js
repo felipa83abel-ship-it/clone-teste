@@ -82,7 +82,27 @@ class ConfigManager {
 
 			if (saved) {
 				const parsed = JSON.parse(saved);
-				return { ...defaultConfig, ...parsed };
+				// 🔥 Merge profundo para preservar estados salvos
+				const merged = { ...defaultConfig };
+				if (parsed.api) {
+					merged.api = { ...defaultConfig.api, ...parsed.api };
+					// Preserva o estado enabled de cada provider
+					Object.keys(defaultConfig.api).forEach(provider => {
+						if (parsed.api[provider] && typeof parsed.api[provider] === 'object') {
+							merged.api[provider] = {
+								...defaultConfig.api[provider],
+								...parsed.api[provider]
+							};
+						}
+					});
+				}
+				if (parsed.audio) merged.audio = { ...defaultConfig.audio, ...parsed.audio };
+				if (parsed.screen) merged.screen = { ...defaultConfig.screen, ...parsed.screen };
+				if (parsed.privacy) merged.privacy = { ...defaultConfig.privacy, ...parsed.privacy };
+				if (parsed.other) merged.other = { ...defaultConfig.other, ...parsed.other };
+				
+				console.log('✅ Configurações carregadas do localStorage (respeitando preferências do usuário)');
+				return merged;
 			}
 
 			return defaultConfig;
@@ -96,7 +116,6 @@ class ConfigManager {
 	async checkApiKeysStatus() {
 		try {
 			const providers = ['openai', 'google', 'openrouter', 'custom'];
-			let foundActiveProvider = false;
 
 			for (const provider of providers) {
 				// 🔥 CORRIGIDO: Aguarda a promessa corretamente
@@ -107,14 +126,6 @@ class ConfigManager {
 				if (savedKey && typeof savedKey === 'string' && savedKey.length > 10) {
 					console.log(`✅ Chave de ${provider} carregada com sucesso (length: ${savedKey.length})`);
 					this.updateApiKeyFieldStatus(provider, true);
-
-					// 🔥 NOVO: Se ainda não encontrou um provider ativo, ativa este
-					if (!foundActiveProvider && this.config.api[provider]) {
-						console.log(`🟢 Ativando provider ${provider} (primeira chave encontrada)`);
-						this.config.api[provider].enabled = true;
-						this.config.api.activeProvider = provider;
-						foundActiveProvider = true;
-					}
 				} else {
 					console.log(`⚠️ Nenhuma chave salva para ${provider}`);
 					this.updateApiKeyFieldStatus(provider, false);
@@ -126,11 +137,8 @@ class ConfigManager {
 				}
 			}
 			
-			// 🔥 NOVO: Se encontrou um provider ativo, atualiza UI
-			if (foundActiveProvider) {
-				this.updateModelStatusUI();
-				this.saveConfig();
-			}
+			// 🔥 NOVO: Não força ativação automática - respeita preferência salva do usuário
+			console.log('✅ Verificação de API keys concluída');
 		} catch (error) {
 			console.error('❌ Erro ao verificar status das API keys:', error);
 		}
@@ -306,8 +314,8 @@ class ConfigManager {
 			});
 		});
 
-		// Botões de ativar/desativar modelo
-		document.querySelectorAll('.btn-activate').forEach(button => {
+		// Botões de ativar/desativar modelo - agora usa seletor mais específico
+		document.querySelectorAll('button[data-model]').forEach(button => {
 			button.addEventListener('click', e => {
 				const model = e.currentTarget.dataset.model;
 				this.toggleModel(model);
@@ -461,29 +469,37 @@ class ConfigManager {
 
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
 					if (input.id === 'audio-input-device') {
-						// 🔥 Limpa streams antigas
-						window.RendererAPI.stopInput().catch(err => {
-							console.warn('⚠️ Erro ao parar input monitor:', err);
-						});
-						
-						// 🔥 Reinicia monitoramento com novo dispositivo
-						setTimeout(() => {
-							window.RendererAPI.startInputVolumeMonitoring().catch(err => {
-								console.error('❌ Erro ao reiniciar monitoramento input:', err);
+						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
+						if (window.RendererAPI?.stopInput) {
+							window.RendererAPI.stopInput().catch(err => {
+								console.warn('⚠️ Erro ao parar input monitor:', err);
 							});
-						}, 150);
+							
+							// 🔥 Reinicia monitoramento com novo dispositivo
+							setTimeout(() => {
+								if (window.RendererAPI?.startInputVolumeMonitoring) {
+									window.RendererAPI.startInputVolumeMonitoring().catch(err => {
+										console.error('❌ Erro ao reiniciar monitoramento input:', err);
+									});
+								}
+							}, 150);
+						}
 					} else if (input.id === 'audio-output-device') {
-						// 🔥 Limpa streams antigas
-						window.RendererAPI.stopOutput().catch(err => {
-							console.warn('⚠️ Erro ao parar output monitor:', err);
-						});
-						
-						// 🔥 Reinicia monitoramento com novo dispositivo
-						setTimeout(() => {
-							window.RendererAPI.startOutputVolumeMonitoring().catch(err => {
-								console.error('❌ Erro ao reiniciar monitoramento output:', err);
+						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
+						if (window.RendererAPI?.stopOutput) {
+							window.RendererAPI.stopOutput().catch(err => {
+								console.warn('⚠️ Erro ao parar output monitor:', err);
 							});
-						}, 150);
+							
+							// 🔥 Reinicia monitoramento com novo dispositivo
+							setTimeout(() => {
+								if (window.RendererAPI?.startOutputVolumeMonitoring) {
+									window.RendererAPI.startOutputVolumeMonitoring().catch(err => {
+										console.error('❌ Erro ao reiniciar monitoramento output:', err);
+									});
+								}
+							}, 150);
+						}
 					}
 				});
 			}
@@ -1189,14 +1205,27 @@ class ConfigManager {
 	}
 
 	registerDOMEventListeners() {
+		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
+		
+		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
+		if (!window.RendererAPI) {
+			console.error('❌ ERRO CRÍTICO: window.RendererAPI não disponível em registerDOMEventListeners!');
+			return;
+		}
+		
 		// Input select
 		const inputSelect = document.getElementById('audio-input-device');
 		if (inputSelect) {
 			inputSelect.addEventListener('change', async () => {
+				console.log('📝 Input device mudou');
 				this.saveDevices();
-				window.RendererAPI.stopInput();
+				if (window.RendererAPI?.stopInput) {
+					window.RendererAPI.stopInput();
+				}
 				if (!inputSelect.value) return;
-				await window.RendererAPI.startInput();
+				if (window.RendererAPI?.startInput) {
+					await window.RendererAPI.startInput();
+				}
 			});
 		}
 
@@ -1204,10 +1233,15 @@ class ConfigManager {
 		const outputSelect = document.getElementById('audio-output-device');
 		if (outputSelect) {
 			outputSelect.addEventListener('change', async () => {
+				console.log('📝 Output device mudou');
 				this.saveDevices();
-				window.RendererAPI.stopOutput();
+				if (window.RendererAPI?.stopOutput) {
+					window.RendererAPI.stopOutput();
+				}
 				if (!outputSelect.value) return;
-				await window.RendererAPI.startOutput();
+				if (window.RendererAPI?.startOutput) {
+					await window.RendererAPI.startOutput();
+				}
 			});
 		}
 
@@ -1215,17 +1249,24 @@ class ConfigManager {
 		const mockToggle = document.getElementById('mockToggle');
 		if (mockToggle) {
 			mockToggle.addEventListener('change', async () => {
+				console.log('📝 Mock toggle mudou');
+				if (!window.RendererAPI) return;
+				
 				const isEnabled = mockToggle.checked;
-				window.RendererAPI.setAppConfig({ ...window.RendererAPI.getAppConfig(), MODE_DEBUG: isEnabled });
+				if (window.RendererAPI?.setAppConfig) {
+					window.RendererAPI.setAppConfig({ ...window.RendererAPI.getAppConfig(), MODE_DEBUG: isEnabled });
+				}
 
 				if (isEnabled) {
-					window.RendererAPI.updateMockBadge(true);
-					window.RendererAPI.resetInterviewState();
-					window.RendererAPI.startMockInterview();
+					window.RendererAPI?.updateMockBadge(true);
+					window.RendererAPI?.resetInterviewState();
+					window.RendererAPI?.startMockInterview();
 				} else {
-					window.RendererAPI.updateMockBadge(false);
-					window.RendererAPI.resetInterviewState();
-					await window.RendererAPI.restartAudioPipeline();
+					window.RendererAPI?.updateMockBadge(false);
+					window.RendererAPI?.resetInterviewState();
+					if (window.RendererAPI?.restartAudioPipeline) {
+						await window.RendererAPI.restartAudioPipeline();
+					}
 				}
 			});
 		}
@@ -1234,8 +1275,12 @@ class ConfigManager {
 		const listenBtn = document.getElementById('listenBtn');
 		if (listenBtn) {
 			listenBtn.addEventListener('click', (e) => {
-				e.stopPropagation(); // 🔥 NOVO: Previne propagação para listeners de classe
-				window.RendererAPI.listenToggleBtn();
+				console.log('🔊 DEBUG: listenBtn clicado!');
+				if (window.RendererAPI?.listenToggleBtn) {
+					window.RendererAPI.listenToggleBtn();
+				} else {
+					console.error('❌ window.RendererAPI.listenToggleBtn não está disponível!');
+				}
 			});
 		}
 
@@ -1243,7 +1288,10 @@ class ConfigManager {
 		const askBtn = document.getElementById('askGptBtn');
 		if (askBtn) {
 			askBtn.addEventListener('click', () => {
-				window.RendererAPI.askGpt();
+				console.log('🔊 DEBUG: askGptBtn clicado!');
+				if (window.RendererAPI?.askGpt) {
+					window.RendererAPI.askGpt();
+				}
 			});
 		}
 
@@ -1261,51 +1309,75 @@ class ConfigManager {
 		if (questionsHistoryBox) {
 			questionsHistoryBox.addEventListener('click', e => {
 				const questionBlock = e.target.closest('.question-block');
-				if (questionBlock) {
+				if (questionBlock && window.RendererAPI?.handleQuestionClick) {
 					const questionId = questionBlock.dataset.qid || questionBlock.id;
 					window.RendererAPI.handleQuestionClick(questionId);
 				}
 			});
 		}
+		
+		console.log('✅ registerDOMEventListeners: Todos os listeners registrados com sucesso');
 	}
 
 	registerIPCListeners() {
+		console.log('🔥 registerIPCListeners: Iniciando registro de IPC listeners...');
+		if (!window.RendererAPI) {
+			console.error('❌ ERRO CRÍTICO: window.RendererAPI não disponível em registerIPCListeners!');
+			return;
+		}
+		
 		// API Key updated
-		window.RendererAPI.onApiKeyUpdated((_, success) => {
-			const statusText = document.getElementById('status');
-			if (success) {
-				console.log('✅ API key atualizada com sucesso');
-				if (statusText) statusText.innerText = '✅ API key configurada com sucesso';
+		if (window.RendererAPI?.onApiKeyUpdated) {
+			window.RendererAPI.onApiKeyUpdated((_, success) => {
+				const statusText = document.getElementById('status');
+				if (success) {
+					console.log('✅ API key atualizada com sucesso');
+					if (statusText) statusText.innerText = '✅ API key configurada com sucesso';
 
-				setTimeout(() => {
-					if (statusText && statusText.innerText.includes('API key configurada')) {
-						const listenBtn = document.getElementById('listenBtn');
-						const isRunning = listenBtn?.innerText === 'Stop';
-						statusText.innerText = isRunning ? 'Status: ouvindo...' : 'Status: parado';
-					}
-				}, 3000);
-			}
-		});
+					setTimeout(() => {
+						if (statusText && statusText.innerText.includes('API key configurada')) {
+							const listenBtn = document.getElementById('listenBtn');
+							const isRunning = listenBtn?.innerText === 'Stop';
+							statusText.innerText = isRunning ? 'Status: ouvindo...' : 'Status: parado';
+						}
+					}, 3000);
+				}
+			});
+		}
 
 		// Toggle audio (global shortcut)
-		window.RendererAPI.onToggleAudio(() => {
-			window.RendererAPI.listenToggleBtn();
-		});
+		if (window.RendererAPI?.onToggleAudio) {
+			window.RendererAPI.onToggleAudio(() => {
+				if (window.RendererAPI?.listenToggleBtn) {
+					window.RendererAPI.listenToggleBtn();
+				}
+			});
+		}
 
 		// Ask GPT (global shortcut)
-		window.RendererAPI.onAskGpt(() => {
-			window.RendererAPI.askGpt();
-		});
+		if (window.RendererAPI?.onAskGpt) {
+			window.RendererAPI.onAskGpt(() => {
+				if (window.RendererAPI?.askGpt) {
+					window.RendererAPI.askGpt();
+				}
+			});
+		}
 
 		// GPT Stream chunks
-		window.RendererAPI.onGptStreamChunk((_,  token) => {
-			// Handled in renderer service
-		});
+		if (window.RendererAPI?.onGptStreamChunk) {
+			window.RendererAPI.onGptStreamChunk((_,  token) => {
+				// Handled in renderer service
+			});
+		}
 
 		// GPT Stream end
-		window.RendererAPI.onGptStreamEnd(() => {
-			// Handled in renderer service
-		});
+		if (window.RendererAPI?.onGptStreamEnd) {
+			window.RendererAPI.onGptStreamEnd(() => {
+				// Handled in renderer service
+			});
+		}
+		
+		console.log('✅ registerIPCListeners: Todos os IPC listeners registrados com sucesso');
 	}
 
 	registerErrorHandlers() {
@@ -1355,6 +1427,12 @@ class ConfigManager {
 
 	// 🔥 NOVO: Registrar callbacks do renderer para atualizar DOM
 	registerRendererCallbacks() {
+		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
+		window.RendererAPI.onUIChange('onError', (message) => {
+			console.error(`❌ Erro renderizado: ${message}`);
+			this.showError(message);
+		});
+
 		// Transcrição
 		window.RendererAPI.onUIChange('onTranscriptAdd', (data) => {
 			const { author, text, timeStr, elementId } = data;
@@ -1599,6 +1677,7 @@ class ConfigManager {
 
 // 🔥 MODIFICADO: Remove inicialização antiga de API key
 document.addEventListener('DOMContentLoaded', async () => {
+	console.log('🚀 INÍCIO DOMContentLoaded em config-manager.js');
 	console.log('🚀 Inicializando ConfigManager...');
 
 	// 🔥 Espera pela disponibilidade de RendererAPI (carregado via renderer.js)
