@@ -3,7 +3,11 @@
 =============================== */
 if (process.env.NODE_ENV === 'development') {
 	try {
-		require('electron-reload')(__dirname, { electron: require(`${__dirname}/node_modules/electron`) });
+		require('electron-reload')(__dirname, {
+			electron: require(`${__dirname}/node_modules/electron`),
+			// 🔥 IGNORA ARQUIVOS TEMPORÁRIOS E DE ÁUDIO
+			// ignored: [/temp-audio.*\.webm$/, /node_modules|[/\\]\./],
+		});
 	} catch (err) {
 		console.log('electron-reload não carregado:', err);
 	}
@@ -82,6 +86,8 @@ function createWindow() {
 	mainWindow = new BrowserWindow({
 		width: 1220, //820
 		height: 620,
+		x: 0, // posição horizontal (0 = extremo esquerdo da tela)
+		y: 0, // posição vertical (0 = topo da tela)
 
 		// 🔥 REMOVE COMPLETAMENTE A MOLDURA NATIVA
 		frame: false,
@@ -346,7 +352,8 @@ ipcMain.handle('transcribe-audio', async (_, audioBuffer) => {
 	}
 
 	const recvAt = Date.now();
-	const tempFilePath = path.join(__dirname, 'temp-audio.webm');
+	//const tempFilePath = path.join(__dirname, 'temp-audio.webm');
+	const tempFilePath = path.join(app.getPath('temp'), `temp-audio.webm`);
 
 	console.log(
 		'STT main: received transcribe-audio buffer, size:',
@@ -404,7 +411,8 @@ ipcMain.handle('transcribe-audio-partial', async (_, audioBuffer) => {
 	}
 
 	const recvAt = Date.now();
-	const tempFilePath = path.join(__dirname, 'temp-audio-partial.webm');
+	// const tempFilePath = path.join(__dirname, 'temp-audio-partial.webm');
+	const tempFilePath = path.join(app.getPath('temp'), `temp-audio-partial.webm`);
 
 	console.log('STT main (partial): received buffer, size:', size);
 

@@ -128,7 +128,7 @@ const UICallbacks = {
 function onUIChange(eventName, callback) {
 	if (UICallbacks.hasOwnProperty(eventName)) {
 		UICallbacks[eventName] = callback;
-		console.log(`📡 UI callback registrado: ${eventName}`);
+		console.log(`📡 UI callback registrado em renderer.js: ${eventName}`);
 	}
 }
 
@@ -174,7 +174,7 @@ let UIElements = {
 // config-manager.js chama isso para registrar elementos
 function registerUIElements(elements) {
 	UIElements = { ...UIElements, ...elements };
-	console.log('✅ UI Elements registrados no renderer');
+	console.log('✅ UI Elements registrados no renderer.js');
 }
 
 /* ===============================
@@ -228,10 +228,14 @@ const ModeController = {
 =============================== */
 
 function finalizeQuestion(t) {
+	debugLog('Início da função: "finalizeQuestion"');
+	debugLog('Fim da função: "finalizeQuestion"');
 	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
 }
 
 function normalizeForCompare(t) {
+	debugLog('Início da função: "normalizeForCompare"');
+	debugLog('Fim da função: "normalizeForCompare"');
 	return (t || '')
 		.toLowerCase()
 		.replace(/[?!.\n\r]/g, '')
@@ -240,6 +244,7 @@ function normalizeForCompare(t) {
 }
 
 function looksLikeQuestion(t) {
+	debugLog('Início da função: "looksLikeQuestion"');
 	const s = t.toLowerCase().trim();
 
 	// precisa ter ? OU começar com palavra típica de pergunta
@@ -265,16 +270,20 @@ function looksLikeQuestion(t) {
 		'tu já',
 	];
 
+	debugLog('Fim da função: "looksLikeQuestion"');
 	return s.includes('?') || questionStarters.some(q => s.startsWith(q));
 }
 
 function isGarbageSentence(t) {
+	debugLog('Início da função: "isGarbageSentence"');
 	const s = t.toLowerCase();
+	debugLog('Fim da função: "isGarbageSentence"');
 	return ['obrigado', 'até a próxima', 'finalizando'].some(w => s.includes(w));
 }
 
 // Encurta uma resposta em markdown para até `maxSentences` sentenças.
 function shortenAnswer(markdownText, maxSentences = 2) {
+	debugLog('Início da função: "shortenAnswer"');
 	if (!markdownText) return markdownText;
 
 	// remove blocos de código temporariamente para evitar cortes ruins
@@ -301,10 +310,12 @@ function shortenAnswer(markdownText, maxSentences = 2) {
 	// garante pontuação final
 	if (!/[\.\?!]$/.test(result)) result = result + '.';
 
+	debugLog('Fim da função: "shortenAnswer"');
 	return result;
 }
 
 function isIncompleteQuestion(t) {
+	debugLog('Início da função: "isIncompleteQuestion"');
 	if (!t) return false;
 	const s = t.trim();
 	// casos óbvios: contém reticências (..., …) — normalmente placeholders ou cortes
@@ -317,10 +328,12 @@ function isIncompleteQuestion(t) {
 	// termina com palavra muito curta e sem contexto (ex: endsWith ' a' )
 	if (/\b[a-z]{1,2}$/.test(s.toLowerCase())) return true;
 
+	debugLog('Fim da função: "isIncompleteQuestion"');
 	return false;
 }
 
 function getNavigableQuestionIds() {
+	debugLog('Início da função: "getNavigableQuestionIds"');
 	const ids = [];
 
 	// CURRENT só entra se tiver texto
@@ -336,17 +349,20 @@ function getNavigableQuestionIds() {
 			.map(q => q.id),
 	);
 
+	debugLog('Fim da função: "getNavigableQuestionIds"');
 	return ids;
 }
 
 function findAnswerByQuestionId(questionId) {
-	// Rastreia respostas internamente (não acessa DOM)
+	debugLog('Início da função: "findAnswerByQuestionId"'); // Rastreia respostas internamente (não acessa DOM)
 	// Mantém um mapa de questionId -> answerData
 	// Por enquanto, retorna null se não encontrado
+	debugLog('Fim da função: "findAnswerByQuestionId"');
 	return null;
 }
 
 function promoteCurrentToHistory(text) {
+	debugLog('Início da função: "promoteCurrentToHistory"');
 	console.log('📚 promovendo pergunta para histórico:', text);
 
 	// evita duplicação no histórico: se a última entrada é igual (normalizada), não adiciona
@@ -391,9 +407,12 @@ function promoteCurrentToHistory(text) {
 
 	renderQuestionsHistory();
 	renderCurrentQuestion();
+
+	debugLog('Fim da função: "promoteCurrentToHistory"');
 }
 
 function isQuestionReady(text) {
+	debugLog('Início da função: "isQuestionReady"');
 	if (!ModeController.isInterviewMode()) return true;
 
 	const trimmed = text.trim();
@@ -433,24 +452,27 @@ function isQuestionReady(text) {
 
 	const hasQuestionMark = trimmed.includes('?');
 
-	// só dispara se houver indício real
+	debugLog('Fim da função: "isQuestionReady"'); // só dispara se houver indício real
 	return hasIndicator || hasQuestionMark;
 }
 
-function resetInterviewRuntimeState() {
-	outputPartialChunks = [];
-	outputPartialText = '';
+// function resetInterviewRuntimeState() {
+// 	outputPartialChunks = [];
+// 	outputPartialText = '';
 
-	if (outputPartialTimer) {
-		clearTimeout(outputPartialTimer);
-		outputPartialTimer = null;
-	}
+// 	if (outputPartialTimer) {
+// 		clearTimeout(outputPartialTimer);
+// 		outputPartialTimer = null;
+// 	}
 
-	console.log('♻️ Estado do modo entrevista resetado');
-}
+// 	console.log('♻️ Estado do modo entrevista resetado');
+// }
 
 function isEndingPhrase(text) {
+	debugLog('Início da função: "isEndingPhrase"');
 	const normalized = text.toLowerCase().trim();
+
+	debugLog('Fim da função: "isEndingPhrase"');
 	return OUTPUT_ENDING_PHRASES.some(p => normalized === p);
 }
 
@@ -459,8 +481,12 @@ function isEndingPhrase(text) {
 =============================== */
 
 async function startAudio() {
+	debugLog('Início da função: "startAudio"');
 	if (!UIElements.inputSelect?.value && !UIElements.outputSelect?.value) {
-		updateStatusMessage('Status: selecione um dispositivo');
+		const errorMsg = 'Selecione um dispositivo de áudio (input/potput) para ouvir a reunião';
+		console.warn(`⚠️ ${errorMsg}`);
+		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
+		emitUIChange('onError', errorMsg);
 		return;
 	}
 
@@ -468,16 +494,22 @@ async function startAudio() {
 
 	if (UIElements.inputSelect?.value) await startInput();
 	if (UIElements.outputSelect?.value) await startOutput();
+
+	debugLog('Fim da função: "startAudio"');
 }
 
 async function stopAudio() {
+	debugLog('Início da função: "stopAudio"');
 	if (currentQuestion.text) closeCurrentQuestionForced();
 
 	inputRecorder?.state === 'recording' && inputRecorder.stop();
 	outputRecorder?.state === 'recording' && outputRecorder.stop();
+
+	debugLog('Fim da função: "stopAudio"');
 }
 
 async function restartAudioPipeline() {
+	debugLog('Início da função: "restartAudioPipeline"');
 	stopAudio();
 	stopInputMonitor();
 	stopOutputMonitor();
@@ -486,14 +518,16 @@ async function restartAudioPipeline() {
 	if (UIElements.inputSelect?.value || UIElements.outputSelect?.value) {
 		await startAudio();
 	}
+	debugLog('Fim da função: "restartAudioPipeline"');
 }
 
 /* ===============================
-   AUDIO - INPUT (VOCÊ)
+   AUDIO - VOLUME MONITORING
 =============================== */
 
-// 🔥 NOVO: Inicia apenas monitoramento de volume (sem gravar)
+// Inicia apenas monitoramento de volume (sem gravar)
 async function startInputVolumeMonitoring() {
+	debugLog('Início da função: "startInputVolumeMonitoring"');
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🎤 Monitoramento de volume entrada (modo teste)...');
 		return Promise.resolve();
@@ -515,7 +549,7 @@ async function startInputVolumeMonitoring() {
 	}
 
 	try {
-				console.log('🔄 Iniciando stream de áudio (input)...');
+		console.log('🔄 Iniciando stream de áudio (input)...');
 		inputStream = await navigator.mediaDevices.getUserMedia({
 			audio: { deviceId: { exact: UIElements.inputSelect.value } },
 		});
@@ -534,10 +568,13 @@ async function startInputVolumeMonitoring() {
 		inputStream = null;
 		inputAnalyser = null;
 	}
+
+	debugLog('Fim da função: "startInputVolumeMonitoring"');
 }
 
-// 🔥 NOVO: Inicia apenas monitoramento de volume para output (sem gravar)
+// Inicia apenas monitoramento de volume para output (sem gravar)
 async function startOutputVolumeMonitoring() {
+	debugLog('Início da função: "startOutputVolumeMonitoring"');
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🔊 Monitoramento de volume saída (modo teste)...');
 		return Promise.resolve();
@@ -558,7 +595,7 @@ async function startOutputVolumeMonitoring() {
 		audioContext = new AudioContext();
 	}
 
-			console.log('🔄 Iniciando stream de áudio (output)...');
+	console.log('🔄 Iniciando stream de áudio (output)...');
 	try {
 		outputStream = await navigator.mediaDevices.getUserMedia({
 			audio: { deviceId: { exact: UIElements.outputSelect.value } },
@@ -571,8 +608,8 @@ async function startOutputVolumeMonitoring() {
 		outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
 		source.connect(outputAnalyser);
 
-		console.log('✅ Monitoramento de volume de saída iniciado com sucesso');
 		updateOutputVolume(); // 🔥 Inicia o loop de atualização
+		debugLog('Fim da função: "startOutputVolumeMonitoring"');
 	} catch (error) {
 		console.error('❌ Erro ao iniciar monitoramento de volume de saída:', error);
 		outputStream = null;
@@ -580,203 +617,259 @@ async function startOutputVolumeMonitoring() {
 	}
 }
 
+function stopInputVolumeMonitoring() {
+	debugLog('Início da função: "stopInputVolumeMonitoring"');
+
+	// 1. Para o loop de animação
+	if (inputVolumeAnimationId) {
+		cancelAnimationFrame(inputVolumeAnimationId);
+		inputVolumeAnimationId = null;
+	}
+
+	// 2. Para as tracks de áudio para economizar energia/recurso
+	if (inputStream) {
+		inputStream.getTracks().forEach(track => track.stop());
+		inputStream = null;
+	}
+
+	inputAnalyser = null;
+	inputData = null;
+
+	// 3. Zera a UI
+	emitUIChange('onInputVolumeUpdate', { percent: 0 });
+
+	console.log('🛑 Monitoramento de volume de entrada parado');
+	debugLog('Fim da função: "stopInputVolumeMonitoring"');
+}
+
+function stopOutputVolumeMonitoring() {
+	debugLog('Início da função: "stopOutputVolumeMonitoring"');
+
+	// 1. Para o loop de animação
+	if (outputVolumeAnimationId) {
+		cancelAnimationFrame(outputVolumeAnimationId);
+		outputVolumeAnimationId = null;
+	}
+
+	// 2. Para as tracks
+	if (outputStream) {
+		outputStream.getTracks().forEach(track => track.stop());
+		outputStream = null;
+	}
+
+	outputAnalyser = null;
+	outputData = null;
+
+	// 3. Zera a UI
+	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+
+	console.log('🛑 Monitoramento de volume de saída parado');
+	debugLog('Fim da função: "stopOutputVolumeMonitoring"');
+}
+
 /* ===============================
    AUDIO - INPUT (VOCÊ)
 =============================== */
 
 async function startInput() {
-    if (APP_CONFIG.MODE_DEBUG) {
-        const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
-        addTranscript('Você', text);
-        return;
-    }
+	debugLog('Início da função: "startInput"');
 
-    if (!UIElements.inputSelect?.value) return;
+	if (APP_CONFIG.MODE_DEBUG) {
+		const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
+		addTranscript('Você', text);
+		return;
+	}
 
-    if (!audioContext) {
-        audioContext = new AudioContext();
-    }
+	if (!UIElements.inputSelect?.value) return;
 
-    // CRÍTICO: Evita recriar recorder E stream se já existem
-    if (inputRecorder && inputRecorder.state !== 'inactive') {
-        console.log('ℹ️ inputRecorder já existe e está ativo, pulando reconfiguração');
-        return;
-    }
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
 
-    // Se já existe stream mas precisa reconfigurar, limpa primeiro
-    if (inputStream) {
-        console.log('🧹 Limpando stream de entrada anterior antes de recriar');
-        inputStream.getTracks().forEach(t => t.stop());
-        inputStream = null;
-    }
+	// CRÍTICO: Evita recriar recorder E stream se já existem
+	if (inputRecorder && inputRecorder.state !== 'inactive') {
+		console.log('ℹ️ inputRecorder já existe e está ativo, pulando reconfiguração');
+		return;
+	}
 
-    try {
-        inputStream = await navigator.mediaDevices.getUserMedia({
-            audio: { deviceId: { exact: UIElements.inputSelect.value } },
-        });
+	// Se já existe stream mas precisa reconfigurar, limpa primeiro
+	if (inputStream) {
+		console.log('🧹 Limpando stream de entrada anterior antes de recriar');
+		inputStream.getTracks().forEach(t => t.stop());
+		inputStream = null;
+	}
 
-        const source = audioContext.createMediaStreamSource(inputStream);
+	try {
+		inputStream = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: UIElements.inputSelect.value } },
+		});
 
-        inputAnalyser = audioContext.createAnalyser();
-        inputAnalyser.fftSize = 256;
-        inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
-        source.connect(inputAnalyser);
+		const source = audioContext.createMediaStreamSource(inputStream);
 
-        // recorder SEMPRE existe
-        inputRecorder = new MediaRecorder(inputStream, {
-            mimeType: 'audio/webm;codecs=opus',
-        });
+		inputAnalyser = audioContext.createAnalyser();
+		inputAnalyser.fftSize = 256;
+		inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
+		source.connect(inputAnalyser);
 
-        inputRecorder.ondataavailable = e => {
-            console.log('🔥 input.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
+		// recorder SEMPRE existe
+		inputRecorder = new MediaRecorder(inputStream, {
+			mimeType: 'audio/webm;codecs=opus',
+		});
 
-            inputChunks.push(e.data);
+		inputRecorder.ondataavailable = e => {
+			console.log('🔥 input.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
 
-            // MODO ENTREVISTA – gancho futuro (ainda inativo)
-            if (ModeController.allowPartialTranscription()) {
-                console.log('🧩 handlePartialInputChunk chamado (input)');
-                handlePartialInputChunk(e.data);
-            }
-        };
-        
-        inputRecorder.onstop = () => {
-            console.log('⏹️ inputRecorder.onstop chamado');
+			inputChunks.push(e.data);
 
-            // marca o momento exato em que a gravação parou
-            lastInputStopAt = Date.now();
-            console.log('⏱️ input stopped at', new Date(lastInputStopAt).toLocaleTimeString());
+			// MODO ENTREVISTA – gancho futuro (ainda inativo)
+			if (ModeController.allowPartialTranscription()) {
+				console.log('🧩 handlePartialInputChunk chamado (input)');
+				handlePartialInputChunk(e.data);
+			}
+		};
 
-            // adiciona placeholder visual para indicar que estamos aguardando a transcrição
-            // usa startAt se disponível para mostrar o horário inicial enquanto aguarda
-            const timeForPlaceholder = lastInputStartAt || lastInputStopAt;
-            lastInputPlaceholderEl = addTranscript(YOU, '...', timeForPlaceholder);
-            if (lastInputPlaceholderEl) {
-                lastInputPlaceholderEl.dataset.stopAt = lastInputStopAt;
-                if (lastInputStartAt) lastInputPlaceholderEl.dataset.startAt = lastInputStartAt;
-            }
+		inputRecorder.onstop = () => {
+			console.log('⏹️ inputRecorder.onstop chamado');
 
-            transcribeInput();
-        };
+			// marca o momento exato em que a gravação parou
+			lastInputStopAt = Date.now();
+			console.log('⏱️ input stopped at', new Date(lastInputStopAt).toLocaleTimeString());
 
-        // Inicia loop de volume apenas se não estiver rodando
-        if (!inputVolumeAnimationId) {
-            updateInputVolume();
-        }
-        
-        console.log('✅ startInput: Configurado com sucesso');
-    } catch (error) {
-        console.error('❌ Erro em startInput:', error);
-        inputStream = null;
-        inputRecorder = null;
-        throw error;
-    }
+			// adiciona placeholder visual para indicar que estamos aguardando a transcrição
+			// usa startAt se disponível para mostrar o horário inicial enquanto aguarda
+			const timeForPlaceholder = lastInputStartAt || lastInputStopAt;
+			lastInputPlaceholderEl = addTranscript(YOU, '...', timeForPlaceholder);
+			if (lastInputPlaceholderEl) {
+				lastInputPlaceholderEl.dataset.stopAt = lastInputStopAt;
+				if (lastInputStartAt) lastInputPlaceholderEl.dataset.startAt = lastInputStartAt;
+			}
+
+			transcribeInput();
+		};
+
+		// Inicia loop de volume apenas se não estiver rodando
+		if (!inputVolumeAnimationId) {
+			updateInputVolume();
+		}
+
+		console.log('✅ startInput: Configurado com sucesso');
+	} catch (error) {
+		console.error('❌ Erro em startInput:', error);
+		inputStream = null;
+		inputRecorder = null;
+		throw error;
+	}
+
+	debugLog('Fim da função: "startInput"');
 }
 
 function updateInputVolume() {
-    // CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
-    if (!inputAnalyser || !inputData) {
-        console.log('⚠️ updateInputVolume: analyser ou data não disponível, parando loop');
-        if (inputVolumeAnimationId) {
-            cancelAnimationFrame(inputVolumeAnimationId);
-            inputVolumeAnimationId = null;
-        }
-        emitUIChange('onInputVolumeUpdate', { percent: 0 });
-        return;
-    }
+	debugLog('Início da função: "updateInputVolume"');
+	// CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
+	if (!inputAnalyser || !inputData) {
+		console.log('⚠️ updateInputVolume: analyser ou data não disponível, parando loop');
+		if (inputVolumeAnimationId) {
+			cancelAnimationFrame(inputVolumeAnimationId);
+			inputVolumeAnimationId = null;
+		}
+		emitUIChange('onInputVolumeUpdate', { percent: 0 });
+		return;
+	}
 
-    try {
-        inputAnalyser.getByteFrequencyData(inputData);
-        const avg = inputData.reduce((a, b) => a + b, 0) / inputData.length;
-        const percent = Math.min(100, Math.round((avg / 80) * 100));
+	try {
+		inputAnalyser.getByteFrequencyData(inputData);
+		const avg = inputData.reduce((a, b) => a + b, 0) / inputData.length;
+		const percent = Math.min(100, Math.round((avg / 80) * 100));
 
-        // Emite evento em vez de atualizar DOM diretamente
-        emitUIChange('onInputVolumeUpdate', { percent });
+		// Emite evento em vez de atualizar DOM diretamente
+		emitUIChange('onInputVolumeUpdate', { percent });
 
-        if (avg > INPUT_SPEECH_THRESHOLD && inputRecorder && isRunning) {
-            if (!inputSpeaking) {
-                inputSpeaking = true;
-                inputChunks = [];
+		if (avg > INPUT_SPEECH_THRESHOLD && inputRecorder && isRunning) {
+			if (!inputSpeaking) {
+				inputSpeaking = true;
+				inputChunks = [];
 
-                const slice = ModeController.mediaRecorderTimeslice();
-                lastInputStartAt = Date.now();
-                console.log(
-                    '🎙️ iniciando gravação de entrada (inputRecorder.start) - startAt',
-                    new Date(lastInputStartAt).toLocaleTimeString(),
-                );
-                slice ? inputRecorder.start(slice) : inputRecorder.start();
-            }
-            if (inputSilenceTimer) {
-                clearTimeout(inputSilenceTimer);
-                inputSilenceTimer = null;
-            }
-        } else if (inputSpeaking && !inputSilenceTimer && inputRecorder) {
-            inputSilenceTimer = setTimeout(() => {
-                inputSpeaking = false;
-                inputSilenceTimer = null;
-                console.log('⏹️ parando gravação de entrada por silêncio (inputRecorder.stop)');
-                if (inputRecorder && inputRecorder.state === 'recording') {
-                    inputRecorder.stop();
-                }
-            }, INPUT_SILENCE_TIMEOUT);
-        }
-    } catch (error) {
-        console.error('❌ Erro em updateInputVolume:', error);
-        if (inputVolumeAnimationId) {
-            cancelAnimationFrame(inputVolumeAnimationId);
-            inputVolumeAnimationId = null;
-        }
-        emitUIChange('onInputVolumeUpdate', { percent: 0 });
-        return;
-    }
+				const slice = ModeController.mediaRecorderTimeslice();
+				lastInputStartAt = Date.now();
+				console.log(
+					'🎙️ iniciando gravação de entrada (inputRecorder.start) - startAt',
+					new Date(lastInputStartAt).toLocaleTimeString(),
+				);
+				slice ? inputRecorder.start(slice) : inputRecorder.start();
+			}
+			if (inputSilenceTimer) {
+				clearTimeout(inputSilenceTimer);
+				inputSilenceTimer = null;
+			}
+		} else if (inputSpeaking && !inputSilenceTimer && inputRecorder) {
+			inputSilenceTimer = setTimeout(() => {
+				inputSpeaking = false;
+				inputSilenceTimer = null;
+				console.log('⏹️ parando gravação de entrada por silêncio (inputRecorder.stop)');
+				if (inputRecorder && inputRecorder.state === 'recording') {
+					inputRecorder.stop();
+				}
+			}, INPUT_SILENCE_TIMEOUT);
+		}
+	} catch (error) {
+		console.error('❌ Erro em updateInputVolume:', error);
+		if (inputVolumeAnimationId) {
+			cancelAnimationFrame(inputVolumeAnimationId);
+			inputVolumeAnimationId = null;
+		}
+		emitUIChange('onInputVolumeUpdate', { percent: 0 });
+		return;
+	}
 
-    // Continua o loop apenas se tudo estiver OK
-    inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
+	// Continua o loop apenas se tudo estiver OK
+	inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
+
+	debugLog('Fim da função: "updateInputVolume"');
 }
 
 function stopInputMonitor() {
-    console.log('🛑 stopInputMonitor: Parando monitoramento de entrada...');
-    
-    // 1. Para o loop de animation PRIMEIRO
-    if (inputVolumeAnimationId) {
-        cancelAnimationFrame(inputVolumeAnimationId);
-        inputVolumeAnimationId = null;
-        console.log('✅ Loop de animação de entrada cancelado');
-    }
+	debugLog('Início da função: "stopInputMonitor"');
+	// 1. Para o loop de animation PRIMEIRO
+	if (inputVolumeAnimationId) {
+		cancelAnimationFrame(inputVolumeAnimationId);
+		inputVolumeAnimationId = null;
+		console.log('✅ Loop de animação de entrada cancelado');
+	}
 
-    // 2. Para o recorder se estiver gravando
-    if (inputRecorder) {
-        if (inputRecorder.state === 'recording') {
-            console.log('⏹️ Parando recorder de entrada...');
-            inputRecorder.stop();
-        }
-        inputRecorder = null;
-    }
+	// 2. Para o recorder se estiver gravando
+	if (inputRecorder) {
+		if (inputRecorder.state === 'recording') {
+			console.log('⏹️ Parando recorder de entrada...');
+			inputRecorder.stop();
+		}
+		inputRecorder = null;
+	}
 
-    // 3. Fecha a stream
-    if (inputStream) {
-        inputStream.getTracks().forEach(t => {
-            t.stop();
-            console.log('✅ Track de entrada parada:', t.label);
-        });
-        inputStream = null;
-    }
+	// 3. Fecha a stream
+	if (inputStream) {
+		inputStream.getTracks().forEach(t => {
+			t.stop();
+			console.log('✅ Track de entrada parada:', t.label);
+		});
+		inputStream = null;
+	}
 
-    // 4. Limpa analyser e dados
-    inputAnalyser = null;
-    inputData = null;
-    
-    // 5. Reseta estado
-    inputSpeaking = false;
-    if (inputSilenceTimer) {
-        clearTimeout(inputSilenceTimer);
-        inputSilenceTimer = null;
-    }
-    
-    // 6. Atualiza UI
-    emitUIChange('onInputVolumeUpdate', { percent: 0 });
-    
-    console.log('✅ stopInputMonitor: Concluído');
-    return Promise.resolve();
+	// 4. Limpa analyser e dados
+	inputAnalyser = null;
+	inputData = null;
+
+	// 5. Reseta estado
+	inputSpeaking = false;
+	if (inputSilenceTimer) {
+		clearTimeout(inputSilenceTimer);
+		inputSilenceTimer = null;
+	}
+
+	// 6. Atualiza UI
+	emitUIChange('onInputVolumeUpdate', { percent: 0 });
+
+	debugLog('Fim da função: "stopInputMonitor"');
+	return Promise.resolve();
 }
 
 /* ===============================
@@ -784,197 +877,202 @@ function stopInputMonitor() {
 =============================== */
 
 async function startOutput() {
-    if (APP_CONFIG.MODE_DEBUG) {
-        const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
-        addTranscript('Outros', text);
-        return;
-    }
+	debugLog('Início da função: "startOutput"');
+	if (APP_CONFIG.MODE_DEBUG) {
+		const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
+		addTranscript('Outros', text);
+		return;
+	}
 
-    if (!UIElements.outputSelect?.value) return;
+	if (!UIElements.outputSelect?.value) return;
 
-    if (!audioContext) {
-        audioContext = new AudioContext();
-    }
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
 
-    // CRÍTICO: Evita recriar recorder E stream se já existem
-    if (outputRecorder && outputRecorder.state !== 'inactive') {
-        console.log('ℹ️ outputRecorder já existe e está ativo, pulando reconfiguração');
-        return;
-    }
+	// CRÍTICO: Evita recriar recorder E stream se já existem
+	if (outputRecorder && outputRecorder.state !== 'inactive') {
+		console.log('ℹ️ outputRecorder já existe e está ativo, pulando reconfiguração');
+		return;
+	}
 
-    // Se já existe stream mas precisa reconfigurar, limpa primeiro
-    if (outputStream) {
-        console.log('🧹 Limpando stream de saída anterior antes de recriar');
-        outputStream.getTracks().forEach(t => t.stop());
-        outputStream = null;
-    }
+	// Se já existe stream mas precisa reconfigurar, limpa primeiro
+	if (outputStream) {
+		console.log('🧹 Limpando stream de saída anterior antes de recriar');
+		outputStream.getTracks().forEach(t => t.stop());
+		outputStream = null;
+	}
 
-    try {
-        outputStream = await navigator.mediaDevices.getUserMedia({
-            audio: { deviceId: { exact: UIElements.outputSelect.value } },
-        });
+	try {
+		outputStream = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: UIElements.outputSelect.value } },
+		});
 
-        const source = audioContext.createMediaStreamSource(outputStream);
+		const source = audioContext.createMediaStreamSource(outputStream);
 
-        outputAnalyser = audioContext.createAnalyser();
-        outputAnalyser.fftSize = 256;
-        outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-        source.connect(outputAnalyser);
+		outputAnalyser = audioContext.createAnalyser();
+		outputAnalyser.fftSize = 256;
+		outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
+		source.connect(outputAnalyser);
 
-        // recorder SEMPRE existe
-        outputRecorder = new MediaRecorder(outputStream, {
-            mimeType: 'audio/webm;codecs=opus',
-        });
+		// recorder SEMPRE existe
+		outputRecorder = new MediaRecorder(outputStream, {
+			mimeType: 'audio/webm;codecs=opus',
+		});
 
-        outputRecorder.ondataavailable = e => {
-            console.log('🔥 output.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
+		outputRecorder.ondataavailable = e => {
+			console.log('🔥 output.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
 
-            outputChunks.push(e.data);
+			outputChunks.push(e.data);
 
-            // MODO ENTREVISTA – gancho futuro para OUTPUT
-            if (ModeController.allowPartialTranscription()) {
-                console.log('🧩 handlePartialOutputChunk chamado (output)');
-                handlePartialOutputChunk(e.data);
-            }
-        };
+			// MODO ENTREVISTA – gancho futuro para OUTPUT
+			if (ModeController.allowPartialTranscription()) {
+				console.log('🧩 handlePartialOutputChunk chamado (output)');
+				handlePartialOutputChunk(e.data);
+			}
+		};
 
-        outputRecorder.onstop = () => {
-            console.log('⏹️ outputRecorder.onstop chamado');
+		outputRecorder.onstop = () => {
+			console.log('⏹️ outputRecorder.onstop chamado');
 
-            // marca o momento exato em que a gravação parou
-            lastOutputStopAt = Date.now();
-            console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
+			// marca o momento exato em que a gravação parou
+			lastOutputStopAt = Date.now();
+			console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
 
-            // placeholder para mostrar que estamos aguardando transcrição
-            const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
-            lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
-            if (lastOutputPlaceholderEl) {
-                lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
-                if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
-            }
+			// placeholder para mostrar que estamos aguardando transcrição
+			const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
+			lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
+			if (lastOutputPlaceholderEl) {
+				lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
+				if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
+			}
 
-            transcribeOutput();
-        };
+			transcribeOutput();
+		};
 
-        // Inicia loop de volume apenas se não estiver rodando
-        if (!outputVolumeAnimationId) {
-            updateOutputVolume();
-        }
-        
-        console.log('✅ startOutput: Configurado com sucesso');
-    } catch (error) {
-        console.error('❌ Erro em startOutput:', error);
-        outputStream = null;
-        outputRecorder = null;
-        throw error;
-    }
+		// Inicia loop de volume apenas se não estiver rodando
+		if (!outputVolumeAnimationId) {
+			updateOutputVolume();
+		}
+
+		console.log('✅ startOutput: Monitoramento de saída de áudio configurado com sucesso');
+	} catch (error) {
+		console.error('❌ Erro em startOutput:', error);
+		outputStream = null;
+		outputRecorder = null;
+		throw error;
+	}
+
+	debugLog('Fim da função: "startOutput"');
 }
 
 function updateOutputVolume() {
-    // CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
-    if (!outputAnalyser || !outputData) {
-        console.log('⚠️ updateOutputVolume: analyser ou data não disponível, parando loop');
-        if (outputVolumeAnimationId) {
-            cancelAnimationFrame(outputVolumeAnimationId);
-            outputVolumeAnimationId = null;
-        }
-        emitUIChange('onOutputVolumeUpdate', { percent: 0 });
-        return;
-    }
+	debugLog('Início da função: "updateOutputVolume"');
+	// CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
+	if (!outputAnalyser || !outputData) {
+		console.log('⚠️ updateOutputVolume: analyser ou data não disponível, parando loop');
+		if (outputVolumeAnimationId) {
+			cancelAnimationFrame(outputVolumeAnimationId);
+			outputVolumeAnimationId = null;
+		}
+		emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+		return;
+	}
 
-    try {
-        outputAnalyser.getByteFrequencyData(outputData);
-        const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
-        const percent = Math.min(100, Math.round((avg / 60) * 100));
+	try {
+		outputAnalyser.getByteFrequencyData(outputData);
+		const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
+		const percent = Math.min(100, Math.round((avg / 60) * 100));
 
-        // Emite evento em vez de atualizar DOM diretamente
-        emitUIChange('onOutputVolumeUpdate', { percent });
+		// Emite evento em vez de atualizar DOM diretamente
+		emitUIChange('onOutputVolumeUpdate', { percent });
 
-        if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
-            if (!outputSpeaking) {
-                outputSpeaking = true;
-                outputChunks = [];
+		if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
+			if (!outputSpeaking) {
+				outputSpeaking = true;
+				outputChunks = [];
 
-                const slice = ModeController.mediaRecorderTimeslice();
-                lastOutputStartAt = Date.now();
-                console.log(
-                    '📊 iniciando gravação de saída (outputRecorder.start) - startAt',
-                    new Date(lastOutputStartAt).toLocaleTimeString(),
-                );
-                slice ? outputRecorder.start(slice) : outputRecorder.start();
-            }
-            if (outputSilenceTimer) {
-                clearTimeout(outputSilenceTimer);
-                outputSilenceTimer = null;
-            }
-        } else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
-            outputSilenceTimer = setTimeout(() => {
-                outputSpeaking = false;
-                outputSilenceTimer = null;
-                console.log('⏹️ parando gravação de saída por silêncio (outputRecorder.stop)');
-                if (outputRecorder && outputRecorder.state === 'recording') {
-                    outputRecorder.stop();
-                }
-            }, OUTPUT_SILENCE_TIMEOUT);
-        }
-    } catch (error) {
-        console.error('❌ Erro em updateOutputVolume:', error);
-        if (outputVolumeAnimationId) {
-            cancelAnimationFrame(outputVolumeAnimationId);
-            outputVolumeAnimationId = null;
-        }
-        emitUIChange('onOutputVolumeUpdate', { percent: 0 });
-        return;
-    }
+				const slice = ModeController.mediaRecorderTimeslice();
+				lastOutputStartAt = Date.now();
+				console.log(
+					'📊 iniciando gravação de saída (outputRecorder.start) - startAt',
+					new Date(lastOutputStartAt).toLocaleTimeString(),
+				);
+				slice ? outputRecorder.start(slice) : outputRecorder.start();
+			}
+			if (outputSilenceTimer) {
+				clearTimeout(outputSilenceTimer);
+				outputSilenceTimer = null;
+			}
+		} else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
+			outputSilenceTimer = setTimeout(() => {
+				outputSpeaking = false;
+				outputSilenceTimer = null;
+				console.log('⏹️ parando gravação de saída por silêncio (outputRecorder.stop)');
+				if (outputRecorder && outputRecorder.state === 'recording') {
+					outputRecorder.stop();
+				}
+			}, OUTPUT_SILENCE_TIMEOUT);
+		}
+	} catch (error) {
+		console.error('❌ Erro em updateOutputVolume:', error);
+		if (outputVolumeAnimationId) {
+			cancelAnimationFrame(outputVolumeAnimationId);
+			outputVolumeAnimationId = null;
+		}
+		emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+		return;
+	}
 
-    // Continua o loop apenas se tudo estiver OK
-    outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
+	// Continua o loop apenas se tudo estiver OK
+	outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
+
+	debugLog('Fim da função: "updateOutputVolume"');
 }
 
 function stopOutputMonitor() {
-    console.log('🛑 stopOutputMonitor: Parando monitoramento de saída...');
-    
-    // 1. Para o loop de animation PRIMEIRO
-    if (outputVolumeAnimationId) {
-        cancelAnimationFrame(outputVolumeAnimationId);
-        outputVolumeAnimationId = null;
-        console.log('✅ Loop de animação de saída cancelado');
-    }
+	debugLog('Início da função: "stopOutputMonitor"');
+	// 1. Para o loop de animation PRIMEIRO
+	if (outputVolumeAnimationId) {
+		cancelAnimationFrame(outputVolumeAnimationId);
+		outputVolumeAnimationId = null;
+		console.log('✅ Loop de animação de saída cancelado');
+	}
 
-    // 2. Para o recorder se estiver gravando
-    if (outputRecorder) {
-        if (outputRecorder.state === 'recording') {
-            console.log('⏹️ Parando recorder de saída...');
-            outputRecorder.stop();
-        }
-        outputRecorder = null;
-    }
+	// 2. Para o recorder se estiver gravando
+	if (outputRecorder) {
+		if (outputRecorder.state === 'recording') {
+			console.log('⏹️ Parando recorder de saída...');
+			outputRecorder.stop();
+		}
+		outputRecorder = null;
+	}
 
-    // 3. Fecha a stream
-    if (outputStream) {
-        outputStream.getTracks().forEach(t => {
-            t.stop();
-            console.log('✅ Track de saída parada:', t.label);
-        });
-        outputStream = null;
-    }
+	// 3. Fecha a stream
+	if (outputStream) {
+		outputStream.getTracks().forEach(t => {
+			t.stop();
+			console.log('✅ Track de saída parada:', t.label);
+		});
+		outputStream = null;
+	}
 
-    // 4. Limpa analyser e dados
-    outputAnalyser = null;
-    outputData = null;
-    
-    // 5. Reseta estado
-    outputSpeaking = false;
-    if (outputSilenceTimer) {
-        clearTimeout(outputSilenceTimer);
-        outputSilenceTimer = null;
-    }
-    
-    // 6. Atualiza UI
-    emitUIChange('onOutputVolumeUpdate', { percent: 0 });
-    
-    console.log('✅ stopOutputMonitor: Concluído');
-    return Promise.resolve();
+	// 4. Limpa analyser e dados
+	outputAnalyser = null;
+	outputData = null;
+
+	// 5. Reseta estado
+	outputSpeaking = false;
+	if (outputSilenceTimer) {
+		clearTimeout(outputSilenceTimer);
+		outputSilenceTimer = null;
+	}
+
+	// 6. Atualiza UI
+	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+
+	debugLog('Fim da função: "stopOutputMonitor"');
+	return Promise.resolve();
 }
 
 /* ===============================
@@ -982,6 +1080,7 @@ function stopOutputMonitor() {
 =============================== */
 
 async function handlePartialInputChunk(blobChunk) {
+	debugLog('Início da função: "handlePartialInputChunk"');
 	if (!ModeController.isInterviewMode()) return;
 
 	// ignora ruído
@@ -1009,6 +1108,8 @@ async function handlePartialInputChunk(blobChunk) {
 			console.warn('⚠️ erro na transcrição parcial (INPUT)', err);
 		}
 	}, 180); // janela curta (reduzida de 250 -> 180)
+
+	debugLog('Fim da função:  "handlePartialInputChunk"');
 }
 
 /* ===============================
@@ -1016,6 +1117,7 @@ async function handlePartialInputChunk(blobChunk) {
 =============================== */
 
 function handlePartialOutputChunk(blobChunk) {
+	debugLog('Início da função: "handlePartialOutputChunk"');
 	if (!ModeController.isInterviewMode()) return;
 
 	// evita blobs pequenos demais (sem header válido)
@@ -1091,6 +1193,8 @@ function handlePartialOutputChunk(blobChunk) {
 			console.warn('⚠️ erro na transcrição parcial (OUTPUT)', err);
 		}
 	}, 120); // 🔥 janela menor (reduzida de 180 -> 120)
+
+	debugLog('Fim da função: "handlePartialOutputChunk"');
 }
 
 /* ===============================
@@ -1098,6 +1202,7 @@ function handlePartialOutputChunk(blobChunk) {
 =============================== */
 
 async function transcribeOutputPartial(blob) {
+	debugLog('Início da função: "transcribeOutputPartial"');
 	const tBlobToBuffer = Date.now();
 	const buffer = Buffer.from(await blob.arrayBuffer());
 	console.log('timing (partial): bufferConv', Date.now() - tBlobToBuffer, 'ms, size', buffer.length);
@@ -1107,6 +1212,8 @@ async function transcribeOutputPartial(blob) {
 	console.log('timing (partial): ipc_stt_roundtrip', Date.now() - tSend, 'ms');
 
 	console.log('📝 transcrição parcial de saída ->', partial);
+
+	debugLog('Fim da função: "transcribeOutputPartial"');
 	return partial;
 }
 
@@ -1115,6 +1222,7 @@ async function transcribeOutputPartial(blob) {
 =============================== */
 
 async function transcribeInput() {
+	debugLog('Início da função: "transcribeInput"');
 	if (!inputChunks.length) return;
 
 	const blob = new Blob(inputChunks, { type: 'audio/webm' });
@@ -1172,9 +1280,12 @@ async function transcribeInput() {
 	}
 
 	handleSpeech(YOU, text);
+
+	debugLog('Fim da função: "transcribeInput"');
 }
 
 async function transcribeOutput() {
+	debugLog('Início da função: "transcribeOutput"');
 	if (!outputChunks.length) return;
 
 	const blob = new Blob(outputChunks, { type: 'audio/webm' });
@@ -1242,6 +1353,8 @@ async function transcribeOutput() {
 		}
 		closeCurrentQuestion();
 	}
+
+	debugLog('Fim da função: "transcribeOutput"');
 }
 
 /* ===============================
@@ -1249,6 +1362,7 @@ async function transcribeOutput() {
 =============================== */
 
 function handleSpeech(author, text) {
+	debugLog('Início da função: "handleSpeech"');
 	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
 	console.log('🔊 handleSpeech', { author, raw: text, cleaned });
 	if (cleaned.length < 3) return;
@@ -1305,6 +1419,8 @@ function handleSpeech(author, text) {
 
 		renderCurrentQuestion();
 	}
+
+	debugLog('Fim da função: "handleSpeech"');
 }
 
 /* ===============================
@@ -1312,6 +1428,7 @@ function handleSpeech(author, text) {
 =============================== */
 
 function closeCurrentQuestion() {
+	debugLog('Início da função: "closeCurrentQuestion"');
 	resetInterviewTurnState();
 	console.log('🚪 closeCurrentQuestion called', {
 		interviewTurnId,
@@ -1377,9 +1494,12 @@ function closeCurrentQuestion() {
 		console.log('🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT');
 		promoteCurrentToHistory(currentQuestion.text);
 	}
+
+	debugLog('Fim da função: "closeCurrentQuestion"');
 }
 
 function closeCurrentQuestionForced() {
+	debugLog('Início da função: "closeCurrentQuestionForced"');
 	// log temporario para testar a aplicação só remover depois
 	console.log('🚪 Fechando pergunta:', currentQuestion.text);
 
@@ -1397,11 +1517,16 @@ function closeCurrentQuestionForced() {
 	selectedQuestionId = null; // 👈 libera seleção
 	renderQuestionsHistory();
 	renderCurrentQuestion();
+
+	debugLog('Fim da função: "closeCurrentQuestionForced"');
 }
 
 function resetInterviewTurnState() {
+	debugLog('Início da função: "resetInterviewTurnState"');
 	outputPartialText = '';
 	outputPartialChunks = [];
+
+	debugLog('Fim da função: "resetInterviewTurnState"');
 }
 
 /* ===============================
@@ -1410,9 +1535,12 @@ function resetInterviewTurnState() {
 
 // 🔥 Verifica o Status da API
 async function checkApiKeyStatus() {
+	debugLog('Início da função: "checkApiKeyStatus"');
 	try {
 		const status = await ipcRenderer.invoke('GET_OPENAI_API_STATUS');
 		console.log('🔑 Status da API key:', status);
+
+		debugLog('Fim da função: "checkApiKeyStatus"');
 		return status;
 	} catch (error) {
 		console.warn('⚠️ Não foi possível verificar status da API:', error);
@@ -1421,29 +1549,31 @@ async function checkApiKeyStatus() {
 }
 
 // 🔥 Inicializa o processo principal com a chave já salva no ConfigManager
-async function syncApiKeyOnStart() {
-	try {
-		// 🔥 O main.js já inicializa automaticamente com a chave do secure store
-		console.log('🔄 Verificando status do cliente OpenAI...');
+// async function syncApiKeyOnStart() {
+// 	try {
+// 		// 🔥 O main.js já inicializa automaticamente com a chave do secure store
+// 		console.log('🔄 Verificando status do cliente OpenAI...');
 
-		// 🔥 VERIFICAR API KEY ANTES DE CONTINUAR
-		const status = await checkApiKeyStatus();
+// 		// 🔥 VERIFICAR API KEY ANTES DE CONTINUAR
+// 		const status = await checkApiKeyStatus();
 
-		if (status.initialized) {
-			console.log('✅ Cliente OpenAI já inicializado no main process');
-		} else {
-			updateStatusMessage('❌ API key não configurada. Configure em "API e Modelos" → OpenAI');
-			console.log('⚠️ Cliente OpenAI não inicializado - Usuário precisa configurar uma chave');
-		}
-	} catch (err) {
-		console.warn('⚠️ syncApiKeyOnStart falhou:', err);
-	}
-}
+// 		if (status.initialized) {
+// 			console.log('✅ Cliente OpenAI já inicializado no main process');
+// 		} else {
+// 			updateStatusMessage('❌ API key não configurada. Configure em "API e Modelos" → OpenAI');
+// 			console.log('⚠️ Cliente OpenAI não inicializado - Usuário precisa configurar uma chave');
+// 		}
+// 	} catch (err) {
+// 		console.warn('⚠️ syncApiKeyOnStart falhou:', err);
+// 	}
+// }
 
 /* ===============================
    GPT
 =============================== */
 async function askGpt() {
+	var teste = true;
+	debugLog('Início da função: "askGpt"');
 	const text = getSelectedQuestionText();
 
 	if (!text || text.trim().length < 5) {
@@ -1453,6 +1583,8 @@ async function askGpt() {
 
 	const isCurrent = selectedQuestionId === CURRENT_QUESTION_ID;
 	const questionId = isCurrent ? CURRENT_QUESTION_ID : selectedQuestionId;
+
+	if (teste) return; // 🔒 DESABILITADO TEMPORARIAMENTE
 
 	// 🛡️ MODO ENTREVISTA — bloqueia duplicação APENAS para histórico
 	if (ModeController.isInterviewMode() && !isCurrent) {
@@ -1524,13 +1656,15 @@ async function askGpt() {
 		let streamedText = '';
 
 		console.log('⏳ enviando para o GPT via stream...');
-		ipcRenderer.invoke('ask-gpt-stream', [
-			{ role: 'system', content: SYSTEM_PROMPT },
-			{ role: 'user', content: text },
-		]).catch(err => {
-			console.error('❌ Erro ao chamar ask-gpt-stream:', err);
-			updateStatusMessage('❌ Erro ao enviar para GPT');
-		});
+		ipcRenderer
+			.invoke('ask-gpt-stream', [
+				{ role: 'system', content: SYSTEM_PROMPT },
+				{ role: 'user', content: text },
+			])
+			.catch(err => {
+				console.error('❌ Erro ao chamar ask-gpt-stream:', err);
+				updateStatusMessage('❌ Erro ao enviar para GPT');
+			});
 
 		const onChunk = (_, token) => {
 			streamedText += token;
@@ -1629,6 +1763,8 @@ async function askGpt() {
 	// marca que o GPT respondeu esse turno (batch)
 	gptAnsweredTurnId = interviewTurnId;
 	gptRequestedTurnId = null;
+
+	debugLog('Fim da função: "askGpt"');
 }
 
 /* ===============================
@@ -1636,6 +1772,7 @@ async function askGpt() {
 =============================== */
 
 function addTranscript(author, text, time) {
+	debugLog('Início da função: "addTranscript"');
 	let timeStr;
 	if (time) {
 		if (typeof time === 'number') timeStr = new Date(time).toLocaleTimeString();
@@ -1659,9 +1796,9 @@ function addTranscript(author, text, time) {
 	// Retorna um objeto proxy que simula um elemento DOM para compatibilidade
 	// Usado quando a transcrição é um placeholder que será atualizado depois
 	const placeholderProxy = {
-		dataset: { 
-			startAt: typeof time === 'number' ? time : Date.now(), 
-			stopAt: null 
+		dataset: {
+			startAt: typeof time === 'number' ? time : Date.now(),
+			stopAt: null,
 		},
 		// Permite que código posterior trate como elemento DOM
 		classList: {
@@ -1669,13 +1806,15 @@ function addTranscript(author, text, time) {
 			remove: () => {},
 			contains: () => false,
 			toggle: () => false,
-		}
+		},
 	};
 
+	debugLog('Fim da função: "addTranscript"');
 	return placeholderProxy;
 }
 
 function renderCurrentQuestion() {
+	debugLog('Início da função: "renderCurrentQuestion"');
 	if (!currentQuestion.text) {
 		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
 		return;
@@ -1697,9 +1836,12 @@ function renderCurrentQuestion() {
 	};
 
 	emitUIChange('onCurrentQuestionUpdate', questionData);
+
+	debugLog('Fim da função: "renderCurrentQuestion"');
 }
 
 function renderQuestionsHistory() {
+	debugLog('Início da função: "renderQuestionsHistory"');
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const historyData = [...questionsHistory].reverse().map(q => {
 		let label = q.text;
@@ -1720,6 +1862,8 @@ function renderQuestionsHistory() {
 	emitUIChange('onQuestionsHistoryUpdate', historyData);
 
 	scrollToSelectedQuestion();
+
+	debugLog('Fim da função: "renderQuestionsHistory"');
 }
 
 function clearAllSelections() {
@@ -1734,6 +1878,7 @@ function scrollToSelectedQuestion() {
 }
 
 function getSelectedQuestionText() {
+	debugLog('Início da função: "getSelectedQuestionText"');
 	// 1️⃣ Se existe seleção explícita
 	if (selectedQuestionId === CURRENT_QUESTION_ID) {
 		return currentQuestion.text;
@@ -1749,10 +1894,12 @@ function getSelectedQuestionText() {
 		return currentQuestion.text;
 	}
 
+	debugLog('Fim da função: "getSelectedQuestionText"');
 	return '';
 }
 
 function renderGptAnswer(questionId, markdownText) {
+	debugLog('Início da função: "renderGptAnswer"');
 	// 🔥 Renderiza markdown e retorna HTML - config-manager aplica ao DOM
 	const short = shortenAnswer(markdownText, 2);
 	const html = marked.parse(short);
@@ -1786,9 +1933,12 @@ function renderGptAnswer(questionId, markdownText) {
 	} catch (err) {
 		console.warn('⚠️ falha ao marcar pergunta como respondida:', err);
 	}
+
+	debugLog('Fim da função: "renderGptAnswer"');
 }
 
 function resetInterviewState() {
+	debugLog('Início da função: "resetInterviewState"');
 	currentQuestion = { text: '', lastUpdate: 0, finalized: false };
 	questionsHistory = [];
 	selectedQuestionId = null;
@@ -1800,21 +1950,24 @@ function resetInterviewState() {
 	clearAllSelections();
 	renderQuestionsHistory();
 	renderCurrentQuestion();
+
+	debugLog('Fim da função: "resetInterviewState"');
 }
 
 // 🔥 NOVO: Verifica se existe um modelo de IA ativo e retorna o nome do modelo
 function hasActiveModel() {
+	debugLog('Início da função: "hasActiveModel"');
 	if (!window.configManager) {
 		console.warn('⚠️ ConfigManager não inicializado ainda');
 		return { active: false, model: null };
 	}
-	
+
 	const config = window.configManager.config;
 	if (!config || !config.api) {
 		console.warn('⚠️ Config ou api não disponível');
 		return { active: false, model: null };
 	}
-	
+
 	// Verifica se algum modelo está ativo e retorna o nome
 	const providers = ['openai', 'google', 'openrouter', 'custom'];
 	for (const provider of providers) {
@@ -1823,18 +1976,19 @@ function hasActiveModel() {
 			return { active: true, model: provider };
 		}
 	}
-	
+
 	console.warn('⚠️ Nenhum modelo ativo encontrado');
+
+	debugLog('Fim da função: "hasActiveModel"');
 	return { active: false, model: null };
 }
 
 async function listenToggleBtn() {
-	console.log('🔥 DEBUG: listenToggleBtn() chamado!');
-	
+	debugLog('Início da função: "listenToggleBtn"');
 	// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
 	const { active: hasModel, model: activeModel } = hasActiveModel();
 	console.log(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`);
-	
+
 	if (!isRunning && !hasModel) {
 		const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
 		console.warn(`⚠️ ${errorMsg}`);
@@ -1842,11 +1996,11 @@ async function listenToggleBtn() {
 		emitUIChange('onError', errorMsg);
 		return;
 	}
-	
+
 	// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
 	const hasOutputDevice = UIElements.outputSelect?.value;
 	console.log(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`);
-	
+
 	if (!isRunning && !hasOutputDevice) {
 		const errorMsg = 'Selecione um dispositivo de áudio (saída) para ouvir a reunião';
 		console.warn(`⚠️ ${errorMsg}`);
@@ -1867,9 +2021,12 @@ async function listenToggleBtn() {
 	updateStatusMessage(statusMsg);
 	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
 	await (isRunning ? startAudio() : stopAudio());
+
+	debugLog('Fim da função: "listenToggleBtn"');
 }
 
 function handleQuestionClick(questionId) {
+	debugLog('Início da função: "handleQuestionClick"');
 	selectedQuestionId = questionId;
 	clearAllSelections();
 	renderQuestionsHistory();
@@ -1912,9 +2069,12 @@ function handleQuestionClick(questionId) {
 
 	// ❓ Ainda não respondida → chama GPT
 	askGpt();
+
+	debugLog('Fim da função: "handleQuestionClick"');
 }
 
 function applyOpacity(value) {
+	debugLog('Início da função: "applyOpacity"');
 	const appOpacity = parseFloat(value);
 
 	// aplica opacidade no conteúdo geral
@@ -1928,17 +2088,16 @@ function applyOpacity(value) {
 
 	// logs temporários para debug
 	console.log('🎚️ Opacity change | app:', value, '| topBar:', topbarOpacity);
+
+	debugLog('Fim da função: "applyOpacity"');
 }
 
 // 🔥 Novo: atualizar status sem tocar em DOM
 function updateStatusMessage(message) {
+	debugLog('Início da função: "updateStatusMessage"');
 	emitUIChange('onStatusUpdate', { message });
+	debugLog('Fim da função: "updateStatusMessage"');
 }
-
-/* ===============================
-   ATALHOS GLOBAIS - MOVED TO CONFIG-MANAGER
-=============================== */
-// Listeners registrados via config-manager.js
 
 /* ===============================
    MOCK / DEBUG
@@ -2050,41 +2209,6 @@ marked.setOptions({
 	breaks: true,
 });
 
-/* ===============================
-   EVENT LISTENERS MOVED TO CONFIG-MANAGER
-   darkToggle, opacitySlider, btnClose listeners
-=============================== */
-
-/* ===============================
-   EVENT LISTENERS MOVED TO CONFIG-MANAGER
-   (renderrer.js é agora apenas Services)
-=============================== */
-
-/* ===============================
-   DRAG AND DROP DA JANELA - MOVED TO CONFIG-MANAGER
-=============================== */
-// Drag logic agora está em config-manager.js
-// Mantém as funções abaixo como utilities públicas:
-
-/* ===============================
-   DOMContentLoaded - INITIALIZATION MOVED TO CONFIG-MANAGER
-=============================== */
-// Controllers now handle DOMContentLoaded initialization
-// renderer.js kept only for direct utility calls if needed
-
-/* ===============================
-   CLICK-THROUGH - MOVED TO CONFIG-MANAGER
-=============================== */
-
-/* ===============================
-   GLOBAL ERROR HANDLING - MOVED TO CONFIG-MANAGER
-=============================== */
-
-/* ===============================
-   PUBLIC API FOR CONFIG-MANAGER
-   (Funções que o Controller chama)
-=============================== */
-
 // Exporta funções públicas que o controller pode chamar
 const RendererAPI = {
 	// Áudio - Gravação
@@ -2094,9 +2218,11 @@ const RendererAPI = {
 	stopOutput: stopOutputMonitor,
 	restartAudioPipeline,
 
-	// 🔥 NOVO: Áudio - Monitoramento de volume
+	// Áudio - Monitoramento de volume
 	startInputVolumeMonitoring,
 	startOutputVolumeMonitoring,
+	stopInputVolumeMonitoring,
+	stopOutputVolumeMonitoring,
 
 	// Entrevista
 	listenToggleBtn,
@@ -2105,7 +2231,7 @@ const RendererAPI = {
 	startMockInterview,
 
 	// Modo
-	changeMode: (mode) => {
+	changeMode: mode => {
 		CURRENT_MODE = mode;
 	},
 	getMode: () => CURRENT_MODE,
@@ -2116,16 +2242,16 @@ const RendererAPI = {
 
 	// UI
 	applyOpacity,
-	updateMockBadge: (show) => {
+	updateMockBadge: show => {
 		emitUIChange('onMockBadgeUpdate', { visible: show });
 	},
-	setMockToggle: (checked) => {
+	setMockToggle: checked => {
 		if (UIElements.mockToggle) {
 			UIElements.mockToggle.checked = checked;
 		}
 		APP_CONFIG.MODE_DEBUG = checked;
 	},
-	setModeSelect: (mode) => {
+	setModeSelect: mode => {
 		emitUIChange('onModeSelectUpdate', { mode });
 	},
 
@@ -2147,7 +2273,10 @@ const RendererAPI = {
 
 			setTimeout(() => ipcRenderer.send('START_WINDOW_DRAG'), 40);
 
-			const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || { x: 0, y: 0 };
+			const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || {
+				x: 0,
+				y: 0,
+			};
 			const startCursor = { x: event.screenX, y: event.screenY };
 			let lastAnimation = 0;
 
@@ -2159,7 +2288,10 @@ const RendererAPI = {
 				const dx = ev.screenX - startCursor.x;
 				const dy = ev.screenY - startCursor.y;
 
-				ipcRenderer.send('MOVE_WINDOW_TO', { x: startBounds.x + dx, y: startBounds.y + dy });
+				ipcRenderer.send('MOVE_WINDOW_TO', {
+					x: startBounds.x + dx,
+					y: startBounds.y + dy,
+				});
 			}
 
 			function onPointerUp(ev) {
@@ -2200,7 +2332,7 @@ const RendererAPI = {
 	},
 
 	// Click-through
-	setClickThrough: (enabled) => {
+	setClickThrough: enabled => {
 		ipcRenderer.send('SET_CLICK_THROUGH', enabled);
 	},
 	updateClickThroughButton: (enabled, btnToggle) => {
@@ -2213,7 +2345,7 @@ const RendererAPI = {
 	},
 
 	// UI Registration
-	registerUIElements: (elements) => {
+	registerUIElements: elements => {
 		registerUIElements(elements);
 	},
 	onUIChange: (eventName, callback) => {
@@ -2221,7 +2353,7 @@ const RendererAPI = {
 	},
 
 	// API Key
-	setAppConfig: (config) => {
+	setAppConfig: config => {
 		APP_CONFIG = config;
 	},
 	getAppConfig: () => APP_CONFIG,
@@ -2252,7 +2384,8 @@ const RendererAPI = {
 					renderCurrentQuestion();
 
 					if (APP_CONFIG.MODE_DEBUG) {
-						const msg = e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
+						const msg =
+							e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
 						updateStatusMessage(msg);
 						console.log('📌 Atalho Selecionou:', selectedQuestionId);
 						return;
@@ -2264,22 +2397,22 @@ const RendererAPI = {
 	},
 
 	// IPC Listeners
-	onApiKeyUpdated: (callback) => {
+	onApiKeyUpdated: callback => {
 		ipcRenderer.on('API_KEY_UPDATED', callback);
 	},
-	onToggleAudio: (callback) => {
+	onToggleAudio: callback => {
 		ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
 	},
-	onAskGpt: (callback) => {
+	onAskGpt: callback => {
 		ipcRenderer.on('CMD_ASK_GPT', callback);
 	},
-	onGptStreamChunk: (callback) => {
+	onGptStreamChunk: callback => {
 		ipcRenderer.on('GPT_STREAM_CHUNK', callback);
 	},
-	onGptStreamEnd: (callback) => {
+	onGptStreamEnd: callback => {
 		ipcRenderer.on('GPT_STREAM_END', callback);
 	},
-	sendRendererError: (error) => {
+	sendRendererError: error => {
 		try {
 			console.error('RENDERER ERROR', error.error || error.message || error);
 			ipcRenderer.send('RENDERER_ERROR', {
@@ -2300,3 +2433,9 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
 	window.RendererAPI = RendererAPI;
 }
+
+// Função de log debug estilizado
+function debugLog(msg) {
+	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: orange; font-weight: bold;');
+}
+console.log('🚀 Entrou no renderer.js');
