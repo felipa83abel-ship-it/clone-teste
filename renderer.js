@@ -585,129 +585,198 @@ async function startOutputVolumeMonitoring() {
 =============================== */
 
 async function startInput() {
-	if (APP_CONFIG.MODE_DEBUG) {
-		const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
-		addTranscript('Você', text);
-		return;
-	}
+    if (APP_CONFIG.MODE_DEBUG) {
+        const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
+        addTranscript('Você', text);
+        return;
+    }
 
-	if (!UIElements.inputSelect?.value) return;
+    if (!UIElements.inputSelect?.value) return;
 
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
+    if (!audioContext) {
+        audioContext = new AudioContext();
+    }
 
-	// evita recriar stream
-	if (inputStream) return;
+    // CRÍTICO: Evita recriar recorder E stream se já existem
+    if (inputRecorder && inputRecorder.state !== 'inactive') {
+        console.log('ℹ️ inputRecorder já existe e está ativo, pulando reconfiguração');
+        return;
+    }
 
-	inputStream = await navigator.mediaDevices.getUserMedia({
-		audio: { deviceId: { exact: UIElements.inputSelect.value } },
-	});
+    // Se já existe stream mas precisa reconfigurar, limpa primeiro
+    if (inputStream) {
+        console.log('🧹 Limpando stream de entrada anterior antes de recriar');
+        inputStream.getTracks().forEach(t => t.stop());
+        inputStream = null;
+    }
 
-	const source = audioContext.createMediaStreamSource(inputStream);
+    try {
+        inputStream = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: { exact: UIElements.inputSelect.value } },
+        });
 
-	inputAnalyser = audioContext.createAnalyser();
-	inputAnalyser.fftSize = 256;
-	inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
-	source.connect(inputAnalyser);
+        const source = audioContext.createMediaStreamSource(inputStream);
 
-	// recorder SEMPRE existe
-	inputRecorder = new MediaRecorder(inputStream, {
-		mimeType: 'audio/webm;codecs=opus',
-	});
+        inputAnalyser = audioContext.createAnalyser();
+        inputAnalyser.fftSize = 256;
+        inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
+        source.connect(inputAnalyser);
 
-	inputRecorder.ondataavailable = e => {
-		console.log('📥 input.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
+        // recorder SEMPRE existe
+        inputRecorder = new MediaRecorder(inputStream, {
+            mimeType: 'audio/webm;codecs=opus',
+        });
 
-		inputChunks.push(e.data);
+        inputRecorder.ondataavailable = e => {
+            console.log('🔥 input.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
 
-		// 🚀 MODO ENTREVISTA — gancho futuro (ainda inativo)
-		if (ModeController.allowPartialTranscription()) {
-			console.log('🧩 handlePartialInputChunk chamado (input)');
-			handlePartialInputChunk(e.data);
-		}
-	};
-	inputRecorder.onstop = () => {
-		console.log('⏹️ inputRecorder.onstop chamado');
+            inputChunks.push(e.data);
 
-		// marca o momento exato em que a gravação parou
-		lastInputStopAt = Date.now();
-		console.log('⏱️ input stopped at', new Date(lastInputStopAt).toLocaleTimeString());
+            // MODO ENTREVISTA – gancho futuro (ainda inativo)
+            if (ModeController.allowPartialTranscription()) {
+                console.log('🧩 handlePartialInputChunk chamado (input)');
+                handlePartialInputChunk(e.data);
+            }
+        };
+        
+        inputRecorder.onstop = () => {
+            console.log('⏹️ inputRecorder.onstop chamado');
 
-		// adiciona placeholder visual para indicar que estamos aguardando a transcrição
-		// usa startAt se disponível para mostrar o horário inicial enquanto aguarda
-		const timeForPlaceholder = lastInputStartAt || lastInputStopAt;
-		lastInputPlaceholderEl = addTranscript(YOU, '...', timeForPlaceholder);
-		if (lastInputPlaceholderEl) {
-			lastInputPlaceholderEl.dataset.stopAt = lastInputStopAt;
-			if (lastInputStartAt) lastInputPlaceholderEl.dataset.startAt = lastInputStartAt;
-		}
+            // marca o momento exato em que a gravação parou
+            lastInputStopAt = Date.now();
+            console.log('⏱️ input stopped at', new Date(lastInputStopAt).toLocaleTimeString());
 
-		transcribeInput();
-	};
+            // adiciona placeholder visual para indicar que estamos aguardando a transcrição
+            // usa startAt se disponível para mostrar o horário inicial enquanto aguarda
+            const timeForPlaceholder = lastInputStartAt || lastInputStopAt;
+            lastInputPlaceholderEl = addTranscript(YOU, '...', timeForPlaceholder);
+            if (lastInputPlaceholderEl) {
+                lastInputPlaceholderEl.dataset.stopAt = lastInputStopAt;
+                if (lastInputStartAt) lastInputPlaceholderEl.dataset.startAt = lastInputStartAt;
+            }
 
-	updateInputVolume();
+            transcribeInput();
+        };
+
+        // Inicia loop de volume apenas se não estiver rodando
+        if (!inputVolumeAnimationId) {
+            updateInputVolume();
+        }
+        
+        console.log('✅ startInput: Configurado com sucesso');
+    } catch (error) {
+        console.error('❌ Erro em startInput:', error);
+        inputStream = null;
+        inputRecorder = null;
+        throw error;
+    }
 }
 
 function updateInputVolume() {
-	// 🔥 Se não há analyser, para o loop
-	if (!inputAnalyser) {
-		inputVolumeAnimationId = null;
-		return;
-	}
+    // CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
+    if (!inputAnalyser || !inputData) {
+        console.log('⚠️ updateInputVolume: analyser ou data não disponível, parando loop');
+        if (inputVolumeAnimationId) {
+            cancelAnimationFrame(inputVolumeAnimationId);
+            inputVolumeAnimationId = null;
+        }
+        emitUIChange('onInputVolumeUpdate', { percent: 0 });
+        return;
+    }
 
-	inputAnalyser.getByteFrequencyData(inputData);
-	const avg = inputData.reduce((a, b) => a + b, 0) / inputData.length;
-	const percent = Math.min(100, Math.round((avg / 80) * 100));
+    try {
+        inputAnalyser.getByteFrequencyData(inputData);
+        const avg = inputData.reduce((a, b) => a + b, 0) / inputData.length;
+        const percent = Math.min(100, Math.round((avg / 80) * 100));
 
-	// 🔥 Emite evento em vez de atualizar DOM diretamente
-	emitUIChange('onInputVolumeUpdate', { percent });
+        // Emite evento em vez de atualizar DOM diretamente
+        emitUIChange('onInputVolumeUpdate', { percent });
 
-	if (avg > INPUT_SPEECH_THRESHOLD && inputRecorder && isRunning) {
-		if (!inputSpeaking) {
-			inputSpeaking = true;
-			inputChunks = [];
+        if (avg > INPUT_SPEECH_THRESHOLD && inputRecorder && isRunning) {
+            if (!inputSpeaking) {
+                inputSpeaking = true;
+                inputChunks = [];
 
-			const slice = ModeController.mediaRecorderTimeslice();
-			lastInputStartAt = Date.now();
-			console.log(
-				'🎙️ iniciando gravação de entrada (inputRecorder.start) - startAt',
-				new Date(lastInputStartAt).toLocaleTimeString(),
-			);
-			slice ? inputRecorder.start(slice) : inputRecorder.start();
-		}
-		if (inputSilenceTimer) {
-			clearTimeout(inputSilenceTimer);
-			inputSilenceTimer = null;
-		}
-	} else if (inputSpeaking && !inputSilenceTimer && inputRecorder) {
-		inputSilenceTimer = setTimeout(() => {
-			inputSpeaking = false;
-			inputSilenceTimer = null; // 👈 MUITO IMPORTANTE
-			console.log('⏹️ parando gravação de entrada por silêncio (inputRecorder.stop)');
-			inputRecorder.stop();
-		}, INPUT_SILENCE_TIMEOUT);
-	}
+                const slice = ModeController.mediaRecorderTimeslice();
+                lastInputStartAt = Date.now();
+                console.log(
+                    '🎙️ iniciando gravação de entrada (inputRecorder.start) - startAt',
+                    new Date(lastInputStartAt).toLocaleTimeString(),
+                );
+                slice ? inputRecorder.start(slice) : inputRecorder.start();
+            }
+            if (inputSilenceTimer) {
+                clearTimeout(inputSilenceTimer);
+                inputSilenceTimer = null;
+            }
+        } else if (inputSpeaking && !inputSilenceTimer && inputRecorder) {
+            inputSilenceTimer = setTimeout(() => {
+                inputSpeaking = false;
+                inputSilenceTimer = null;
+                console.log('⏹️ parando gravação de entrada por silêncio (inputRecorder.stop)');
+                if (inputRecorder && inputRecorder.state === 'recording') {
+                    inputRecorder.stop();
+                }
+            }, INPUT_SILENCE_TIMEOUT);
+        }
+    } catch (error) {
+        console.error('❌ Erro em updateInputVolume:', error);
+        if (inputVolumeAnimationId) {
+            cancelAnimationFrame(inputVolumeAnimationId);
+            inputVolumeAnimationId = null;
+        }
+        emitUIChange('onInputVolumeUpdate', { percent: 0 });
+        return;
+    }
 
-	inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
+    // Continua o loop apenas se tudo estiver OK
+    inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
 }
 
 function stopInputMonitor() {
-	// 🔥 Para o loop de animation
-	if (inputVolumeAnimationId) {
-		cancelAnimationFrame(inputVolumeAnimationId);
-		inputVolumeAnimationId = null;
-	}
+    console.log('🛑 stopInputMonitor: Parando monitoramento de entrada...');
+    
+    // 1. Para o loop de animation PRIMEIRO
+    if (inputVolumeAnimationId) {
+        cancelAnimationFrame(inputVolumeAnimationId);
+        inputVolumeAnimationId = null;
+        console.log('✅ Loop de animação de entrada cancelado');
+    }
 
-	if (inputStream) {
-		inputStream.getTracks().forEach(t => t.stop());
-		inputStream = null;
-	}
+    // 2. Para o recorder se estiver gravando
+    if (inputRecorder) {
+        if (inputRecorder.state === 'recording') {
+            console.log('⏹️ Parando recorder de entrada...');
+            inputRecorder.stop();
+        }
+        inputRecorder = null;
+    }
 
-	inputAnalyser = null;
-	inputData = null;
-	emitUIChange('onInputVolumeUpdate', { percent: 0 });
-	return Promise.resolve();
+    // 3. Fecha a stream
+    if (inputStream) {
+        inputStream.getTracks().forEach(t => {
+            t.stop();
+            console.log('✅ Track de entrada parada:', t.label);
+        });
+        inputStream = null;
+    }
+
+    // 4. Limpa analyser e dados
+    inputAnalyser = null;
+    inputData = null;
+    
+    // 5. Reseta estado
+    inputSpeaking = false;
+    if (inputSilenceTimer) {
+        clearTimeout(inputSilenceTimer);
+        inputSilenceTimer = null;
+    }
+    
+    // 6. Atualiza UI
+    emitUIChange('onInputVolumeUpdate', { percent: 0 });
+    
+    console.log('✅ stopInputMonitor: Concluído');
+    return Promise.resolve();
 }
 
 /* ===============================
@@ -715,128 +784,197 @@ function stopInputMonitor() {
 =============================== */
 
 async function startOutput() {
-	if (APP_CONFIG.MODE_DEBUG) {
-		console.log('🔊 Iniciando monitoramento de saída de áudio (modo teste)...');
-		return;
-	}
+    if (APP_CONFIG.MODE_DEBUG) {
+        const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
+        addTranscript('Outros', text);
+        return;
+    }
 
-	if (!UIElements.outputSelect?.value) return;
+    if (!UIElements.outputSelect?.value) return;
 
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
+    if (!audioContext) {
+        audioContext = new AudioContext();
+    }
 
-	// evita recriar stream
-	if (outputStream) return;
+    // CRÍTICO: Evita recriar recorder E stream se já existem
+    if (outputRecorder && outputRecorder.state !== 'inactive') {
+        console.log('ℹ️ outputRecorder já existe e está ativo, pulando reconfiguração');
+        return;
+    }
 
-	outputStream = await navigator.mediaDevices.getUserMedia({
-		audio: { deviceId: { exact: UIElements.outputSelect.value } },
-	});
+    // Se já existe stream mas precisa reconfigurar, limpa primeiro
+    if (outputStream) {
+        console.log('🧹 Limpando stream de saída anterior antes de recriar');
+        outputStream.getTracks().forEach(t => t.stop());
+        outputStream = null;
+    }
 
-	const source = audioContext.createMediaStreamSource(outputStream);
+    try {
+        outputStream = await navigator.mediaDevices.getUserMedia({
+            audio: { deviceId: { exact: UIElements.outputSelect.value } },
+        });
 
-	outputAnalyser = audioContext.createAnalyser();
-	outputAnalyser.fftSize = 256;
-	outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-	source.connect(outputAnalyser);
+        const source = audioContext.createMediaStreamSource(outputStream);
 
-	// recorder SEMPRE existe
-	outputRecorder = new MediaRecorder(outputStream, {
-		mimeType: 'audio/webm;codecs=opus',
-	});
+        outputAnalyser = audioContext.createAnalyser();
+        outputAnalyser.fftSize = 256;
+        outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
+        source.connect(outputAnalyser);
 
-	outputRecorder.ondataavailable = e => {
-		console.log('📥 output.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
+        // recorder SEMPRE existe
+        outputRecorder = new MediaRecorder(outputStream, {
+            mimeType: 'audio/webm;codecs=opus',
+        });
 
-		outputChunks.push(e.data);
+        outputRecorder.ondataavailable = e => {
+            console.log('🔥 output.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
 
-		// 🚀 MODO ENTREVISTA — gancho futuro para OUTPUT
-		if (ModeController.allowPartialTranscription()) {
-			console.log('🧩 handlePartialOutputChunk chamado (output)');
-			handlePartialOutputChunk(e.data);
-		}
-	};
+            outputChunks.push(e.data);
 
-	outputRecorder.onstop = () => {
-		console.log('⏹️ outputRecorder.onstop chamado');
+            // MODO ENTREVISTA – gancho futuro para OUTPUT
+            if (ModeController.allowPartialTranscription()) {
+                console.log('🧩 handlePartialOutputChunk chamado (output)');
+                handlePartialOutputChunk(e.data);
+            }
+        };
 
-		// marca o momento exato em que a gravação parou
-		lastOutputStopAt = Date.now();
-		console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
+        outputRecorder.onstop = () => {
+            console.log('⏹️ outputRecorder.onstop chamado');
 
-		// placeholder para mostrar que estamos aguardando transcrição
-		const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
-		lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
-		if (lastOutputPlaceholderEl) {
-			lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
-			if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
-		}
+            // marca o momento exato em que a gravação parou
+            lastOutputStopAt = Date.now();
+            console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
 
-		transcribeOutput();
-	};
+            // placeholder para mostrar que estamos aguardando transcrição
+            const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
+            lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
+            if (lastOutputPlaceholderEl) {
+                lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
+                if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
+            }
 
-	updateOutputVolume();
+            transcribeOutput();
+        };
+
+        // Inicia loop de volume apenas se não estiver rodando
+        if (!outputVolumeAnimationId) {
+            updateOutputVolume();
+        }
+        
+        console.log('✅ startOutput: Configurado com sucesso');
+    } catch (error) {
+        console.error('❌ Erro em startOutput:', error);
+        outputStream = null;
+        outputRecorder = null;
+        throw error;
+    }
 }
 
 function updateOutputVolume() {
-	// 🔥 Se não há analyser, para o loop
-	if (!outputAnalyser) {
-		outputVolumeAnimationId = null;
-		return;
-	}
+    // CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
+    if (!outputAnalyser || !outputData) {
+        console.log('⚠️ updateOutputVolume: analyser ou data não disponível, parando loop');
+        if (outputVolumeAnimationId) {
+            cancelAnimationFrame(outputVolumeAnimationId);
+            outputVolumeAnimationId = null;
+        }
+        emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+        return;
+    }
 
-	outputAnalyser.getByteFrequencyData(outputData);
-	const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
-	const percent = Math.min(100, Math.round((avg / 60) * 100));
+    try {
+        outputAnalyser.getByteFrequencyData(outputData);
+        const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
+        const percent = Math.min(100, Math.round((avg / 60) * 100));
 
-	// 🔥 Emite evento em vez de atualizar DOM diretamente
-	emitUIChange('onOutputVolumeUpdate', { percent });
+        // Emite evento em vez de atualizar DOM diretamente
+        emitUIChange('onOutputVolumeUpdate', { percent });
 
-	if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
-		if (!outputSpeaking) {
-			outputSpeaking = true;
-			outputChunks = [];
+        if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
+            if (!outputSpeaking) {
+                outputSpeaking = true;
+                outputChunks = [];
 
-			const slice = ModeController.mediaRecorderTimeslice();
-			lastOutputStartAt = Date.now();
-			console.log(
-				'🔊 iniciando gravação de saída (outputRecorder.start) - startAt',
-				new Date(lastOutputStartAt).toLocaleTimeString(),
-			);
-			slice ? outputRecorder.start(slice) : outputRecorder.start();
-		}
-		if (outputSilenceTimer) {
-			clearTimeout(outputSilenceTimer);
-			outputSilenceTimer = null;
-		}
-	} else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
-		outputSilenceTimer = setTimeout(() => {
-			outputSpeaking = false;
-			outputSilenceTimer = null; // 👈 MUITO IMPORTANTE
-			console.log('⏹️ parando gravação de saída por silêncio (outputRecorder.stop)');
-			outputRecorder.stop();
-		}, OUTPUT_SILENCE_TIMEOUT);
-	}
+                const slice = ModeController.mediaRecorderTimeslice();
+                lastOutputStartAt = Date.now();
+                console.log(
+                    '📊 iniciando gravação de saída (outputRecorder.start) - startAt',
+                    new Date(lastOutputStartAt).toLocaleTimeString(),
+                );
+                slice ? outputRecorder.start(slice) : outputRecorder.start();
+            }
+            if (outputSilenceTimer) {
+                clearTimeout(outputSilenceTimer);
+                outputSilenceTimer = null;
+            }
+        } else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
+            outputSilenceTimer = setTimeout(() => {
+                outputSpeaking = false;
+                outputSilenceTimer = null;
+                console.log('⏹️ parando gravação de saída por silêncio (outputRecorder.stop)');
+                if (outputRecorder && outputRecorder.state === 'recording') {
+                    outputRecorder.stop();
+                }
+            }, OUTPUT_SILENCE_TIMEOUT);
+        }
+    } catch (error) {
+        console.error('❌ Erro em updateOutputVolume:', error);
+        if (outputVolumeAnimationId) {
+            cancelAnimationFrame(outputVolumeAnimationId);
+            outputVolumeAnimationId = null;
+        }
+        emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+        return;
+    }
 
-	outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
+    // Continua o loop apenas se tudo estiver OK
+    outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
 }
 
 function stopOutputMonitor() {
-	// 🔥 Para o loop de animation
-	if (outputVolumeAnimationId) {
-		cancelAnimationFrame(outputVolumeAnimationId);
-		outputVolumeAnimationId = null;
-	}
+    console.log('🛑 stopOutputMonitor: Parando monitoramento de saída...');
+    
+    // 1. Para o loop de animation PRIMEIRO
+    if (outputVolumeAnimationId) {
+        cancelAnimationFrame(outputVolumeAnimationId);
+        outputVolumeAnimationId = null;
+        console.log('✅ Loop de animação de saída cancelado');
+    }
 
-	if (outputStream) {
-		outputStream.getTracks().forEach(t => t.stop());
-		outputStream = null;
-	}
+    // 2. Para o recorder se estiver gravando
+    if (outputRecorder) {
+        if (outputRecorder.state === 'recording') {
+            console.log('⏹️ Parando recorder de saída...');
+            outputRecorder.stop();
+        }
+        outputRecorder = null;
+    }
 
-	outputAnalyser = null;
-	outputData = null;
-	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
-	return Promise.resolve();
+    // 3. Fecha a stream
+    if (outputStream) {
+        outputStream.getTracks().forEach(t => {
+            t.stop();
+            console.log('✅ Track de saída parada:', t.label);
+        });
+        outputStream = null;
+    }
+
+    // 4. Limpa analyser e dados
+    outputAnalyser = null;
+    outputData = null;
+    
+    // 5. Reseta estado
+    outputSpeaking = false;
+    if (outputSilenceTimer) {
+        clearTimeout(outputSilenceTimer);
+        outputSilenceTimer = null;
+    }
+    
+    // 6. Atualiza UI
+    emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+    
+    console.log('✅ stopOutputMonitor: Concluído');
+    return Promise.resolve();
 }
 
 /* ===============================
@@ -1389,7 +1527,10 @@ async function askGpt() {
 		ipcRenderer.invoke('ask-gpt-stream', [
 			{ role: 'system', content: SYSTEM_PROMPT },
 			{ role: 'user', content: text },
-		]);
+		]).catch(err => {
+			console.error('❌ Erro ao chamar ask-gpt-stream:', err);
+			updateStatusMessage('❌ Erro ao enviar para GPT');
+		});
 
 		const onChunk = (_, token) => {
 			streamedText += token;
@@ -1725,7 +1866,7 @@ async function listenToggleBtn() {
 
 	updateStatusMessage(statusMsg);
 	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
-	isRunning ? startAudio() : stopAudio();
+	await (isRunning ? startAudio() : stopAudio());
 }
 
 function handleQuestionClick(questionId) {
