@@ -1058,12 +1058,12 @@ class ConfigManager {
 			const outputSelect = document.getElementById('audio-output-device');
 
 			if (inputSelect?.value) {
-								console.log('📊 Iniciando monitoramento de volume (input) com dispositivo:', inputSelect.value);
+				console.log('📊 Iniciando monitoramento de volume (input) com dispositivo:', inputSelect.value);
 				await window.RendererAPI.startInputVolumeMonitoring();
 			}
 
 			if (outputSelect?.value) {
-								console.log('📊 Iniciando monitoramento de volume (output) com dispositivo:', outputSelect.value);
+				console.log('📊 Iniciando monitoramento de volume (output) com dispositivo:', outputSelect.value);
 				await window.RendererAPI.startOutputVolumeMonitoring();
 			}
 
@@ -1427,12 +1427,21 @@ class ConfigManager {
 
 	// 🔥 NOVO: Registrar callbacks do renderer para atualizar DOM
 	registerRendererCallbacks() {
+		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
+		
+		// VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
+		if (!window.RendererAPI || typeof window.RendererAPI.onUIChange !== 'function') {
+			console.error('❌ ERRO CRÍTICO: window.RendererAPI.onUIChange não disponível!');
+			return;
+		}
+		
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
 		window.RendererAPI.onUIChange('onError', (message) => {
 			console.error(`❌ Erro renderizado: ${message}`);
 			this.showError(message);
 		});
-
+		console.log('✅ Callback onError registrado');
+		
 		// Transcrição
 		window.RendererAPI.onUIChange('onTranscriptAdd', (data) => {
 			const { author, text, timeStr, elementId } = data;
@@ -1671,7 +1680,7 @@ class ConfigManager {
 			if (interviewModeSelect) interviewModeSelect.value = mode;
 		});
 
-		console.log('✅ Callbacks do renderer registrados');
+		console.log('✅ registerRendererCallbacks: Todos os callbacks UI registrados com sucesso');
 	}
 }
 
