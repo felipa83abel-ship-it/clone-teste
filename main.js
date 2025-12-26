@@ -265,7 +265,8 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 		// 🔥 DEBUG: Log ANTES de processar
 		console.log(`main.js: Recebido SAVE_API_KEY - provider: ${provider}`);
 		console.log(`main.js: apiKey recebida (length: ${apiKey?.length || 0})`);
-		console.log(`main.js: apiKey completa: ${apiKey}`); // 🔥 TEMPORÁRIO
+		const masked = apiKey ? apiKey.substring(0, 8) + '...' : '';
+		console.log(`main.js: apiKey (masked): ${masked}`);
 
 		if (!apiKey || apiKey.trim().length < 2) {
 			console.warn('---> API key inválida ou muito curta');
@@ -280,14 +281,16 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 		// Salva de forma criptografada
 		secureStore.set(`apiKeys.${provider}`, trimmedKey);
 
-		// 🔥 VERIFICAÇÃO: Lê imediatamente para confirmar
+		// 🔥 VERIFICAÇÃO: Lê imediatamente para confirmar (mostrando apenas máscaras)
 		const verification = secureStore.get(`apiKeys.${provider}`);
 		console.log(`main.js: Verificação pós-save (length: ${verification?.length || 0})`);
 
 		if (verification !== trimmedKey) {
+			const sentMask = trimmedKey ? trimmedKey.substring(0, 8) + '...' : '';
+			const savedMask = verification ? String(verification).substring(0, 8) + '...' : '';
 			console.error(`main.js: CHAVE SALVA DIFERENTE DA ENVIADA!`);
-			console.error(`   Enviada: ${trimmedKey}`);
-			console.error(`   Salva: ${verification}`);
+			console.error(`   Enviada (masked): ${sentMask}`);
+			console.error(`   Salva (masked): ${savedMask}`);
 		}
 
 		console.log(`API key salva com segurança para provider: ${provider}`);

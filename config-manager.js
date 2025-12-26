@@ -414,10 +414,11 @@ class ConfigManager {
 				return { success: false, error: 'API key inválida' };
 			}
 
-			// 🔥 DEBUG: Log da chave ANTES de enviar ao main
+			// 🔥 DEBUG: Log da chave ANTES de enviar ao main (masked)
 			const trimmedKey = apiKey.trim();
 			console.log(`Enviando para main.js - provider: ${provider}, key length: ${trimmedKey.length}`);
-			console.log(`Chave completa: ${trimmedKey}`); // 🔥 TEMPORÁRIO - remover depois
+			const masked = trimmedKey ? trimmedKey.substring(0, 8) + '...' : '';
+			console.log(`Chave (masked): ${masked}`);
 
 			// Salva a chave de forma segura
 			await _ipc.invoke('SAVE_API_KEY', {
