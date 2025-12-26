@@ -39,6 +39,78 @@
 
 ---
 
+---
+
+## 📊 Arquitetura Confirmada
+
+### Separação de Responsabilidades ✅
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    index.html (View)                     │
+│  • Estrutura pura (ids, classes, data-attributes)       │
+│  • Zero lógica                                           │
+└─────────────────────────────────────────────────────────┘
+                            ↕
+┌─────────────────────────────────────────────────────────┐
+│           config-manager.js (Controller/UI)             │
+│  • Único lugar com document.getElementById()            │
+│  • Único lugar com addEventListener()                   │
+│  • Traduz eventos em chamadas RendererAPI               │
+│  • Renderiza dados emitidos pelo renderer               │
+└─────────────────────────────────────────────────────────┘
+                            ↕
+┌─────────────────────────────────────────────────────────┐
+│           renderer.js (Service/Model)                   │
+│  ✅ ZERO document.* (cego para UI)                      │
+│  ✅ ZERO addEventListener                               │
+│  ✅ Processa dados (audio, gpt, transcrição)            │
+│  ✅ Emite callbacks via onUIChange()                    │
+│  ✅ Expõe API via window.RendererAPI                    │
+└─────────────────────────────────────────────────────────┘
+                            ↕
+┌─────────────────────────────────────────────────────────┐
+│              main.js (Backend/Electron)                 │
+│  • I/O (arquivos, rede)                                 │
+│  • Integração OpenAI (Whisper, Chat)                    │
+│  • IPC handlers (SAVE_API_KEY, GET_API_KEY, etc)        │
+│  • Gerenciamento de janela (drag, click-through)        │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🏗️ Arquitetura Atual
+
+```
+INDEX.HTML (View)
+    └─ Apenas estrutura HTML + data-attributes
+
+CONFIG-MANAGER.JS (Controller)
+    ├─ Captura TODOS os eventos do DOM
+    ├─ Orquestra ações chamando RendererAPI
+    ├─ Gerencia estado de UI
+    ├─ Manipula DOM (classes, estilos)
+    └─ Persiste configurações
+
+RENDERER.JS (Model/Services)
+    ├─ NUNCA captura eventos DOM
+    ├─ Expõe RendererAPI com funções públicas
+    ├─ Contém TODA lógica de negócio
+    │  ├─ Captura de áudio
+    │  ├─ Orquestração de entrevista
+    │  ├─ Processamento GPT
+    │  └─ Renderização de UI
+    └─ Comunica com main.js via IPC
+
+MAIN.JS (Backend Services)
+    ├─ Operações de sistema
+    ├─ Integração com OpenAI
+    └─ IPC Handlers
+```
+
+---
+
 ## ✨ Funcionalidades Principais
 
 - ✅ Transcrição de áudio em tempo real (Whisper)
@@ -60,23 +132,27 @@
 ## 📦 Requisitos
 
 ### Sistema Operacional
+
 - Windows 10/11 (recomendado)
 - macOS 10.15+ (suporte parcial)
 - Linux (não testado)
 
 ### Software
+
 ```
 Node.js  → versão 18.x ou superior
 npm      → versão 8.x ou superior
 ```
 
 ### Hardware
+
 - **Microfone** (para captura de entrada)
 - **VoiceMeeter** ou similar (opcional, para captura de saída/outros participantes)
 - **RAM** → Mínimo 4GB (recomendado 8GB)
 - **Processador** → Multi-core (transcrição de áudio é intensiva)
 
 ### APIs Necessárias
+
 - **OpenAI API Key** (obrigatória para Whisper + GPT)
 - **Google API Key** (opcional, para Gemini)
 - **OpenRouter API Key** (opcional)
@@ -88,22 +164,26 @@ npm      → versão 8.x ou superior
 ## 🚀 Instalação
 
 ### 1. Clone o repositório
+
 ```bash
 git clone https://github.com/seu-usuario/askme.git
 cd askme
 ```
 
 ### 2. Instale as dependências
+
 ```bash
 npm install
 ```
 
 ### 3. Verifique a instalação
+
 ```bash
 npm list
 ```
 
 **Dependências esperadas:**
+
 ```
 askme@1.0.0
 ├── electron@39.2.7
@@ -119,29 +199,33 @@ askme@1.0.0
 ## ▶️ Execução
 
 ### Modo Desenvolvimento
+
 ```bash
 npm start
 ```
+
 - Hot reload habilitado via `electron-reload`
 - Console aberto com `Ctrl+Shift+I`
 - Logs detalhados no terminal
 
 ### Modo Produção
+
 ```bash
 npm run build
 ```
+
 - Sem hot reload
 - Console desabilitado
 - Otimizações de performance
 
 ### Atalhos de Teclado
 
-| Atalho | Ação |
-|--------|------|
-| `Ctrl+D` | Iniciar/parar escuta de áudio |
-| `Ctrl+Enter` | Enviar pergunta selecionada ao GPT |
-| `Ctrl+Shift+I` | Abrir DevTools (apenas desenvolvimento) |
-| `Ctrl+Shift+↑/↓` | Navegar entre perguntas (futuro) |
+| Atalho           | Ação                                    |
+| ---------------- | --------------------------------------- |
+| `Ctrl+D`         | Iniciar/parar escuta de áudio           |
+| `Ctrl+Enter`     | Enviar pergunta selecionada ao GPT      |
+| `Ctrl+Shift+I`   | Abrir DevTools (apenas desenvolvimento) |
+| `Ctrl+Shift+↑/↓` | Navegar entre perguntas (futuro)        |
 
 ---
 
@@ -163,12 +247,14 @@ askme/
 ### Arquivos Principais
 
 #### `main.js`
+
 - Criação da janela Electron (frameless, transparent, always-on-top)
 - IPC handlers (transcrição, GPT, API keys)
 - Armazenamento seguro via `electron-store`
 - Atalhos globais
 
 #### `renderer.js`
+
 - Captura de áudio (input/output via MediaRecorder)
 - Transcrição via OpenAI Whisper
 - Respostas GPT (batch e streaming)
@@ -176,12 +262,14 @@ askme/
 - Sistema de callbacks para UI
 
 #### `config-manager.js`
+
 - Gerenciamento de configurações (API keys, dispositivos, tema)
 - Controle de UI (DOM manipulation)
 - Inicialização de controllers
 - Event listeners
 
 #### `index.html`
+
 - Interface com menu lateral
 - Seções: Home, API e Modelos, Áudio e Tela, Privacidade, Outros
 - Dark mode toggle
@@ -192,6 +280,7 @@ askme/
 ## 📚 Documentação Adicional
 
 - 📋 **[Funcionalidades Detalhadas →](FEATURES.md)**
+
   - Lista completa de recursos por seção
   - Capturas de tela (futuro)
   - Exemplos de uso
@@ -207,6 +296,7 @@ askme/
 ## 🔧 Troubleshooting
 
 ### Aplicação não inicia
+
 ```bash
 # Limpar node_modules e reinstalar
 rm -rf node_modules package-lock.json
@@ -215,29 +305,34 @@ npm start
 ```
 
 ### API key não funciona
+
 1. Verifique se a chave tem 10+ caracteres
 2. Confirme se clicou em "Salvar Configurações"
 3. Clique em "Ativar" no modelo desejado
 4. Verifique o console (F12) para erros
 
 ### Áudio não captura
+
 1. Verifique permissões de microfone no sistema
 2. Selecione um dispositivo em "Áudio e Tela"
 3. Teste o volume (barra deve oscilar)
 4. Reinicie a aplicação se necessário
 
 ### Volume não oscila
+
 - O monitoramento inicia automaticamente ao selecionar dispositivo
 - Não é necessário clicar "Começar a Ouvir" para ver o volume
 - Se não funcionar, troque de dispositivo e aguarde 2 segundos
 
 ### Transcrição não acontece
+
 1. Confirme que o modelo está ativo (badge "Ativo")
 2. Verifique se clicou em "Começar a Ouvir"
 3. Faça barulho próximo ao microfone
 4. Aguarde alguns segundos (transcrição tem latência)
 
 ### Janela não move
+
 - O drag handle está no topo do menu lateral
 - Cursor deve virar "grab" ao passar o mouse
 - Se não funcionar, reabra a aplicação
@@ -279,5 +374,3 @@ Este projeto está sob a licença ISC. Veja o arquivo `LICENSE` para mais detalh
 - [ ] Modo de captura de tela (screenshots)
 - [ ] Sistema de plugins/extensões
 - [ ] Testes automatizados
-
-
