@@ -15,17 +15,17 @@ const _ipc =
 // (não precisa fazer require pois renderer.js é carregado primeiro no index.html)
 class ConfigManager {
 	constructor() {
-		debugLog('Início da função: "constructor" em config-manager.js');
+		debugLogConfig('Início da função: "constructor"');
 		this.config = this.loadConfig();
 		this.initEventListeners();
 		this.checkApiKeysStatus();
 
-		debugLog('Fim da função: "constructor" em config-manager.js');
+		debugLogConfig('Fim da função: "constructor"');
 	}
 
 	// Carrega configurações salvas
 	loadConfig() {
-		debugLog('Início da função: "loadConfig" em config-manager.js');
+		debugLogConfig('Início da função: "loadConfig"');
 		try {
 			const defaultConfig = {
 				api: {
@@ -104,13 +104,13 @@ class ConfigManager {
 
 				console.log('✅ Configurações carregadas do localStorage');
 
-				debugLog('Fim da função: "loadConfig"');
+				debugLogConfig('Fim da função: "loadConfig"');
 				return merged;
 			}
 
 			console.log('✅ Configurações default carregadas');
 
-			debugLog('Fim da função: "loadConfig"');
+			debugLogConfig('Fim da função: "loadConfig"');
 			return defaultConfig;
 		} catch (error) {
 			console.error('Erro ao carregar configurações:', error);
@@ -120,7 +120,7 @@ class ConfigManager {
 
 	// Inicializa listeners de eventos
 	initEventListeners() {
-		debugLog('Início da função: "initEventListeners"');
+		debugLogConfig('Início da função: "initEventListeners"');
 		// Menu lateral
 		document.querySelectorAll('.menu-item').forEach(item => {
 			item.addEventListener('click', e => {
@@ -336,12 +336,12 @@ class ConfigManager {
 
 		console.log('✅ Listeners de eventos inicializados');
 
-		debugLog('Fim da função: "initEventListeners"');
+		debugLogConfig('Fim da função: "initEventListeners"');
 	}
 
 	// 🔥 NOVO: Verifica status das API keys de todos os providers
 	async checkApiKeysStatus() {
-		debugLog('Início da função: "checkApiKeysStatus"');
+		debugLogConfig('Início da função: "checkApiKeysStatus"');
 		try {
 			const providers = ['openai', 'google', 'openrouter', 'custom'];
 
@@ -371,11 +371,11 @@ class ConfigManager {
 			console.error('❌ Erro ao verificar status das API keys:', error);
 		}
 
-		debugLog('Fim da função: "checkApiKeysStatus"');
+		debugLogConfig('Fim da função: "checkApiKeysStatus"');
 	}
 
 	updateApiKeyFieldStatus(provider, hasKey) {
-		debugLog('Início da função: "updateApiKeyFieldStatus"');
+		debugLogConfig('Início da função: "updateApiKeyFieldStatus"');
 		const input = document.getElementById(`${provider}-api-key`);
 
 		if (input) {
@@ -400,12 +400,12 @@ class ConfigManager {
 			console.warn(`⚠️ Input ${provider}-api-key não encontrado no DOM`);
 		}
 
-		debugLog('Fim da função: "updateApiKeyFieldStatus"');
+		debugLogConfig('Fim da função: "updateApiKeyFieldStatus"');
 	}
 
 	// 🔥 NOVO: Salva API key de forma segura
 	async saveApiKey(provider, apiKey) {
-		debugLog('Início da função: "saveApiKey"');
+		debugLogConfig('Início da função: "saveApiKey"');
 		try {
 			// 🔥 CRÍTICO: Valida que a chave não está vazia
 			if (!apiKey || apiKey.trim().length < 10) {
@@ -430,7 +430,7 @@ class ConfigManager {
 			this.updateApiKeyFieldStatus(provider, true);
 			this.showSaveFeedback(`API key de ${provider} salva com segurança`);
 
-			debugLog('Fim da função: "saveApiKey"');
+			debugLogConfig('Fim da função: "saveApiKey"');
 			return { success: true };
 		} catch (error) {
 			console.error(`Erro ao salvar API key de ${provider}:`, error);
@@ -441,7 +441,7 @@ class ConfigManager {
 
 	// 🔥 NOVO: Remove API key de forma segura
 	async deleteApiKey(provider) {
-		debugLog('Início da função: "deleteApiKey"');
+		debugLogConfig('Início da função: "deleteApiKey"');
 		try {
 			const confirmed = confirm(`Tem certeza que deseja remover a API key de ${provider}?`);
 
@@ -472,12 +472,12 @@ class ConfigManager {
 			this.showError(`Erro ao remover API key: ${error.message}`);
 		}
 
-		debugLog('Fim da função: "deleteApiKey"');
+		debugLogConfig('Fim da função: "deleteApiKey"');
 	}
 
 	// Salva configurações
 	saveConfig() {
-		debugLog('Início da função: "saveConfig"');
+		debugLogConfig('Início da função: "saveConfig"');
 		try {
 			localStorage.setItem('appConfig', JSON.stringify(this.config));
 			this.showSaveFeedback();
@@ -487,12 +487,12 @@ class ConfigManager {
 			this.showError('Erro ao salvar configurações');
 		}
 
-		debugLog('Fim da função: "saveConfig"');
+		debugLogConfig('Fim da função: "saveConfig"');
 	}
 
 	// 🔥 Sincroniza API key ao iniciar
 	async syncApiKeyOnStart() {
-		debugLog('Início da função: "syncApiKeyOnStart"');
+		debugLogConfig('Início da função: "syncApiKeyOnStart"');
 		try {
 			const statusText = document.getElementById('status');
 			const openaiKey = await _ipc.invoke('GET_API_KEY', 'openai');
@@ -509,11 +509,11 @@ class ConfigManager {
 			console.error('❌ Erro ao sincronizar API key:', error);
 		}
 
-		debugLog('Fim da função: "syncApiKeyOnStart"');
+		debugLogConfig('Fim da função: "syncApiKeyOnStart"');
 	}
 
 	showSaveFeedback() {
-		debugLog('Início da função: "showSaveFeedback"');
+		debugLogConfig('Início da função: "showSaveFeedback"');
 		const feedback = document.createElement('div');
 		feedback.className = 'save-feedback';
 		feedback.innerHTML = `
@@ -526,12 +526,12 @@ class ConfigManager {
 			feedback.remove();
 		}, 3000);
 
-		debugLog('Fim da função: "showSaveFeedback"');
+		debugLogConfig('Fim da função: "showSaveFeedback"');
 	}
 
 	// Mostra erro
 	showError(message) {
-		debugLog('Início da função: "showError"');
+		debugLogConfig('Início da função: "showError"');
 		const error = document.createElement('div');
 		error.className = 'save-feedback';
 		error.style.background = '#dc3545';
@@ -545,12 +545,12 @@ class ConfigManager {
 			error.remove();
 		}, 3000);
 
-		debugLog('Fim da função: "showError"');
+		debugLogConfig('Fim da função: "showError"');
 	}
 
 	// Carrega dispositivos de áudio disponíveis
 	async loadDevices() {
-		debugLog('Início da função: "loadDevices"');
+		debugLogConfig('Início da função: "loadDevices"');
 		try {
 			const devices = await navigator.mediaDevices.enumerateDevices();
 			const inputs = devices.filter(d => d.kind === 'audioinput');
@@ -587,7 +587,7 @@ class ConfigManager {
 			console.error('❌ Erro ao carregar dispositivos de áudio:', error);
 		}
 
-		debugLog('Fim da função: "loadDevices"');
+		debugLogConfig('Fim da função: "loadDevices"');
 	}
 
 	// Adiciona opção "Nenhum" ao select
@@ -598,7 +598,7 @@ class ConfigManager {
 
 	// Salva dispositivos selecionados
 	saveDevices() {
-		debugLog('Início da função: "saveDevices"');
+		debugLogConfig('Início da função: "saveDevices"');
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
 
@@ -615,12 +615,12 @@ class ConfigManager {
 			});
 		}
 
-		debugLog('Fim da função: "saveDevices"');
+		debugLogConfig('Fim da função: "saveDevices"');
 	}
 
 	// Restaura dispositivos salvos
 	restoreDevices() {
-		debugLog('Início da função: "restoreDevices"');
+		debugLogConfig('Início da função: "restoreDevices"');
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
 
@@ -641,12 +641,12 @@ class ConfigManager {
 			output: outputSelect.value,
 		});
 
-		debugLog('Fim da função: "restoreDevices"');
+		debugLogConfig('Fim da função: "restoreDevices"');
 	}
 
 	// Alterna entre seções de configuração
 	switchConfigSection(sectionId) {
-		debugLog(`Início da função: "switchConfigSection" para sectionId: "${sectionId}"`);
+		debugLogConfig(`Início da função: "switchConfigSection" para sectionId: "${sectionId}"`);
 
 		// 1. Remove classes ativas de todos os itens de menu e seções (Lógica original)
 		document.querySelectorAll('.menu-item').forEach(i => i.classList.remove('active'));
@@ -669,11 +669,13 @@ class ConfigManager {
 			this.initAudioMonitoring();
 		}
 
-		debugLog('Fim da função: "switchConfigSection"');
+		debugLogConfig('Fim da função: "switchConfigSection"');
 	}
 
 	// Criamos um método auxiliar para organizar o código
 	async initAudioMonitoring() {
+		debugLogConfig('Início da função: "initAudioMonitoring"');
+
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
 
@@ -689,6 +691,8 @@ class ConfigManager {
 			console.log('📊 [Tab Audio] Iniciando monitoramento output:', outputSelect.value);
 			await window.RendererAPI.startOutputVolumeMonitoring();
 		}
+
+		debugLogConfig('Fim da função: "initAudioMonitoring"');
 	}
 
 	// Método opcional para desligar os medidores ao sair da aba
@@ -703,7 +707,7 @@ class ConfigManager {
 
 	// Alterna entre tabs
 	switchTab(tabId) {
-		debugLog('Início da função: "switchTab"');
+		debugLogConfig('Início da função: "switchTab"');
 		// Remove classe active de todos os botões
 		document.querySelectorAll('.tab-button').forEach(button => {
 			button.classList.remove('active');
@@ -720,11 +724,11 @@ class ConfigManager {
 		// Mostra o painel selecionado
 		document.getElementById(tabId).classList.add('active');
 
-		debugLog('Fim da função: "switchTab"');
+		debugLogConfig('Fim da função: "switchTab"');
 	}
 
 	async toggleModel(model) {
-		debugLog('Início da função: "toggleModel"');
+		debugLogConfig('Início da função: "toggleModel"');
 		// 🔥 NOVO: Detecta se é ativação ou desativação
 		const isCurrentlyActive = this.config.api[model]?.enabled === true;
 
@@ -778,12 +782,12 @@ class ConfigManager {
 			this.showError(`Erro ao alternar modelo: ${error.message}`);
 		}
 
-		debugLog('Fim da função: "toggleModel"');
+		debugLogConfig('Fim da função: "toggleModel"');
 	}
 
 	// Atualiza status dos modelos na UI
 	updateModelStatusUI() {
-		debugLog('Início da função: "updateModelStatusUI"');
+		debugLogConfig('Início da função: "updateModelStatusUI"');
 		Object.keys(this.config.api).forEach(model => {
 			if (model !== 'activeProvider' && this.config.api[model]) {
 				const statusBadge = document
@@ -806,12 +810,12 @@ class ConfigManager {
 			}
 		});
 
-		debugLog('Fim da função: "updateModelStatusUI"');
+		debugLogConfig('Fim da função: "updateModelStatusUI"');
 	}
 
 	// 🔥 MODIFICAR: saveField para enviar chave quando ela for alterada
 	saveField(fieldId, value) {
-		debugLog('Início da função: "saveField"');
+		debugLogConfig('Início da função: "saveField"');
 		const path = this.getConfigPath(fieldId);
 		if (path) {
 			this.setNestedValue(this.config, path, value);
@@ -822,12 +826,12 @@ class ConfigManager {
 			}
 		}
 
-		debugLog('Fim da função: "saveField"');
+		debugLogConfig('Fim da função: "saveField"');
 	}
 
 	// 🔥 MODIFICADO: salva API key de forma segura separadamente
 	async saveSection(section) {
-		debugLog('Início da função: "saveSection"');
+		debugLogConfig('Início da função: "saveSection"');
 		const sectionElement =
 			document.getElementById(section) || document.querySelector(`[data-section="${section}"]`)?.closest('.tab-pane');
 
@@ -865,12 +869,12 @@ class ConfigManager {
 
 		this.saveConfig();
 
-		debugLog('Fim da função: "saveSection"');
+		debugLogConfig('Fim da função: "saveSection"');
 	}
 
 	// Converte ID do campo para caminho na configuração
 	getConfigPath(fieldId) {
-		debugLog('Início da função: "getConfigPath"');
+		debugLogConfig('Início da função: "getConfigPath"');
 		const pathMap = {
 			// 🔥 API: Modelos de transcrição e resposta
 			'openai-transcription-model': ['api', 'openai', 'transcriptionModel'],
@@ -909,7 +913,7 @@ class ConfigManager {
 			'log-level': ['other', 'logLevel'],
 		};
 
-		debugLog('Fim da função: "getConfigPath"');
+		debugLogConfig('Fim da função: "getConfigPath"');
 		return pathMap[fieldId];
 	}
 
@@ -928,7 +932,7 @@ class ConfigManager {
 
 	// Alterna visibilidade de senha
 	togglePasswordVisibility(inputId) {
-		debugLog('Início da função: "togglePasswordVisibility"');
+		debugLogConfig('Início da função: "togglePasswordVisibility"');
 		const input = document.getElementById(inputId);
 		const button = document.querySelector(`[data-target="${inputId}"]`);
 
@@ -942,12 +946,12 @@ class ConfigManager {
 			}
 		}
 
-		debugLog('Fim da função: "togglePasswordVisibility"');
+		debugLogConfig('Fim da função: "togglePasswordVisibility"');
 	}
 
 	// Envia API key atual do input para o main (quando saveField detecta mudança)
 	sendApiKeyToMain() {
-		debugLog('Início da função: "sendApiKeyToMain"');
+		debugLogConfig('Início da função: "sendApiKeyToMain"');
 		try {
 			const apiKeyInput = document.getElementById('openai-api-key');
 			if (!apiKeyInput) return;
@@ -960,12 +964,12 @@ class ConfigManager {
 			console.error('Erro em sendApiKeyToMain:', err);
 		}
 
-		debugLog('Fim da função: "sendApiKeyToMain"');
+		debugLogConfig('Fim da função: "sendApiKeyToMain"');
 	}
 
 	// Grava atalho do teclado
 	recordHotkey(button) {
-		debugLog('Início da função: "recordHotkey"');
+		debugLogConfig('Início da função: "recordHotkey"');
 		button.classList.add('recording');
 		button.textContent = 'Pressione uma tecla...';
 
@@ -999,12 +1003,12 @@ class ConfigManager {
 
 		window.addEventListener('keydown', handleKeyDown);
 
-		debugLog('Fim da função: "recordHotkey"');
+		debugLogConfig('Fim da função: "recordHotkey"');
 	}
 
 	// Exporta configurações
 	exportConfig() {
-		debugLog('Início da função: "exportConfig"');
+		debugLogConfig('Início da função: "exportConfig"');
 		const dataStr = JSON.stringify(this.config, null, 2);
 		const dataBlob = new Blob([dataStr], { type: 'application/json' });
 
@@ -1013,12 +1017,12 @@ class ConfigManager {
 		downloadLink.download = 'Askme-config.json';
 		downloadLink.click();
 
-		debugLog('Fim da função: "exportConfig"');
+		debugLogConfig('Fim da função: "exportConfig"');
 	}
 
 	// Importa configurações
 	importConfig() {
-		debugLog('Início da função: "importConfig"');
+		debugLogConfig('Início da função: "importConfig"');
 		const input = document.createElement('input');
 		input.type = 'file';
 		input.accept = '.json';
@@ -1046,25 +1050,25 @@ class ConfigManager {
 
 		input.click();
 
-		debugLog('Fim da função: "importConfig"');
+		debugLogConfig('Fim da função: "importConfig"');
 	}
 
 	// Restaura configurações padrão
 	resetConfig() {
-		debugLog('Início da função: "resetConfig"');
+		debugLogConfig('Início da função: "resetConfig"');
 		if (confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão?')) {
 			this.config = this.getDefaultConfig();
 			localStorage.removeItem('appConfig');
 			location.reload();
 		}
 
-		debugLog('Fim da função: "resetConfig"');
+		debugLogConfig('Fim da função: "resetConfig"');
 	}
 
 	// Retorna configurações padrão
 	getDefaultConfig() {
-		debugLog('Início da função: "getDefaultConfig"');
-		debugLog('Fim da função: "getDefaultConfig"');
+		debugLogConfig('Início da função: "getDefaultConfig"');
+		debugLogConfig('Fim da função: "getDefaultConfig"');
 		return {
 			api: {
 				activeProvider: 'openai',
@@ -1141,7 +1145,7 @@ class ConfigManager {
 	=============================== */
 
 	async initializeController() {
-		debugLog('Início da função: "initializeController"');
+		debugLogConfig('Início da função: "initializeController"');
 		try {
 			// ✅ 1. Registrar UIElements ANTES de iniciar monitoramento
 			this.registerUIElements();
@@ -1200,12 +1204,12 @@ class ConfigManager {
 			console.error('❌ Erro ao inicializar controller:', error);
 		}
 
-		debugLog('Fim da função: "initializeController"');
+		debugLogConfig('Fim da função: "initializeController"');
 	}
 
 	// 🔥 NOVO: Registrar UIElements para que renderer.js possa ler valores
 	registerUIElements() {
-		debugLog('Início da função: "registerUIElements"');
+		debugLogConfig('Início da função: "registerUIElements"');
 		const elements = {
 			inputSelect: document.getElementById('audio-input-device'),
 			outputSelect: document.getElementById('audio-output-device'),
@@ -1219,6 +1223,8 @@ class ConfigManager {
 			askBtn: document.getElementById('askGptBtn'),
 			inputVu: document.getElementById('inputVu'),
 			outputVu: document.getElementById('outputVu'),
+			inputVuHome: document.getElementById('inputVuHome'),
+			outputVuHome: document.getElementById('outputVuHome'),
 			mockToggle: document.getElementById('mockToggle'),
 			mockBadge: document.getElementById('mockBadge'),
 			interviewModeSelect: document.getElementById('interviewModeSelect'),
@@ -1231,12 +1237,12 @@ class ConfigManager {
 
 		window.RendererAPI.registerUIElements(elements);
 
-		debugLog('Fim da função: "registerUIElements"');
+		debugLogConfig('Fim da função: "registerUIElements"');
 	}
 
 	// 🔥 NOVO: Registrar callbacks do renderer para atualizar DOM
 	registerRendererCallbacks() {
-		debugLog('Início da função: "registerRendererCallbacks"');
+		debugLogConfig('Início da função: "registerRendererCallbacks"');
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
 
 		// VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
@@ -1285,6 +1291,9 @@ class ConfigManager {
 			const { percent } = data;
 			const inputVu = document.getElementById('inputVu');
 			if (inputVu) inputVu.style.width = percent + '%';
+
+			const inputVuHome = document.getElementById('inputVuHome');
+			if (inputVuHome) inputVuHome.style.width = percent + '%';
 		});
 
 		// Output Volume
@@ -1292,6 +1301,9 @@ class ConfigManager {
 			const { percent } = data;
 			const outputVu = document.getElementById('outputVu');
 			if (outputVu) outputVu.style.width = percent + '%';
+
+			const outputVuHome = document.getElementById('outputVuHome');
+			if (outputVuHome) outputVuHome.style.width = percent + '%';
 		});
 
 		// Mock Badge
@@ -1308,6 +1320,12 @@ class ConfigManager {
 			const { isRunning, buttonText } = data;
 			const listenBtn = document.getElementById('listenBtn');
 			if (listenBtn) listenBtn.innerText = buttonText;
+
+			// 🔥 NOVO: Aplica efeito visual no home
+			const homeVuMeters = document.querySelector('.home-vu-meters');
+			if (homeVuMeters) {
+				homeVuMeters.classList.toggle('listening', isRunning);
+			}
 		});
 
 		// Clear All Selections
@@ -1494,11 +1512,11 @@ class ConfigManager {
 
 		console.log('✅ registerRendererCallbacks: Todos os callbacks UI registrados com sucesso');
 
-		debugLog('Fim da função: "registerRendererCallbacks"');
+		debugLogConfig('Fim da função: "registerRendererCallbacks"');
 	}
 
 	registerDOMEventListeners() {
-		debugLog('Início da função: "registerDOMEventListeners"');
+		debugLogConfig('Início da função: "registerDOMEventListeners"');
 		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
 
 		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
@@ -1616,11 +1634,11 @@ class ConfigManager {
 
 		console.log('✅ registerDOMEventListeners: Todos os listeners registrados com sucesso');
 
-		debugLog('Fim da função: "registerDOMEventListeners"');
+		debugLogConfig('Fim da função: "registerDOMEventListeners"');
 	}
 
 	registerIPCListeners() {
-		debugLog('Início da função: "registerIPCListeners"');
+		debugLogConfig('Início da função: "registerIPCListeners"');
 		console.log('🔥 registerIPCListeners: Iniciando registro de IPC listeners...');
 		if (!window.RendererAPI) {
 			console.error('❌ ERRO CRÍTICO: window.RendererAPI não disponível em registerIPCListeners!');
@@ -1635,6 +1653,7 @@ class ConfigManager {
 					console.log('✅ API key atualizada com sucesso');
 					if (statusText) statusText.innerText = '✅ API key configurada com sucesso';
 
+					// não sei se precisa disso
 					setTimeout(() => {
 						if (statusText && statusText.innerText.includes('API key configurada')) {
 							const listenBtn = document.getElementById('listenBtn');
@@ -1680,11 +1699,11 @@ class ConfigManager {
 
 		console.log('✅ registerIPCListeners: Todos os IPC listeners registrados com sucesso');
 
-		debugLog('Fim da função: "registerIPCListeners"');
+		debugLogConfig('Fim da função: "registerIPCListeners"');
 	}
 
 	registerErrorHandlers() {
-		debugLog('Início da função: "registerErrorHandlers"');
+		debugLogConfig('Início da função: "registerErrorHandlers"');
 		window.addEventListener('error', e => {
 			window.RendererAPI.sendRendererError({
 				message: String(e.message || e),
@@ -1699,11 +1718,11 @@ class ConfigManager {
 			});
 		});
 
-		debugLog('Fim da função: "registerErrorHandlers"');
+		debugLogConfig('Fim da função: "registerErrorHandlers"');
 	}
 
 	restoreTheme() {
-		debugLog('Início da função: "restoreTheme"');
+		debugLogConfig('Início da função: "restoreTheme"');
 		try {
 			const darkToggle = document.getElementById('darkModeToggle');
 			const savedTheme = localStorage.getItem('theme');
@@ -1725,11 +1744,11 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao restaurar tema:', err);
 		}
 
-		debugLog('Fim da função: "restoreTheme"');
+		debugLogConfig('Fim da função: "restoreTheme"');
 	}
 
 	restoreOpacity() {
-		debugLog('Início da função: "restoreOpacity"');
+		debugLogConfig('Início da função: "restoreOpacity"');
 		try {
 			const opacitySlider = document.getElementById('opacityRange');
 			if (!opacitySlider) return;
@@ -1749,11 +1768,11 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao restaurar opacidade:', err);
 		}
 
-		debugLog('Fim da função: "restoreOpacity"');
+		debugLogConfig('Fim da função: "restoreOpacity"');
 	}
 
 	restoreMode() {
-		debugLog('Início da função: "restoreMode"');
+		debugLogConfig('Início da função: "restoreMode"');
 		try {
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			const savedMode = localStorage.getItem('appMode') || 'NORMAL';
@@ -1775,11 +1794,11 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao restaurar modo:', err);
 		}
 
-		debugLog('Fim da função: "restoreMode"');
+		debugLogConfig('Fim da função: "restoreMode"');
 	}
 
 	async initClickThroughController() {
-		debugLog('Início da função: "initClickThroughController"');
+		debugLogConfig('Início da função: "initClickThroughController"');
 		try {
 			const btnToggle = document.getElementById('btnToggleClick');
 			if (!btnToggle) return;
@@ -1815,13 +1834,13 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao inicializar click-through:', err);
 		}
 
-		debugLog('Fim da função: "initClickThroughController"');
+		debugLogConfig('Fim da função: "initClickThroughController"');
 	}
 }
 
 // 🔥 MODIFICADO: Remove inicialização antiga de API key
 document.addEventListener('DOMContentLoaded', async () => {
-	debugLog('Início da função: "DOMContentLoaded"');
+	debugLogConfig('Início da função: "DOMContentLoaded"');
 	// 🔥 Espera pela disponibilidade de RendererAPI (carregado via renderer.js)
 	let attempts = 0;
 	while (!window.RendererAPI && attempts < 50) {
@@ -1851,11 +1870,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 	console.log('✅ ConfigManager inicializado com sucesso');
 
-	debugLog('Fim da função: "DOMContentLoaded"');
+	debugLogConfig('Fim da função: "DOMContentLoaded"');
 });
 
 // Função de log debug estilizado
-function debugLog(msg) {
+function debugLogConfig(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
 }
 console.log('🚀 Entrou no config-manager.js');

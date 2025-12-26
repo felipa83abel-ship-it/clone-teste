@@ -76,7 +76,25 @@
 				<section id="home" class="config-section active">
 					<div class="config-form">
 						<div class="form-group">
-							<span id="status">Status: parado</span>
+							<!-- Monitoramento de Volume -->
+
+							<div class="home-vu-meters">
+								<div class="vu-meter-home">
+									<label>🎤 Entrada:</label>
+									<div class="vu-meter">
+										<div id="inputVuHome" class="vu-fill"></div>
+									</div>
+								</div>
+
+								<div class="vu-meter-home">
+									<label>🔊 Saída:</label>
+									<div class="vu-meter">
+										<div id="outputVuHome" class="vu-fill"></div>
+									</div>
+								</div>
+
+								<span id="status">Status: parado</span>
+							</div>
 						</div>
 
 						<div class="form-group config-home">

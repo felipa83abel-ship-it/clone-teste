@@ -329,11 +329,48 @@ body {
     background: rgba(var(--bg-panel-rgb), var(--app-opacity));    
 }
 
+/* VU meters no home - compactos e horizontais */
+.home-vu-meters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px;
+  background: rgba(var(--bg-panel-rgb), 0.5);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.vu-meter-home {
+  /* flex: 1; */
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.vu-meter-home label {
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+.vu-meter-home .vu-meter {
+  height: 16px !important;
+  min-width: 16px;
+  border-radius: 16px;
+  margin: 0 !important;
+  border: 1px solid var(--border-default);
+}
+
+/* Efeito visual quando isRunning = true */
+.home-vu-meters.listening {
+  animation: pulse-glow 2s infinite;
+  border: 2px solid rgba(var(--color-active-rgb), 0.5);
+}
+
 /* SPAN STATUS */
 #status {
     display: flex;
-    justify-content: center;
+    flex: 1;
     color: rgb(var(--text-main-rgb));
+    font-size: 12px;
 }
 
 /* TRANSCRIÇÃO */
@@ -977,4 +1014,13 @@ input:checked + .slider:before { transform: translateX(22px); }
     0% { opacity: 0.5; }
     50% { opacity: 1; }
     100% { opacity: 0.5; }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { 
+    box-shadow: 0 0 5px rgba(var(--color-active-rgb), 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 15px rgba(var(--color-active-rgb), 0.6);
+  }
 }

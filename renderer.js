@@ -161,6 +161,8 @@ let UIElements = {
 	askBtn: null,
 	inputVu: null,
 	outputVu: null,
+	inputVuHome: null,
+	outputVuHome: null,
 	mockToggle: null,
 	mockBadge: null,
 	interviewModeSelect: null,
@@ -228,14 +230,14 @@ const ModeController = {
 =============================== */
 
 function finalizeQuestion(t) {
-	debugLog('Início da função: "finalizeQuestion"');
-	debugLog('Fim da função: "finalizeQuestion"');
+	debugLogRenderer('Início da função: "finalizeQuestion"');
+	debugLogRenderer('Fim da função: "finalizeQuestion"');
 	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
 }
 
 function normalizeForCompare(t) {
-	debugLog('Início da função: "normalizeForCompare"');
-	debugLog('Fim da função: "normalizeForCompare"');
+	debugLogRenderer('Início da função: "normalizeForCompare"');
+	debugLogRenderer('Fim da função: "normalizeForCompare"');
 	return (t || '')
 		.toLowerCase()
 		.replace(/[?!.\n\r]/g, '')
@@ -244,7 +246,7 @@ function normalizeForCompare(t) {
 }
 
 function looksLikeQuestion(t) {
-	debugLog('Início da função: "looksLikeQuestion"');
+	debugLogRenderer('Início da função: "looksLikeQuestion"');
 	const s = t.toLowerCase().trim();
 
 	// precisa ter ? OU começar com palavra típica de pergunta
@@ -270,20 +272,20 @@ function looksLikeQuestion(t) {
 		'tu já',
 	];
 
-	debugLog('Fim da função: "looksLikeQuestion"');
+	debugLogRenderer('Fim da função: "looksLikeQuestion"');
 	return s.includes('?') || questionStarters.some(q => s.startsWith(q));
 }
 
 function isGarbageSentence(t) {
-	debugLog('Início da função: "isGarbageSentence"');
+	debugLogRenderer('Início da função: "isGarbageSentence"');
 	const s = t.toLowerCase();
-	debugLog('Fim da função: "isGarbageSentence"');
+	debugLogRenderer('Fim da função: "isGarbageSentence"');
 	return ['obrigado', 'até a próxima', 'finalizando'].some(w => s.includes(w));
 }
 
 // Encurta uma resposta em markdown para até `maxSentences` sentenças.
 function shortenAnswer(markdownText, maxSentences = 2) {
-	debugLog('Início da função: "shortenAnswer"');
+	debugLogRenderer('Início da função: "shortenAnswer"');
 	if (!markdownText) return markdownText;
 
 	// remove blocos de código temporariamente para evitar cortes ruins
@@ -310,12 +312,12 @@ function shortenAnswer(markdownText, maxSentences = 2) {
 	// garante pontuação final
 	if (!/[\.\?!]$/.test(result)) result = result + '.';
 
-	debugLog('Fim da função: "shortenAnswer"');
+	debugLogRenderer('Fim da função: "shortenAnswer"');
 	return result;
 }
 
 function isIncompleteQuestion(t) {
-	debugLog('Início da função: "isIncompleteQuestion"');
+	debugLogRenderer('Início da função: "isIncompleteQuestion"');
 	if (!t) return false;
 	const s = t.trim();
 	// casos óbvios: contém reticências (..., …) — normalmente placeholders ou cortes
@@ -328,12 +330,12 @@ function isIncompleteQuestion(t) {
 	// termina com palavra muito curta e sem contexto (ex: endsWith ' a' )
 	if (/\b[a-z]{1,2}$/.test(s.toLowerCase())) return true;
 
-	debugLog('Fim da função: "isIncompleteQuestion"');
+	debugLogRenderer('Fim da função: "isIncompleteQuestion"');
 	return false;
 }
 
 function getNavigableQuestionIds() {
-	debugLog('Início da função: "getNavigableQuestionIds"');
+	debugLogRenderer('Início da função: "getNavigableQuestionIds"');
 	const ids = [];
 
 	// CURRENT só entra se tiver texto
@@ -349,20 +351,20 @@ function getNavigableQuestionIds() {
 			.map(q => q.id),
 	);
 
-	debugLog('Fim da função: "getNavigableQuestionIds"');
+	debugLogRenderer('Fim da função: "getNavigableQuestionIds"');
 	return ids;
 }
 
 function findAnswerByQuestionId(questionId) {
-	debugLog('Início da função: "findAnswerByQuestionId"'); // Rastreia respostas internamente (não acessa DOM)
+	debugLogRenderer('Início da função: "findAnswerByQuestionId"'); // Rastreia respostas internamente (não acessa DOM)
 	// Mantém um mapa de questionId -> answerData
 	// Por enquanto, retorna null se não encontrado
-	debugLog('Fim da função: "findAnswerByQuestionId"');
+	debugLogRenderer('Fim da função: "findAnswerByQuestionId"');
 	return null;
 }
 
 function promoteCurrentToHistory(text) {
-	debugLog('Início da função: "promoteCurrentToHistory"');
+	debugLogRenderer('Início da função: "promoteCurrentToHistory"');
 	console.log('📚 promovendo pergunta para histórico:', text);
 
 	// evita duplicação no histórico: se a última entrada é igual (normalizada), não adiciona
@@ -408,11 +410,11 @@ function promoteCurrentToHistory(text) {
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
-	debugLog('Fim da função: "promoteCurrentToHistory"');
+	debugLogRenderer('Fim da função: "promoteCurrentToHistory"');
 }
 
 function isQuestionReady(text) {
-	debugLog('Início da função: "isQuestionReady"');
+	debugLogRenderer('Início da função: "isQuestionReady"');
 	if (!ModeController.isInterviewMode()) return true;
 
 	const trimmed = text.trim();
@@ -452,7 +454,7 @@ function isQuestionReady(text) {
 
 	const hasQuestionMark = trimmed.includes('?');
 
-	debugLog('Fim da função: "isQuestionReady"'); // só dispara se houver indício real
+	debugLogRenderer('Fim da função: "isQuestionReady"'); // só dispara se houver indício real
 	return hasIndicator || hasQuestionMark;
 }
 
@@ -469,10 +471,10 @@ function isQuestionReady(text) {
 // }
 
 function isEndingPhrase(text) {
-	debugLog('Início da função: "isEndingPhrase"');
+	debugLogRenderer('Início da função: "isEndingPhrase"');
 	const normalized = text.toLowerCase().trim();
 
-	debugLog('Fim da função: "isEndingPhrase"');
+	debugLogRenderer('Fim da função: "isEndingPhrase"');
 	return OUTPUT_ENDING_PHRASES.some(p => normalized === p);
 }
 
@@ -481,44 +483,36 @@ function isEndingPhrase(text) {
 =============================== */
 
 async function startAudio() {
-	debugLog('Início da função: "startAudio"');
-	if (!UIElements.inputSelect?.value && !UIElements.outputSelect?.value) {
-		const errorMsg = 'Selecione um dispositivo de áudio (input/potput) para ouvir a reunião';
-		console.warn(`⚠️ ${errorMsg}`);
-		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
-		emitUIChange('onError', errorMsg);
-		return;
-	}
+	debugLogRenderer('Início da função: "startAudio"');
 
 	audioContext = new AudioContext();
 
 	if (UIElements.inputSelect?.value) await startInput();
 	if (UIElements.outputSelect?.value) await startOutput();
 
-	debugLog('Fim da função: "startAudio"');
+	debugLogRenderer('Fim da função: "startAudio"');
 }
 
 async function stopAudio() {
-	debugLog('Início da função: "stopAudio"');
+	debugLogRenderer('Início da função: "stopAudio"');
+
 	if (currentQuestion.text) closeCurrentQuestionForced();
 
 	inputRecorder?.state === 'recording' && inputRecorder.stop();
 	outputRecorder?.state === 'recording' && outputRecorder.stop();
 
-	debugLog('Fim da função: "stopAudio"');
-}
-
-async function restartAudioPipeline() {
-	debugLog('Início da função: "restartAudioPipeline"');
-	stopAudio();
 	stopInputMonitor();
 	stopOutputMonitor();
 
-	// 🔥 reinicia pipeline, mas NÃO liga escuta
-	if (UIElements.inputSelect?.value || UIElements.outputSelect?.value) {
-		await startAudio();
-	}
-	debugLog('Fim da função: "restartAudioPipeline"');
+	debugLogRenderer('Fim da função: "stopAudio"');
+}
+
+async function restartAudioPipeline() {
+	debugLogRenderer('Início da função: "restartAudioPipeline"');
+
+	stopAudio();
+
+	debugLogRenderer('Fim da função: "restartAudioPipeline"');
 }
 
 /* ===============================
@@ -527,89 +521,100 @@ async function restartAudioPipeline() {
 
 // Inicia apenas monitoramento de volume (sem gravar)
 async function startInputVolumeMonitoring() {
-	debugLog('Início da função: "startInputVolumeMonitoring"');
+	debugLogRenderer('Início da função: "startInputVolumeMonitoring"');
+
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🎤 Monitoramento de volume entrada (modo teste)...');
-		return Promise.resolve();
+		return;
 	}
 
 	if (!UIElements.inputSelect?.value) {
 		console.log('⚠️ Nenhum dispositivo input selecionado');
-		return Promise.resolve();
-	}
-
-	// 🔥 NOVO: Se já tem stream ativa, não faz nada
-	if (inputStream && inputAnalyser) {
-		console.log('ℹ️ Monitoramento de volume entrada já ativo');
-		return Promise.resolve();
+		return;
 	}
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
 	}
 
+	// 🔥 NOVO: Se já tem stream ativa, não faz nada
+	if (inputStream && inputAnalyser) {
+		console.log('ℹ️ Monitoramento de volume de entrada já ativo');
+		return;
+	}
+
 	try {
-		console.log('🔄 Iniciando stream de áudio (input)...');
-		inputStream = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: UIElements.inputSelect.value } },
-		});
+		// Verificar se isRunning é false antes de iniciar o stream
+		if (!isRunning) {
+			console.log('🔄 Iniciando stream de áudio (input)...');
 
-		const source = audioContext.createMediaStreamSource(inputStream);
+			inputStream = await navigator.mediaDevices.getUserMedia({
+				audio: { deviceId: { exact: UIElements.inputSelect.value } },
+			});
 
-		inputAnalyser = audioContext.createAnalyser();
-		inputAnalyser.fftSize = 256;
-		inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
-		source.connect(inputAnalyser);
+			const source = audioContext.createMediaStreamSource(inputStream);
 
-		console.log('✅ Monitoramento de volume de entrada iniciado com sucesso');
-		updateInputVolume(); // 🔥 Inicia o loop de atualização
+			inputAnalyser = audioContext.createAnalyser();
+			inputAnalyser.fftSize = 256;
+			inputData = new Uint8Array(inputAnalyser.frequencyBinCount);
+			source.connect(inputAnalyser);
+
+			console.log('✅ Monitoramento de volume de entrada iniciado com sucesso');
+			updateInputVolume(); // 🔥 Inicia o loop de atualização
+		}
 	} catch (error) {
 		console.error('❌ Erro ao iniciar monitoramento de volume de entrada:', error);
 		inputStream = null;
 		inputAnalyser = null;
 	}
 
-	debugLog('Fim da função: "startInputVolumeMonitoring"');
+	debugLogRenderer('Fim da função: "startInputVolumeMonitoring"');
 }
 
 // Inicia apenas monitoramento de volume para output (sem gravar)
 async function startOutputVolumeMonitoring() {
-	debugLog('Início da função: "startOutputVolumeMonitoring"');
+	debugLogRenderer('Início da função: "startOutputVolumeMonitoring"');
+
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🔊 Monitoramento de volume saída (modo teste)...');
-		return Promise.resolve();
+		return;
 	}
 
 	if (!UIElements.outputSelect?.value) {
 		console.log('⚠️ Nenhum dispositivo output selecionado');
-		return Promise.resolve();
-	}
-
-	// 🔥 NOVO: Se já tem stream ativa, não faz nada
-	if (outputStream && outputAnalyser) {
-		console.log('ℹ️ Monitoramento de volume saída já ativo');
-		return Promise.resolve();
+		return;
 	}
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
 	}
 
-	console.log('🔄 Iniciando stream de áudio (output)...');
+	// 🔥 NOVO: Se já tem stream ativa, não faz nada
+	if (outputStream && outputAnalyser) {
+		console.log('ℹ️ Monitoramento de volume de saída já ativo');
+		return;
+	}
+
 	try {
-		outputStream = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: UIElements.outputSelect.value } },
-		});
+		// Verificar se isRunning é false antes de iniciar o stream
+		if (!isRunning) {
+			console.log('🔄 Iniciando stream de áudio (output)...');
 
-		const source = audioContext.createMediaStreamSource(outputStream);
+			outputStream = await navigator.mediaDevices.getUserMedia({
+				audio: { deviceId: { exact: UIElements.outputSelect.value } },
+			});
 
-		outputAnalyser = audioContext.createAnalyser();
-		outputAnalyser.fftSize = 256;
-		outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-		source.connect(outputAnalyser);
+			const source = audioContext.createMediaStreamSource(outputStream);
 
-		updateOutputVolume(); // 🔥 Inicia o loop de atualização
-		debugLog('Fim da função: "startOutputVolumeMonitoring"');
+			outputAnalyser = audioContext.createAnalyser();
+			outputAnalyser.fftSize = 256;
+			outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
+			source.connect(outputAnalyser);
+
+			updateOutputVolume(); // 🔥 Inicia o loop de atualização
+		}
+
+		debugLogRenderer('Fim da função: "startOutputVolumeMonitoring"');
 	} catch (error) {
 		console.error('❌ Erro ao iniciar monitoramento de volume de saída:', error);
 		outputStream = null;
@@ -618,7 +623,15 @@ async function startOutputVolumeMonitoring() {
 }
 
 function stopInputVolumeMonitoring() {
-	debugLog('Início da função: "stopInputVolumeMonitoring"');
+	debugLogRenderer('Início da função: "stopInputVolumeMonitoring"');
+
+	// Se isRunning true, não para o monitoramento
+	if (isRunning) {
+		console.log('ℹ️ Monitoramento de volume de entrada em execução, isRunning = true — pulando parada');
+
+		debugLogRenderer('Fim da função: "stopInputVolumeMonitoring"');
+		return;
+	}
 
 	// 1. Para o loop de animação
 	if (inputVolumeAnimationId) {
@@ -639,11 +652,20 @@ function stopInputVolumeMonitoring() {
 	emitUIChange('onInputVolumeUpdate', { percent: 0 });
 
 	console.log('🛑 Monitoramento de volume de entrada parado');
-	debugLog('Fim da função: "stopInputVolumeMonitoring"');
+
+	debugLogRenderer('Fim da função: "stopInputVolumeMonitoring"');
 }
 
 function stopOutputVolumeMonitoring() {
-	debugLog('Início da função: "stopOutputVolumeMonitoring"');
+	debugLogRenderer('Início da função: "stopOutputVolumeMonitoring"');
+
+	// Se isRunning true, não para o monitoramento
+	if (isRunning) {
+		console.log('ℹ️ Monitoramento de volume de saída em execução, isRunning = true — pulando parada');
+
+		debugLogRenderer('Fim da função: "stopOutputVolumeMonitoring"');
+		return;
+	}
 
 	// 1. Para o loop de animação
 	if (outputVolumeAnimationId) {
@@ -651,7 +673,7 @@ function stopOutputVolumeMonitoring() {
 		outputVolumeAnimationId = null;
 	}
 
-	// 2. Para as tracks
+	// 2.Para as tracks de áudio para economizar energia/recurso
 	if (outputStream) {
 		outputStream.getTracks().forEach(track => track.stop());
 		outputStream = null;
@@ -664,7 +686,8 @@ function stopOutputVolumeMonitoring() {
 	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
 
 	console.log('🛑 Monitoramento de volume de saída parado');
-	debugLog('Fim da função: "stopOutputVolumeMonitoring"');
+
+	debugLogRenderer('Fim da função: "stopOutputVolumeMonitoring"');
 }
 
 /* ===============================
@@ -672,7 +695,7 @@ function stopOutputVolumeMonitoring() {
 =============================== */
 
 async function startInput() {
-	debugLog('Início da função: "startInput"');
+	debugLogRenderer('Início da função: "startInput"');
 
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
@@ -760,11 +783,11 @@ async function startInput() {
 		throw error;
 	}
 
-	debugLog('Fim da função: "startInput"');
+	debugLogRenderer('Fim da função: "startInput"');
 }
 
 function updateInputVolume() {
-	debugLog('Início da função: "updateInputVolume"');
+	debugLogRenderer('Início da função: "updateInputVolume"');
 	// CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
 	if (!inputAnalyser || !inputData) {
 		console.log('⚠️ updateInputVolume: analyser ou data não disponível, parando loop');
@@ -824,11 +847,12 @@ function updateInputVolume() {
 	// Continua o loop apenas se tudo estiver OK
 	inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
 
-	debugLog('Fim da função: "updateInputVolume"');
+	debugLogRenderer('Fim da função: "updateInputVolume"');
 }
 
 function stopInputMonitor() {
-	debugLog('Início da função: "stopInputMonitor"');
+	debugLogRenderer('Início da função: "stopInputMonitor"');
+
 	// 1. Para o loop de animation PRIMEIRO
 	if (inputVolumeAnimationId) {
 		cancelAnimationFrame(inputVolumeAnimationId);
@@ -868,7 +892,7 @@ function stopInputMonitor() {
 	// 6. Atualiza UI
 	emitUIChange('onInputVolumeUpdate', { percent: 0 });
 
-	debugLog('Fim da função: "stopInputMonitor"');
+	debugLogRenderer('Fim da função: "stopInputMonitor"');
 	return Promise.resolve();
 }
 
@@ -877,14 +901,18 @@ function stopInputMonitor() {
 =============================== */
 
 async function startOutput() {
-	debugLog('Início da função: "startOutput"');
+	debugLogRenderer('Início da função: "startOutput"');
+
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
 		addTranscript('Outros', text);
 		return;
 	}
 
-	if (!UIElements.outputSelect?.value) return;
+	if (!UIElements.outputSelect?.value) {
+		console.log('⚠️ Nenhum dispositivo output selecionado');
+		return Promise.resolve();
+	}
 
 	if (!audioContext) {
 		audioContext = new AudioContext();
@@ -903,6 +931,7 @@ async function startOutput() {
 		outputStream = null;
 	}
 
+	console.log('🔄 Iniciando stream de áudio (output)...');
 	try {
 		outputStream = await navigator.mediaDevices.getUserMedia({
 			audio: { deviceId: { exact: UIElements.outputSelect.value } },
@@ -963,19 +992,23 @@ async function startOutput() {
 		throw error;
 	}
 
-	debugLog('Fim da função: "startOutput"');
+	debugLogRenderer('Fim da função: "startOutput"');
 }
 
 function updateOutputVolume() {
-	debugLog('Início da função: "updateOutputVolume"');
+	debugLogRenderer('Início da função: "updateOutputVolume"');
+
 	// CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
 	if (!outputAnalyser || !outputData) {
 		console.log('⚠️ updateOutputVolume: analyser ou data não disponível, parando loop');
+
 		if (outputVolumeAnimationId) {
 			cancelAnimationFrame(outputVolumeAnimationId);
 			outputVolumeAnimationId = null;
 		}
+
 		emitUIChange('onOutputVolumeUpdate', { percent: 0 });
+
 		return;
 	}
 
@@ -1027,11 +1060,12 @@ function updateOutputVolume() {
 	// Continua o loop apenas se tudo estiver OK
 	outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
 
-	debugLog('Fim da função: "updateOutputVolume"');
+	debugLogRenderer('Fim da função: "updateOutputVolume"');
 }
 
 function stopOutputMonitor() {
-	debugLog('Início da função: "stopOutputMonitor"');
+	debugLogRenderer('Início da função: "stopOutputMonitor"');
+
 	// 1. Para o loop de animation PRIMEIRO
 	if (outputVolumeAnimationId) {
 		cancelAnimationFrame(outputVolumeAnimationId);
@@ -1071,7 +1105,7 @@ function stopOutputMonitor() {
 	// 6. Atualiza UI
 	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
 
-	debugLog('Fim da função: "stopOutputMonitor"');
+	debugLogRenderer('Fim da função: "stopOutputMonitor"');
 	return Promise.resolve();
 }
 
@@ -1080,7 +1114,7 @@ function stopOutputMonitor() {
 =============================== */
 
 async function handlePartialInputChunk(blobChunk) {
-	debugLog('Início da função: "handlePartialInputChunk"');
+	debugLogRenderer('Início da função: "handlePartialInputChunk"');
 	if (!ModeController.isInterviewMode()) return;
 
 	// ignora ruído
@@ -1109,7 +1143,7 @@ async function handlePartialInputChunk(blobChunk) {
 		}
 	}, 180); // janela curta (reduzida de 250 -> 180)
 
-	debugLog('Fim da função:  "handlePartialInputChunk"');
+	debugLogRenderer('Fim da função:  "handlePartialInputChunk"');
 }
 
 /* ===============================
@@ -1117,7 +1151,14 @@ async function handlePartialInputChunk(blobChunk) {
 =============================== */
 
 function handlePartialOutputChunk(blobChunk) {
-	debugLog('Início da função: "handlePartialOutputChunk"');
+	debugLogRenderer('Início da função: "handlePartialOutputChunk"');
+
+	var teste = true;
+	if (teste) {
+		debugLogRenderer('Fim da função: "handlePartialOutputChunk" 🔒 DESABILITADO TEMPORARIAMENTE');
+		return; // 🔒 DESABILITADO TEMPORARIAMENTE
+	}
+
 	if (!ModeController.isInterviewMode()) return;
 
 	// evita blobs pequenos demais (sem header válido)
@@ -1194,7 +1235,7 @@ function handlePartialOutputChunk(blobChunk) {
 		}
 	}, 120); // 🔥 janela menor (reduzida de 180 -> 120)
 
-	debugLog('Fim da função: "handlePartialOutputChunk"');
+	debugLogRenderer('Fim da função: "handlePartialOutputChunk"');
 }
 
 /* ===============================
@@ -1202,7 +1243,7 @@ function handlePartialOutputChunk(blobChunk) {
 =============================== */
 
 async function transcribeOutputPartial(blob) {
-	debugLog('Início da função: "transcribeOutputPartial"');
+	debugLogRenderer('Início da função: "transcribeOutputPartial"');
 	const tBlobToBuffer = Date.now();
 	const buffer = Buffer.from(await blob.arrayBuffer());
 	console.log('timing (partial): bufferConv', Date.now() - tBlobToBuffer, 'ms, size', buffer.length);
@@ -1213,7 +1254,7 @@ async function transcribeOutputPartial(blob) {
 
 	console.log('📝 transcrição parcial de saída ->', partial);
 
-	debugLog('Fim da função: "transcribeOutputPartial"');
+	debugLogRenderer('Fim da função: "transcribeOutputPartial"');
 	return partial;
 }
 
@@ -1222,7 +1263,7 @@ async function transcribeOutputPartial(blob) {
 =============================== */
 
 async function transcribeInput() {
-	debugLog('Início da função: "transcribeInput"');
+	debugLogRenderer('Início da função: "transcribeInput"');
 	if (!inputChunks.length) return;
 
 	const blob = new Blob(inputChunks, { type: 'audio/webm' });
@@ -1281,11 +1322,18 @@ async function transcribeInput() {
 
 	handleSpeech(YOU, text);
 
-	debugLog('Fim da função: "transcribeInput"');
+	debugLogRenderer('Fim da função: "transcribeInput"');
 }
 
 async function transcribeOutput() {
-	debugLog('Início da função: "transcribeOutput"');
+	debugLogRenderer('Início da função: "transcribeOutput"');
+
+	var teste = true;
+	if (teste) {
+		debugLogRenderer('Fim da função: "transcribeOutput" 🔒 DESABILITADO TEMPORARIAMENTE');
+		return; // 🔒 DESABILITADO TEMPORARIAMENTE
+	}
+
 	if (!outputChunks.length) return;
 
 	const blob = new Blob(outputChunks, { type: 'audio/webm' });
@@ -1354,7 +1402,7 @@ async function transcribeOutput() {
 		closeCurrentQuestion();
 	}
 
-	debugLog('Fim da função: "transcribeOutput"');
+	debugLogRenderer('Fim da função: "transcribeOutput"');
 }
 
 /* ===============================
@@ -1362,7 +1410,7 @@ async function transcribeOutput() {
 =============================== */
 
 function handleSpeech(author, text) {
-	debugLog('Início da função: "handleSpeech"');
+	debugLogRenderer('Início da função: "handleSpeech"');
 	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
 	console.log('🔊 handleSpeech', { author, raw: text, cleaned });
 	if (cleaned.length < 3) return;
@@ -1420,7 +1468,7 @@ function handleSpeech(author, text) {
 		renderCurrentQuestion();
 	}
 
-	debugLog('Fim da função: "handleSpeech"');
+	debugLogRenderer('Fim da função: "handleSpeech"');
 }
 
 /* ===============================
@@ -1428,7 +1476,7 @@ function handleSpeech(author, text) {
 =============================== */
 
 function closeCurrentQuestion() {
-	debugLog('Início da função: "closeCurrentQuestion"');
+	debugLogRenderer('Início da função: "closeCurrentQuestion"');
 	resetInterviewTurnState();
 	console.log('🚪 closeCurrentQuestion called', {
 		interviewTurnId,
@@ -1495,11 +1543,12 @@ function closeCurrentQuestion() {
 		promoteCurrentToHistory(currentQuestion.text);
 	}
 
-	debugLog('Fim da função: "closeCurrentQuestion"');
+	debugLogRenderer('Fim da função: "closeCurrentQuestion"');
 }
 
 function closeCurrentQuestionForced() {
-	debugLog('Início da função: "closeCurrentQuestionForced"');
+	debugLogRenderer('Início da função: "closeCurrentQuestionForced"');
+
 	// log temporario para testar a aplicação só remover depois
 	console.log('🚪 Fechando pergunta:', currentQuestion.text);
 
@@ -1518,15 +1567,16 @@ function closeCurrentQuestionForced() {
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
-	debugLog('Fim da função: "closeCurrentQuestionForced"');
+	debugLogRenderer('Fim da função: "closeCurrentQuestionForced"');
 }
 
 function resetInterviewTurnState() {
-	debugLog('Início da função: "resetInterviewTurnState"');
+	debugLogRenderer('Início da função: "resetInterviewTurnState"');
+
 	outputPartialText = '';
 	outputPartialChunks = [];
 
-	debugLog('Fim da função: "resetInterviewTurnState"');
+	debugLogRenderer('Fim da função: "resetInterviewTurnState"');
 }
 
 /* ===============================
@@ -1535,12 +1585,12 @@ function resetInterviewTurnState() {
 
 // 🔥 Verifica o Status da API
 async function checkApiKeyStatus() {
-	debugLog('Início da função: "checkApiKeyStatus"');
+	debugLogRenderer('Início da função: "checkApiKeyStatus"');
 	try {
 		const status = await ipcRenderer.invoke('GET_OPENAI_API_STATUS');
 		console.log('🔑 Status da API key:', status);
 
-		debugLog('Fim da função: "checkApiKeyStatus"');
+		debugLogRenderer('Fim da função: "checkApiKeyStatus"');
 		return status;
 	} catch (error) {
 		console.warn('⚠️ Não foi possível verificar status da API:', error);
@@ -1572,8 +1622,8 @@ async function checkApiKeyStatus() {
    GPT
 =============================== */
 async function askGpt() {
-	var teste = true;
-	debugLog('Início da função: "askGpt"');
+	debugLogRenderer('Início da função: "askGpt"');
+
 	const text = getSelectedQuestionText();
 
 	if (!text || text.trim().length < 5) {
@@ -1584,7 +1634,11 @@ async function askGpt() {
 	const isCurrent = selectedQuestionId === CURRENT_QUESTION_ID;
 	const questionId = isCurrent ? CURRENT_QUESTION_ID : selectedQuestionId;
 
-	if (teste) return; // 🔒 DESABILITADO TEMPORARIAMENTE
+	var teste = true;
+	if (teste) {
+		debugLogRenderer('Fim da função: "askGpt" 🔒 DESABILITADO TEMPORARIAMENTE');
+		return; // 🔒 DESABILITADO TEMPORARIAMENTE
+	}
 
 	// 🛡️ MODO ENTREVISTA — bloqueia duplicação APENAS para histórico
 	if (ModeController.isInterviewMode() && !isCurrent) {
@@ -1764,7 +1818,7 @@ async function askGpt() {
 	gptAnsweredTurnId = interviewTurnId;
 	gptRequestedTurnId = null;
 
-	debugLog('Fim da função: "askGpt"');
+	debugLogRenderer('Fim da função: "askGpt"');
 }
 
 /* ===============================
@@ -1772,7 +1826,7 @@ async function askGpt() {
 =============================== */
 
 function addTranscript(author, text, time) {
-	debugLog('Início da função: "addTranscript"');
+	debugLogRenderer('Início da função: "addTranscript"');
 	let timeStr;
 	if (time) {
 		if (typeof time === 'number') timeStr = new Date(time).toLocaleTimeString();
@@ -1809,12 +1863,12 @@ function addTranscript(author, text, time) {
 		},
 	};
 
-	debugLog('Fim da função: "addTranscript"');
+	debugLogRenderer('Fim da função: "addTranscript"');
 	return placeholderProxy;
 }
 
 function renderCurrentQuestion() {
-	debugLog('Início da função: "renderCurrentQuestion"');
+	debugLogRenderer('Início da função: "renderCurrentQuestion"');
 	if (!currentQuestion.text) {
 		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
 		return;
@@ -1837,11 +1891,11 @@ function renderCurrentQuestion() {
 
 	emitUIChange('onCurrentQuestionUpdate', questionData);
 
-	debugLog('Fim da função: "renderCurrentQuestion"');
+	debugLogRenderer('Fim da função: "renderCurrentQuestion"');
 }
 
 function renderQuestionsHistory() {
-	debugLog('Início da função: "renderQuestionsHistory"');
+	debugLogRenderer('Início da função: "renderQuestionsHistory"');
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const historyData = [...questionsHistory].reverse().map(q => {
 		let label = q.text;
@@ -1863,7 +1917,7 @@ function renderQuestionsHistory() {
 
 	scrollToSelectedQuestion();
 
-	debugLog('Fim da função: "renderQuestionsHistory"');
+	debugLogRenderer('Fim da função: "renderQuestionsHistory"');
 }
 
 function clearAllSelections() {
@@ -1878,7 +1932,7 @@ function scrollToSelectedQuestion() {
 }
 
 function getSelectedQuestionText() {
-	debugLog('Início da função: "getSelectedQuestionText"');
+	debugLogRenderer('Início da função: "getSelectedQuestionText"');
 	// 1️⃣ Se existe seleção explícita
 	if (selectedQuestionId === CURRENT_QUESTION_ID) {
 		return currentQuestion.text;
@@ -1894,12 +1948,12 @@ function getSelectedQuestionText() {
 		return currentQuestion.text;
 	}
 
-	debugLog('Fim da função: "getSelectedQuestionText"');
+	debugLogRenderer('Fim da função: "getSelectedQuestionText"');
 	return '';
 }
 
 function renderGptAnswer(questionId, markdownText) {
-	debugLog('Início da função: "renderGptAnswer"');
+	debugLogRenderer('Início da função: "renderGptAnswer"');
 	// 🔥 Renderiza markdown e retorna HTML - config-manager aplica ao DOM
 	const short = shortenAnswer(markdownText, 2);
 	const html = marked.parse(short);
@@ -1934,11 +1988,11 @@ function renderGptAnswer(questionId, markdownText) {
 		console.warn('⚠️ falha ao marcar pergunta como respondida:', err);
 	}
 
-	debugLog('Fim da função: "renderGptAnswer"');
+	debugLogRenderer('Fim da função: "renderGptAnswer"');
 }
 
 function resetInterviewState() {
-	debugLog('Início da função: "resetInterviewState"');
+	debugLogRenderer('Início da função: "resetInterviewState"');
 	currentQuestion = { text: '', lastUpdate: 0, finalized: false };
 	questionsHistory = [];
 	selectedQuestionId = null;
@@ -1951,12 +2005,12 @@ function resetInterviewState() {
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
-	debugLog('Fim da função: "resetInterviewState"');
+	debugLogRenderer('Fim da função: "resetInterviewState"');
 }
 
 // 🔥 NOVO: Verifica se existe um modelo de IA ativo e retorna o nome do modelo
 function hasActiveModel() {
-	debugLog('Início da função: "hasActiveModel"');
+	debugLogRenderer('Início da função: "hasActiveModel"');
 	if (!window.configManager) {
 		console.warn('⚠️ ConfigManager não inicializado ainda');
 		return { active: false, model: null };
@@ -1979,12 +2033,13 @@ function hasActiveModel() {
 
 	console.warn('⚠️ Nenhum modelo ativo encontrado');
 
-	debugLog('Fim da função: "hasActiveModel"');
+	debugLogRenderer('Fim da função: "hasActiveModel"');
 	return { active: false, model: null };
 }
 
 async function listenToggleBtn() {
-	debugLog('Início da função: "listenToggleBtn"');
+	debugLogRenderer('Início da função: "listenToggleBtn"');
+
 	// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
 	const { active: hasModel, model: activeModel } = hasActiveModel();
 	console.log(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`);
@@ -2002,7 +2057,7 @@ async function listenToggleBtn() {
 	console.log(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`);
 
 	if (!isRunning && !hasOutputDevice) {
-		const errorMsg = 'Selecione um dispositivo de áudio (saída) para ouvir a reunião';
+		const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
 		console.warn(`⚠️ ${errorMsg}`);
 		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
 		emitUIChange('onError', errorMsg);
@@ -2010,7 +2065,7 @@ async function listenToggleBtn() {
 	}
 
 	isRunning = !isRunning;
-	const buttonText = isRunning ? 'Stop' : 'Start';
+	const buttonText = isRunning ? 'Parar Escuta... (Ctrl+d)' : 'Começar a Ouvir... (Ctrl+d)';
 	const statusMsg = isRunning ? 'Status: ouvindo...' : 'Status: parado';
 
 	emitUIChange('onListenButtonToggle', {
@@ -2019,14 +2074,15 @@ async function listenToggleBtn() {
 	});
 
 	updateStatusMessage(statusMsg);
+
 	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
 	await (isRunning ? startAudio() : stopAudio());
 
-	debugLog('Fim da função: "listenToggleBtn"');
+	debugLogRenderer('Fim da função: "listenToggleBtn"');
 }
 
 function handleQuestionClick(questionId) {
-	debugLog('Início da função: "handleQuestionClick"');
+	debugLogRenderer('Início da função: "handleQuestionClick"');
 	selectedQuestionId = questionId;
 	clearAllSelections();
 	renderQuestionsHistory();
@@ -2070,11 +2126,11 @@ function handleQuestionClick(questionId) {
 	// ❓ Ainda não respondida → chama GPT
 	askGpt();
 
-	debugLog('Fim da função: "handleQuestionClick"');
+	debugLogRenderer('Fim da função: "handleQuestionClick"');
 }
 
 function applyOpacity(value) {
-	debugLog('Início da função: "applyOpacity"');
+	debugLogRenderer('Início da função: "applyOpacity"');
 	const appOpacity = parseFloat(value);
 
 	// aplica opacidade no conteúdo geral
@@ -2089,14 +2145,14 @@ function applyOpacity(value) {
 	// logs temporários para debug
 	console.log('🎚️ Opacity change | app:', value, '| topBar:', topbarOpacity);
 
-	debugLog('Fim da função: "applyOpacity"');
+	debugLogRenderer('Fim da função: "applyOpacity"');
 }
 
 // 🔥 Novo: atualizar status sem tocar em DOM
 function updateStatusMessage(message) {
-	debugLog('Início da função: "updateStatusMessage"');
+	debugLogRenderer('Início da função: "updateStatusMessage"');
 	emitUIChange('onStatusUpdate', { message });
-	debugLog('Fim da função: "updateStatusMessage"');
+	debugLogRenderer('Fim da função: "updateStatusMessage"');
 }
 
 /* ===============================
@@ -2435,7 +2491,7 @@ if (typeof window !== 'undefined') {
 }
 
 // Função de log debug estilizado
-function debugLog(msg) {
+function debugLogRenderer(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: orange; font-weight: bold;');
 }
 console.log('🚀 Entrou no renderer.js');
