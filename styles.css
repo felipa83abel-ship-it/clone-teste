@@ -879,6 +879,7 @@ input:checked + .slider:before { transform: translateX(22px); }
     padding: 6px 10px;
     font-size: 12px;
     color: rgba(var(--text-main-rgb), var(--app-opacity));
+    margin-left: 32px;
 }
 
 .opacity-control input[type="range"] { flex: 1; cursor: pointer; }
@@ -1017,10 +1018,30 @@ input:checked + .slider:before { transform: translateX(22px); }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { 
-    box-shadow: 0 0 5px rgba(var(--color-active-rgb), 0.3);
-  }
-  50% { 
-    box-shadow: 0 0 15px rgba(var(--color-active-rgb), 0.6);
-  }
+    0%, 100% { 
+        box-shadow: 0 0 5px rgba(var(--color-active-rgb), 0.3);
+    }
+    50% { 
+        box-shadow: 0 0 15px rgba(var(--color-active-rgb), 0.6);
+    }
+}
+
+/* ajustar depois */
+
+.form-group-top {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.interviewMode {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+}
+
+.interviewMode .interactive-zone{
+    padding: 4px 4px;
+    font-size: 10px;
 }

@@ -13,20 +13,20 @@ const YOU = 'Você';
 const OTHER = 'Outros';
 
 const ENABLE_INTERVIEW_TIMING_DEBUG = true; // ← desligar depois = false
-const QUESTION_IDLE_TIMEOUT = 300; // reduzido para diminuir latência percebida
-const CURRENT_QUESTION_ID = 'CURRENT';
+const QUESTION_IDLE_TIMEOUT = 300; // Tempo de espera para a pergunta ser considerada inativa = 300
+const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
 
-const INPUT_SPEECH_THRESHOLD = 20; //
-const INPUT_SILENCE_TIMEOUT = 100; // 1600 300
-const MIN_INPUT_AUDIO_SIZE = 1000; // normal 1000
-const MIN_INPUT_AUDIO_SIZE_INTERVIEW = 350; // 350
+const INPUT_SPEECH_THRESHOLD = 20; // Valor limite (threshold) para detectar fala mais cedo = 20
+const INPUT_SILENCE_TIMEOUT = 100; // Tempo de espera para silêncio = 100
+const MIN_INPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a normal = 1000
+const MIN_INPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo de tamanho de áudio para a entrevista = 350
 
-const OUTPUT_SPEECH_THRESHOLD = 8; // detecta fala mais cedo 8
-const OUTPUT_SILENCE_TIMEOUT = 250; // menos espera no fim 250
-const MIN_OUTPUT_AUDIO_SIZE = 2500; // normal 2500
-const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 400; // reduzido para detectar perguntas mais cedo
+const OUTPUT_SPEECH_THRESHOLD = 8; // Valor limite (threshold) para detectar fala mais cedo = 8
+const OUTPUT_SILENCE_TIMEOUT = 250; // Tempo de espera para silêncio = 250
+const MIN_OUTPUT_AUDIO_SIZE = 2500; // Valor mínimo de tamanho de áudio para a normal = 2500
+const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 400; // Valor mínimo de tamanho de áudio para a entrevista = 400
 
-const OUTPUT_ENDING_PHRASES = ['tchau', 'tchau tchau', 'obrigado', 'valeu', 'falou', 'beleza', 'ok'];
+const OUTPUT_ENDING_PHRASES = ['tchau', 'tchau tchau', 'obrigado', 'valeu', 'falou', 'beleza', 'ok']; // Palavras finais para detectar o fim da fala
 
 const SYSTEM_PROMPT = `
 Você é um assistente para entrevistas técnicas de Java. Responda como candidato.
@@ -132,9 +132,10 @@ function onUIChange(eventName, callback) {
 	}
 }
 
-// Dispara um callback com dados
+// Função para emitir/enviar eventos para config-manager
 function emitUIChange(eventName, data) {
 	//console.log(`📡 DEBUG: emitUIChange('${eventName}', ${typeof data === 'object' ? JSON.stringify(data) : data})`);
+
 	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
 		//console.log(`✅ DEBUG: Callback encontrado para '${eventName}', disparando...`);
 		UICallbacks[eventName](data);
@@ -197,31 +198,22 @@ const ModeController = {
 		return CURRENT_MODE === MODES.INTERVIEW;
 	},
 
-	isInterview() {
-		return CURRENT_MODE === MODES.INTERVIEW;
-	},
-
 	// ⏱️ MediaRecorder.start(timeslice)
 	mediaRecorderTimeslice() {
-		if (!this.isInterview()) return null;
+		if (!this.isInterviewMode()) return null;
 
 		// OUTPUT pode ser mais agressivo que INPUT
 		return 60; // reduzido para janelas parciais mais responsivas
 	},
 
-	// 🎧 transcrição incremental
-	allowPartialTranscription() {
-		return this.isInterview();
-	},
-
 	// 🤖 GPT streaming
 	allowGptStreaming() {
-		return this.isInterview();
+		return this.isInterviewMode();
 	},
 
 	// 📦 tamanho mínimo de áudio aceito
 	minInputAudioSize(defaultSize) {
-		return this.isInterview() ? Math.min(400, defaultSize) : defaultSize;
+		return this.isInterviewMode() ? Math.min(400, defaultSize) : defaultSize;
 	},
 };
 
@@ -485,9 +477,9 @@ function isEndingPhrase(text) {
 async function startAudio() {
 	debugLogRenderer('Início da função: "startAudio"');
 
-	audioContext = new AudioContext();
-
+	// Se houver dispositivo de entrada selecionado, inicia a captura de áudio
 	if (UIElements.inputSelect?.value) await startInput();
+	// Se houver dispositivo de saída selecionado, inicia a captura de áudio
 	if (UIElements.outputSelect?.value) await startOutput();
 
 	debugLogRenderer('Fim da função: "startAudio"');
@@ -575,48 +567,46 @@ async function startInputVolumeMonitoring() {
 async function startOutputVolumeMonitoring() {
 	debugLogRenderer('Início da função: "startOutputVolumeMonitoring"');
 
+	// Se o modo de debug estiver ativo, retorna
 	if (APP_CONFIG.MODE_DEBUG) {
 		console.log('🔊 Monitoramento de volume saída (modo teste)...');
 		return;
 	}
 
+	// Se não houver dispositivo de saída selecionado, retorna
 	if (!UIElements.outputSelect?.value) {
 		console.log('⚠️ Nenhum dispositivo output selecionado');
 		return;
 	}
 
+	// Se não houver contexto de áudio, cria um novo
 	if (!audioContext) {
 		audioContext = new AudioContext();
 	}
 
-	// 🔥 NOVO: Se já tem stream ativa, não faz nada
+	// Se já houver stream e analisador de frequência ativos, retorna
 	if (outputStream && outputAnalyser) {
 		console.log('ℹ️ Monitoramento de volume de saída já ativo');
 		return;
 	}
 
 	try {
-		// Verificar se isRunning é false antes de iniciar o stream
+		// Se isRunning for false, inicia o stream de áudio (output)
 		if (!isRunning) {
 			console.log('🔄 Iniciando stream de áudio (output)...');
 
-			outputStream = await navigator.mediaDevices.getUserMedia({
-				audio: { deviceId: { exact: UIElements.outputSelect.value } },
-			});
+			// Cria a stream de áudio (outputStream)
+			await createOutputStream();
 
-			const source = audioContext.createMediaStreamSource(outputStream);
-
-			outputAnalyser = audioContext.createAnalyser();
-			outputAnalyser.fftSize = 256;
-			outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-			source.connect(outputAnalyser);
-
-			updateOutputVolume(); // 🔥 Inicia o loop de atualização
+			// Inicia o loop de atualização do volume de saída
+			updateOutputVolume();
 		}
 
 		debugLogRenderer('Fim da função: "startOutputVolumeMonitoring"');
 	} catch (error) {
 		console.error('❌ Erro ao iniciar monitoramento de volume de saída:', error);
+
+		// Limpa a stream e o analisador de frequência (outputStream e outputAnalyser)
 		outputStream = null;
 		outputAnalyser = null;
 	}
@@ -744,8 +734,8 @@ async function startInput() {
 
 			inputChunks.push(e.data);
 
-			// MODO ENTREVISTA – gancho futuro (ainda inativo)
-			if (ModeController.allowPartialTranscription()) {
+			// MODO ENTREVISTA – permite transcrição incremental
+			if (ModeController.isInterviewMode()) {
 				console.log('🧩 handlePartialInputChunk chamado (input)');
 				handlePartialInputChunk(e.data);
 			}
@@ -900,86 +890,118 @@ function stopInputMonitor() {
    AUDIO - OUTPUT (OUTROS) - VIA VOICEMEETER
 =============================== */
 
+async function createOutputStream() {
+	debugLogRenderer('Início da função: "createOutputStream"');
+
+	// Cria a stream de áudio (outputStream)
+	outputStream = await navigator.mediaDevices.getUserMedia({
+		audio: { deviceId: { exact: UIElements.outputSelect.value } },
+	});
+
+	// Cria o source de áudio (source)
+	const source = audioContext.createMediaStreamSource(outputStream);
+
+	// Cria o analisador de frequência (outputAnalyser)
+	outputAnalyser = audioContext.createAnalyser();
+	// Define o tamanho do FFT (fftSize) como 256
+	outputAnalyser.fftSize = 256;
+	// Cria os dados (outputData)
+	outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
+	// Conecta o source ao analisador de frequência
+	source.connect(outputAnalyser);
+
+	debugLogRenderer('Fim da função: "createOutputStream"');
+}
+
 async function startOutput() {
 	debugLogRenderer('Início da função: "startOutput"');
 
+	// Se o modo de debug estiver ativo, retorna
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
 		addTranscript('Outros', text);
 		return;
 	}
 
+	// Se não houver dispositivo de saída selecionado, retorna
 	if (!UIElements.outputSelect?.value) {
 		console.log('⚠️ Nenhum dispositivo output selecionado');
-		return Promise.resolve();
+		return;
 	}
 
+	// Se não houver contexto de áudio, cria um novo
 	if (!audioContext) {
 		audioContext = new AudioContext();
 	}
 
-	// CRÍTICO: Evita recriar recorder E stream se já existem
+	// Se já houver outputRecorder e ele estiver ativo, retorna
 	if (outputRecorder && outputRecorder.state !== 'inactive') {
 		console.log('ℹ️ outputRecorder já existe e está ativo, pulando reconfiguração');
 		return;
 	}
 
-	// Se já existe stream mas precisa reconfigurar, limpa primeiro
+	// Se já houver outputStream, limpa primeiro
 	if (outputStream) {
 		console.log('🧹 Limpando stream de saída anterior antes de recriar');
 		outputStream.getTracks().forEach(t => t.stop());
 		outputStream = null;
 	}
 
-	console.log('🔄 Iniciando stream de áudio (output)...');
 	try {
-		outputStream = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: UIElements.outputSelect.value } },
-		});
+		console.log('🔄 startOutput: Configurando monitoramento de saída de áudio...');
 
-		const source = audioContext.createMediaStreamSource(outputStream);
+		// Cria a stream de áudio (outputStream)
+		await createOutputStream();
 
-		outputAnalyser = audioContext.createAnalyser();
-		outputAnalyser.fftSize = 256;
-		outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-		source.connect(outputAnalyser);
-
-		// recorder SEMPRE existe
+		// Cria o recorder (outputRecorder), recorder SEMPRE existe
 		outputRecorder = new MediaRecorder(outputStream, {
 			mimeType: 'audio/webm;codecs=opus',
 		});
 
+		// Define o callback para quando houver dados disponíveis no outputRecorder
 		outputRecorder.ondataavailable = e => {
-			console.log('🔥 output.ondataavailable - chunk tamanho:', e.data?.size || e.data?.byteLength || 'n/a');
+			console.log(
+				'🔥 outputRecorder.ondataavailable chamado - chunk tamanho:',
+				e.data?.size || e.data?.byteLength || 'n/a',
+			);
 
+			// Adiciona o chunk (pedaços de dados) ao array de chunks de saída
 			outputChunks.push(e.data);
 
-			// MODO ENTREVISTA – gancho futuro para OUTPUT
-			if (ModeController.allowPartialTranscription()) {
-				console.log('🧩 handlePartialOutputChunk chamado (output)');
+			// MODO ENTREVISTA – permite transcrição incremental
+			if (ModeController.isInterviewMode()) {
+				console.log('🧩 MODO ENTREVISTA: handlePartialOutputChunk chamado (output)');
+
+				// Chama a função para lidar com o chunk parcial de saída para transcrição incremental
 				handlePartialOutputChunk(e.data);
 			}
 		};
 
+		// Define o callback para quando o outputRecorder for parado
 		outputRecorder.onstop = () => {
 			console.log('⏹️ outputRecorder.onstop chamado');
 
-			// marca o momento exato em que a gravação parou
+			// Marca o momento exato em que a gravação parou
 			lastOutputStopAt = Date.now();
 			console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
 
-			// placeholder para mostrar que estamos aguardando transcrição
+			// Adiciona placeholder visual para indicar que estamos aguardando a transcrição
 			const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
 			lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
+
+			// Se o placeholder foi criado, define os atributos de startAt e stopAt
 			if (lastOutputPlaceholderEl) {
+				if (lastOutputStartAt) {
+					lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
+				}
 				lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
-				if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
 			}
 
+			// Inicia a transcrição do áudio de saída
 			transcribeOutput();
 		};
 
-		// Inicia loop de volume apenas se não estiver rodando
+		// Inicia o loop de atualização do volume de saída, se não estiver rodando
 		if (!outputVolumeAnimationId) {
 			updateOutputVolume();
 		}
@@ -987,6 +1009,7 @@ async function startOutput() {
 		console.log('✅ startOutput: Monitoramento de saída de áudio configurado com sucesso');
 	} catch (error) {
 		console.error('❌ Erro em startOutput:', error);
+
 		outputStream = null;
 		outputRecorder = null;
 		throw error;
@@ -998,66 +1021,101 @@ async function startOutput() {
 function updateOutputVolume() {
 	debugLogRenderer('Início da função: "updateOutputVolume"');
 
-	// CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
+	// Crítico: Verifica se o analisador de frequência (outputAnalyser) e os dados (outputData)
+	// estão disponíveis antes de continuar o loop de animação
 	if (!outputAnalyser || !outputData) {
-		console.log('⚠️ updateOutputVolume: analyser ou data não disponível, parando loop');
+		console.log('⚠️ updateOutputVolume: outputAnalyser ou outputData não disponível, parando loop de animação');
 
+		// Se o loop de animação (outputVolumeAnimationId) estiver definido, limpa o loop de animação
 		if (outputVolumeAnimationId) {
+			// Para o loop de animação
 			cancelAnimationFrame(outputVolumeAnimationId);
+			// Limpa o loop de animação
 			outputVolumeAnimationId = null;
 		}
 
+		// Emite o evento 'onOutputVolumeUpdate' para atualizar o volume de saída
 		emitUIChange('onOutputVolumeUpdate', { percent: 0 });
 
 		return;
 	}
 
 	try {
+		// Obtém os dados do analisador de frequência (outputAnalyser)
 		outputAnalyser.getByteFrequencyData(outputData);
+		// Calcula o volume médio (avg) dos dados do analisador de frequência (outputData)
 		const avg = outputData.reduce((a, b) => a + b, 0) / outputData.length;
+		// Calcula o percentual de volume (percent) dos dados do analisador de frequência (outputData)
 		const percent = Math.min(100, Math.round((avg / 60) * 100));
 
-		// Emite evento em vez de atualizar DOM diretamente
+		// Emite o evento 'onOutputVolumeUpdate' para atualizar o volume de saída
 		emitUIChange('onOutputVolumeUpdate', { percent });
 
+		// Se o volume médio (avg) estiver acima do limite (OUTPUT_SPEECH_THRESHOLD)
+		// e o recorder (outputRecorder) estiver rodando e o isRunning for true, inicia a gravação de saída
 		if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
+			// Se o outputSpeaking for false, inicia a gravação de saída
 			if (!outputSpeaking) {
+				// Define o estado de outputSpeaking como true
 				outputSpeaking = true;
+				// Limpa o array de chunks de saída
 				outputChunks = [];
 
-				const slice = ModeController.mediaRecorderTimeslice();
+				// Define o momento exato em que a gravação de saída foi iniciada
 				lastOutputStartAt = Date.now();
+
 				console.log(
 					'📊 iniciando gravação de saída (outputRecorder.start) - startAt',
 					new Date(lastOutputStartAt).toLocaleTimeString(),
 				);
+
+				// Obtém o tamanho da fatia de gravação de saída
+				const slice = ModeController.mediaRecorderTimeslice();
+				// Se o tamanho da fatia de gravação de saída for maior que 0, inicia a gravação de saída com o tamanho da fatia
+				// Caso contrário, inicia a gravação de saída sem tamanho de fatia
 				slice ? outputRecorder.start(slice) : outputRecorder.start();
 			}
+
+			// Se o timer de silêncio (outputSilenceTimer) estiver definido, limpa o timer
 			if (outputSilenceTimer) {
 				clearTimeout(outputSilenceTimer);
 				outputSilenceTimer = null;
 			}
-		} else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
+		}
+		// Se o outputSpeaking for true, e o timer de silêncio (outputSilenceTimer) não estiver definido,
+		// e o recorder (outputRecorder) estiver rodando, para a gravação de saída
+		else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
+			// Define o timer de silêncio (outputSilenceTimer)
 			outputSilenceTimer = setTimeout(() => {
+				// Define o estado de outputSpeaking como false
 				outputSpeaking = false;
+				// Limpa o timer de silêncio (outputSilenceTimer)
 				outputSilenceTimer = null;
+
 				console.log('⏹️ parando gravação de saída por silêncio (outputRecorder.stop)');
+
+				// Se o recorder (outputRecorder) estiver rodando, para a gravação de saída
 				if (outputRecorder && outputRecorder.state === 'recording') {
+					// Para a gravação de saída
 					outputRecorder.stop();
 				}
-			}, OUTPUT_SILENCE_TIMEOUT);
+			}, OUTPUT_SILENCE_TIMEOUT); // Tempo de espera para silêncio
 		}
 	} catch (error) {
 		console.error('❌ Erro em updateOutputVolume:', error);
+		// Se o loop de animação (outputVolumeAnimationId) estiver definido, limpa o loop de animação
 		if (outputVolumeAnimationId) {
+			// Para o loop de animação
 			cancelAnimationFrame(outputVolumeAnimationId);
+			// Limpa o loop de animação
 			outputVolumeAnimationId = null;
 		}
+		// Emite o evento 'onOutputVolumeUpdate' para atualizar o volume de saída
 		emitUIChange('onOutputVolumeUpdate', { percent: 0 });
 		return;
 	}
 
-	// Continua o loop apenas se tudo estiver OK
+	// Continua o loop de animação apenas se tudo estiver OK
 	outputVolumeAnimationId = requestAnimationFrame(updateOutputVolume);
 
 	debugLogRenderer('Fim da função: "updateOutputVolume"');
@@ -1159,6 +1217,7 @@ function handlePartialOutputChunk(blobChunk) {
 		return; // 🔒 DESABILITADO TEMPORARIAMENTE
 	}
 
+	// Se não estiver no modo entrevista, retorna
 	if (!ModeController.isInterviewMode()) return;
 
 	// evita blobs pequenos demais (sem header válido)
@@ -1233,7 +1292,7 @@ function handlePartialOutputChunk(blobChunk) {
 		} catch (err) {
 			console.warn('⚠️ erro na transcrição parcial (OUTPUT)', err);
 		}
-	}, 120); // 🔥 janela menor (reduzida de 180 -> 120)
+	}, 120);
 
 	debugLogRenderer('Fim da função: "handlePartialOutputChunk"');
 }
@@ -1244,6 +1303,7 @@ function handlePartialOutputChunk(blobChunk) {
 
 async function transcribeOutputPartial(blob) {
 	debugLogRenderer('Início da função: "transcribeOutputPartial"');
+
 	const tBlobToBuffer = Date.now();
 	const buffer = Buffer.from(await blob.arrayBuffer());
 	console.log('timing (partial): bufferConv', Date.now() - tBlobToBuffer, 'ms, size', buffer.length);
@@ -1353,6 +1413,7 @@ async function transcribeOutput() {
 	const tSend = Date.now();
 	const text = (await ipcRenderer.invoke('transcribe-audio', buffer))?.trim();
 	console.log('timing: ipc_stt_roundtrip (output)', Date.now() - tSend, 'ms');
+
 	if (!text || isGarbageSentence(text)) return;
 
 	// Se existia um placeholder (timestamp do stop), atualiza esse placeholder com o texto final e latência
@@ -1393,12 +1454,14 @@ async function transcribeOutput() {
 	// Se a transcrição final indicar claramente uma pergunta, fechar e enviar ao GPT imediatamente
 	if (ModeController.isInterviewMode() && isQuestionReady(text)) {
 		console.log('🔔 transcrição final parece pergunta — fechando e chamando GPT agora');
+
 		// limpa estado parcial e cancela o temporizador automático para evitar duplicatas
 		outputPartialText = '';
 		if (autoCloseQuestionTimer) {
 			clearTimeout(autoCloseQuestionTimer);
 			autoCloseQuestionTimer = null;
 		}
+
 		closeCurrentQuestion();
 	}
 
@@ -2064,18 +2127,23 @@ async function listenToggleBtn() {
 		return;
 	}
 
+	// Inverte o estado de isRunning
 	isRunning = !isRunning;
-	const buttonText = isRunning ? 'Parar Escuta... (Ctrl+d)' : 'Começar a Ouvir... (Ctrl+d)';
+	const buttonText = isRunning ? 'Parar a Escuta... (Ctrl+d)' : 'Começar a Ouvir... (Ctrl+d)';
 	const statusMsg = isRunning ? 'Status: ouvindo...' : 'Status: parado';
 
+	// Emite o evento 'onListenButtonToggle' para atualizar o botão de escuta
 	emitUIChange('onListenButtonToggle', {
 		isRunning,
 		buttonText,
 	});
 
+	// Atualiza o status da escuta na tela
 	updateStatusMessage(statusMsg);
 
 	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
+
+	// Inicia ou para a captura de áudio
 	await (isRunning ? startAudio() : stopAudio());
 
 	debugLogRenderer('Fim da função: "listenToggleBtn"');
@@ -2492,6 +2560,7 @@ if (typeof window !== 'undefined') {
 
 // Função de log debug estilizado
 function debugLogRenderer(msg) {
-	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: orange; font-weight: bold;');
+	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: yellow; font-weight: bold;');
 }
-console.log('🚀 Entrou no renderer.js');
+
+//console.log('🚀 Entrou no renderer.js');

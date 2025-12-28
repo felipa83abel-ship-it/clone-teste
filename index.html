@@ -57,7 +57,18 @@
 
 		<!-- 🔝 TOP BAR -->
 		<div id="topBar">
-			<div class="top-bar-title">AskMe</div>
+			<div class="form-group-top">
+				<div class="top-bar-title">AskMe</div>
+
+				<div class="interviewMode">
+					<!-- Modo (combobox) -->
+					<label for="interviewModeSelect">Modo:</label>
+					<select id="interviewModeSelect" class="interactive-zone">
+						<option value="NORMAL">Padrão</option>
+						<option value="INTERVIEW" selected>Entrevista</option>
+					</select>
+				</div>
+			</div>
 
 			<!-- MOCK BADGE -->
 			<div id="mockBadge" class="mock-badge hidden">🧪 MODO MOCK ATIVADO!!!</div>
@@ -582,11 +593,11 @@
 
 						<div class="form-group">
 							<!-- Modo (combobox) abaixo do mock -->
-							<label for="interviewModeSelect">Modo Perguntas:</label>
+							<!-- <label for="interviewModeSelect">Modo Perguntas:</label>
 							<select id="interviewModeSelect" class="interactive-zone">
 								<option value="NORMAL">Padrão</option>
 								<option value="INTERVIEW" selected>Entrevista</option>
-							</select>
+							</select> -->
 						</div>
 
 						<div class="form-group">

@@ -1586,7 +1586,7 @@ class ConfigManager {
 			});
 		}
 
-		// Listen button (Começar a Ouvir... (Ctrl+d))
+		// Listen button click (Começar a Ouvir... (Ctrl+d))
 		const listenBtn = document.getElementById('listenBtn');
 		if (listenBtn) {
 			listenBtn.addEventListener('click', e => {
@@ -1639,7 +1639,10 @@ class ConfigManager {
 
 	registerIPCListeners() {
 		debugLogConfig('Início da função: "registerIPCListeners"');
+
 		console.log('🔥 registerIPCListeners: Iniciando registro de IPC listeners...');
+
+		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
 		if (!window.RendererAPI) {
 			console.error('❌ ERRO CRÍTICO: window.RendererAPI não disponível em registerIPCListeners!');
 			return;
@@ -1877,4 +1880,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 function debugLogConfig(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
 }
-console.log('🚀 Entrou no config-manager.js');
+
+//console.log('🚀 Entrou no config-manager.js');
