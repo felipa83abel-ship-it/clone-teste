@@ -692,7 +692,7 @@ async function startInput() {
 
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de entrada de áudio (modo teste)...';
-		addTranscript('Você', text);
+		addTranscript(YOU, text);
 		return;
 	}
 
@@ -922,7 +922,7 @@ async function startOutput() {
 	// Se o modo de debug estiver ativo, retorna
 	if (APP_CONFIG.MODE_DEBUG) {
 		const text = 'Iniciando monitoramento de saída de áudio (modo teste)...';
-		addTranscript('Outros', text);
+		addTranscript(OTHER, text);
 		return;
 	}
 
@@ -1207,7 +1207,9 @@ function transcribeOutputPartial(blobChunk) {
 
 	// Se não estiver no modo entrevista, retorna
 	if (!ModeController.isInterviewMode()) {
-		debugLogRenderer('Fim da função: "transcribeOutputPartial" - modo entrevista não ativo');
+		console.log('ℹ️ transcribeOutputPartial: retornando, modo entrevista não ativo');
+
+		debugLogRenderer('Fim da função: "transcribeOutputPartial"');
 		return;
 	}
 
@@ -1229,6 +1231,7 @@ function transcribeOutputPartial(blobChunk) {
 
 	// Adiciona o chunk ao array de chunks parciais de saída
 	outputPartialChunks.push(blobChunk);
+	console.log('📦 Chunk acumulado:', blobChunk.size, 'bytes | Total chunks:', outputPartialChunks.length);
 
 	// Reinicia o timer para processar o chunk parcial após um curto período
 	if (outputPartialTimer) clearTimeout(outputPartialTimer);
@@ -1236,81 +1239,106 @@ function transcribeOutputPartial(blobChunk) {
 	// Define um timer para processar o chunk parcial após X(ms)
 	outputPartialTimer = setTimeout(async () => {
 		// Se não houver chunks parciais de saída, retorna
-		if (!outputPartialChunks.length) return;
+		if (!outputPartialChunks.length) {
+			console.log('⚠️ Nenhum chunk parcial para processar');
+			return;
+		}
 
 		// Cria um blob a partir dos chunks parciais de saída
 		const blob = new Blob(outputPartialChunks, { type: 'audio/webm' });
-		// Limpa o array de chunks parciais de saída
+
+		// Loga o tamanho total do blob parcial
+		const totalSize = outputPartialChunks.reduce((acc, chunk) => acc + chunk.size, 0);
+		console.log('🎵 Processando blob parcial:', totalSize, 'bytes de', outputPartialChunks.length, 'chunks');
+
+		// Limpa o array de chunks parciais de saída após criar blob
 		outputPartialChunks = [];
 
 		try {
-			// Transcreve o blob parcial de saída
+			// Envia para transcrição o blob parcial de saída
 			const partialText = await transcribeAudioPartial(blob);
+			console.log('📝 transcribeOutputPartial: Transcrição recebida: ', partialText);
 
-			// Se houver texto parcial válido, processa a transcrição
-			if (partialText && !isGarbageSentence(partialText)) {
-				// acumula texto parcial
-				outputPartialText += ' ' + partialText;
+			// Ignora transcrição vazia
+			if (!partialText || partialText.trim().length === 0) {
+				console.log('⚠️ Transcrição vazia - ignorando');
+				return;
+			}
 
-				// verifica se a pergunta está "pronta" (heurística)
-				if (isQuestionReady(outputPartialText)) {
-					// limpa texto parcial acumulado
-					const newText = outputPartialText.trim();
+			// Ignora sentenças garbage
+			if (isGarbageSentence(partialText)) {
+				console.log('🗑️ Sentença descartada (garbage):', partialText);
+				return;
+			}
 
-					// verifica se o novo texto é igual ao texto atual da pergunta, se sim, ignora
-					if (newText === currentQuestion.text) {
-						console.log('🔁 ignorando nova transcrição igual à currentQuestion');
-						return;
-					}
+			// acumula texto parcial
+			outputPartialText += ' ' + partialText;
+			outputPartialText = outputPartialText.trim();
+			console.log('📋 Texto acumulado:', outputPartialText);
 
-					// se currentQuestion ainda não tinha texto, marca como um novo turno
-					if (!currentQuestion.text) {
-						currentQuestion.createdAt = Date.now();
-						interviewTurnId++; // novo turno detectado
-					}
+			// verifica se a pergunta está "pronta" (heurística)
+			if (isQuestionReady(outputPartialText)) {
+				console.log('❓ Pergunta detectada (parcial):', outputPartialText);
 
-					// atualiza a pergunta atual com o novo texto parcial
-					currentQuestion.text = newText;
-					// atualiza timestamp de última modificação
-					currentQuestion.lastUpdate = Date.now();
-					// marca como não finalizada
-					currentQuestion.finalized = false;
+				// limpa texto parcial acumulado
+				const newText = outputPartialText.trim();
 
-					// atualiza UI
-					selectedQuestionId = CURRENT_QUESTION_ID;
-					renderCurrentQuestion();
-
-					// reseta o timer de auto fechamento
-					if (autoCloseQuestionTimer) {
-						clearTimeout(autoCloseQuestionTimer);
-					}
-
-					// ⏱️ define timer para auto fechamento da pergunta após período ocioso
-					autoCloseQuestionTimer = setTimeout(() => {
-						console.log('⏱️ Auto close question disparado');
-
-						if (
-							ModeController.isInterviewMode() &&
-							currentQuestion.text &&
-							!currentQuestion.finalized &&
-							gptAnsweredTurnId !== interviewTurnId
-						) {
-							// fecha a pergunta atual automaticamente
-							closeCurrentQuestion();
-						}
-					}, QUESTION_IDLE_TIMEOUT);
-
-					// log temporario para testar a aplicação só remover depois
-					console.log('🧠 currentQuestion (parcial):', currentQuestion.text);
-					console.log('🎯 interviewTurnId:', interviewTurnId);
-					console.log('🤖 gptAnsweredTurnId:', gptAnsweredTurnId);
-					console.log('🧪 temporizador de auto-fechamento definido; chamará closeCurrentQuestion se necessário');
+				// verifica se o novo texto é igual ao texto atual da pergunta, se sim, ignora
+				if (newText === currentQuestion.text) {
+					console.log('🔕 Ignorando nova transcrição igual à currentQuestion');
+					return;
 				}
+
+				// se currentQuestion ainda não tinha texto, marca como um novo turno
+				if (!currentQuestion.text) {
+					currentQuestion.createdAt = Date.now();
+					interviewTurnId++; // novo turno detectado
+					console.log('🆕 Novo turno iniciado:', interviewTurnId);
+				}
+
+				// atualiza a pergunta atual com o novo texto parcial
+				currentQuestion.text = newText;
+				// atualiza timestamp de última modificação
+				currentQuestion.lastUpdate = Date.now();
+				// marca como não finalizada
+				currentQuestion.finalized = false;
+
+				// atualiza UI
+				selectedQuestionId = CURRENT_QUESTION_ID;
+				renderCurrentQuestion();
+
+				console.log('🧠 currentQuestion (parcial):', currentQuestion.text);
+				console.log('🎯 interviewTurnId:', interviewTurnId);
+				console.log('🤖 gptAnsweredTurnId:', gptAnsweredTurnId);
+
+				// reseta o timer de auto fechamento
+				if (autoCloseQuestionTimer) {
+					clearTimeout(autoCloseQuestionTimer);
+				}
+
+				// ⏱️ agenda timer para auto fechamento da pergunta após período ocioso
+				autoCloseQuestionTimer = setTimeout(() => {
+					console.log('⏱️ Auto close question disparado (timeout)');
+
+					if (
+						ModeController.isInterviewMode() &&
+						currentQuestion.text &&
+						!currentQuestion.finalized &&
+						gptAnsweredTurnId !== interviewTurnId
+					) {
+						// fecha a pergunta atual automaticamente
+						closeCurrentQuestion();
+					}
+				}, QUESTION_IDLE_TIMEOUT);
+
+				console.log('⏲️ Timer de auto-fechamento agendado para', QUESTION_IDLE_TIMEOUT, 'ms');
+			} else {
+				console.log('⏳ Aguardando mais texto para formar pergunta completa');
 			}
 		} catch (err) {
-			console.warn('⚠️ erro na transcrição parcial (OUTPUT)', err);
+			console.error('❌ Erro na transcrição parcial (OUTPUT):', err);
 		}
-	}, 120);
+	}, 120); // ✅ Janela de 120ms para agrupar chunks próximos
 
 	debugLogRenderer('Fim da função: "transcribeOutputPartial"');
 }
@@ -1325,8 +1353,6 @@ async function transcribeAudioPartial(blob) {
 	const tSend = Date.now();
 	const text = (await ipcRenderer.invoke('transcribe-audio-partial', buffer))?.trim();
 	console.log('timing (partial): ipc_stt_roundtrip', Date.now() - tSend, 'ms');
-
-	console.log('📝 transcrição parcial de saída ->', text);
 
 	debugLogRenderer('Fim da função: "transcribeAudioPartial"');
 	return text;
@@ -1418,85 +1444,102 @@ async function transcribeOutput() {
 
 	// Cria um blob a partir dos chunks de saída
 	const blob = new Blob(outputChunks, { type: 'audio/webm' });
-	// Pega o tamanho minimo do blob dependendo do modo
-	const minSize = ModeController.isInterviewMode() ? MIN_OUTPUT_AUDIO_SIZE_INTERVIEW : MIN_OUTPUT_AUDIO_SIZE;
+	console.log('🎵 transcribeOutput: blob.size =', blob.size, 'bytes | chunks =', outputChunks.length);
 
-	// Ignora ruído / respiração, evita blobs pequenos demais
+	// Limpa o array de chunks de saída
+	outputChunks = [];
+
+	// Valida tamanho mínimo dependendo do modo (evita ruído / respiração)
+	const minSize = ModeController.isInterviewMode() ? MIN_OUTPUT_AUDIO_SIZE_INTERVIEW : MIN_OUTPUT_AUDIO_SIZE;
 	if (blob.size < minSize) {
-		console.log('⚠️ Ignorando blobChunk pequeno demais para transcrição parcial (OUTPUT) - size:', blobChunk.size);
+		console.log('⚠️ transcribeOutput: Blob muito pequeno (', blob.size, '/', minSize, ') - ignorando');
 
 		debugLogRenderer('Fim da função: "transcribeOutput"');
 		return;
 	}
 
-	// Limpa o array de chunks de saída
-	outputChunks = [];
-
 	try {
-		// Transcreve o blob de saída
+		// Envia para transcrição o blob de saída
 		const text = await transcribeAudio(blob);
+		console.log('📝 transcribeOutput: Transcrição recebida: ', text);
 
-		// Se houver texto válido, processa a transcrição
-		if (text && !isGarbageSentence(text)) {
-			// Se existia um placeholder (timestamp do stop), atualiza esse placeholder com o texto final e latência
-			if (lastOutputPlaceholderEl && lastOutputPlaceholderEl.dataset) {
-				// obtém os timestamps de stop do dataset do placeholder, ou usa os valores globais
-				const stop = lastOutputPlaceholderEl.dataset.stopAt
-					? Number(lastOutputPlaceholderEl.dataset.stopAt)
-					: lastOutputStopAt;
+		// Ignora transcrição vazia
+		if (!text || text.trim().length === 0) {
+			console.log('⚠️ transcribeOutput: Transcrição vazia - ignorando');
+			return;
+		}
 
-				// obtém os timestamps de start do dataset do placeholder, ou usa os valores globais
-				const start = lastOutputPlaceholderEl.dataset.startAt
-					? Number(lastOutputPlaceholderEl.dataset.startAt)
-					: lastOutputStartAt || stop;
+		// Ignora sentenças garbage
+		if (isGarbageSentence(text)) {
+			console.log('🗑️ transcribeOutput: Sentença descartada (garbage):', text);
+			return;
+		}
 
-				// calcula métricas
-				const now = Date.now();
-				const recordingDuration = stop - start;
-				const latency = now - stop;
-				const total = now - start;
-				const startStr = new Date(start).toLocaleTimeString();
-				const stopStr = new Date(stop).toLocaleTimeString();
+		// Se existia um placeholder (timestamp do stop), atualiza esse placeholder com o texto final e latência
+		if (lastOutputPlaceholderEl && lastOutputPlaceholderEl.dataset) {
+			console.log('🔄 Atualizando placeholder com transcrição final...');
 
-				// Emite atualização de UI ao placeholder com texto final e métricas
-				emitUIChange('onPlaceholderFulfill', {
-					speaker: OTHER,
-					text,
-					stopStr,
-					startStr,
-					recordingDuration,
-					latency,
-					total,
-				});
+			// obtém os timestamps de stop do dataset do placeholder, ou usa os valores globais
+			const stop = lastOutputPlaceholderEl.dataset.stopAt
+				? Number(lastOutputPlaceholderEl.dataset.stopAt)
+				: lastOutputStopAt;
 
-				// reseta variáveis de placeholder
-				lastOutputPlaceholderEl = null;
-				lastOutputStopAt = null;
-				lastOutputStartAt = null;
-			} else {
-				// adiciona transcrição normal
-				addTranscript(OTHER, text);
+			// obtém os timestamps de start do dataset do placeholder, ou usa os valores globais
+			const start = lastOutputPlaceholderEl.dataset.startAt
+				? Number(lastOutputPlaceholderEl.dataset.startAt)
+				: lastOutputStartAt || stop;
+
+			// calcula métricas
+			const now = Date.now();
+			const recordingDuration = stop - start;
+			const latency = now - stop;
+			const total = now - start;
+			const startStr = new Date(start).toLocaleTimeString();
+			const stopStr = new Date(stop).toLocaleTimeString();
+
+			// Emite atualização de UI ao placeholder com texto final e métricas
+			emitUIChange('onPlaceholderFulfill', {
+				speaker: OTHER,
+				text,
+				stopStr,
+				startStr,
+				recordingDuration,
+				latency,
+				total,
+			});
+
+			// reseta variáveis de placeholder
+			lastOutputPlaceholderEl = null;
+			lastOutputStopAt = null;
+			lastOutputStartAt = null;
+
+			console.log('✅ Placeholder atualizado com sucesso');
+		} else {
+			// Sem placeholder - adiciona transcrição direta
+			console.log('➕ Adicionando transcrição direta (sem placeholder)');
+			addTranscript(OTHER, text);
+		}
+
+		// processa a fala transcrita (consolidação de perguntas)
+		handleSpeech(OTHER, text);
+
+		// MODO ENTREVISTA: Se a transcrição final indicar claramente uma pergunta, fechar e enviar ao GPT imediatamente
+		if (ModeController.isInterviewMode() && isQuestionReady(text)) {
+			console.log('🔔 transcribeOutput: Transcrição final forma pergunta válida');
+			console.log('   → Fechando pergunta e chamando GPT agora');
+
+			// limpa estado parcial e cancela o temporizador automático para evitar duplicatas
+			outputPartialText = '';
+
+			// cancela o temporizador automático para evitar duplicatas
+			if (autoCloseQuestionTimer) {
+				clearTimeout(autoCloseQuestionTimer);
+				autoCloseQuestionTimer = null;
+				console.log('   → Timer automático cancelado');
 			}
 
-			// processa a fala transcrita (consolidação de perguntas)
-			handleSpeech(OTHER, text);
-
-			// Se a transcrição final indicar claramente uma pergunta, fechar e enviar ao GPT imediatamente
-			if (ModeController.isInterviewMode() && isQuestionReady(text)) {
-				console.log('🔔 transcrição final parece pergunta — fechando e chamando GPT agora');
-
-				// limpa estado parcial e cancela o temporizador automático para evitar duplicatas
-				outputPartialText = '';
-
-				// cancela o temporizador automático para evitar duplicatas
-				if (autoCloseQuestionTimer) {
-					clearTimeout(autoCloseQuestionTimer);
-					autoCloseQuestionTimer = null;
-				}
-
-				// fecha a pergunta atual imediatamente
-				closeCurrentQuestion();
-			}
+			// fecha a pergunta atual imediatamente
+			closeCurrentQuestion();
 		}
 	} catch (err) {
 		console.warn('⚠️ erro na transcrição (OUTPUT)', err);
@@ -1515,8 +1558,6 @@ async function transcribeAudio(blob) {
 	const tSend = Date.now();
 	const text = (await ipcRenderer.invoke('transcribe-audio', buffer))?.trim();
 	console.log('timing: ipc_stt_roundtrip (output)', Date.now() - tSend, 'ms');
-
-	console.log('📝 transcrição de saída ->', text);
 
 	debugLogRenderer('Fim da função: "transcribeAudio"');
 	return text;
@@ -2628,7 +2669,7 @@ if (typeof window !== 'undefined') {
 
 // Função de log debug estilizado
 function debugLogRenderer(msg) {
-	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: yellow; font-weight: bold;');
+	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: brown; font-weight: bold;');
 }
 
 //console.log('🚀 Entrou no renderer.js');

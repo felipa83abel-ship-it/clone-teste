@@ -1469,17 +1469,30 @@ class ConfigManager {
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
 		window.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
+			console.log('🔔 onPlaceholderFulfill recebido:', data);
+
 			const { speaker, text, stopStr, startStr, recordingDuration, latency, total } = data;
 			const transcriptionBox = document.getElementById('conversation');
-			if (!transcriptionBox) return;
+
+			if (!transcriptionBox) {
+				console.error('❌ transcriptionBox não encontrado');
+				return;
+			}
 
 			// Encontra e atualiza o último placeholder
 			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
-			if (placeholders.length === 0) return;
+			console.log('🔍 Placeholders encontrados:', placeholders.length);
+
+			if (placeholders.length === 0) {
+				console.warn('⚠️ Nenhum placeholder encontrado para atualizar'); // ✅ ADICIONAR ESTE LOG
+				return;
+			}
 
 			const lastPlaceholder = placeholders[placeholders.length - 1];
 			lastPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
 			lastPlaceholder.removeAttribute('data-is-placeholder');
+
+			console.log('✅ Placeholder atualizado:', text.substring(0, 50) + '...');
 
 			// Adiciona metadados
 			const meta = document.createElement('div');
@@ -1489,6 +1502,8 @@ class ConfigManager {
 			meta.style.marginBottom = '2px';
 			meta.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
 			lastPlaceholder.parentNode.insertBefore(meta, lastPlaceholder.nextSibling);
+
+			console.log('✅ Metadados adicionados');
 		});
 
 		// Clear Transcription
