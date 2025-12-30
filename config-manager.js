@@ -1643,6 +1643,7 @@ class ConfigManager {
 
 	registerDOMEventListeners() {
 		debugLogConfig('Início da função: "registerDOMEventListeners"');
+
 		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
 
 		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
@@ -1754,6 +1755,53 @@ class ConfigManager {
 				if (questionBlock && window.RendererAPI?.handleQuestionClick) {
 					const questionId = questionBlock.dataset.qid || questionBlock.id;
 					window.RendererAPI.handleQuestionClick(questionId);
+				}
+			});
+		}
+
+		//////////////////////////////////////
+		// No método whisper local
+		//////////////////////////////////////
+		const whisperToggle = document.getElementById('whisperLocalToggle');
+		const whisperStatus = document.getElementById('whisperStatus');
+
+		if (whisperToggle && whisperStatus) {
+			// Restaurar estado salvo
+			const saved = localStorage.getItem('useLocalWhisper') === 'true';
+			whisperToggle.checked = saved;
+
+			if (window.RendererAPI?.setTranscriptionMode) {
+				window.RendererAPI.setTranscriptionMode(saved);
+			}
+			whisperStatus.textContent = saved ? '✅ Whisper Local (Ativo)' : '🌐 OpenAI (Ativo)';
+
+			// Evento de mudança
+			whisperToggle.addEventListener('change', e => {
+				const useLocal = e.target.checked;
+				localStorage.setItem('useLocalWhisper', useLocal);
+
+				if (window.RendererAPI?.setTranscriptionMode) {
+					window.RendererAPI.setTranscriptionMode(useLocal);
+				}
+
+				whisperStatus.textContent = useLocal ? '✅ Whisper Local (Ativo)' : '🌐 OpenAI (Ativo)';
+
+				console.log(`🎤 Modo alterado: ${useLocal ? 'Whisper Local' : 'OpenAI'}`);
+			});
+		}
+
+		// Botão para testar Whisper local
+		const testWhisperBtn = document.getElementById('testWhisperBtn');
+		if (testWhisperBtn && window.RendererAPI?.testWhisperLocal) {
+			testWhisperBtn.addEventListener('click', async () => {
+				console.log('🧪 Testando Whisper local...');
+				const result = await window.RendererAPI.testWhisperLocal();
+				console.log('Resultado do teste:', result);
+
+				if (result.success) {
+					alert(`✅ Whisper local funciona!\n\nOutput: ${result.output || '(vazio)'}`);
+				} else {
+					alert(`❌ Whisper local falhou:\n\n${result.error || 'Erro desconhecido'}`);
 				}
 			});
 		}

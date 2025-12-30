@@ -58,6 +58,8 @@ let isRunning = false;
 let audioContext;
 let mockInterviewRunning = false;
 
+let USE_LOCAL_WHISPER = false; // false = OpenAI, true = Whisper local
+
 /* 🎤 INPUT (VOCÊ) */
 let inputStream;
 let inputAnalyser;
@@ -116,7 +118,7 @@ const UICallbacks = {
 	onCurrentQuestionUpdate: null,
 	onQuestionsHistoryUpdate: null,
 	onAnswerAdd: null,
-	onStatusUpdate: null,
+	onStatusUpdate: null, // ← Adicionado: Para atualizar status na UI
 	onInputVolumeUpdate: null,
 	onOutputVolumeUpdate: null,
 	onMockBadgeUpdate: null,
@@ -143,10 +145,7 @@ function onUIChange(eventName, callback) {
 
 // Função para emitir/enviar eventos para config-manager
 function emitUIChange(eventName, data) {
-	//console.log(`📡 DEBUG: emitUIChange('${eventName}', ${typeof data === 'object' ? JSON.stringify(data) : data})`);
-
 	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
-		//console.log(`✅ DEBUG: Callback encontrado para '${eventName}', disparando...`);
 		UICallbacks[eventName](data);
 	} else {
 		console.warn(`⚠️ DEBUG: Nenhum callback registrado para '${eventName}'`);
@@ -464,24 +463,71 @@ function isQuestionReady(text) {
 	return hasIndicator || hasQuestionMark;
 }
 
-// function resetInterviewRuntimeState() {
-// 	outputPartialChunks = [];
-// 	outputPartialText = '';
-
-// 	if (outputPartialTimer) {
-// 		clearTimeout(outputPartialTimer);
-// 		outputPartialTimer = null;
-// 	}
-
-// 	console.log('♻️ Estado do modo entrevista resetado');
-// }
-
 function isEndingPhrase(text) {
 	debugLogRenderer('Início da função: "isEndingPhrase"');
 	const normalized = text.toLowerCase().trim();
 
 	debugLogRenderer('Fim da função: "isEndingPhrase"');
 	return OUTPUT_ENDING_PHRASES.some(p => normalized === p);
+}
+
+/* ===============================
+   TRANSCRIÇÃO LOCAL
+=============================== */
+
+function setTranscriptionMode(useLocal) {
+	USE_LOCAL_WHISPER = useLocal;
+	console.log(`🎤 Modo de transcrição: ${useLocal ? 'WHISPER LOCAL' : 'OPENAI'}`);
+}
+
+async function transcribeAudio(blob) {
+	const buffer = Buffer.from(await blob.arrayBuffer());
+	console.log(`🎤 Transcrição (${USE_LOCAL_WHISPER ? 'Local' : 'OpenAI'}): ${blob.size} bytes`);
+
+	// Adiciona log mais detalhado sobre o buffer
+	console.log(`🔍 Buffer info: length=${buffer.length}, first 10 bytes:`, buffer.slice(0, 10).toString('hex'));
+
+	if (USE_LOCAL_WHISPER) {
+		try {
+			console.log('🔄 Chamando Whisper local...');
+			const result = await ipcRenderer.invoke('transcribe-local', buffer);
+			console.log(`✅ Whisper local retornou: "${result}" (length: ${result.length})`);
+			return result;
+		} catch (error) {
+			console.error('❌ Whisper local falhou:', error.message);
+			console.error('Stack:', error.stack);
+			// Fallback para OpenAI se disponível
+			try {
+				console.log('🔄 Tentando fallback para OpenAI...');
+				const fallbackResult = await ipcRenderer.invoke('transcribe-audio', buffer);
+				console.log(`✅ OpenAI fallback retornou: "${fallbackResult}"`);
+				return fallbackResult;
+			} catch (openaiError) {
+				throw new Error(`Falha na transcrição (local e fallback): ${openaiError.message}`);
+			}
+		}
+	} else {
+		// Usa OpenAI
+		console.log('🔄 Chamando OpenAI...');
+		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
+		console.log(`✅ OpenAI retornou: "${result}" (length: ${result.length})`);
+		return result;
+	}
+}
+
+async function transcribeAudioPartial(blob) {
+	const buffer = Buffer.from(await blob.arrayBuffer());
+
+	if (USE_LOCAL_WHISPER) {
+		try {
+			return await ipcRenderer.invoke('transcribe-local-partial', buffer);
+		} catch (error) {
+			console.warn('⚠️ Whisper local parcial falhou:', error.message);
+			return '';
+		}
+	} else {
+		return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
+	}
 }
 
 /* ===============================
@@ -983,7 +1029,7 @@ async function startOutput() {
 			outputChunks.push(e.data);
 
 			// Chama a função para lidar com o chunk parcial de saída para transcrição incremental
-			transcribeOutputPartial(e.data);
+			//transcribeOutputPartial(e.data);
 		};
 
 		// Define o callback para quando o outputRecorder for parado, acionado ao chamar outputRecorder.stop()
@@ -1199,7 +1245,7 @@ async function handlePartialInputChunk(blobChunk) {
 
 		try {
 			const buffer = Buffer.from(await blob.arrayBuffer());
-			const partialText = (await ipcRenderer.invoke('transcribe-audio-partial', buffer))?.trim();
+			const partialText = (await transcribeAudioPartial(blob))?.trim();
 
 			if (partialText && !isGarbageSentence(partialText)) {
 				addTranscript(YOU, partialText);
@@ -1416,21 +1462,6 @@ function transcribeOutputPartial(blobChunk) {
 	debugLogRenderer('Fim da função: "transcribeOutputPartial"');
 }
 
-async function transcribeAudioPartial(blob) {
-	debugLogRenderer('Início da função: "transcribeAudioPartial"');
-
-	const tBlobToBuffer = Date.now();
-	const buffer = Buffer.from(await blob.arrayBuffer());
-	console.log('timing (partial): bufferConv', Date.now() - tBlobToBuffer, 'ms, size', buffer.length);
-
-	const tSend = Date.now();
-	const text = (await ipcRenderer.invoke('transcribe-audio-partial', buffer))?.trim();
-	console.log('timing (partial): ipc_stt_roundtrip', Date.now() - tSend, 'ms');
-
-	debugLogRenderer('Fim da função: "transcribeAudioPartial"');
-	return text;
-}
-
 /* ===============================
    MODO NORMAL - TRANSCRIÇÃO
 =============================== */
@@ -1456,7 +1487,7 @@ async function transcribeInput() {
 
 	// medir tempo IPC + STT (roundtrip)
 	const tSend = Date.now();
-	const text = (await ipcRenderer.invoke('transcribe-audio', buffer))?.trim();
+	const text = (await transcribeAudio(blob))?.trim();
 	console.log('timing: ipc_stt_roundtrip', Date.now() - tSend, 'ms');
 	if (!text || isGarbageSentence(text)) return;
 
@@ -1652,21 +1683,6 @@ async function transcribeOutput() {
 	debugLogRenderer('Fim da função: "transcribeOutput"');
 }
 
-async function transcribeAudio(blob) {
-	debugLogRenderer('Início da função: "transcribeAudio"');
-
-	const tBlobToBuffer = Date.now();
-	const buffer = Buffer.from(await blob.arrayBuffer());
-	console.log('timing: bufferConv (output)', Date.now() - tBlobToBuffer, 'ms, size', buffer.length);
-
-	const tSend = Date.now();
-	const text = (await ipcRenderer.invoke('transcribe-audio', buffer))?.trim();
-	console.log('timing: ipc_stt_roundtrip (output)', Date.now() - tSend, 'ms');
-
-	debugLogRenderer('Fim da função: "transcribeAudio"');
-	return text;
-}
-
 /* ===============================
    CONSOLIDAÇÃO DE PERGUNTAS
 =============================== */
@@ -1732,94 +1748,6 @@ function handleSpeech(author, text) {
 /* ===============================
    FECHAMENTO DE PERGUNTAS
 =============================== */
-
-// function closeCurrentQuestion() {
-// 	debugLogRenderer('Início da função: "closeCurrentQuestion"');
-
-// 	//resetInterviewTurnState();
-
-// 	console.log('🚪 closeCurrentQuestion called', {
-// 		interviewTurnId,
-// 		gptAnsweredTurnId,
-// 		currentQuestionText: currentQuestion.text,
-// 	});
-
-// 	// trata perguntas incompletas (reticências ou fragmentos)
-// 	if (isIncompleteQuestion(currentQuestion.text)) {
-// 		console.log('⚠️ pergunta incompleta detectada — promovendo ao histórico como incompleta:', currentQuestion.text);
-
-// 		const newId = crypto.randomUUID();
-// 		questionsHistory.push({
-// 			id: newId,
-// 			text: currentQuestion.text,
-// 			createdAt: currentQuestion.createdAt || Date.now(),
-// 			incomplete: true,
-// 		});
-
-// 		// seleciona a pergunta recém-criada para revisão manual
-// 		selectedQuestionId = newId;
-
-// 		// limpa CURRENT mas preserva seleção lógica
-// 		currentQuestion.text = '';
-// 		currentQuestion.finalized = false;
-
-// 		renderQuestionsHistory();
-// 		renderCurrentQuestion();
-// 		return;
-// 	}
-
-// 	if (!looksLikeQuestion(currentQuestion.text)) {
-// 		currentQuestion.text = '';
-// 		currentQuestion.finalized = false;
-// 		renderCurrentQuestion();
-// 		return;
-// 	}
-
-// 	// consolida a pergunta
-// 	currentQuestion.text = finalizeQuestion(currentQuestion.text);
-// 	currentQuestion.finalized = true;
-
-// 	// ⚠️ PONTO CRÍTICO:
-// 	// No modo entrevista, NÃO re-renderizar agora,
-// 	// pois o GPT ainda precisa do CURRENT intacto.
-// 	if (!ModeController.isInterviewMode()) {
-// 		renderCurrentQuestion();
-// 	}
-
-// 	// 🔥 COMPORTAMENTO POR MODO
-// 	if (ModeController.isInterviewMode()) {
-// 		// MODO ENTREVISTA — chama GPT automaticamente (se ainda não requisitado/respondido)
-// 		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
-// 			selectedQuestionId = CURRENT_QUESTION_ID;
-
-// 			console.log('➡️ closeCurrentQuestion chamou askGpt (vou enviar para o GPT)', {
-// 				interviewTurnId,
-// 				gptRequestedTurnId,
-// 				gptAnsweredTurnId,
-// 			});
-
-// 			askGpt();
-// 		} else {
-// 			console.log('⛔ closeCurrentQuestion pulou askGpt porque já foi requisitado/respondido este turno', {
-// 				interviewTurnId,
-// 				gptRequestedTurnId,
-// 				gptAnsweredTurnId,
-// 			});
-// 		}
-// 	} else {
-// 		// MODO NORMAL — não pergunta automaticamente ao GPT; promove para histórico e libera CURRENT
-// 		console.log('🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT');
-
-// 		promoteCurrentToHistory(currentQuestion.text);
-
-// 		currentQuestion.text = '';
-// 		currentQuestion.finalized = false;
-
-// 		renderCurrentQuestion();
-// 	}
-
-// 	debugLogRenderer('Fim da função: "closeCurrentQuestion"');
-// }
 
 function closeCurrentQuestion() {
 	debugLogRenderer('Início da função: "closeCurrentQuestion"');
@@ -1981,26 +1909,6 @@ async function checkApiKeyStatus() {
 	}
 }
 
-// 🔥 Inicializa o processo principal com a chave já salva no ConfigManager
-// async function syncApiKeyOnStart() {
-// 	try {
-// 		// 🔥 O main.js já inicializa automaticamente com a chave do secure store
-// 		console.log('🔄 Verificando status do cliente OpenAI...');
-
-// 		// 🔥 VERIFICAR API KEY ANTES DE CONTINUAR
-// 		const status = await checkApiKeyStatus();
-
-// 		if (status.initialized) {
-// 			console.log('✅ Cliente OpenAI já inicializado no main process');
-// 		} else {
-// 			updateStatusMessage('❌ API key não configurada. Configure em "API e Modelos" → OpenAI');
-// 			console.log('⚠️ Cliente OpenAI não inicializado - Usuário precisa configurar uma chave');
-// 		}
-// 	} catch (err) {
-// 		console.warn('⚠️ syncApiKeyOnStart falhou:', err);
-// 	}
-// }
-
 /* ===============================
    GPT
 =============================== */
@@ -2049,13 +1957,6 @@ async function askGpt() {
 		questionId,
 		action: 'clearActive',
 	});
-
-	// 🔥 Apenas emite que precisa adicionar novo answer - config-manager cria DOM
-	// emitUIChange('onAnswerAdd', {
-	// 	questionId,
-	// 	action: 'new',
-	// 	text,
-	// });
 
 	// log temporario para testar a aplicação só remover depois
 	console.log('🤖 askGpt chamado | questionId:', selectedQuestionId);
@@ -2645,37 +2546,6 @@ function startMockInterview() {
 	sendNext();
 }
 
-// function getMockGptAnswer() {
-// 	return `
-// ### ✔️ Resposta
-
-// Em Java, a **POO (Programação Orientada a Objetos)** é baseada em **4 pilares**:
-
-// - **Encapsulamento**
-// - **Herança**
-// - **Polimorfismo**
-// - **Abstração**
-
-// ### 💡 Exemplo em Java
-
-// \`\`\`java
-// public class Pessoa {
-// 	private String nome;
-
-// 	public Pessoa(String nome) {
-// 		this.nome = nome;
-// 	}
-
-// 	public String getNome() {
-// 		return nome;
-// 	}
-// }
-// \`\`\`
-
-// 📌 **Dica:** use encapsulamento para proteger o estado interno da classe.
-// `;
-// }
-
 function getMockGptAnswer(question) {
 	return `
 ### ✔️ Resposta simulada
@@ -2919,6 +2789,28 @@ const RendererAPI = {
 			});
 		} catch (err) {
 			console.error('Falha ao enviar RENDERER_ERROR', err);
+		}
+	},
+
+	///////////////////////////////////
+	// FUNÇÕES PARA WHISPER LOCAL
+	///////////////////////////////////
+	setTranscriptionMode: useLocal => {
+		setTranscriptionMode(useLocal);
+	},
+
+	getTranscriptionMode: () => USE_LOCAL_WHISPER,
+
+	testWhisperLocal: async () => {
+		try {
+			console.log('🧪 Testando Whisper local...');
+			// Envia um buffer vazio apenas para testar a conexão
+			const result = await ipcRenderer.invoke('test-whisper-local');
+			console.log('Teste Whisper:', result);
+			return result;
+		} catch (error) {
+			console.error('Teste Whisper falhou:', error);
+			return { success: false, error: error.message };
 		}
 	},
 };

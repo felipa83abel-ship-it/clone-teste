@@ -1,62 +1,59 @@
-/* ===============================
-   IMPORTS
+/* ================================
+   IMPORTS E CONFIGURAÇÕES INICIAIS
 =============================== */
 if (process.env.NODE_ENV === 'development') {
 	try {
 		require('electron-reload')(__dirname, {
 			electron: require(`${__dirname}/node_modules/electron`),
-			// 🔥 IGNORA ARQUIVOS TEMPORÁRIOS E DE ÁUDIO
-			// ignored: [/temp-audio.*\.webm$/, /node_modules|[/\\]\./],
 		});
 	} catch (err) {
 		console.log('electron-reload não carregado:', err);
 	}
 }
+
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const OpenAI = require('openai');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 
-// 🔥 Import alternativo do electron-store
+// Importações condicionais
 let ElectronStore;
 try {
 	ElectronStore = require('electron-store');
-	// Tenta acessar como default export se necessário
 	if (ElectronStore.default) {
 		ElectronStore = ElectronStore.default;
 	}
-	console.log('✅ electron-store importado com sucesso:', typeof ElectronStore);
+	console.log('✅ electron-store importado com sucesso');
 } catch (error) {
 	console.error('❌ Erro ao importar electron-store:', error);
 	ElectronStore = null;
 }
 
-/* ===============================
+/* ================================
    CONSTANTES
 =============================== */
-
 const APP_CONFIG = {
-	MODE_DEBUG: false, // 🔒 true, não envia ao  GPT só simula
+	MODE_DEBUG: false,
 };
 
-/* ===============================
+// Caminhos para Whisper.cpp local
+const WHISPER_EXE = path.join(__dirname, 'whisper-local', 'whisper-cli.exe');
+const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'ggml-tiny.bin');
+
+/* ================================
    ESTADO GLOBAL
 =============================== */
-
-let mainWindow;
+let mainWindow = null;
 let openaiClient = null;
-let secureStore = null; // 🔥 NOVO: Store seguro para API keys (criptografado)
+let secureStore = null;
+let clickThroughEnabled = false;
 
-// =======================================================
-// 🔥 CONTROLE GLOBAL DE MODO DEV (MANUAL)
-// true  = comportamento DEV (click-through desligado)
-// false = comportamento PROD (click-through ligado)
-// =======================================================
-
-/* ===============================
-   HELPERS PUROS
+/* ================================
+   INICIALIZAÇÃO DO SECURE STORE
 =============================== */
-
 if (ElectronStore) {
 	try {
 		secureStore = new ElectronStore({
@@ -65,101 +62,26 @@ if (ElectronStore) {
 		});
 		console.log('✅ SecureStore inicializado com sucesso');
 
-		// 🔥 CORRIGIDO: Inicializa cliente OpenAI com chave do secure store
+		// Inicializa cliente OpenAI se houver chave salva
 		const savedKey = secureStore.get('apiKeys.openai');
 		if (savedKey && savedKey.length > 10) {
-			console.log('🔑 Chave OpenAI encontrada no secure store - inicializando cliente...');
+			console.log('🔑 Chave OpenAI encontrada - inicializando cliente...');
 			initializeOpenAIClient(savedKey);
-		} else {
-			console.log('⚠️ Nenhuma chave OpenAI salva - cliente não inicializado');
 		}
 	} catch (error) {
 		console.error('❌ Erro ao criar secureStore:', error);
 	}
-} else {
-	console.warn('⚠️ electron-store não disponível - usando localStorage como fallback');
 }
 
-function createWindow() {
-	console.log('🪟 Criando janela principal (frameless)');
+/* ================================
+   FUNÇÕES AUXILIARES
+=============================== */
 
-	mainWindow = new BrowserWindow({
-		width: 1220, //820
-		height: 620,
-		x: 0, // posição horizontal (0 = extremo esquerdo da tela)
-		y: 0, // posição vertical (0 = topo da tela)
-
-		// 🔥 REMOVE COMPLETAMENTE A MOLDURA NATIVA
-		frame: false,
-
-		// 🔥 OVERLAY REAL
-		transparent: true,
-		backgroundColor: '#00000000',
-
-		// sempre visível
-		alwaysOnTop: true,
-
-		// mantém comportamento atual
-		resizable: true,
-		minimizable: false, // overlay não precisa minimizar
-		maximizable: false, // overlay não precisa maximizar
-		closable: true,
-
-		webPreferences: {
-			nodeIntegration: true,
-			contextIsolation: false,
-		},
-	});
-	console.log('🪟 Janela criada em modo overlay (transparente + alwaysOnTop)');
-
-	// remove menu padrão (Windows/Linux)
-	mainWindow.setMenu(null);
-
-	// Atalho para abrir DevTools (somente em desenvolvimento)
-	if (!app.isPackaged) {
-		mainWindow.webContents.on('before-input-event', (event, input) => {
-			if (input.control && input.shift && input.key.toLowerCase() === 'i') {
-				mainWindow.webContents.toggleDevTools();
-				event.preventDefault();
-			}
-		});
-	}
-
-	mainWindow.loadFile('index.html');
-
-	// *******************************************************
-	// 🔥 CLICK-THROUGH: Estado inicial (desativado)
-	let clickThroughEnabled = false;
-
-	// 🔥 IPC: Ativa/desativa click-through
-	ipcMain.on('SET_CLICK_THROUGH', (_, enabled) => {
-		clickThroughEnabled = enabled;
-		mainWindow.setIgnoreMouseEvents(enabled, { forward: true });
-		console.log('🖱️ Click-through:', enabled ? 'ATIVADO' : 'DESATIVADO');
-	});
-
-	// 🔥 IPC: Retorna estado atual
-	ipcMain.handle('GET_CLICK_THROUGH', () => clickThroughEnabled);
-
-	// 🔥 IPC: Permite interação temporária em zonas interativas
-	ipcMain.on('SET_INTERACTIVE_ZONE', (_, isInteractive) => {
-		if (clickThroughEnabled) {
-			mainWindow.setIgnoreMouseEvents(!isInteractive, { forward: true });
-		}
-	});
-
-	// *******************************************************
-
-	// log temporário de debug
-	mainWindow.on('closed', () => {
-		console.log('❌ Janela principal fechada');
-	});
-}
-
-// 🔥 usa secure store se apiKey não for fornecida
+/**
+ * Inicializa o cliente OpenAI
+ */
 function initializeOpenAIClient(apiKey = null) {
 	try {
-		// 🔥 CORRIGIDO: Se não recebeu apiKey, tenta pegar do secure store
 		const key = apiKey || (secureStore ? secureStore.get('apiKeys.openai') : null);
 
 		if (!key || typeof key !== 'string' || key.trim().length < 10) {
@@ -168,7 +90,6 @@ function initializeOpenAIClient(apiKey = null) {
 			return false;
 		}
 
-		// 🔥 DEBUG: Mostra apenas primeiros 8 caracteres por segurança
 		const maskedKey = key.substring(0, 8) + '...';
 		console.log(`---> Inicializando cliente OpenAI com chave: ${maskedKey}`);
 
@@ -185,47 +106,92 @@ function initializeOpenAIClient(apiKey = null) {
 	}
 }
 
-// 🔥 Recupera API key de forma segura (apenas para uso interno do main process)
-function getSecureApiKey(provider) {
-	try {
-		const key = secureStore.get(`apiKeys.${provider}`);
-		return key || null;
-	} catch (error) {
-		console.error(`❌ Erro ao recuperar API key de ${provider}:`, error);
-		return null;
-	}
+/**
+ * Verifica se os arquivos do Whisper local existem
+ */
+function checkWhisperFiles() {
+	const exeExists = fs.existsSync(WHISPER_EXE);
+	const modelExists = fs.existsSync(WHISPER_MODEL);
+
+	console.log('🔍 Verificando arquivos Whisper:');
+	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_EXE}`);
+	console.log(`   Modelo: ${modelExists ? '✅' : '❌'} ${WHISPER_MODEL}`);
+
+	return exeExists && modelExists;
 }
 
-/* ===============================
-   ATALHOS GLOBAIS
+/* ================================
+   CRIAÇÃO DA JANELA
 =============================== */
-app.whenReady().then(() => {
-	createWindow();
+function createWindow() {
+	console.log('🪟 Criando janela principal (frameless)');
 
-	globalShortcut.register('Control+D', () => {
-		mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
+	mainWindow = new BrowserWindow({
+		width: 1220,
+		height: 620,
+		x: 0,
+		y: 0,
+		frame: false,
+		transparent: true,
+		backgroundColor: '#00000000',
+		alwaysOnTop: true,
+		resizable: true,
+		minimizable: false,
+		maximizable: false,
+		closable: true,
+		webPreferences: {
+			nodeIntegration: true,
+			contextIsolation: false,
+		},
 	});
 
-	globalShortcut.register('Control+Enter', () => {
-		mainWindow.webContents.send('CMD_ASK_GPT');
-	});
-});
+	console.log('🪟 Janela criada em modo overlay');
 
-/* ===============================
-   BOOT
-   ipcMain.handle = precisa de resposta
-   ipcMain.on = não precisa de resposta apenas ( notificação/evento)
+	// Remove menu padrão
+	mainWindow.setMenu(null);
+
+	// Atalho para DevTools (somente desenvolvimento)
+	if (!app.isPackaged) {
+		mainWindow.webContents.on('before-input-event', (event, input) => {
+			if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+				mainWindow.webContents.toggleDevTools();
+				event.preventDefault();
+			}
+		});
+	}
+
+	// Carrega a página principal
+	mainWindow.loadFile('index.html');
+
+	// Eventos da janela
+	mainWindow.on('closed', () => {
+		console.log('❌ Janela principal fechada');
+	});
+}
+
+/* ================================
+   HANDLERS IPC - GERAIS
 =============================== */
+
+// Erros do renderer
 ipcMain.on('RENDERER_ERROR', (_, info) => {
 	console.error('Renderer reported error:', info && (info.message || info));
 	if (info && info.stack) console.error(info.stack);
 });
 
-ipcMain.handle('GET_APP_CONFIG', () => {
-	return APP_CONFIG;
-});
+// Configuração do app
+ipcMain.handle('GET_APP_CONFIG', () => APP_CONFIG);
 
-// 🔥 Verifica se provider tem API key configurada (sem retornar a key real)
+// Status do cliente OpenAI
+ipcMain.handle('GET_OPENAI_API_STATUS', () => ({
+	initialized: !!openaiClient,
+}));
+
+/* ================================
+   HANDLERS IPC - API KEYS
+=============================== */
+
+// Verifica se há API key
 ipcMain.handle('HAS_API_KEY', async (_, provider) => {
 	try {
 		const key = secureStore.get(`apiKeys.${provider}`);
@@ -239,63 +205,28 @@ ipcMain.handle('HAS_API_KEY', async (_, provider) => {
 	}
 });
 
-// 🔥 Recupera API key
-ipcMain.handle('GET_API_KEY', async (event, provider) => {
+// Recupera API key
+ipcMain.handle('GET_API_KEY', async (_, provider) => {
 	try {
-		console.log(`🔍 main.js: Recuperando chave de ${provider}...`);
-
 		const key = secureStore.get(`apiKeys.${provider}`);
-
-		if (key) {
-			console.log(`✅ main.js: Chave de ${provider} recuperada (length: ${key.length})`);
-		} else {
-			console.log(`⚠️ main.js: Nenhuma chave salva para ${provider}`);
-		}
-
 		return key || null;
 	} catch (error) {
-		console.error(`❌ main.js: Erro ao recuperar chave de ${provider}`, error);
+		console.error(`❌ Erro ao recuperar chave de ${provider}:`, error);
 		return null;
 	}
 });
 
-// 🔥 Salva API key de forma segura (criptografada)
+// Salva API key
 ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 	try {
-		// 🔥 DEBUG: Log ANTES de processar
-		console.log(`main.js: Recebido SAVE_API_KEY - provider: ${provider}`);
-		console.log(`main.js: apiKey recebida (length: ${apiKey?.length || 0})`);
-		const masked = apiKey ? apiKey.substring(0, 8) + '...' : '';
-		console.log(`main.js: apiKey (masked): ${masked}`);
-
 		if (!apiKey || apiKey.trim().length < 2) {
-			console.warn('---> API key inválida ou muito curta');
 			return { success: false, error: 'API key inválida' };
 		}
 
 		const trimmedKey = apiKey.trim();
-
-		// 🔥 DEBUG: Log DEPOIS de trim
-		console.log(` main.js: Após trim (length: ${trimmedKey.length})`);
-
-		// Salva de forma criptografada
 		secureStore.set(`apiKeys.${provider}`, trimmedKey);
 
-		// 🔥 VERIFICAÇÃO: Lê imediatamente para confirmar (mostrando apenas máscaras)
-		const verification = secureStore.get(`apiKeys.${provider}`);
-		console.log(`main.js: Verificação pós-save (length: ${verification?.length || 0})`);
-
-		if (verification !== trimmedKey) {
-			const sentMask = trimmedKey ? trimmedKey.substring(0, 8) + '...' : '';
-			const savedMask = verification ? String(verification).substring(0, 8) + '...' : '';
-			console.error(`main.js: CHAVE SALVA DIFERENTE DA ENVIADA!`);
-			console.error(`   Enviada (masked): ${sentMask}`);
-			console.error(`   Salva (masked): ${savedMask}`);
-		}
-
-		console.log(`API key salva com segurança para provider: ${provider}`);
-
-		// Se for OpenAI, inicializa cliente imediatamente
+		// Se for OpenAI, inicializa cliente
 		if (provider === 'openai') {
 			const success = initializeOpenAIClient(trimmedKey);
 			if (mainWindow && mainWindow.webContents) {
@@ -311,13 +242,11 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 	}
 });
 
-// 🔥 Remove API key de forma segura
+// Remove API key
 ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
 	try {
 		secureStore.delete(`apiKeys.${provider}`);
-		console.log(`🗑️ API key removida para provider: ${provider}`);
 
-		// Se for OpenAI, reseta cliente
 		if (provider === 'openai') {
 			openaiClient = null;
 		}
@@ -329,154 +258,255 @@ ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
 	}
 });
 
-// 🔥 Retorna status do cliente OpenAI (inicializado ou não)
-ipcMain.handle('GET_OPENAI_API_STATUS', async () => {
-	return {
-		initialized: !!openaiClient,
-	};
-});
+/* ================================
+   HANDLERS IPC - TRANSCRIÇÃO ONLINE (OpenAI)
+=============================== */
 
-// Inicializa o cliente OpenAI com uma chave fornecida (opcional)
-ipcMain.handle('initialize-api-client', async (_, apiKey) => {
-	const initialized = initializeOpenAIClient(apiKey);
-	if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
-	return { initialized };
-});
-
-ipcMain.handle('transcribe-audio', async (_, audioBuffer) => {
-	// 🔥 VERIFICA SE O CLIENTE ESTÁ INICIALIZADO, se não tenta inicializar do secure store
+async function transcribeAudioCommon(audioBuffer, isPartial = false) {
+	// Verifica se o cliente está inicializado
 	if (!openaiClient) {
-		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar do secure store...');
+		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
 		const initialized = initializeOpenAIClient();
 		if (!initialized) {
-			console.error('❌ OpenAI client não inicializado. Chave da API não configurada.');
 			throw new Error('OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
 		}
 	}
 
-	const recvAt = Date.now();
-	//const tempFilePath = path.join(__dirname, 'temp-audio.webm');
-	const tempFilePath = path.join(app.getPath('temp'), `temp-audio.webm`);
-
-	console.log(
-		'STT main: received transcribe-audio buffer, size:',
-		audioBuffer?.byteLength || audioBuffer?.length || 'n/a',
-	);
-
-	const tWriteStart = Date.now();
-	fs.writeFileSync(tempFilePath, Buffer.from(audioBuffer));
-	console.log('STT main: wrote temp file in', Date.now() - tWriteStart, 'ms -', tempFilePath);
-
-	try {
-		const tSttStart = Date.now();
-		// 🔥 USA O CLIENTE DINÂMICO
-		const transcription = await openaiClient.audio.transcriptions.create({
-			file: fs.createReadStream(tempFilePath),
-			model: 'whisper-1',
-			language: 'pt',
-		});
-		const sttDuration = Date.now() - tSttStart;
-
-		console.log('STT main: transcription finished in', sttDuration, 'ms (received->start:', tSttStart - recvAt, 'ms)');
-
-		return transcription.text;
-	} catch (error) {
-		console.error('❌ Erro na transcrição:', error.message);
-		// 🔥 SE A CHAVE FOR INVÁLIDA, RESETA O CLIENTE
-		if (error.status === 401 || error.message.includes('authentication') || error.message.includes('API key')) {
-			openaiClient = null;
-			throw new Error('Chave da API inválida ou expirada. Por favor, verifique suas configurações.');
-		}
-		throw error;
-	} finally {
-		if (fs.existsSync(tempFilePath)) {
-			fs.unlinkSync(tempFilePath);
-		}
-	}
-});
-
-ipcMain.handle('transcribe-audio-partial', async (_, audioBuffer) => {
-	// 🔥 VERIFICA SE O CLIENTE ESTÁ INICIALIZADO, se não tenta inicializar do secure store
-	if (!openaiClient) {
-		console.log('⚠️ Cliente OpenAI não inicializado para transcrição parcial, tentando recuperar...');
-		const initialized = initializeOpenAIClient();
-		if (!initialized) {
-			console.error('❌ OpenAI client não inicializado. Chave da API não configurada.');
-			throw new Error('OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
-		}
-	}
-
-	// Proteção: buffers muito pequenos frequentemente não formam um arquivo válido
-	// Ajustado para tolerar blobs menores vindos de MediaRecorder em janelas curtas
+	// Proteção para buffers muito pequenos
 	const size = audioBuffer?.byteLength || audioBuffer?.length || 0;
-	if (size < 800) {
-		console.log('STT main (partial): buffer demasiado pequeno, ignorando (size=', size, ')');
+	if (isPartial && size < 800) {
+		console.log('STT main (partial): buffer demasiado pequeno, ignorando');
 		return '';
 	}
 
-	const recvAt = Date.now();
-	// const tempFilePath = path.join(__dirname, 'temp-audio-partial.webm');
-	const tempFilePath = path.join(app.getPath('temp'), `temp-audio-partial.webm`);
-
-	console.log('STT main (partial): received buffer, size:', size);
-
-	const tWriteStart = Date.now();
-	fs.writeFileSync(tempFilePath, Buffer.from(audioBuffer));
-	console.log('STT main (partial): wrote temp file in', Date.now() - tWriteStart, 'ms -', tempFilePath);
+	// Salva arquivo temporário
+	const tempFileName = isPartial ? 'temp-audio-partial.webm' : 'temp-audio.webm';
+	const tempFilePath = path.join(app.getPath('temp'), tempFileName);
 
 	try {
-		const tSttStart = Date.now();
+		fs.writeFileSync(tempFilePath, Buffer.from(audioBuffer));
+
 		const transcription = await openaiClient.audio.transcriptions.create({
 			file: fs.createReadStream(tempFilePath),
 			model: 'whisper-1',
 			language: 'pt',
 		});
-		const sttDuration = Date.now() - tSttStart;
-
-		console.log(
-			'STT main (partial): transcription finished in',
-			sttDuration,
-			'(received->start:',
-			tSttStart - recvAt,
-			'ms)',
-		);
 
 		return transcription.text;
 	} catch (error) {
-		console.error('❌ Erro na transcrição parcial:', error && error.message ? error.message : error);
-		// Se o erro for de formato inválido, não propagar — retorna string vazia
-		if (
-			error &&
-			error.status === 400 &&
-			error.error &&
-			error.error.message &&
-			error.error.message.includes('Invalid file format')
-		) {
-			console.warn('STT partial: invalid file format, retornando string vazia');
+		console.error(`❌ Erro na transcrição ${isPartial ? 'parcial' : ''}:`, error.message);
+
+		if (error.status === 401 || error.message.includes('authentication')) {
+			openaiClient = null;
+			throw new Error('Chave da API inválida ou expirada. Verifique suas configurações.');
+		}
+
+		if (isPartial && error.status === 400 && error.error?.message?.includes('Invalid file format')) {
 			return '';
 		}
-		if (error.status === 401 || (error.message && error.message.includes('authentication'))) {
-			openaiClient = null;
-			throw new Error('Chave da API inválida. Verifique as configurações.');
-		}
+
 		throw error;
 	} finally {
 		if (fs.existsSync(tempFilePath)) {
 			fs.unlinkSync(tempFilePath);
 		}
 	}
-});
+}
 
-ipcMain.handle('ask-gpt', async (_, messages) => {
-	// 🔥 VERIFICA SE O CLIENTE ESTÁ INICIALIZADO, se não tenta inicializar do secure store
+// Handlers específicos
+ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, false));
+ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, true));
+
+/* ================================
+   HANDLERS IPC - TRANSCRIÇÃO LOCAL (Whisper.cpp)
+=============================== */
+
+/* ================================
+   HANDLERS IPC - TRANSCRIÇÃO LOCAL (Whisper.cpp) OTIMIZADA
+=============================== */
+// CORREÇÃO FINAL: Use os argumentos corretos desta versão
+async function transcribeLocalCommon(audioBuffer, isPartial = false) {
+	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
+
+	if (!checkWhisperFiles()) {
+		if (isPartial) return '';
+		throw new Error('Arquivos do Whisper.cpp não encontrados!');
+	}
+
+	const tempDir = app.getPath('temp');
+
+	// Salva como WebM primeiro
+	const tempWebmPath = path.join(tempDir, `whisper-${isPartial ? 'partial' : 'temp'}-${Date.now()}.webm`);
+	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
+
+	try {
+		// 1. Salva o buffer WebM
+		fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
+		console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
+
+		// 2. Converte WebM para WAV
+		await convertWebMToWAV(tempWebmPath, tempWavPath);
+		console.log(`🔄 Convertido para WAV: ${tempWavPath}`);
+
+		// 3. Verifica se o arquivo WAV existe
+		if (!fs.existsSync(tempWavPath)) {
+			throw new Error('Arquivo WAV não foi criado');
+		}
+
+		const wavStats = fs.statSync(tempWavPath);
+		console.log(`📊 WAV stats: ${wavStats.size} bytes`);
+
+		if (wavStats.size < 1000) {
+			console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
+		}
+
+		// 4. Executar Whisper.cpp COM ARGUMENTOS CORRETOS
+		console.log(`🚀 Executando Whisper...`);
+
+		// 🔥 ARGUMENTOS CORRETOS baseados no --help:
+		const args = [
+			'-m',
+			WHISPER_MODEL,
+			'-f',
+			tempWavPath,
+			'-l',
+			'pt', // idioma português
+			'-otxt', // saída em texto
+			'-t',
+			'4', // 4 threads
+			'-np', // não imprimir logs (no-prints)
+			'-nt', // não imprimir timestamps
+		];
+
+		// Se for parcial, ajusta parâmetros para ser mais rápido
+		if (isPartial) {
+			args.push('-d', '3000'); // máximo 3 segundos
+			args.push('-ml', '50'); // máximo 50 caracteres por segmento
+		}
+
+		console.log(`🤖 Comando: ${WHISPER_EXE} ${args.join(' ')}`);
+
+		const { stdout, stderr } = await execFileAsync(WHISPER_EXE, args, {
+			timeout: isPartial ? 8000 : 20000, // Mais tempo
+			maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+		});
+
+		console.log(`✅ [WHISPER LOCAL] Execução concluída`);
+
+		// Debug detalhado
+		if (stdout && stdout.trim()) {
+			console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
+		} else {
+			console.log(`📝 STDOUT: vazio ou nulo`);
+		}
+
+		if (stderr && stderr.trim()) {
+			console.log(`⚠️ STDERR:`, stderr.substring(0, 200));
+		}
+
+		let result = '';
+
+		// Tenta extrair resultado de stdout
+		if (stdout && stdout.trim()) {
+			result = stdout.trim();
+			console.log(`📋 Resultado do stdout: "${result}" (${result.length} chars)`);
+		}
+		// Algumas versões escrevem no stderr mesmo com sucesso
+		else if (stderr && stderr.trim()) {
+			// Tenta extrair texto entre [ ] que é onde fica a transcrição
+			const lines = stderr.split('\n');
+			for (const line of lines) {
+				if (line.includes('[') && line.includes(']')) {
+					const match = line.match(/\[([^\]]+)\]/);
+					if (match && match[1]) {
+						result = match[1].trim();
+						console.log(`🔍 Transcrição extraída do stderr: "${result}"`);
+						break;
+					}
+				}
+			}
+
+			// Se não encontrou entre colchetes, pega a última linha não vazia
+			if (!result) {
+				const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+				if (nonEmptyLines.length > 0) {
+					result = nonEmptyLines[nonEmptyLines.length - 1].trim();
+					console.log(`🔍 Última linha do stderr: "${result}"`);
+				}
+			}
+		}
+
+		console.log(`🎯 Resultado final: "${result}" (${result.length} chars)`);
+
+		return result || '';
+	} catch (error) {
+		console.error(`❌ [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Erro:`, error.message);
+
+		// Log do erro completo
+		if (error.code) console.error(`Error code: ${error.code}`);
+		if (error.signal) console.error(`Signal: ${error.signal}`);
+		if (error.stderr) {
+			console.error(`STDERR (primeiros 1000 chars):`, error.stderr.substring(0, 1000));
+		}
+
+		if (isPartial) return '';
+		throw error;
+	} finally {
+		// Limpa arquivos temporários
+		try {
+			if (fs.existsSync(tempWebmPath)) fs.unlinkSync(tempWebmPath);
+			if (fs.existsSync(tempWavPath)) fs.unlinkSync(tempWavPath);
+		} catch (e) {
+			console.warn('⚠️ Erro ao limpar temporários:', e.message);
+		}
+	}
+}
+
+// 🔥 ADICIONE ESTA FUNÇÃO PARA CONVERSÃO (se ainda não existir)
+function convertWebMToWAV(inputPath, outputPath) {
+	return new Promise((resolve, reject) => {
+		// Usa ffmpeg estático se disponível
+		const ffmpeg = require('fluent-ffmpeg');
+		const ffmpegPath = require('ffmpeg-static');
+
+		ffmpeg(inputPath)
+			.setFfmpegPath(ffmpegPath)
+			.audioCodec('pcm_s16le')
+			.audioFrequency(16000) // Whisper usa 16kHz
+			.audioChannels(1) // Mono
+			.format('wav')
+			.on('end', () => {
+				console.log('✅ Conversão WebM → WAV concluída');
+				resolve();
+			})
+			.on('error', err => {
+				console.error('❌ Erro na conversão WebM → WAV:', err);
+				reject(err);
+			})
+			.save(outputPath);
+	});
+}
+
+// Handlers específicos
+ipcMain.handle('transcribe-local', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, false));
+ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, true));
+
+/* ================================
+   HANDLERS IPC - GPT
+=============================== */
+
+async function ensureOpenAIClient() {
 	if (!openaiClient) {
-		console.log('⚠️ Cliente OpenAI não inicializado para GPT, tentando recuperar...');
+		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
 		const initialized = initializeOpenAIClient();
 		if (!initialized) {
-			console.error('❌ OpenAI client não inicializado.');
 			throw new Error('OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
 		}
 	}
+}
+
+ipcMain.handle('ask-gpt', async (_, messages) => {
+	await ensureOpenAIClient();
 
 	try {
 		const completion = await openaiClient.chat.completions.create({
@@ -497,18 +527,14 @@ ipcMain.handle('ask-gpt', async (_, messages) => {
 });
 
 ipcMain.handle('ask-gpt-stream', async (event, messages) => {
-	// 🔥 VERIFICA SE O CLIENTE ESTÁ INICIALIZADO, se não tenta inicializar do secure store
-	if (!openaiClient) {
-		console.log('⚠️ Cliente OpenAI não inicializado para streaming, tentando recuperar...');
-		const initialized = initializeOpenAIClient();
-		if (!initialized) {
-			console.error('❌ OpenAI client não inicializado.');
-			event.sender.send('GPT_STREAM_ERROR', 'OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
-			return;
-		}
-	}
-
 	const win = BrowserWindow.fromWebContents(event.sender);
+
+	try {
+		await ensureOpenAIClient();
+	} catch (error) {
+		win.webContents.send('GPT_STREAM_ERROR', error.message);
+		return;
+	}
 
 	try {
 		const stream = await openaiClient.chat.completions.create({
@@ -518,21 +544,16 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 			stream: true,
 		});
 
-		try {
-			for await (const chunk of stream) {
-				const token = chunk.choices?.[0]?.delta?.content;
-				if (token) {
-					win.webContents.send('GPT_STREAM_CHUNK', token);
-				}
+		for await (const chunk of stream) {
+			const token = chunk.choices?.[0]?.delta?.content;
+			if (token) {
+				win.webContents.send('GPT_STREAM_CHUNK', token);
 			}
-		} catch (err) {
-			console.error('GPT stream error:', err);
-			win.webContents.send('GPT_STREAM_ERROR', err.message);
-		} finally {
-			win.webContents.send('GPT_STREAM_END');
 		}
+
+		win.webContents.send('GPT_STREAM_END');
 	} catch (error) {
-		console.error('❌ Erro ao iniciar stream GPT:', error.message);
+		console.error('❌ Erro no stream GPT:', error.message);
 		if (error.status === 401 || error.message.includes('authentication')) {
 			openaiClient = null;
 			win.webContents.send('GPT_STREAM_ERROR', 'Chave da API inválida. Configure na seção "API e Modelos".');
@@ -542,19 +563,35 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 	}
 });
 
-/* ====================================
-   🪟 Inicio do DRAG AND DROP DA JANELA
-==================================== */
+/* ================================
+   HANDLERS IPC - CONTROLE DA JANELA
+=============================== */
+
+// Click-through
+ipcMain.on('SET_CLICK_THROUGH', (_, enabled) => {
+	clickThroughEnabled = enabled;
+	mainWindow.setIgnoreMouseEvents(enabled, { forward: true });
+	console.log('🖱️ Click-through:', enabled ? 'ATIVADO' : 'DESATIVADO');
+});
+
+ipcMain.handle('GET_CLICK_THROUGH', () => clickThroughEnabled);
+
+// Zonas interativas
+ipcMain.on('SET_INTERACTIVE_ZONE', (_, isInteractive) => {
+	if (clickThroughEnabled) {
+		mainWindow.setIgnoreMouseEvents(!isInteractive, { forward: true });
+	}
+});
+
+// Drag and drop da janela
 ipcMain.on('START_WINDOW_DRAG', () => {
 	if (!mainWindow) return;
-	console.log('🪟 START_WINDOW_DRAG');
-	mainWindow.moveTop(); // garante foco
-	mainWindow.startDrag?.(); // macOS (seguro)
+	mainWindow.moveTop();
+	mainWindow.startDrag?.();
 });
 
 ipcMain.handle('GET_WINDOW_BOUNDS', () => {
-	if (!mainWindow) return null;
-	return mainWindow.getBounds();
+	return mainWindow ? mainWindow.getBounds() : null;
 });
 
 ipcMain.handle('GET_CURSOR_SCREEN_POINT', () => {
@@ -570,20 +607,166 @@ ipcMain.on('MOVE_WINDOW_TO', (_, { x, y }) => {
 	if (!mainWindow) return;
 	try {
 		const b = mainWindow.getBounds();
-		mainWindow.setBounds({ x: Math.round(x), y: Math.round(y), width: b.width, height: b.height });
+		mainWindow.setBounds({
+			x: Math.round(x),
+			y: Math.round(y),
+			width: b.width,
+			height: b.height,
+		});
 	} catch (err) {
 		console.warn('MOVE_WINDOW_TO falhou:', err);
 	}
 });
-/* =================================
-   🪟 Fim do DRAG AND DROP DA JANELA
-================================= */
 
+// Fechar app
 ipcMain.on('APP_CLOSE', () => {
 	console.log('❌ APP_CLOSE recebido — encerrando aplicação');
-	if (mainWindow) {
-		mainWindow.close();
+	app.quit();
+});
+
+/* ================================
+   HANDLER DE TESTE
+=============================== */
+// Handler de teste corrigido
+ipcMain.handle('test-whisper-local', async () => {
+	console.log('🧪 Teste manual do Whisper local chamado...');
+
+	// Verificar se existem
+	if (!fs.existsSync(WHISPER_EXE) || !fs.existsSync(WHISPER_MODEL)) {
+		return {
+			success: false,
+			error: 'Arquivos do Whisper não encontrados',
+			exe: WHISPER_EXE,
+			model: WHISPER_MODEL,
+		};
 	}
+
+	// Criar arquivo WAV de teste REAL (não silêncio)
+	const tempDir = app.getPath('temp');
+	const testWav = path.join(tempDir, `test-whisper-${Date.now()}.wav`);
+
+	try {
+		// Cria um WAV simples com um tom (não silêncio)
+		const sampleRate = 16000;
+		const duration = 1; // 1 segundo
+		const frequency = 440; // Hz (Lá)
+
+		// Gera um tom simples
+		const numSamples = duration * sampleRate;
+		const samples = new Int16Array(numSamples);
+
+		for (let i = 0; i < numSamples; i++) {
+			// Gera uma onda senoidal
+			const t = i / sampleRate;
+			samples[i] = Math.floor(32767 * 0.1 * Math.sin(2 * Math.PI * frequency * t));
+		}
+
+		// Cria header WAV
+		const header = Buffer.alloc(44);
+		header.write('RIFF', 0);
+		header.writeUInt32LE(36 + samples.length * 2, 4); // ChunkSize
+		header.write('WAVE', 8);
+		header.write('fmt ', 12);
+		header.writeUInt32LE(16, 16); // Subchunk1Size
+		header.writeUInt16LE(1, 20); // AudioFormat (PCM)
+		header.writeUInt16LE(1, 22); // NumChannels
+		header.writeUInt32LE(sampleRate, 24); // SampleRate
+		header.writeUInt32LE(sampleRate * 2, 28); // ByteRate
+		header.writeUInt16LE(2, 32); // BlockAlign
+		header.writeUInt16LE(16, 34); // BitsPerSample
+		header.write('data', 36);
+		header.writeUInt32LE(samples.length * 2, 40); // Subchunk2Size
+
+		// Converte samples para buffer
+		const sampleBuffer = Buffer.from(samples.buffer);
+		const wavFile = Buffer.concat([header, sampleBuffer]);
+
+		fs.writeFileSync(testWav, wavFile);
+		console.log(`📁 WAV de teste criado: ${testWav} (${wavFile.length} bytes)`);
+
+		// Executa whisper
+		console.log('Executando whisper-cli.exe...');
+		const { stdout, stderr } = await execFileAsync(
+			WHISPER_EXE,
+			[
+				'-m',
+				WHISPER_MODEL,
+				'-f',
+				testWav,
+				'-l',
+				'pt',
+				'-otxt',
+				'-t',
+				'2',
+				'-np', // não imprimir logs
+				'-nt', // não imprimir timestamps
+			],
+			{ timeout: 15000 },
+		);
+
+		// Tenta extrair resultado
+		let output = '';
+		if (stdout && stdout.trim()) {
+			output = stdout.trim();
+		} else if (stderr && stderr.trim()) {
+			// Tenta extrair do stderr
+			const lines = stderr.split('\n');
+			for (const line of lines) {
+				if (line.includes('[') && line.includes(']')) {
+					const match = line.match(/\[([^\]]+)\]/);
+					if (match && match[1]) {
+						output = match[1].trim();
+						break;
+					}
+				}
+			}
+			if (!output) {
+				output = stderr.trim();
+			}
+		}
+
+		console.log(`✅ Whisper output: "${output}"`);
+
+		// Limpar
+		fs.unlinkSync(testWav);
+
+		return {
+			success: true,
+			message: output ? 'Whisper local funciona!' : 'Whisper executou mas retornou vazio',
+			output: output || '(vazio)',
+			rawOutput: stdout || '',
+			rawError: stderr || '',
+		};
+	} catch (error) {
+		// Limpar mesmo em caso de erro
+		if (fs.existsSync(testWav)) {
+			fs.unlinkSync(testWav);
+		}
+
+		return {
+			success: false,
+			error: error.message,
+			code: error.code,
+			stderr: error.stderr || '',
+			stdout: error.stdout || '',
+		};
+	}
+});
+
+/* ================================
+   INICIALIZAÇÃO DO APP
+=============================== */
+app.whenReady().then(() => {
+	createWindow();
+
+	// Atalhos globais
+	globalShortcut.register('Control+D', () => {
+		mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
+	});
+
+	globalShortcut.register('Control+Enter', () => {
+		mainWindow.webContents.send('CMD_ASK_GPT');
+	});
 });
 
 app.on('will-quit', () => {

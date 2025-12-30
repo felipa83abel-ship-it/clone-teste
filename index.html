@@ -70,6 +70,8 @@
 				</div>
 			</div>
 
+			<button id="testWhisperBtn" class="btn-secondary" style="margin-top: 10px">🧪 Testar Whisper Local</button>
+
 			<!-- MOCK BADGE -->
 			<div id="mockBadge" class="mock-badge hidden">🧪 MODO MOCK ATIVADO!!!</div>
 
@@ -212,6 +214,22 @@
 											>🔒 Sua chave é armazenada de forma criptografada localmente. Não é possível copiar ou visualizar
 											a chave após salvar.</small
 										>
+									</div>
+
+									<div class="form-group">
+										<!-- Alternar entre OpenAI e Whisper local -->
+										<div
+											id="transcriptionToggle"
+											style="margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 5px"
+										>
+											<label style="color: white; cursor: pointer; display: flex; align-items: center">
+												<input type="checkbox" id="whisperLocalToggle" style="margin-right: 8px" />
+												<span id="whisperStatus">🌐 OpenAI (Ativo)</span>
+											</label>
+											<small style="color: #888; display: block; margin-top: 5px">
+												Alternar entre OpenAI (nuvem) e Whisper.cpp (local/offline)
+											</small>
+										</div>
 									</div>
 
 									<div class="form-group">
