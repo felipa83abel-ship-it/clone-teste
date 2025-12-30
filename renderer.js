@@ -27,7 +27,9 @@ const MIN_INPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo de tamanho de áudi
 const OUTPUT_SPEECH_THRESHOLD = 8; // Valor limite (threshold) para detectar fala mais cedo = 8
 const OUTPUT_SILENCE_TIMEOUT = 250; // Tempo de espera para silêncio = 250
 const MIN_OUTPUT_AUDIO_SIZE = 2500; // Valor mínimo de tamanho de áudio para a normal = 2500
-const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 400; // Valor mínimo de tamanho de áudio para a entrevista = 400
+const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 800; // Valor mínimo para enviar parcial (~3-4 chunks, ~3KB)
+// controla intervalo mínimo entre requisições STT parciais (ms) - mantém rate-limit para não sobrecarregar API
+const PARTIAL_MIN_INTERVAL_MS = 3000;
 
 const OUTPUT_ENDING_PHRASES = ['tchau', 'tchau tchau', 'obrigado', 'valeu', 'falou', 'beleza', 'ok']; // Palavras finais para detectar o fim da fala
 
@@ -98,6 +100,8 @@ let lastOutputStartAt = null;
 let lastOutputStopAt = null;
 let lastInputPlaceholderEl = null;
 let lastOutputPlaceholderEl = null;
+let lastAskedQuestionNormalized = null;
+let lastPartialSttAt = null;
 
 /* ===============================
    CALLBACKS / OBSERVERS SYSTEM
@@ -125,6 +129,7 @@ const UICallbacks = {
 	onAnswerStreamChunk: null,
 	onModeSelectUpdate: null,
 	onPlaceholderFulfill: null,
+	onPlaceholderUpdate: null,
 };
 
 // Função para config-manager se inscrever em eventos
@@ -1236,7 +1241,17 @@ function transcribeOutputPartial(blobChunk) {
 	// Reinicia o timer para processar o chunk parcial após um curto período
 	if (outputPartialTimer) clearTimeout(outputPartialTimer);
 
+	// calcula delay respeitando um intervalo mínimo entre requisições STT parciais
+	const now = Date.now();
+	const elapsedSinceLast = typeof lastPartialSttAt === 'number' ? now - lastPartialSttAt : Infinity;
+	let intendedDelay = 120; // janela base para agrupar chunks
+	if (elapsedSinceLast < PARTIAL_MIN_INTERVAL_MS) {
+		intendedDelay = PARTIAL_MIN_INTERVAL_MS - elapsedSinceLast + 50; // pequeno buffer extra
+		console.log('⏱️ Ajustando delay parcial para respeitar rate-limit (ms):', intendedDelay);
+	}
+
 	// Define um timer para processar o chunk parcial após X(ms)
+	// Timeout curto (300ms) para agrupar ~5-8 chunks e enviar rápido para STT
 	outputPartialTimer = setTimeout(async () => {
 		// Se não houver chunks parciais de saída, retorna
 		if (!outputPartialChunks.length) {
@@ -1257,6 +1272,8 @@ function transcribeOutputPartial(blobChunk) {
 		try {
 			// Envia para transcrição o blob parcial de saída
 			const partialText = await transcribeAudioPartial(blob);
+			// marca último envio parcial
+			lastPartialSttAt = Date.now();
 			console.log('📝 transcribeOutputPartial: Transcrição recebida: ', partialText);
 
 			// Ignora transcrição vazia
@@ -1275,6 +1292,50 @@ function transcribeOutputPartial(blobChunk) {
 			outputPartialText += ' ' + partialText;
 			outputPartialText = outputPartialText.trim();
 			console.log('📋 Texto acumulado:', outputPartialText);
+
+			// Atualiza UI com transcrição parcial imediatamente (usa placeholder incremental)
+			try {
+				// cria placeholder se ainda não existe (usa startAt se disponível)
+				if (!lastOutputPlaceholderEl) {
+					const placeholderTime = lastOutputStartAt || Date.now();
+					lastOutputPlaceholderEl = addTranscript(OTHER, '...', placeholderTime);
+					if (lastOutputPlaceholderEl && lastOutputPlaceholderEl.dataset) {
+						lastOutputPlaceholderEl.dataset.startAt = placeholderTime;
+						// marca um stop provisório para o UI mostrar intervalo dinâmico
+						lastOutputPlaceholderEl.dataset.stopAt = Date.now();
+					}
+				} else if (lastOutputPlaceholderEl && lastOutputPlaceholderEl.dataset) {
+					// atualiza stop provisório a cada parcial
+					lastOutputPlaceholderEl.dataset.stopAt = Date.now();
+				}
+
+				// solicita ao config-manager atualização parcial do placeholder (inclui métricas provisórias)
+				emitUIChange('onPlaceholderUpdate', {
+					speaker: OTHER,
+					text: outputPartialText,
+					timeStr: new Date(lastOutputStartAt || Date.now()).toLocaleTimeString(),
+					startStr: new Date(lastOutputStartAt || Date.now()).toLocaleTimeString(),
+					stopStr: new Date().toLocaleTimeString(),
+					recordingDuration: Date.now() - (lastOutputStartAt || Date.now()),
+					latency: 0,
+					total: Date.now() - (lastOutputStartAt || Date.now()),
+					provisional: true,
+				});
+
+				// atualiza currentQuestion para refletir texto parcial
+				if (
+					!currentQuestion.text ||
+					normalizeForCompare(currentQuestion.text) !== normalizeForCompare(outputPartialText)
+				) {
+					currentQuestion.text = outputPartialText;
+					currentQuestion.lastUpdate = Date.now();
+					currentQuestion.finalized = false;
+					selectedQuestionId = CURRENT_QUESTION_ID;
+					renderCurrentQuestion();
+				}
+			} catch (err) {
+				console.warn('⚠️ falha ao atualizar UI com transcrição parcial:', err);
+			}
 
 			// verifica se a pergunta está "pronta" (heurística)
 			if (isQuestionReady(outputPartialText)) {
@@ -1338,7 +1399,7 @@ function transcribeOutputPartial(blobChunk) {
 		} catch (err) {
 			console.error('❌ Erro na transcrição parcial (OUTPUT):', err);
 		}
-	}, 120); // ✅ Janela de 120ms para agrupar chunks próximos
+	}, 300); // Janela de 300ms para máxima responsividade - envia ~5-8 chunks a cada 3s (rate-limit)
 
 	debugLogRenderer('Fim da função: "transcribeOutputPartial"');
 }
@@ -1515,9 +1576,40 @@ async function transcribeOutput() {
 
 			console.log('✅ Placeholder atualizado com sucesso');
 		} else {
-			// Sem placeholder - adiciona transcrição direta
-			console.log('➕ Adicionando transcrição direta (sem placeholder)');
-			addTranscript(OTHER, text);
+			// Sem placeholder - cria placeholder e emite fulfill para garantir métricas
+			console.log('➕ Nenhum placeholder existente - criando e preenchendo com métricas');
+			// obtém timestamps de fallback
+			const stop = lastOutputStopAt || Date.now();
+			const start = lastOutputStartAt || stop;
+			const now = Date.now();
+			const recordingDuration = stop - start;
+			const latency = now - stop;
+			const total = now - start;
+			const startStr = new Date(start).toLocaleTimeString();
+			const stopStr = new Date(stop).toLocaleTimeString();
+
+			// cria um placeholder visível antes de preencher (garante consistência com fluxo parcial)
+			const placeholderEl = addTranscript(OTHER, '...', start);
+			if (placeholderEl && placeholderEl.dataset) {
+				placeholderEl.dataset.startAt = start;
+				placeholderEl.dataset.stopAt = stop;
+			}
+
+			// Emite atualização final para preencher o placeholder com texto e métricas
+			emitUIChange('onPlaceholderFulfill', {
+				speaker: OTHER,
+				text,
+				stopStr,
+				startStr,
+				recordingDuration,
+				latency,
+				total,
+			});
+
+			// reseta variáveis de placeholder
+			lastOutputPlaceholderEl = null;
+			lastOutputStopAt = null;
+			lastOutputStartAt = null;
 		}
 
 		// processa a fala transcrita (consolidação de perguntas)
@@ -1583,10 +1675,6 @@ function handleSpeech(author, text) {
 				'ℹ️ Questão anterior finalizada — promovendo para a história e continuando a processar o novo discurso.',
 			);
 			promoteCurrentToHistory(currentQuestion.text);
-		}
-
-		if (currentQuestion.text && now - currentQuestion.lastUpdate > QUESTION_IDLE_TIMEOUT) {
-			closeCurrentQuestion();
 		}
 
 		// 🧠 Detecta início de NOVA pergunta e fecha a anterior
@@ -1734,6 +1822,9 @@ function resetInterviewTurnState() {
 	outputPartialText = '';
 	outputPartialChunks = [];
 
+	// limpa fingerprint de pergunta enviada para evitar bloqueios indevidos
+	lastAskedQuestionNormalized = null;
+
 	debugLogRenderer('Fim da função: "resetInterviewTurnState"');
 }
 
@@ -1796,6 +1887,14 @@ async function askGpt() {
 	}
 
 	const isCurrent = selectedQuestionId === CURRENT_QUESTION_ID;
+	const normalizedText = normalizeForCompare(text);
+
+	// Evita reenvio da mesma pergunta atual ao GPT (dedupe)
+	if (isCurrent && normalizedText && lastAskedQuestionNormalized === normalizedText) {
+		updateStatusMessage('⛔ Pergunta já enviada');
+		console.log('⛔ askGpt: mesma pergunta já enviada, pulando');
+		return;
+	}
 	const questionId = isCurrent ? CURRENT_QUESTION_ID : selectedQuestionId;
 
 	// 🛡️ MODO ENTREVISTA — bloqueia duplicação APENAS para histórico
@@ -1839,6 +1938,7 @@ async function askGpt() {
 	// marca que este turno teve uma requisição ao GPT (apenas para CURRENT)
 	if (isCurrent) {
 		gptRequestedTurnId = interviewTurnId;
+		lastAskedQuestionNormalized = normalizedText;
 		console.log('ℹ️ gptRequestedTurnId definido para turno', gptRequestedTurnId);
 		lastSentQuestionText = text.trim();
 		console.log('ℹ️ lastSentQuestionText definido:', lastSentQuestionText);
@@ -2054,6 +2154,10 @@ function renderCurrentQuestion() {
 		createdAt: currentQuestion.createdAt,
 	};
 
+	console.log(`📤 renderCurrentQuestion: emitindo onCurrentQuestionUpdate`, {
+		label,
+		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
+	});
 	emitUIChange('onCurrentQuestionUpdate', questionData);
 
 	debugLogRenderer('Fim da função: "renderCurrentQuestion"');

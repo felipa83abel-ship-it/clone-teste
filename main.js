@@ -407,8 +407,9 @@ ipcMain.handle('transcribe-audio-partial', async (_, audioBuffer) => {
 	}
 
 	// Proteção: buffers muito pequenos frequentemente não formam um arquivo válido
+	// Ajustado para tolerar blobs menores vindos de MediaRecorder em janelas curtas
 	const size = audioBuffer?.byteLength || audioBuffer?.length || 0;
-	if (size < 3000) {
+	if (size < 800) {
 		console.log('STT main (partial): buffer demasiado pequeno, ignorando (size=', size, ')');
 		return '';
 	}

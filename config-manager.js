@@ -1355,13 +1355,25 @@ class ConfigManager {
 
 		// Pergunta Atual
 		window.RendererAPI.onUIChange('onCurrentQuestionUpdate', data => {
+			console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
 			const { text, isSelected } = data;
 			const currentQuestionBox = document.getElementById('currentQuestion');
-			if (!currentQuestionBox) return;
+			if (!currentQuestionBox) {
+				console.warn(`⚠️ config-manager: elemento #currentQuestion não encontrado`);
+				return;
+			}
 
 			// Procura por span dentro do elemento (pode ser currentQuestionText)
 			const textEl = currentQuestionBox.querySelector('span') || currentQuestionBox;
-			if (textEl) textEl.innerText = text;
+			if (textEl) {
+				console.log(`✅ config-manager: atualizando texto em elemento:`, {
+					seletor: textEl.id || textEl.className,
+					texto: text?.substring(0, 50),
+				});
+				textEl.innerText = text;
+			} else {
+				console.warn(`⚠️ config-manager: elemento de texto não encontrado dentro de #currentQuestion`);
+			}
 
 			if (isSelected) {
 				currentQuestionBox.classList.add('selected-question');
@@ -1504,6 +1516,68 @@ class ConfigManager {
 			lastPlaceholder.parentNode.insertBefore(meta, lastPlaceholder.nextSibling);
 
 			console.log('✅ Metadados adicionados');
+		});
+
+		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
+		window.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
+			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total, provisional } = data;
+
+			const transcriptionBox = document.getElementById('conversation');
+			if (!transcriptionBox) return;
+
+			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+			// fallback: cria um novo placeholder se não existir
+			if (!placeholders || placeholders.length === 0) {
+				const div = document.createElement('div');
+				div.className = 'transcript-item';
+				div.setAttribute('data-is-placeholder', 'true');
+				const ts = timeStr || new Date().toLocaleTimeString();
+				div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+				transcriptionBox.appendChild(div);
+
+				// cria meta provisório se houver métricas
+				if (startStr || stopStr || recordingDuration) {
+					const meta = document.createElement('div');
+					meta.className = 'transcript-meta';
+					meta.style.fontSize = '0.8em';
+					meta.style.color = '#888';
+					meta.style.marginTop = '2px';
+					meta.style.marginBottom = '2px';
+					meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
+						latency || 0
+					}ms, total ${total || 0}ms)`;
+					transcriptionBox.appendChild(meta);
+				}
+
+				return;
+			}
+
+			const lastPlaceholder = placeholders[placeholders.length - 1];
+			const ts = timeStr || new Date().toLocaleTimeString();
+			lastPlaceholder.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+
+			// Atualiza ou cria o elemento de meta imediatamente após o placeholder
+			let meta = lastPlaceholder.nextElementSibling;
+			if (!meta || !meta.classList || !meta.classList.contains('transcript-meta')) {
+				meta = document.createElement('div');
+				meta.className = 'transcript-meta';
+				meta.style.fontSize = '0.8em';
+				meta.style.color = '#888';
+				meta.style.marginTop = '2px';
+				meta.style.marginBottom = '2px';
+				lastPlaceholder.parentNode.insertBefore(meta, lastPlaceholder.nextSibling);
+			}
+
+			// exibe métricas provisórias (se disponíveis)
+			if (startStr || stopStr || recordingDuration) {
+				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
+					latency || 0
+				}ms, total ${total || 0}ms)`;
+			} else {
+				meta.innerText = '';
+			}
+
+			// mantém data-is-placeholder até receber onPlaceholderFulfill
 		});
 
 		// Clear Transcription
