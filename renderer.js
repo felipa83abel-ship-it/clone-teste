@@ -7,6 +7,7 @@ const hljs = require('highlight.js');
 
 // 🔒 DESABILITADO TEMPORARIAMENTE
 const DESABILITADO_TEMPORARIAMENTE = false;
+const ASK_GPT_DESABILITADO_TEMPORARIAMENTE = true;
 
 /* ===============================
    CONSTANTES
@@ -59,6 +60,15 @@ let audioContext;
 let mockInterviewRunning = false;
 
 let USE_LOCAL_WHISPER = false; // false = OpenAI, true = Whisper local
+let transcriptionMetrics = {
+	audioStartTime: null,
+	whisperStartTime: null,
+	whisperEndTime: null,
+	gptStartTime: null,
+	gptEndTime: null,
+	totalTime: null,
+	audioSize: 0,
+};
 
 /* 🎤 INPUT (VOCÊ) */
 let inputStream;
@@ -481,36 +491,53 @@ function setTranscriptionMode(useLocal) {
 }
 
 async function transcribeAudio(blob) {
+	transcriptionMetrics.audioStartTime = Date.now();
+	transcriptionMetrics.audioSize = blob.size;
+
 	const buffer = Buffer.from(await blob.arrayBuffer());
 	console.log(`🎤 Transcrição (${USE_LOCAL_WHISPER ? 'Local' : 'OpenAI'}): ${blob.size} bytes`);
-
-	// Adiciona log mais detalhado sobre o buffer
-	console.log(`🔍 Buffer info: length=${buffer.length}, first 10 bytes:`, buffer.slice(0, 10).toString('hex'));
+	console.log(
+		`⏱️ Início: ${new Date(transcriptionMetrics.audioStartTime).toLocaleTimeString()}.${
+			transcriptionMetrics.audioStartTime % 1000
+		}`,
+	);
 
 	if (USE_LOCAL_WHISPER) {
 		try {
-			console.log('🔄 Chamando Whisper local...');
+			console.log(`🚀 Enviando para Whisper local...`);
+			transcriptionMetrics.whisperStartTime = Date.now();
+
 			const result = await ipcRenderer.invoke('transcribe-local', buffer);
-			console.log(`✅ Whisper local retornou: "${result}" (length: ${result.length})`);
+
+			transcriptionMetrics.whisperEndTime = Date.now();
+			const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
+
+			console.log(`✅ Whisper local concluído em ${whisperTime}ms`);
+			console.log(`📝 Resultado (${result.length} chars): "${result.substring(0, 80)}..."`);
+
+			// Log intermediário
+			console.log(
+				`📊 Whisper: ${whisperTime}ms para ${blob.size} bytes (${Math.round(blob.size / whisperTime)} bytes/ms)`,
+			);
+
 			return result;
 		} catch (error) {
 			console.error('❌ Whisper local falhou:', error.message);
-			console.error('Stack:', error.stack);
-			// Fallback para OpenAI se disponível
+			// Fallback para OpenAI
 			try {
-				console.log('🔄 Tentando fallback para OpenAI...');
-				const fallbackResult = await ipcRenderer.invoke('transcribe-audio', buffer);
-				console.log(`✅ OpenAI fallback retornou: "${fallbackResult}"`);
-				return fallbackResult;
+				return await ipcRenderer.invoke('transcribe-audio', buffer);
 			} catch (openaiError) {
-				throw new Error(`Falha na transcrição (local e fallback): ${openaiError.message}`);
+				throw new Error(`Falha na transcrição: ${openaiError.message}`);
 			}
 		}
 	} else {
-		// Usa OpenAI
-		console.log('🔄 Chamando OpenAI...');
+		transcriptionMetrics.whisperStartTime = Date.now();
 		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
-		console.log(`✅ OpenAI retornou: "${result}" (length: ${result.length})`);
+		transcriptionMetrics.whisperEndTime = Date.now();
+
+		const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
+		console.log(`✅ OpenAI concluído em ${whisperTime}ms`);
+
 		return result;
 	}
 }
@@ -1979,6 +2006,9 @@ async function askGpt() {
 		console.log('ℹ️ lastSentQuestionText definido:', lastSentQuestionText);
 	}
 
+	// Inicia medição do GPT
+	transcriptionMetrics.gptStartTime = Date.now();
+
 	// 🧪 DEBUG
 	if (APP_CONFIG.MODE_DEBUG) {
 		updateStatusMessage('🧪 Pergunta enviada ao GPT (modo teste)');
@@ -1994,6 +2024,14 @@ async function askGpt() {
 		// marca como respondido nesse turno (mock)
 		gptAnsweredTurnId = interviewTurnId;
 		gptRequestedTurnId = null;
+
+		// Finaliza medições
+		transcriptionMetrics.gptEndTime = Date.now();
+		transcriptionMetrics.totalTime = Date.now() - transcriptionMetrics.audioStartTime;
+
+		// Log métricas
+		logTranscriptionMetrics();
+
 		return;
 	}
 
@@ -2027,6 +2065,13 @@ async function askGpt() {
 			console.log('✅ GPT_STREAM_END recebido (stream finalizado)');
 			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
 			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
+
+			// Finaliza medições
+			transcriptionMetrics.gptEndTime = Date.now();
+			transcriptionMetrics.totalTime = Date.now() - transcriptionMetrics.audioStartTime;
+
+			// Log métricas
+			logTranscriptionMetrics();
 
 			let finalText = streamedText;
 			if (ENABLE_INTERVIEW_TIMING_DEBUG && gptStartAt) {
@@ -2100,6 +2145,14 @@ async function askGpt() {
 	]);
 
 	console.log('✅ resposta do GPT recebida (batch)');
+
+	// Finaliza medições
+	transcriptionMetrics.gptEndTime = Date.now();
+	transcriptionMetrics.totalTime = Date.now() - transcriptionMetrics.audioStartTime;
+
+	// Log métricas
+	logTranscriptionMetrics();
+
 	renderGptAnswer(questionId, res);
 
 	const wasRequestedForThisTurn = gptRequestedTurnId === interviewTurnId;
@@ -2800,19 +2853,6 @@ const RendererAPI = {
 	},
 
 	getTranscriptionMode: () => USE_LOCAL_WHISPER,
-
-	testWhisperLocal: async () => {
-		try {
-			console.log('🧪 Testando Whisper local...');
-			// Envia um buffer vazio apenas para testar a conexão
-			const result = await ipcRenderer.invoke('test-whisper-local');
-			console.log('Teste Whisper:', result);
-			return result;
-		} catch (error) {
-			console.error('Teste Whisper falhou:', error);
-			return { success: false, error: error.message };
-		}
-	},
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -2827,6 +2867,40 @@ if (typeof window !== 'undefined') {
 // Função de log debug estilizado
 function debugLogRenderer(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: brown; font-weight: bold;');
+}
+
+/* ===============================
+   FUNÇÃO PARA LOGAR MÉTRICAS
+=============================== */
+
+function logTranscriptionMetrics() {
+	if (!transcriptionMetrics.audioStartTime) return;
+
+	const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
+	const gptTime = transcriptionMetrics.gptEndTime - transcriptionMetrics.gptStartTime;
+	const totalTime = transcriptionMetrics.totalTime;
+
+	console.log(`📊 ================================`);
+	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
+	console.log(`📊 ================================`);
+	console.log(`📊 TAMANHO ÁUDIO: ${transcriptionMetrics.audioSize} bytes`);
+	console.log(`📊 WHISPER: ${whisperTime}ms (${Math.round(transcriptionMetrics.audioSize / whisperTime)} bytes/ms)`);
+	console.log(`📊 GPT: ${gptTime}ms`);
+	console.log(`📊 TOTAL: ${totalTime}ms`);
+	console.log(`📊 WHISPER % DO TOTAL: ${Math.round((whisperTime / totalTime) * 100)}%`);
+	console.log(`📊 GPT % DO TOTAL: ${Math.round((gptTime / totalTime) * 100)}%`);
+	console.log(`📊 ================================`);
+
+	// Reset para próxima medição
+	transcriptionMetrics = {
+		audioStartTime: null,
+		whisperStartTime: null,
+		whisperEndTime: null,
+		gptStartTime: null,
+		gptEndTime: null,
+		totalTime: null,
+		audioSize: 0,
+	};
 }
 
 //console.log('🚀 Entrou no renderer.js');

@@ -326,7 +326,9 @@ ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCo
 =============================== */
 // CORREÇÃO FINAL: Use os argumentos corretos desta versão
 async function transcribeLocalCommon(audioBuffer, isPartial = false) {
+	const startTime = Date.now();
 	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
+	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes em ${startTime}`);
 
 	if (!checkWhisperFiles()) {
 		if (isPartial) return '';
@@ -341,12 +343,16 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 
 	try {
 		// 1. Salva o buffer WebM
+		const saveStart = Date.now();
 		fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
+		const saveTime = Date.now() - saveStart;
 		console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
 
 		// 2. Converte WebM para WAV
+		const convertStart = Date.now();
 		await convertWebMToWAV(tempWebmPath, tempWavPath);
-		console.log(`🔄 Convertido para WAV: ${tempWavPath}`);
+		const convertTime = Date.now() - convertStart;
+		console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
 
 		// 3. Verifica se o arquivo WAV existe
 		if (!fs.existsSync(tempWavPath)) {
@@ -354,16 +360,16 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 		}
 
 		const wavStats = fs.statSync(tempWavPath);
-		console.log(`📊 WAV stats: ${wavStats.size} bytes`);
+		console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
 
 		if (wavStats.size < 1000) {
 			console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
 		}
 
 		// 4. Executar Whisper.cpp COM ARGUMENTOS CORRETOS
-		console.log(`🚀 Executando Whisper...`);
+		const whisperStart = Date.now();
 
-		// 🔥 ARGUMENTOS CORRETOS baseados no --help:
+		// 🔥 ARGUMENTOS OTIMIZADOS AO MÁXIMO
 		const args = [
 			'-m',
 			WHISPER_MODEL,
@@ -384,14 +390,15 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 			args.push('-ml', '50'); // máximo 50 caracteres por segmento
 		}
 
-		console.log(`🤖 Comando: ${WHISPER_EXE} ${args.join(' ')}`);
+		console.log(`🚀 4. Executando Whisper: ${WHISPER_EXE} ${args.join(' ')}`);
 
 		const { stdout, stderr } = await execFileAsync(WHISPER_EXE, args, {
-			timeout: isPartial ? 8000 : 20000, // Mais tempo
-			maxBuffer: 1024 * 1024 * 10, // 10MB buffer
+			timeout: isPartial ? 2000 : 4000, // Timeout maior para garantir
+			maxBuffer: 1024 * 1024 * 5, // 5MB buffer
 		});
 
-		console.log(`✅ [WHISPER LOCAL] Execução concluída`);
+		const whisperTime = Date.now() - whisperStart;
+		console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
 
 		// Debug detalhado
 		if (stdout && stdout.trim()) {
@@ -427,16 +434,28 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 			}
 
 			// Se não encontrou entre colchetes, pega a última linha não vazia
-			if (!result) {
-				const nonEmptyLines = lines.filter(line => line.trim().length > 0);
-				if (nonEmptyLines.length > 0) {
-					result = nonEmptyLines[nonEmptyLines.length - 1].trim();
-					console.log(`🔍 Última linha do stderr: "${result}"`);
-				}
-			}
+			// if (!result) {
+			// 	const nonEmptyLines = lines.filter(line => line.trim().length > 0);
+			// 	if (nonEmptyLines.length > 0) {
+			// 		result = nonEmptyLines[nonEmptyLines.length - 1].trim();
+			// 		console.log(`🔍 Última linha do stderr: "${result}"`);
+			// 	}
+			// }
 		}
 
-		console.log(`🎯 Resultado final: "${result}" (${result.length} chars)`);
+		// 🔥 3. Log métricas detalhadas
+		const totalTime = Date.now() - startTime;
+		console.log(`⏱️ ================================`);
+		console.log(`⏱️ [WHISPER LOCAL] MÉTRICAS DETALHADAS:`);
+		console.log(`⏱️ ================================`);
+		console.log(`⏱️ Tamanho buffer: ${audioBuffer.length} bytes`);
+		console.log(`⏱️ 1. Salvamento: ${saveTime}ms`);
+		console.log(`⏱️ 2. Conversão: ${convertTime}ms`);
+		console.log(`⏱️ 3. Whisper: ${whisperTime}ms`);
+		console.log(`⏱️ TOTAL: ${totalTime}ms`);
+		console.log(`⏱️ Whisper % do total: ${Math.round((whisperTime / totalTime) * 100)}%`);
+		console.log(`⏱️ ================================`);
+		console.log(`🎯 Resultado final (${result.length} chars): "${result.substring(0, 100)}..."`);
 
 		return result || '';
 	} catch (error) {

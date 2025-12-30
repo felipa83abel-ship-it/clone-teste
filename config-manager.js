@@ -1790,22 +1790,6 @@ class ConfigManager {
 			});
 		}
 
-		// Botão para testar Whisper local
-		const testWhisperBtn = document.getElementById('testWhisperBtn');
-		if (testWhisperBtn && window.RendererAPI?.testWhisperLocal) {
-			testWhisperBtn.addEventListener('click', async () => {
-				console.log('🧪 Testando Whisper local...');
-				const result = await window.RendererAPI.testWhisperLocal();
-				console.log('Resultado do teste:', result);
-
-				if (result.success) {
-					alert(`✅ Whisper local funciona!\n\nOutput: ${result.output || '(vazio)'}`);
-				} else {
-					alert(`❌ Whisper local falhou:\n\n${result.error || 'Erro desconhecido'}`);
-				}
-			});
-		}
-
 		console.log('✅ registerDOMEventListeners: Todos os listeners registrados com sucesso');
 
 		debugLogConfig('Fim da função: "registerDOMEventListeners"');
