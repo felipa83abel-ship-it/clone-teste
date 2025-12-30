@@ -1400,6 +1400,43 @@ class ConfigManager {
 			});
 		});
 
+		// Answer Selected — exibe resposta existente e faz scroll
+		window.RendererAPI.onUIChange('onAnswerSelected', payload => {
+			console.log('📌 onAnswerSelected recebido:', payload);
+
+			if (!payload) return;
+
+			const { questionId, shouldScroll } = payload;
+			if (!questionId) return;
+
+			const answersBox = document.getElementById('answersContainer');
+			if (!answersBox) return;
+
+			// remove seleção anterior
+			answersBox.querySelectorAll('.selected-answer').forEach(el => {
+				el.classList.remove('selected-answer');
+			});
+
+			// procura resposta vinculada à pergunta
+			const answerEl = answersBox.querySelector(`[data-question-id="${questionId}"]`);
+
+			if (!answerEl) {
+				console.warn('⚠️ Resposta não encontrada para questionId:', questionId);
+				return;
+			}
+
+			// marca como selecionada
+			answerEl.classList.add('selected-answer');
+
+			// garante visibilidade
+			if (shouldScroll) {
+				answerEl.scrollIntoView({
+					behavior: 'smooth',
+					block: 'center',
+				});
+			}
+		});
+
 		// Resposta GPT
 		window.RendererAPI.onUIChange('onAnswerAdd', data => {
 			const { questionId, action, html, questionText } = data;
