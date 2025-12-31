@@ -258,6 +258,13 @@ ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
 	}
 });
 
+// Inicializa cliente OpenAI com chave fornecida
+ipcMain.handle('initialize-api-client', async (_, apiKey) => {
+	const initialized = initializeOpenAIClient(apiKey);
+	if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
+	return { initialized };
+});
+
 /* ================================
    HANDLERS IPC - TRANSCRIÇÃO ONLINE (OpenAI)
 =============================== */
@@ -316,10 +323,6 @@ async function transcribeAudioCommon(audioBuffer, isPartial = false) {
 // Handlers específicos
 ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, false));
 ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, true));
-
-/* ================================
-   HANDLERS IPC - TRANSCRIÇÃO LOCAL (Whisper.cpp)
-=============================== */
 
 /* ================================
    HANDLERS IPC - TRANSCRIÇÃO LOCAL (Whisper.cpp) OTIMIZADA

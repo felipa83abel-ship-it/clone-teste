@@ -667,6 +667,16 @@ textarea:focus {
     background: rgba(var(--color-active-hover-rgb), var(--app-opacity));
 }
 
+/* Feedback visual quando o botão está ouvindo */
+.btn-activate.listening {
+    background: rgba(var(--color-danger-rgb), var(--app-opacity));
+    animation: pulse 1s infinite;
+}
+
+.btn-activate.listening:hover {
+    background: rgba(var(--color-danger-hover-rgb), var(--app-opacity));
+}
+
 .btn-save {
     display: inline-flex;
     align-items: center;

@@ -25,10 +25,10 @@ const INPUT_SILENCE_TIMEOUT = 100; // Tempo de espera para silêncio = 100
 const MIN_INPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a normal = 1000
 const MIN_INPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo de tamanho de áudio para a entrevista = 350
 
-const OUTPUT_SPEECH_THRESHOLD = 8; // Valor limite (threshold) para detectar fala mais cedo = 8
-const OUTPUT_SILENCE_TIMEOUT = 250; // Tempo de espera para silêncio = 250
-const MIN_OUTPUT_AUDIO_SIZE = 2500; // Valor mínimo de tamanho de áudio para a normal = 2500
-const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 800; // Valor mínimo para enviar parcial (~3-4 chunks, ~3KB)
+const OUTPUT_SPEECH_THRESHOLD = 20; // Valor limite (threshold) para detectar fala mais cedo = 8
+const OUTPUT_SILENCE_TIMEOUT = 100; // Tempo de espera para silêncio = 250
+const MIN_OUTPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a normal = 2500
+const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo para enviar parcial (~3-4 chunks, ~3KB)
 // controla intervalo mínimo entre requisições STT parciais (ms) - mantém rate-limit para não sobrecarregar API
 const PARTIAL_MIN_INTERVAL_MS = 3000;
 
@@ -98,7 +98,7 @@ let inputVolumeAnimationId = null;
 let outputVolumeAnimationId = null;
 
 /* 🧠 PERGUNTAS */
-let currentQuestion = { text: '', lastUpdate: 0, finalized: false };
+let currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
 let questionsHistory = [];
 const answeredQuestions = new Set(); // 🔒 Armazena respostas já geradas (questionId -> true)
 let selectedQuestionId = null;
@@ -389,7 +389,7 @@ function promoteCurrentToHistory(text) {
 
 		// limpa CURRENT mas preserva seleção conforme antes
 		const prevSelected = selectedQuestionId;
-		currentQuestion = { text: '', lastUpdate: 0, finalized: false };
+		currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
 		if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
 			selectedQuestionId = CURRENT_QUESTION_ID;
 		} else {
@@ -407,13 +407,14 @@ function promoteCurrentToHistory(text) {
 		id: newId,
 		text,
 		createdAt: currentQuestion.createdAt || Date.now(),
+		lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
 	});
 
 	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
 	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
 	const prevSelected = selectedQuestionId;
 
-	currentQuestion = { text: '', lastUpdate: 0, finalized: false };
+	currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
 
 	if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
 		selectedQuestionId = CURRENT_QUESTION_ID;
@@ -1152,8 +1153,11 @@ async function startOutput() {
 			// Adiciona o chunk (pedaços de dados) ao array de chunks de saída
 			outputChunks.push(e.data);
 
-			// 🔌 Vosk com chunks WebM fragmentados não funciona - ffmpeg rejeita
-			// Usar apenas Whisper para transcrição completa (no onstop)
+			// MODO ENTREVISTA – permite transcrição incremental
+			if (ModeController.isInterviewMode()) {
+				console.log('🧩 handlePartialOutputChunk chamado (output)');
+				handlePartialOutputChunk(e.data);
+			}
 		};
 
 		// Define o callback para quando o outputRecorder for parado, acionado ao chamar outputRecorder.stop()
@@ -1162,7 +1166,21 @@ async function startOutput() {
 
 			// Marca o momento exato em que a gravação parou
 			lastOutputStopAt = Date.now();
-			console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
+			const recordingDuration = lastOutputStopAt - lastOutputStartAt;
+			console.log('⏱️ Parada: ' + new Date(lastOutputStopAt).toLocaleTimeString());
+			console.log('⏱️ Duração da gravação:', recordingDuration, 'ms');
+
+			// Cancela qualquer timer pendente de transcrição parcial
+			// Isso evita que transcribeOutputPartial processe chunks após onstop
+			if (outputPartialTimer) {
+				clearTimeout(outputPartialTimer);
+				outputPartialTimer = null;
+				console.log('⏱️ Cancelado timer de transcrição parcial (outputPartialTimer)');
+			}
+
+			// Limpa chunks parciais acumulados para evitar duplicação
+			outputPartialChunks = [];
+			console.log('🗑️ Limpos chunks parciais acumulados (outputPartialChunks)');
 
 			// Fluxo padrão (Whisper): Adiciona placeholder visual para indicar que estamos aguardando a transcrição
 			const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
@@ -1170,10 +1188,8 @@ async function startOutput() {
 
 			// Se o placeholder foi criado, define os atributos de startAt e stopAt
 			if (lastOutputPlaceholderEl) {
-				if (lastOutputStartAt) {
-					lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
-				}
 				lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
+				if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
 			}
 
 			// Inicia a transcrição do áudio de saída (Whisper)
@@ -1183,13 +1199,6 @@ async function startOutput() {
 		// Inicia o loop de atualização do volume de saída, se não estiver rodando
 		if (!outputVolumeAnimationId) {
 			updateOutputVolume();
-		}
-
-		// 🆕 VOSK: Modo entrevista usa MediaRecorder com timeslice (padrão Deepgram)
-		// NÃO usar ScriptProcessorNode - usar timeslice de 2s para chunks regulares
-		if (ModeController.isInterviewMode()) {
-			console.log('🎤 Iniciando modo entrevista com MediaRecorder timeslice (2s)');
-			// mediaRecorder.start(timesliceMs) vai gerar ondataavailable a cada 2s
 		}
 
 		console.log('✅ startOutput: Monitoramento de saída de áudio configurado com sucesso');
@@ -1250,31 +1259,17 @@ function updateOutputVolume() {
 				// Define o momento exato em que a gravação de saída foi iniciada
 				lastOutputStartAt = Date.now();
 
-				console.log(
-					'📊 iniciando gravação de saída (outputRecorder.start) - startAt',
-					new Date(lastOutputStartAt).toLocaleTimeString(),
-				);
+				console.log('🎙️ Início: ' + new Date(lastOutputStartAt).toLocaleTimeString());
 
-				// 🆕 MODO ENTREVISTA: usar timeslice de 2s para chunks regulares (padrão Deepgram)
-				// Isso vai chamar ondataavailable a cada 2s automaticamente
-				if (ModeController.isInterviewMode()) {
-					console.log('🎤 Timeslice de 2s para modo entrevista');
-					outputRecorder.start(2000); // 2 segundos
-				} else {
-					const slice = ModeController.mediaRecorderTimeslice();
-					slice ? outputRecorder.start(slice) : outputRecorder.start();
-				}
+				// Usar o mesmo timeslice que INPUT para manter consistência
+				const slice = ModeController.mediaRecorderTimeslice();
+				slice ? outputRecorder.start(slice) : outputRecorder.start();
 			}
-
-			// Se o timer de silêncio (outputSilenceTimer) estiver definido, limpa o timer
 			if (outputSilenceTimer) {
 				clearTimeout(outputSilenceTimer);
 				outputSilenceTimer = null;
 			}
-		}
-		// Se o outputSpeaking for true, e o timer de silêncio (outputSilenceTimer) não estiver definido,
-		// e o recorder (outputRecorder) estiver rodando, para a gravação de saída
-		else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
+		} else if (outputSpeaking && !outputSilenceTimer && outputRecorder) {
 			// Define o timer de silêncio (outputSilenceTimer)
 			outputSilenceTimer = setTimeout(() => {
 				// Define o estado de outputSpeaking como false
@@ -1392,6 +1387,40 @@ async function handlePartialInputChunk(blobChunk) {
 	}, 180); // janela curta (reduzida de 250 -> 180)
 
 	debugLogRenderer('Fim da função:  "handlePartialInputChunk"');
+}
+
+async function handlePartialOutputChunk(blobChunk) {
+	debugLogRenderer('Início da função: "handlePartialOutputChunk"');
+	if (!ModeController.isInterviewMode()) return;
+
+	// ignora ruído
+	if (blobChunk.size < 200) return;
+
+	outputPartialChunks.push(blobChunk);
+
+	if (outputPartialTimer) clearTimeout(outputPartialTimer);
+
+	outputPartialTimer = setTimeout(async () => {
+		if (!outputPartialChunks.length) return;
+
+		const blob = new Blob(outputPartialChunks, { type: 'audio/webm' });
+		outputPartialChunks = [];
+
+		try {
+			const buffer = Buffer.from(await blob.arrayBuffer());
+			const partialText = (await transcribeAudioPartial(blob))?.trim();
+
+			if (partialText && !isGarbageSentence(partialText)) {
+				addTranscript(OTHER, partialText);
+				// NÃO chamar handleSpeech aqui - evita consolidação nas parciais
+				// consolidação só acontece em transcribeOutput() para o áudio final
+			}
+		} catch (err) {
+			console.warn('⚠️ erro na transcrição parcial (OUTPUT)', err);
+		}
+	}, 180); // janela curta (reduzida de 250 -> 180)
+
+	debugLogRenderer('Fim da função:  "handlePartialOutputChunk"');
 }
 
 function transcribeOutputPartial(blobChunk) {
@@ -1516,6 +1545,7 @@ function transcribeOutputPartial(blobChunk) {
 				) {
 					currentQuestion.text = outputPartialText;
 					currentQuestion.lastUpdate = Date.now();
+					currentQuestion.lastUpdateTime = Date.now();
 					currentQuestion.finalized = false;
 					selectedQuestionId = CURRENT_QUESTION_ID;
 					renderCurrentQuestion();
@@ -1554,6 +1584,7 @@ function transcribeOutputPartial(blobChunk) {
 				currentQuestion.text = newText;
 				// atualiza timestamp de última modificação
 				currentQuestion.lastUpdate = Date.now();
+				currentQuestion.lastUpdateTime = Date.now();
 				// marca como não finalizada
 				currentQuestion.finalized = false;
 
@@ -1693,9 +1724,6 @@ async function transcribeOutput() {
 	const blob = new Blob(outputChunks, { type: 'audio/webm' });
 	console.log('🎵 transcribeOutput: blob.size =', blob.size, 'bytes | chunks =', outputChunks.length);
 
-	// Limpa o array de chunks de saída
-	outputChunks = [];
-
 	// Valida tamanho mínimo dependendo do modo (evita ruído / respiração)
 	const minSize = ModeController.isInterviewMode() ? MIN_OUTPUT_AUDIO_SIZE_INTERVIEW : MIN_OUTPUT_AUDIO_SIZE;
 	if (blob.size < minSize) {
@@ -1704,6 +1732,9 @@ async function transcribeOutput() {
 		debugLogRenderer('Fim da função: "transcribeOutput"');
 		return;
 	}
+
+	// Limpa o array de chunks de saída
+	outputChunks = [];
 
 	try {
 		// Envia para transcrição o blob de saída
@@ -1743,6 +1774,14 @@ async function transcribeOutput() {
 			const total = now - start;
 			const startStr = new Date(start).toLocaleTimeString();
 			const stopStr = new Date(stop).toLocaleTimeString();
+			const displayStr = new Date(now).toLocaleTimeString();
+
+			// Log detalhado de timing
+			console.log('⏱️ TIMING COMPLETO (Output):');
+			console.log(`  ✅ Início: ${startStr}`);
+			console.log(`  ⏹️ Parada: ${stopStr}`);
+			console.log(`  📺 Exibição: ${displayStr}`);
+			console.log(`  📊 Duração gravação: ${recordingDuration}ms | Latência: ${latency}ms | Total: ${total}ms`);
 
 			// Emite atualização de UI ao placeholder com texto final e métricas
 			emitUIChange('onPlaceholderFulfill', {
@@ -1760,8 +1799,12 @@ async function transcribeOutput() {
 			lastOutputStopAt = null;
 			lastOutputStartAt = null;
 
-			console.log('✅ Placeholder atualizado com sucesso');
+			// processa a fala transcrita (consolidação de perguntas)
+			// Usa Date.now() para pegar o tempo exato que chegou no renderer
+			handleSpeech(OTHER, text);
 		} else {
+			addTranscript(OTHER, text);
+
 			// Sem placeholder - cria placeholder e emite fulfill para garantir métricas
 			console.log('➕ Nenhum placeholder existente - criando e preenchendo com métricas');
 			// obtém timestamps de fallback
@@ -1773,9 +1816,18 @@ async function transcribeOutput() {
 			const total = now - start;
 			const startStr = new Date(start).toLocaleTimeString();
 			const stopStr = new Date(stop).toLocaleTimeString();
+			const displayStr = new Date(now).toLocaleTimeString();
+
+			// Log detalhado de timing
+			console.log('⏱️ TIMING COMPLETO (Output):');
+			console.log(`  ✅ Início: ${startStr}`);
+			console.log(`  ⏹️ Parada: ${stopStr}`);
+			console.log(`  📺 Exibição: ${displayStr}`);
+			console.log(`  📊 Duração gravação: ${recordingDuration}ms | Latência: ${latency}ms | Total: ${total}ms`);
 
 			// cria um placeholder visível antes de preencher (garante consistência com fluxo parcial)
 			const placeholderEl = addTranscript(OTHER, '...', start);
+
 			if (placeholderEl && placeholderEl.dataset) {
 				placeholderEl.dataset.startAt = start;
 				placeholderEl.dataset.stopAt = stop;
@@ -1796,29 +1848,30 @@ async function transcribeOutput() {
 			lastOutputPlaceholderEl = null;
 			lastOutputStopAt = null;
 			lastOutputStartAt = null;
-		}
 
-		// processa a fala transcrita (consolidação de perguntas)
-		handleSpeech(OTHER, text);
+			// processa a fala transcrita (consolidação de perguntas)
+			// Usa Date.now() para pegar o tempo exato que chegou no renderer
+			handleSpeech(OTHER, text);
+		}
 
 		// MODO ENTREVISTA: Se a transcrição final indicar claramente uma pergunta, fechar e enviar ao GPT imediatamente
-		if (ModeController.isInterviewMode() && isQuestionReady(text)) {
-			console.log('🔔 transcribeOutput: Transcrição final forma pergunta válida');
-			console.log('   → Fechando pergunta e chamando GPT agora');
+		// if (ModeController.isInterviewMode() && isQuestionReady(text)) {
+		// 	console.log('🔔 transcribeOutput: Transcrição final forma pergunta válida');
+		// 	console.log('   → Fechando pergunta e chamando GPT agora');
 
-			// limpa estado parcial e cancela o temporizador automático para evitar duplicatas
-			outputPartialText = '';
+		// 	// limpa estado parcial e cancela o temporizador automático para evitar duplicatas
+		// 	outputPartialText = '';
 
-			// cancela o temporizador automático para evitar duplicatas
-			if (autoCloseQuestionTimer) {
-				clearTimeout(autoCloseQuestionTimer);
-				autoCloseQuestionTimer = null;
-				console.log('   → Timer automático cancelado');
-			}
+		// 	// cancela o temporizador automático para evitar duplicatas
+		// 	if (autoCloseQuestionTimer) {
+		// 		clearTimeout(autoCloseQuestionTimer);
+		// 		autoCloseQuestionTimer = null;
+		// 		console.log('   → Timer automático cancelado');
+		// 	}
 
-			// fecha a pergunta atual imediatamente
-			closeCurrentQuestion();
-		}
+		// 	// fecha a pergunta atual imediatamente
+		// 	closeCurrentQuestion();
+		// }
 	} catch (err) {
 		console.warn('⚠️ erro na transcrição (OUTPUT)', err);
 	}
@@ -1836,6 +1889,7 @@ function handleSpeech(author, text) {
 	console.log('🔊 handleSpeech', { author, raw: text, cleaned });
 	if (cleaned.length < 3) return;
 
+	// Usa o tempo exato que chegou no renderer (Date.now)
 	const now = Date.now();
 
 	if (author === OTHER) {
@@ -1865,6 +1919,7 @@ function handleSpeech(author, text) {
 				return;
 			}
 			currentQuestion.createdAt = Date.now();
+			currentQuestion.lastUpdateTime = Date.now();
 			interviewTurnId++; // 🔥 novo turno
 		}
 
@@ -1873,6 +1928,7 @@ function handleSpeech(author, text) {
 			console.log('🔁 speech igual ao currentQuestion — ignorando concatenação');
 		} else {
 			currentQuestion.text += (currentQuestion.text ? ' ' : '') + cleaned;
+			currentQuestion.lastUpdateTime = now;
 		}
 		currentQuestion.lastUpdate = now;
 
@@ -1902,6 +1958,11 @@ function closeCurrentQuestion() {
 		return;
 	}
 
+	// Garante que lastUpdateTime seja definido quando se tenta fechar
+	if (!currentQuestion.lastUpdateTime && currentQuestion.text) {
+		currentQuestion.lastUpdateTime = Date.now();
+	}
+
 	console.log('🚪 closeCurrentQuestion called', {
 		interviewTurnId,
 		gptAnsweredTurnId,
@@ -1917,12 +1978,15 @@ function closeCurrentQuestion() {
 			id: newId,
 			text: currentQuestion.text,
 			createdAt: currentQuestion.createdAt || Date.now(),
+			lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
 			incomplete: true,
 		});
 
 		selectedQuestionId = newId;
 
 		currentQuestion.text = '';
+		currentQuestion.lastUpdateTime = null;
+		currentQuestion.createdAt = null;
 		currentQuestion.finalized = false;
 
 		renderQuestionsHistory();
@@ -1936,6 +2000,7 @@ function closeCurrentQuestion() {
 			console.log('⚠️ looksLikeQuestion=false, mas modo entrevista ativo — forçando fechamento');
 
 			currentQuestion.text = finalizeQuestion(currentQuestion.text);
+			currentQuestion.lastUpdateTime = Date.now();
 			currentQuestion.finalized = true;
 
 			// garante seleção lógica
@@ -1948,6 +2013,8 @@ function closeCurrentQuestion() {
 					gptRequestedTurnId,
 					gptAnsweredTurnId,
 				});
+
+				console.error('closeCurrentQuestion: askGpt() 2017; 🔒 COMENTADA até transcrição em tempo real funcionar');
 				// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 			}
 
@@ -1956,6 +2023,8 @@ function closeCurrentQuestion() {
 
 		// modo normal mantém comportamento atual
 		currentQuestion.text = '';
+		currentQuestion.lastUpdateTime = null;
+		currentQuestion.createdAt = null;
 		currentQuestion.finalized = false;
 		renderCurrentQuestion();
 		return;
@@ -1963,6 +2032,7 @@ function closeCurrentQuestion() {
 
 	// ✅ consolida a pergunta
 	currentQuestion.text = finalizeQuestion(currentQuestion.text);
+	currentQuestion.lastUpdateTime = Date.now();
 	currentQuestion.finalized = true;
 
 	// ⚠️ NUNCA renderizar aqui no modo entrevista
@@ -1981,7 +2051,9 @@ function closeCurrentQuestion() {
 				gptAnsweredTurnId,
 			});
 
-			askGpt();
+			console.error('closeCurrentQuestion: askGpt() 2054; 🔒 COMENTADA até transcrição em tempo real funcionar');
+
+			// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 		}
 	} else {
 		console.log('🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT');
@@ -1989,6 +2061,8 @@ function closeCurrentQuestion() {
 		promoteCurrentToHistory(currentQuestion.text);
 
 		currentQuestion.text = '';
+		currentQuestion.lastUpdateTime = null;
+		currentQuestion.createdAt = null;
 		currentQuestion.finalized = false;
 
 		renderCurrentQuestion();
@@ -2365,8 +2439,8 @@ function renderCurrentQuestion() {
 
 	let label = currentQuestion.text;
 
-	if (ENABLE_INTERVIEW_TIMING_DEBUG && currentQuestion.createdAt) {
-		const time = new Date(currentQuestion.createdAt).toLocaleTimeString();
+	if (ENABLE_INTERVIEW_TIMING_DEBUG && currentQuestion.lastUpdateTime) {
+		const time = new Date(currentQuestion.lastUpdateTime).toLocaleTimeString();
 		label = `⏱️ ${time} — ${label}`;
 	}
 
@@ -2376,6 +2450,7 @@ function renderCurrentQuestion() {
 		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
 		rawText: currentQuestion.text,
 		createdAt: currentQuestion.createdAt,
+		lastUpdateTime: currentQuestion.lastUpdateTime,
 	};
 
 	console.log(`📤 renderCurrentQuestion: emitindo onCurrentQuestionUpdate`, {
@@ -2399,8 +2474,8 @@ function renderQuestionsHistory() {
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const historyData = [...questionsHistory].reverse().map(q => {
 		let label = q.text;
-		if (ENABLE_INTERVIEW_TIMING_DEBUG && q.createdAt) {
-			const time = new Date(q.createdAt).toLocaleTimeString();
+		if (ENABLE_INTERVIEW_TIMING_DEBUG && q.lastUpdateTime) {
+			const time = new Date(q.lastUpdateTime).toLocaleTimeString();
 			label = `⏱️ ${time} — ${label}`;
 		}
 
@@ -2500,7 +2575,7 @@ function renderGptAnswer(questionId, markdownText) {
 
 function resetInterviewState() {
 	debugLogRenderer('Início da função: "resetInterviewState"');
-	currentQuestion = { text: '', lastUpdate: 0, finalized: false };
+	currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
 	questionsHistory = [];
 	selectedQuestionId = null;
 
@@ -2635,8 +2710,9 @@ function handleQuestionClick(questionId) {
 		return;
 	}
 
-	// ❓ Ainda não respondida → chama GPT
-	askGpt();
+	// ❓ Ainda não respondida → chama GPT (click ou atalho)
+	console.error('closeCurrentQuestion: askGpt() 2714; 🔒 COMENTADA até transcrição em tempo real funcionar');
+	// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 
 	debugLogRenderer('Fim da função: "handleQuestionClick"');
 }

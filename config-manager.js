@@ -1277,6 +1277,19 @@ class ConfigManager {
 			div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
 			transcriptionBox.appendChild(div);
 			console.log(`✅ Transcrição adicionada: ${author} - ${text}`);
+
+			// 📜 Auto-scroll para acompanhar a fala em tempo real
+			// Faz scroll no container pai que tem overflow-y: auto
+			requestAnimationFrame(() => {
+				const container = transcriptionBox.parentElement;
+				if (container && container.id === 'transcriptionContainer') {
+					container.scrollTop = container.scrollHeight;
+					console.log('📜 Auto-scroll para última transcrição', {
+						scrollTop: container.scrollTop,
+						scrollHeight: container.scrollHeight,
+					});
+				}
+			});
 		});
 
 		// Status
@@ -1319,7 +1332,16 @@ class ConfigManager {
 		window.RendererAPI.onUIChange('onListenButtonToggle', data => {
 			const { isRunning, buttonText } = data;
 			const listenBtn = document.getElementById('listenBtn');
-			if (listenBtn) listenBtn.innerText = buttonText;
+			if (listenBtn) {
+				listenBtn.innerText = buttonText;
+				// 🔥 Mudar cor: vermelha quando ouvindo, cor original quando parado
+				if (isRunning) {
+					listenBtn.classList.add('listening');
+				} else {
+					listenBtn.classList.remove('listening');
+				}
+				console.log(`🎙️ Botão atualizado: ${buttonText} | Ouvindo: ${isRunning ? 'SIM' : 'NÃO'}`);
+			}
 
 			// 🔥 NOVO: Aplica efeito visual no home
 			const homeVuMeters = document.querySelector('.home-vu-meters');
@@ -1733,7 +1755,10 @@ class ConfigManager {
 			askBtn.addEventListener('click', () => {
 				console.log('🔊 DEBUG: askGptBtn clicado!');
 				if (window.RendererAPI?.askGpt) {
-					window.RendererAPI.askGpt();
+					//window.RendererAPI.askGpt();  // 🔒 COMENTADA até transcrição em tempo real funcionar
+					console.error(
+						'registerDOMEventListeners: askGpt() 1759; 🔒 COMENTADA até transcrição em tempo real funcionar',
+					);
 				}
 			});
 		}
@@ -1839,7 +1864,10 @@ class ConfigManager {
 		if (window.RendererAPI?.onAskGpt) {
 			window.RendererAPI.onAskGpt(() => {
 				if (window.RendererAPI?.askGpt) {
-					window.RendererAPI.askGpt();
+					//window.RendererAPI.askGpt();  // 🔒 COMENTADA até transcrição em tempo real funcionar
+					console.error(
+						'registerDOMEventListeners: askGpt() 1867; 🔒 COMENTADA até transcrição em tempo real funcionar',
+					);
 				}
 			});
 		}
