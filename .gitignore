@@ -51,3 +51,10 @@ Thumbs.db
 .cache/
 .eslintcache
 .parcel-cache
+
+# =============================== 
+# Outros
+# ===============================
+vosk-models/
+whisper-local/
+exemplo-deepgram/

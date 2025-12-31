@@ -176,7 +176,25 @@ cd askme
 npm install
 ```
 
-### 3. Verifique a instalação
+### 3. Setup Vosk (Transcrição em Tempo Real - Modo Entrevista)
+
+O projeto suporta **Vosk** para transcrição ultra-rápida no modo entrevista (latência <300ms).
+
+```bash
+# Já incluído em npm install, mas precisa do modelo português
+npm install vosk
+
+# Baixe o modelo em: https://alphacephei.com/vosk/models
+# Procure por: vosk-model-pt-0.3
+# Descompacte em: ./vosk-models/vosk-model-pt-0.3/
+
+# Verifique o setup:
+node check-vosk-setup.js
+```
+
+📖 **Instruções detalhadas:** [VOSK_SETUP.md](./VOSK_SETUP.md)
+
+### 4. Verifique a instalação
 
 ```bash
 npm list
@@ -188,9 +206,12 @@ npm list
 askme@1.0.0
 ├── electron@39.2.7
 ├── electron-store@11.0.2
+├── fluent-ffmpeg@2.1.2
+├── ffmpeg-static@5.2.0
 ├── highlight.js@11.11.1
 ├── marked@17.0.1
 ├── openai@6.10.0
+├── vosk@0.3.44  ← NOVO: Para modo entrevista
 └── wav@1.0.2
 ```
 
@@ -286,10 +307,17 @@ askme/
   - Exemplos de uso
 
 - 🧪 **[Guia de Testes →](TEST_GUIDE.md)**
+
   - Testes manuais passo a passo
   - Cenários de validação
   - Checklist de funcionalidades
   - Troubleshooting específico
+
+- 🎤 **[Setup Vosk (Novo!) →](VOSK_SETUP.md)**
+  - Instalação e configuração do Vosk
+  - Transcrição em tempo real (modo entrevista)
+  - Comparação Vosk vs Whisper
+  - Troubleshooting de compilação
 
 ---
 

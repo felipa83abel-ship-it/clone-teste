@@ -558,6 +558,77 @@ async function transcribeAudioPartial(blob) {
 }
 
 /* ===============================
+   TRANSCRIÇÃO VOSK (MODO ENTREVISTA)
+=============================== */
+
+let voskAccumulatedText = ''; // Acumula resultado parcial do Vosk
+let voskPartialTimer = null;
+let voskScriptProcessor = null; // ScriptProcessorNode para capturar PCM bruto
+let voskAudioBuffer = []; // Acumula PCM entre envios
+
+/**
+ * Converte array de floats PCM para Int16Array
+ */
+function floatToPCM16(floatArray) {
+	const pcm16 = new Int16Array(floatArray.length);
+	for (let i = 0; i < floatArray.length; i++) {
+		pcm16[i] = Math.max(-1, Math.min(1, floatArray[i])) * 0x7fff;
+	}
+	return pcm16;
+}
+
+/**
+ * Inicia captura de PCM bruto do áudio (substitui MediaRecorder para Vosk)
+ * @param {MediaStreamAudioSourceNode} source - Source do áudio da stream
+ * @deprecated Usar MediaRecorder com timeslice ao invés de ScriptProcessorNode
+ */
+function startVoskPcmCapture(source) {
+	console.warn('⚠️ startVoskPcmCapture deprecated - use MediaRecorder timeslice instead');
+}
+
+/**
+ * Para captura de PCM bruto do Vosk
+ */
+function stopVoskPcmCapture() {
+	try {
+		if (voskScriptProcessor) {
+			voskScriptProcessor.disconnect();
+			voskScriptProcessor.onaudioprocess = null;
+			voskScriptProcessor = null;
+		}
+		voskAudioBuffer = [];
+		console.log('✅ Captura PCM para Vosk parada');
+	} catch (error) {
+		console.error('❌ Erro ao parar captura PCM:', error);
+	}
+}
+
+/**
+ * Transcreve chunk de blob com Vosk (modo entrevista - padrão Deepgram)
+ * Envia blobs WebM diretamente para Vosk via IPC
+ */
+/**
+ * 🚫 DEPRECADO: Vosk não funciona com chunks WebM fragmentados do MediaRecorder
+ * MediaRecorder gera blobs WebM incompletos que ffmpeg/Vosk rejeitam
+ * Solução: usar apenas Whisper para OUTPUT (funciona bem com WebM fragmentado)
+ * @deprecated
+ */
+async function voskTranscribeChunkFromBlob(blob) {
+	console.warn('⚠️ voskTranscribeChunkFromBlob deprecado - usar Whisper ao invés');
+	// Função removida - ver transcribeOutput() para transcrição final de saída
+}
+
+/**
+ * Inicia captura de PCM bruto do áudio (substitui MediaRecorder para Vosk)
+ * @param {MediaStreamAudioSourceNode} source - Source do áudio da stream
+ * @deprecated Usar MediaRecorder com timeslice ao invés de ScriptProcessorNode
+ */
+function startVoskPcmCapture(source) {
+	console.warn('⚠️ startVoskPcmCapture deprecated - usar MediaRecorder com timeslice ao invés de ScriptProcessorNode');
+	// Função deprecada mantida para compatibilidade reversa
+}
+
+/* ===============================
    DISPOSITIVOS / CONTROLE DE ÁUDIO
 =============================== */
 
@@ -579,6 +650,15 @@ async function stopAudio() {
 
 	inputRecorder?.state === 'recording' && inputRecorder.stop();
 	outputRecorder?.state === 'recording' && outputRecorder.stop();
+
+	// 🆕 VOSK: Reset do estado
+	if (ModeController.isInterviewMode()) {
+		voskAccumulatedText = '';
+		if (voskPartialTimer) {
+			clearTimeout(voskPartialTimer);
+			voskPartialTimer = null;
+		}
+	}
 
 	stopInputMonitor();
 	stopOutputMonitor();
@@ -833,7 +913,21 @@ async function startInput() {
 
 			// marca o momento exato em que a gravação parou
 			lastInputStopAt = Date.now();
-			console.log('⏱️ input stopped at', new Date(lastInputStopAt).toLocaleTimeString());
+			const recordingDuration = lastInputStopAt - lastInputStartAt;
+			console.log('⏱️ Parada:', new Date(lastInputStopAt).toLocaleTimeString());
+			console.log('⏱️ Duração da gravação:', recordingDuration, 'ms');
+
+			// Cancela qualquer timer pendente de transcrição parcial
+			// Isso evita que handlePartialInputChunk processe chunks após onstop
+			if (inputPartialTimer) {
+				clearTimeout(inputPartialTimer);
+				inputPartialTimer = null;
+				console.log('⏱️ Cancelado timer de transcrição parcial (inputPartialTimer)');
+			}
+
+			// Limpa chunks parciais acumulados para evitar duplicação
+			inputPartialChunks = [];
+			console.log('🗑️ Limpos chunks parciais acumulados (inputPartialChunks)');
 
 			// adiciona placeholder visual para indicar que estamos aguardando a transcrição
 			// usa startAt se disponível para mostrar o horário inicial enquanto aguarda
@@ -864,7 +958,8 @@ async function startInput() {
 }
 
 function updateInputVolume() {
-	debugLogRenderer('Início da função: "updateInputVolume"');
+	//debugLogRenderer('Início da função: "updateInputVolume"');
+
 	// CRÍTICO: Verifica se deve continuar ANTES de fazer qualquer processamento
 	if (!inputAnalyser || !inputData) {
 		console.log('⚠️ updateInputVolume: analyser ou data não disponível, parando loop');
@@ -924,7 +1019,7 @@ function updateInputVolume() {
 	// Continua o loop apenas se tudo estiver OK
 	inputVolumeAnimationId = requestAnimationFrame(updateInputVolume);
 
-	debugLogRenderer('Fim da função: "updateInputVolume"');
+	//debugLogRenderer('Fim da função: "updateInputVolume"');
 }
 
 function stopInputMonitor() {
@@ -998,6 +1093,8 @@ async function createOutputStream() {
 	source.connect(outputAnalyser);
 
 	debugLogRenderer('Fim da função: "createOutputStream"');
+
+	return source;
 }
 
 async function startOutput() {
@@ -1055,8 +1152,8 @@ async function startOutput() {
 			// Adiciona o chunk (pedaços de dados) ao array de chunks de saída
 			outputChunks.push(e.data);
 
-			// Chama a função para lidar com o chunk parcial de saída para transcrição incremental
-			//transcribeOutputPartial(e.data);
+			// 🔌 Vosk com chunks WebM fragmentados não funciona - ffmpeg rejeita
+			// Usar apenas Whisper para transcrição completa (no onstop)
 		};
 
 		// Define o callback para quando o outputRecorder for parado, acionado ao chamar outputRecorder.stop()
@@ -1067,7 +1164,7 @@ async function startOutput() {
 			lastOutputStopAt = Date.now();
 			console.log('⏱️ output stopped at', new Date(lastOutputStopAt).toLocaleTimeString());
 
-			// Adiciona placeholder visual para indicar que estamos aguardando a transcrição
+			// Fluxo padrão (Whisper): Adiciona placeholder visual para indicar que estamos aguardando a transcrição
 			const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
 			lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
 
@@ -1079,13 +1176,20 @@ async function startOutput() {
 				lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
 			}
 
-			// Inicia a transcrição do áudio de saída
+			// Inicia a transcrição do áudio de saída (Whisper)
 			transcribeOutput();
 		};
 
 		// Inicia o loop de atualização do volume de saída, se não estiver rodando
 		if (!outputVolumeAnimationId) {
 			updateOutputVolume();
+		}
+
+		// 🆕 VOSK: Modo entrevista usa MediaRecorder com timeslice (padrão Deepgram)
+		// NÃO usar ScriptProcessorNode - usar timeslice de 2s para chunks regulares
+		if (ModeController.isInterviewMode()) {
+			console.log('🎤 Iniciando modo entrevista com MediaRecorder timeslice (2s)');
+			// mediaRecorder.start(timesliceMs) vai gerar ondataavailable a cada 2s
 		}
 
 		console.log('✅ startOutput: Monitoramento de saída de áudio configurado com sucesso');
@@ -1151,11 +1255,15 @@ function updateOutputVolume() {
 					new Date(lastOutputStartAt).toLocaleTimeString(),
 				);
 
-				// Obtém o tamanho da fatia de gravação de saída
-				const slice = ModeController.mediaRecorderTimeslice();
-				// Se o tamanho da fatia de gravação de saída for maior que 0, inicia a gravação de saída com o tamanho da fatia
-				// Caso contrário, inicia a gravação de saída sem tamanho de fatia
-				slice ? outputRecorder.start(slice) : outputRecorder.start();
+				// 🆕 MODO ENTREVISTA: usar timeslice de 2s para chunks regulares (padrão Deepgram)
+				// Isso vai chamar ondataavailable a cada 2s automaticamente
+				if (ModeController.isInterviewMode()) {
+					console.log('🎤 Timeslice de 2s para modo entrevista');
+					outputRecorder.start(2000); // 2 segundos
+				} else {
+					const slice = ModeController.mediaRecorderTimeslice();
+					slice ? outputRecorder.start(slice) : outputRecorder.start();
+				}
 			}
 
 			// Se o timer de silêncio (outputSilenceTimer) estiver definido, limpa o timer
@@ -1532,6 +1640,14 @@ async function transcribeInput() {
 		const total = now - start;
 		const startStr = new Date(start).toLocaleTimeString();
 		const stopStr = new Date(stop).toLocaleTimeString();
+		const displayStr = new Date(now).toLocaleTimeString();
+
+		// Log detalhado de timing
+		console.log('⏱️ TIMING COMPLETO:');
+		console.log(`  ✅ Início: ${startStr}`);
+		console.log(`  ⏹️ Parada: ${stopStr}`);
+		console.log(`  📺 Exibição: ${displayStr}`);
+		console.log(`  📊 Duração gravação: ${recordingDuration}ms | Latência: ${latency}ms | Total: ${total}ms`);
 
 		// Emite para config-manager atualizar o placeholder com texto final e métricas
 		emitUIChange('onPlaceholderFulfill', {
@@ -1832,7 +1948,7 @@ function closeCurrentQuestion() {
 					gptRequestedTurnId,
 					gptAnsweredTurnId,
 				});
-				askGpt();
+				// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 			}
 
 			return;

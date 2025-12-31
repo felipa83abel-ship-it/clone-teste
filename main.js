@@ -773,6 +773,212 @@ ipcMain.handle('test-whisper-local', async () => {
 });
 
 /* ================================
+   HANDLERS IPC - VOSK (VIA PYTHON SUBPROCESS)
+=============================== */
+
+const { spawn } = require('child_process');
+let voskProcess = null;
+let voskReady = false;
+
+/**
+ * Inicia servidor Vosk em Python (subprocess)
+ * Comunica via stdin/stdout JSON
+ */
+function startVoskServer() {
+	return new Promise((resolve, reject) => {
+		try {
+			console.log('🚀 Iniciando servidor Vosk (Python)...');
+
+			voskProcess = spawn('python', ['vosk-server.py'], {
+				cwd: __dirname,
+				stdio: ['pipe', 'pipe', 'pipe'],
+			});
+
+			// Aumenta limite de listeners para múltiplas requisições
+			voskProcess.stdout.setMaxListeners(50);
+
+			let readyCheck = false;
+
+			voskProcess.stdout.on('data', data => {
+				const line = data.toString().trim();
+				console.log(`[Vosk] ${line}`);
+
+				// Aguarda sinal VOSK_READY
+				if (line === 'VOSK_READY' && !readyCheck) {
+					readyCheck = true;
+					voskReady = true;
+					console.log('✅ Servidor Vosk pronto!');
+					resolve(true);
+				}
+			});
+
+			voskProcess.stderr.on('data', data => {
+				console.log(`[Vosk stderr] ${data.toString().trim()}`);
+			});
+
+			voskProcess.on('error', error => {
+				console.error('❌ Erro ao iniciar Vosk:', error.message);
+				voskReady = false;
+				reject(error);
+			});
+
+			voskProcess.on('close', code => {
+				console.log(`⏹️ Vosk processo encerrado (código ${code})`);
+				voskReady = false;
+				voskProcess = null;
+			});
+
+			// Timeout de 5s para inicializar
+			setTimeout(() => {
+				if (!readyCheck) {
+					console.error('⏱️ Timeout ao inicializar Vosk');
+					reject(new Error('Vosk não respondeu (timeout)'));
+				}
+			}, 5000);
+		} catch (error) {
+			console.error('❌ Erro ao criar processo Vosk:', error);
+			reject(error);
+		}
+	});
+}
+
+/**
+ * Handler IPC para transcrição Vosk em streaming
+ * Envia comando JSON para servidor Python
+ */
+ipcMain.handle('vosk-transcribe', async (_, audioBuffer) => {
+	try {
+		// Inicia servidor se não estiver rodando
+		if (!voskReady || !voskProcess) {
+			console.log('🔄 Inicializando Vosk...');
+			await startVoskServer();
+		}
+
+		// Converte para Buffer se necessário (IPC pode enviar Uint8Array ou objeto)
+		let buffer = audioBuffer;
+		if (!Buffer.isBuffer(buffer)) {
+			if (buffer?.data && Array.isArray(buffer.data)) {
+				// Se for objeto com array 'data' (serializado)
+				buffer = Buffer.from(buffer.data);
+			} else if (ArrayBuffer.isView(buffer)) {
+				// Se for Uint8Array ou similar
+				buffer = Buffer.from(buffer);
+			} else if (typeof buffer === 'object' && buffer !== null) {
+				// Se for object genérico com propriedades numéricas
+				const arr = Object.values(buffer);
+				buffer = Buffer.from(arr);
+			} else {
+				throw new Error('audioBuffer formato inválido');
+			}
+		}
+
+		console.log(`🎤 Enviando para Vosk: ${buffer.length} bytes`);
+
+		// Codifica áudio em base64 (JSON-safe)
+		const audioBase64 = buffer.toString('base64');
+
+		// Cria comando JSON
+		const command = {
+			type: 'transcribe',
+			audio: audioBase64,
+		};
+
+		// Envia comando para servidor Python
+		const commandJson = JSON.stringify(command) + '\n';
+
+		// Aguarda resposta
+		return new Promise((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				voskProcess.stdout.removeListener('data', responseHandler);
+				reject(new Error('Timeout ao aguardar resposta do Vosk'));
+			}, 5000);
+
+			// Listener para resposta - filtra apenas JSON válido
+			const responseHandler = data => {
+				const lines = data.toString().split('\n');
+
+				for (const line of lines) {
+					const trimmed = line.trim();
+
+					// Ignora linhas vazias ou que não parecem ser JSON
+					if (!trimmed || trimmed.startsWith('[VOSK]') || trimmed === 'VOSK_READY') {
+						continue;
+					}
+
+					// Tenta parsear como JSON
+					try {
+						const response = JSON.parse(trimmed);
+						clearTimeout(timeout);
+						voskProcess.stdout.removeListener('data', responseHandler);
+						console.log('📝 Resposta Vosk:', response);
+						resolve(response);
+						return;
+					} catch (e) {
+						// Não é JSON válido, continua procurando
+						continue;
+					}
+				}
+			};
+
+			// Aguarda próxima linha de resposta
+			voskProcess.stdout.on('data', responseHandler);
+
+			// Envia comando
+			voskProcess.stdin.write(commandJson);
+		});
+	} catch (error) {
+		console.error('❌ Erro em vosk-transcribe:', error.message);
+		return {
+			final: '',
+			partial: '',
+			isFinal: false,
+			error: error.message,
+		};
+	}
+});
+
+/**
+ * Handler para finalizar Vosk e obter resultado final
+ */
+ipcMain.handle('vosk-finalize', async () => {
+	try {
+		if (!voskReady || !voskProcess) {
+			return { final: '' };
+		}
+
+		console.log('🔄 Finalizando Vosk...');
+
+		const command = { type: 'reset' };
+		const commandJson = JSON.stringify(command) + '\n';
+
+		return new Promise(resolve => {
+			const timeout = setTimeout(() => {
+				resolve({ final: '' });
+			}, 2000);
+
+			const responseHandler = data => {
+				clearTimeout(timeout);
+				voskProcess.stdout.removeListener('data', responseHandler);
+
+				try {
+					const response = JSON.parse(data.toString().trim());
+					console.log('✅ Vosk reset:', response);
+					resolve({ final: '' });
+				} catch (error) {
+					resolve({ final: '' });
+				}
+			};
+
+			voskProcess.stdout.once('data', responseHandler);
+			voskProcess.stdin.write(commandJson);
+		});
+	} catch (error) {
+		console.error('❌ Erro em vosk-finalize:', error.message);
+		return { final: '' };
+	}
+});
+
+/* ================================
    INICIALIZAÇÃO DO APP
 =============================== */
 app.whenReady().then(() => {
