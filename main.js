@@ -39,9 +39,15 @@ const APP_CONFIG = {
 	MODE_DEBUG: false,
 };
 
-// Caminhos para Whisper.cpp local
-const WHISPER_EXE = path.join(__dirname, 'whisper-local', 'whisper-cli.exe');
-const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'ggml-tiny.bin');
+// Configuração de modelo Vosk
+const VOSK_CONFIG = {
+	MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3',
+	// MODEL: 'vosk-models/vosk-model-small-pt-0.3' ( Modelo pequeno, rápido, menos preciso)
+	// Alternativa: 'vosk-models/vosk-model-pt-fb-v0.1.1' (modelo maior, mais preciso, mas mais lento)
+};
+
+// 🔥 MODIFICADO: Removidas constantes do Whisper.cpp local
+// (Whisper local será substituído por Vosk para STT)
 
 /* ================================
    ESTADO GLOBAL
@@ -107,17 +113,57 @@ function initializeOpenAIClient(apiKey = null) {
 }
 
 /**
- * Verifica se os arquivos do Whisper local existem
+ * Converte WebM/Ogg para PCM 16-bit 16kHz (formato que Vosk espera)
+ * Usa ffmpeg para decodificação
  */
-function checkWhisperFiles() {
-	const exeExists = fs.existsSync(WHISPER_EXE);
-	const modelExists = fs.existsSync(WHISPER_MODEL);
+async function convertWebMToWAV(webmBuffer) {
+	try {
+		const ffmpegPath = require('ffmpeg-static');
+		const inputFile = path.join(app.getPath('temp'), `input-${Date.now()}.webm`);
+		const outputFile = path.join(app.getPath('temp'), `output-${Date.now()}.wav`);
 
-	console.log('🔍 Verificando arquivos Whisper:');
-	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_EXE}`);
-	console.log(`   Modelo: ${modelExists ? '✅' : '❌'} ${WHISPER_MODEL}`);
+		try {
+			// Escreve WebM temporário
+			fs.writeFileSync(inputFile, webmBuffer);
 
-	return exeExists && modelExists;
+			// Converte com ffmpeg: WebM → WAV 16-bit 16kHz mono (MESMA FORMA DE ANTES)
+			const { stdout, stderr } = await execFileAsync(
+				ffmpegPath,
+				[
+					'-i',
+					inputFile,
+					'-acodec',
+					'pcm_s16le', // PCM 16-bit signed
+					'-ar',
+					'16000', // 16kHz sample rate
+					'-ac',
+					'1', // Mono
+					'-f',
+					'wav', // WAV container (melhor preservação de qualidade)
+					outputFile,
+				],
+				{ maxBuffer: 10 * 1024 * 1024 },
+			);
+
+			// Lê arquivo WAV convertido
+			const wavBuffer = fs.readFileSync(outputFile);
+
+			// Limpa arquivos temporários
+			fs.unlinkSync(inputFile);
+			fs.unlinkSync(outputFile);
+
+			console.log(`✅ Convertido WebM (${webmBuffer.length} bytes) → WAV (${wavBuffer.length} bytes)`);
+			return wavBuffer;
+		} catch (error) {
+			// Limpa se houver erro
+			if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
+			if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
+			throw error;
+		}
+	} catch (error) {
+		console.error('❌ Erro ao converter WebM para WAV:', error.message);
+		throw error;
+	}
 }
 
 /* ================================
@@ -325,195 +371,6 @@ ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(aud
 ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, true));
 
 /* ================================
-   HANDLERS IPC - TRANSCRIÇÃO LOCAL (Whisper.cpp) OTIMIZADA
-=============================== */
-// CORREÇÃO FINAL: Use os argumentos corretos desta versão
-async function transcribeLocalCommon(audioBuffer, isPartial = false) {
-	const startTime = Date.now();
-	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
-	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes em ${startTime}`);
-
-	if (!checkWhisperFiles()) {
-		if (isPartial) return '';
-		throw new Error('Arquivos do Whisper.cpp não encontrados!');
-	}
-
-	const tempDir = app.getPath('temp');
-
-	// Salva como WebM primeiro
-	const tempWebmPath = path.join(tempDir, `whisper-${isPartial ? 'partial' : 'temp'}-${Date.now()}.webm`);
-	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
-
-	try {
-		// 1. Salva o buffer WebM
-		const saveStart = Date.now();
-		fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
-		const saveTime = Date.now() - saveStart;
-		console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
-
-		// 2. Converte WebM para WAV
-		const convertStart = Date.now();
-		await convertWebMToWAV(tempWebmPath, tempWavPath);
-		const convertTime = Date.now() - convertStart;
-		console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
-
-		// 3. Verifica se o arquivo WAV existe
-		if (!fs.existsSync(tempWavPath)) {
-			throw new Error('Arquivo WAV não foi criado');
-		}
-
-		const wavStats = fs.statSync(tempWavPath);
-		console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
-
-		if (wavStats.size < 1000) {
-			console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
-		}
-
-		// 4. Executar Whisper.cpp COM ARGUMENTOS CORRETOS
-		const whisperStart = Date.now();
-
-		// 🔥 ARGUMENTOS OTIMIZADOS AO MÁXIMO
-		const args = [
-			'-m',
-			WHISPER_MODEL,
-			'-f',
-			tempWavPath,
-			'-l',
-			'pt', // idioma português
-			'-otxt', // saída em texto
-			'-t',
-			'4', // 4 threads
-			'-np', // não imprimir logs (no-prints)
-			'-nt', // não imprimir timestamps
-		];
-
-		// Se for parcial, ajusta parâmetros para ser mais rápido
-		if (isPartial) {
-			args.push('-d', '3000'); // máximo 3 segundos
-			args.push('-ml', '50'); // máximo 50 caracteres por segmento
-		}
-
-		console.log(`🚀 4. Executando Whisper: ${WHISPER_EXE} ${args.join(' ')}`);
-
-		const { stdout, stderr } = await execFileAsync(WHISPER_EXE, args, {
-			timeout: isPartial ? 2000 : 4000, // Timeout maior para garantir
-			maxBuffer: 1024 * 1024 * 5, // 5MB buffer
-		});
-
-		const whisperTime = Date.now() - whisperStart;
-		console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
-
-		// Debug detalhado
-		if (stdout && stdout.trim()) {
-			console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
-		} else {
-			console.log(`📝 STDOUT: vazio ou nulo`);
-		}
-
-		if (stderr && stderr.trim()) {
-			console.log(`⚠️ STDERR:`, stderr.substring(0, 200));
-		}
-
-		let result = '';
-
-		// Tenta extrair resultado de stdout
-		if (stdout && stdout.trim()) {
-			result = stdout.trim();
-			console.log(`📋 Resultado do stdout: "${result}" (${result.length} chars)`);
-		}
-		// Algumas versões escrevem no stderr mesmo com sucesso
-		else if (stderr && stderr.trim()) {
-			// Tenta extrair texto entre [ ] que é onde fica a transcrição
-			const lines = stderr.split('\n');
-			for (const line of lines) {
-				if (line.includes('[') && line.includes(']')) {
-					const match = line.match(/\[([^\]]+)\]/);
-					if (match && match[1]) {
-						result = match[1].trim();
-						console.log(`🔍 Transcrição extraída do stderr: "${result}"`);
-						break;
-					}
-				}
-			}
-
-			// Se não encontrou entre colchetes, pega a última linha não vazia
-			// if (!result) {
-			// 	const nonEmptyLines = lines.filter(line => line.trim().length > 0);
-			// 	if (nonEmptyLines.length > 0) {
-			// 		result = nonEmptyLines[nonEmptyLines.length - 1].trim();
-			// 		console.log(`🔍 Última linha do stderr: "${result}"`);
-			// 	}
-			// }
-		}
-
-		// 🔥 3. Log métricas detalhadas
-		const totalTime = Date.now() - startTime;
-		console.log(`⏱️ ================================`);
-		console.log(`⏱️ [WHISPER LOCAL] MÉTRICAS DETALHADAS:`);
-		console.log(`⏱️ ================================`);
-		console.log(`⏱️ Tamanho buffer: ${audioBuffer.length} bytes`);
-		console.log(`⏱️ 1. Salvamento: ${saveTime}ms`);
-		console.log(`⏱️ 2. Conversão: ${convertTime}ms`);
-		console.log(`⏱️ 3. Whisper: ${whisperTime}ms`);
-		console.log(`⏱️ TOTAL: ${totalTime}ms`);
-		console.log(`⏱️ Whisper % do total: ${Math.round((whisperTime / totalTime) * 100)}%`);
-		console.log(`⏱️ ================================`);
-		console.log(`🎯 Resultado final (${result.length} chars): "${result.substring(0, 100)}..."`);
-
-		return result || '';
-	} catch (error) {
-		console.error(`❌ [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Erro:`, error.message);
-
-		// Log do erro completo
-		if (error.code) console.error(`Error code: ${error.code}`);
-		if (error.signal) console.error(`Signal: ${error.signal}`);
-		if (error.stderr) {
-			console.error(`STDERR (primeiros 1000 chars):`, error.stderr.substring(0, 1000));
-		}
-
-		if (isPartial) return '';
-		throw error;
-	} finally {
-		// Limpa arquivos temporários
-		try {
-			if (fs.existsSync(tempWebmPath)) fs.unlinkSync(tempWebmPath);
-			if (fs.existsSync(tempWavPath)) fs.unlinkSync(tempWavPath);
-		} catch (e) {
-			console.warn('⚠️ Erro ao limpar temporários:', e.message);
-		}
-	}
-}
-
-// 🔥 ADICIONE ESTA FUNÇÃO PARA CONVERSÃO (se ainda não existir)
-function convertWebMToWAV(inputPath, outputPath) {
-	return new Promise((resolve, reject) => {
-		// Usa ffmpeg estático se disponível
-		const ffmpeg = require('fluent-ffmpeg');
-		const ffmpegPath = require('ffmpeg-static');
-
-		ffmpeg(inputPath)
-			.setFfmpegPath(ffmpegPath)
-			.audioCodec('pcm_s16le')
-			.audioFrequency(16000) // Whisper usa 16kHz
-			.audioChannels(1) // Mono
-			.format('wav')
-			.on('end', () => {
-				console.log('✅ Conversão WebM → WAV concluída');
-				resolve();
-			})
-			.on('error', err => {
-				console.error('❌ Erro na conversão WebM → WAV:', err);
-				reject(err);
-			})
-			.save(outputPath);
-	});
-}
-
-// Handlers específicos
-ipcMain.handle('transcribe-local', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, false));
-ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, true));
-
-/* ================================
    HANDLERS IPC - GPT
 =============================== */
 
@@ -647,133 +504,10 @@ ipcMain.on('APP_CLOSE', () => {
 });
 
 /* ================================
-   HANDLER DE TESTE
+   HANDLER DE TESTE (DEPRECATED)
 =============================== */
-// Handler de teste corrigido
-ipcMain.handle('test-whisper-local', async () => {
-	console.log('🧪 Teste manual do Whisper local chamado...');
-
-	// Verificar se existem
-	if (!fs.existsSync(WHISPER_EXE) || !fs.existsSync(WHISPER_MODEL)) {
-		return {
-			success: false,
-			error: 'Arquivos do Whisper não encontrados',
-			exe: WHISPER_EXE,
-			model: WHISPER_MODEL,
-		};
-	}
-
-	// Criar arquivo WAV de teste REAL (não silêncio)
-	const tempDir = app.getPath('temp');
-	const testWav = path.join(tempDir, `test-whisper-${Date.now()}.wav`);
-
-	try {
-		// Cria um WAV simples com um tom (não silêncio)
-		const sampleRate = 16000;
-		const duration = 1; // 1 segundo
-		const frequency = 440; // Hz (Lá)
-
-		// Gera um tom simples
-		const numSamples = duration * sampleRate;
-		const samples = new Int16Array(numSamples);
-
-		for (let i = 0; i < numSamples; i++) {
-			// Gera uma onda senoidal
-			const t = i / sampleRate;
-			samples[i] = Math.floor(32767 * 0.1 * Math.sin(2 * Math.PI * frequency * t));
-		}
-
-		// Cria header WAV
-		const header = Buffer.alloc(44);
-		header.write('RIFF', 0);
-		header.writeUInt32LE(36 + samples.length * 2, 4); // ChunkSize
-		header.write('WAVE', 8);
-		header.write('fmt ', 12);
-		header.writeUInt32LE(16, 16); // Subchunk1Size
-		header.writeUInt16LE(1, 20); // AudioFormat (PCM)
-		header.writeUInt16LE(1, 22); // NumChannels
-		header.writeUInt32LE(sampleRate, 24); // SampleRate
-		header.writeUInt32LE(sampleRate * 2, 28); // ByteRate
-		header.writeUInt16LE(2, 32); // BlockAlign
-		header.writeUInt16LE(16, 34); // BitsPerSample
-		header.write('data', 36);
-		header.writeUInt32LE(samples.length * 2, 40); // Subchunk2Size
-
-		// Converte samples para buffer
-		const sampleBuffer = Buffer.from(samples.buffer);
-		const wavFile = Buffer.concat([header, sampleBuffer]);
-
-		fs.writeFileSync(testWav, wavFile);
-		console.log(`📁 WAV de teste criado: ${testWav} (${wavFile.length} bytes)`);
-
-		// Executa whisper
-		console.log('Executando whisper-cli.exe...');
-		const { stdout, stderr } = await execFileAsync(
-			WHISPER_EXE,
-			[
-				'-m',
-				WHISPER_MODEL,
-				'-f',
-				testWav,
-				'-l',
-				'pt',
-				'-otxt',
-				'-t',
-				'2',
-				'-np', // não imprimir logs
-				'-nt', // não imprimir timestamps
-			],
-			{ timeout: 15000 },
-		);
-
-		// Tenta extrair resultado
-		let output = '';
-		if (stdout && stdout.trim()) {
-			output = stdout.trim();
-		} else if (stderr && stderr.trim()) {
-			// Tenta extrair do stderr
-			const lines = stderr.split('\n');
-			for (const line of lines) {
-				if (line.includes('[') && line.includes(']')) {
-					const match = line.match(/\[([^\]]+)\]/);
-					if (match && match[1]) {
-						output = match[1].trim();
-						break;
-					}
-				}
-			}
-			if (!output) {
-				output = stderr.trim();
-			}
-		}
-
-		console.log(`✅ Whisper output: "${output}"`);
-
-		// Limpar
-		fs.unlinkSync(testWav);
-
-		return {
-			success: true,
-			message: output ? 'Whisper local funciona!' : 'Whisper executou mas retornou vazio',
-			output: output || '(vazio)',
-			rawOutput: stdout || '',
-			rawError: stderr || '',
-		};
-	} catch (error) {
-		// Limpar mesmo em caso de erro
-		if (fs.existsSync(testWav)) {
-			fs.unlinkSync(testWav);
-		}
-
-		return {
-			success: false,
-			error: error.message,
-			code: error.code,
-			stderr: error.stderr || '',
-			stdout: error.stdout || '',
-		};
-	}
-});
+// 🔥 COMENTADO: Handler de teste do Whisper.cpp removido (migramos para Vosk)
+// Para testar Whisper local, usar o arquivo whisper-server.js ou whisper-local/
 
 /* ================================
    HANDLERS IPC - VOSK (VIA PYTHON SUBPROCESS)
@@ -790,9 +524,9 @@ let voskReady = false;
 function startVoskServer() {
 	return new Promise((resolve, reject) => {
 		try {
-			console.log('🚀 Iniciando servidor Vosk (Python)...');
+			console.log(`🚀 Iniciando servidor Vosk (Python) com modelo: ${VOSK_CONFIG.MODEL}...`);
 
-			voskProcess = spawn('python', ['vosk-server.py'], {
+			voskProcess = spawn('python', ['vosk-server.py', VOSK_CONFIG.MODEL], {
 				cwd: __dirname,
 				stdio: ['pipe', 'pipe', 'pipe'],
 			});
@@ -875,10 +609,19 @@ ipcMain.handle('vosk-transcribe', async (_, audioBuffer) => {
 			}
 		}
 
-		console.log(`🎤 Enviando para Vosk: ${buffer.length} bytes`);
+		console.log(`🎤 Recebido WebM: ${buffer.length} bytes`);
 
-		// Codifica áudio em base64 (JSON-safe)
-		const audioBase64 = buffer.toString('base64');
+		// Converte WebM para WAV 16-bit 16kHz (MESMO FORMATO QUE ERA ANTES)
+		let wavBuffer;
+		try {
+			wavBuffer = await convertWebMToWAV(buffer);
+		} catch (error) {
+			console.error('❌ Erro na conversão WebM→WAV:', error.message);
+			throw new Error(`Falha ao converter áudio: ${error.message}`);
+		}
+
+		// Codifica WAV em base64 (JSON-safe)
+		const audioBase64 = wavBuffer.toString('base64');
 
 		// Cria comando JSON
 		const command = {
@@ -949,9 +692,9 @@ ipcMain.handle('vosk-finalize', async () => {
 			return { final: '' };
 		}
 
-		console.log('🔄 Finalizando Vosk...');
+		console.log('🔄 Finalizando Vosk e obtendo resultado final...');
 
-		const command = { type: 'reset' };
+		const command = { type: 'finalize' };
 		const commandJson = JSON.stringify(command) + '\n';
 
 		return new Promise(resolve => {
@@ -965,8 +708,8 @@ ipcMain.handle('vosk-finalize', async () => {
 
 				try {
 					const response = JSON.parse(data.toString().trim());
-					console.log('✅ Vosk reset:', response);
-					resolve({ final: '' });
+					console.log('✅ Vosk finalized:', response);
+					resolve(response);
 				} catch (error) {
 					resolve({ final: '' });
 				}

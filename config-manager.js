@@ -31,28 +31,28 @@ class ConfigManager {
 				api: {
 					activeProvider: 'openai',
 					openai: {
-						// 🔥 MODIFICADO: API key não é mais salva aqui (usa secure store)
-						transcriptionModel: 'whisper-1',
-						responseModel: 'gpt-4o-mini',
+						// 🔥 MODIFICADO: Agora usa selectedSTTModel e selectedLLMModel
+						selectedSTTModel: 'vosk-local',
+						selectedLLMModel: 'gpt-4o-mini',
 						enabled: true,
 					},
 					google: {
-						// 🔥 MODIFICADO: API key não é mais salva aqui
-						transcriptionModel: '', // Google pode ter modelo específico
-						responseModel: 'gemini-pro',
+						// 🔥 MODIFICADO: Agora usa selectedSTTModel e selectedLLMModel
+						selectedSTTModel: 'vosk-local',
+						selectedLLMModel: 'gemini-pro',
 						enabled: false,
 					},
 					openrouter: {
-						// 🔥 MODIFICADO: API key não é mais salva aqui
-						transcriptionModel: '',
-						responseModel: '',
+						// 🔥 MODIFICADO: Agora usa selectedSTTModel e selectedLLMModel
+						selectedSTTModel: 'vosk-local',
+						selectedLLMModel: '',
 						enabled: false,
 					},
 					custom: {
 						// 🔥 MODIFICADO: API key não é mais salva aqui
 						endpoint: '',
-						transcriptionModel: '',
-						responseModel: '',
+						selectedSTTModel: '',
+						selectedLLMModel: '',
 						enabled: false,
 					},
 				},
@@ -876,19 +876,27 @@ class ConfigManager {
 	getConfigPath(fieldId) {
 		debugLogConfig('Início da função: "getConfigPath"');
 		const pathMap = {
-			// 🔥 API: Modelos de transcrição e resposta
-			'openai-transcription-model': ['api', 'openai', 'transcriptionModel'],
-			'openai-response-model': ['api', 'openai', 'responseModel'],
+			// 🔥 API: Modelos STT e LLM (combo-boxes)
+			'openai-stt-model': ['api', 'openai', 'selectedSTTModel'],
+			'openai-llm-model': ['api', 'openai', 'selectedLLMModel'],
 
-			'google-transcription-model': ['api', 'google', 'transcriptionModel'],
-			'google-response-model': ['api', 'google', 'responseModel'],
+			'google-stt-model': ['api', 'google', 'selectedSTTModel'],
+			'google-llm-model': ['api', 'google', 'selectedLLMModel'],
 
-			'openrouter-transcription-model': ['api', 'openrouter', 'transcriptionModel'],
-			'openrouter-response-model': ['api', 'openrouter', 'responseModel'],
+			'openrouter-stt-model': ['api', 'openrouter', 'selectedSTTModel'],
+			'openrouter-llm-model': ['api', 'openrouter', 'selectedLLMModel'],
+
+			// 🔥 DEPRECATED: Manter para compatibilidade reversa (será removido)
+			'openai-transcription-model': ['api', 'openai', 'selectedSTTModel'],
+			'openai-response-model': ['api', 'openai', 'selectedLLMModel'],
+			'google-transcription-model': ['api', 'google', 'selectedSTTModel'],
+			'google-response-model': ['api', 'google', 'selectedLLMModel'],
+			'openrouter-transcription-model': ['api', 'openrouter', 'selectedSTTModel'],
+			'openrouter-response-model': ['api', 'openrouter', 'selectedLLMModel'],
 
 			'custom-endpoint': ['api', 'custom', 'endpoint'],
-			'custom-transcription-model': ['api', 'custom', 'transcriptionModel'],
-			'custom-response-model': ['api', 'custom', 'responseModel'],
+			'custom-transcription-model': ['api', 'custom', 'selectedSTTModel'],
+			'custom-response-model': ['api', 'custom', 'selectedLLMModel'],
 
 			// Áudio
 			'audio-input-device': ['audio', 'inputDevice'],
@@ -1259,7 +1267,7 @@ class ConfigManager {
 
 		// Transcrição
 		window.RendererAPI.onUIChange('onTranscriptAdd', data => {
-			const { author, text, timeStr, elementId } = data;
+			const { author, text, timeStr, elementId, placeholderId } = data;
 			const transcriptionBox = document.getElementById(elementId || 'conversation');
 			if (!transcriptionBox) {
 				console.warn(`⚠️ Elemento de transcrição não encontrado: ${elementId || 'conversation'}`);
@@ -1272,11 +1280,20 @@ class ConfigManager {
 			// Se for placeholder (texto = "..."), marca para ser atualizado depois
 			if (text === '...') {
 				div.setAttribute('data-is-placeholder', 'true');
+				// 🔥 ATRIBUIR ID AO ELEMENTO REAL DO DOM
+				if (placeholderId) {
+					div.id = placeholderId;
+					console.log('🔥 ID atribuído ao placeholder real:', placeholderId);
+				}
+				// 🔥 Não adicionar "..." visível - deixar para atualizar depois com texto real
+				div.innerHTML = ''; // Elemento vazio, será preenchido com onPlaceholderFulfill
+				console.log('✅ Placeholder reservado no DOM (vazio, aguardando transcrição):', placeholderId);
+			} else {
+				div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
+				console.log(`✅ Transcrição adicionada: ${author} - ${text}`);
 			}
 
-			div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
 			transcriptionBox.appendChild(div);
-			console.log(`✅ Transcrição adicionada: ${author} - ${text}`);
 
 			// 📜 Auto-scroll para acompanhar a fala em tempo real
 			// Faz scroll no container pai que tem overflow-y: auto
@@ -1542,7 +1559,8 @@ class ConfigManager {
 		window.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
 			console.log('🔔 onPlaceholderFulfill recebido:', data);
 
-			const { speaker, text, stopStr, startStr, recordingDuration, latency, total } = data;
+			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
+			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, placeholderId } = data;
 			const transcriptionBox = document.getElementById('conversation');
 
 			if (!transcriptionBox) {
@@ -1550,18 +1568,39 @@ class ConfigManager {
 				return;
 			}
 
-			// Encontra e atualiza o último placeholder
-			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
-			console.log('🔍 Placeholders encontrados:', placeholders.length);
+			// 🔥 USAR ID DO PLACEHOLDER AO INVÉS DE SELECIONAR O ÚLTIMO
+			let targetPlaceholder = null;
 
-			if (placeholders.length === 0) {
-				console.warn('⚠️ Nenhum placeholder encontrado para atualizar'); // ✅ ADICIONAR ESTE LOG
+			if (placeholderId) {
+				// Buscar placeholder pelo ID
+				targetPlaceholder = document.getElementById(placeholderId);
+				if (targetPlaceholder) {
+					console.log('✅ Placeholder encontrado por ID:', placeholderId);
+				} else {
+					console.warn('⚠️ Placeholder com ID não encontrado:', placeholderId);
+					// Fallback: busca pelo selector de data-is-placeholder
+					const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+					if (placeholders.length > 0) {
+						targetPlaceholder = placeholders[placeholders.length - 1];
+						console.log('📍 Usando FALLBACK: último placeholder');
+					}
+				}
+			} else {
+				// Sem ID (compatibilidade), usa o último
+				const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+				if (placeholders.length > 0) {
+					targetPlaceholder = placeholders[placeholders.length - 1];
+					console.log('📍 ID não fornecido, usando último placeholder');
+				}
+			}
+
+			if (!targetPlaceholder) {
+				console.warn('⚠️ Nenhum placeholder encontrado para atualizar');
 				return;
 			}
 
-			const lastPlaceholder = placeholders[placeholders.length - 1];
-			lastPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
-			lastPlaceholder.removeAttribute('data-is-placeholder');
+			targetPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
+			targetPlaceholder.removeAttribute('data-is-placeholder');
 
 			console.log('✅ Placeholder atualizado:', text.substring(0, 50) + '...');
 
@@ -1572,7 +1611,7 @@ class ConfigManager {
 			meta.style.marginTop = '2px';
 			meta.style.marginBottom = '2px';
 			meta.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
-			lastPlaceholder.parentNode.insertBefore(meta, lastPlaceholder.nextSibling);
+			targetPlaceholder.parentNode.insertBefore(meta, targetPlaceholder.nextSibling);
 
 			console.log('✅ Metadados adicionados');
 		});

@@ -215,36 +215,20 @@
 									</div>
 
 									<div class="form-group">
-										<!-- Alternar entre OpenAI e Whisper local -->
-										<div
-											id="transcriptionToggle"
-											style="margin: 10px 0; padding: 10px; background: #2a2a2a; border-radius: 5px"
-										>
-											<label style="color: white; cursor: pointer; display: flex; align-items: center">
-												<input type="checkbox" id="whisperLocalToggle" style="margin-right: 8px" />
-												<span id="whisperStatus">🌐 OpenAI (Ativo)</span>
-											</label>
-											<small style="color: #888; display: block; margin-top: 5px">
-												Alternar entre OpenAI (nuvem) e Whisper.cpp (local/offline)
-											</small>
-										</div>
+										<label for="openai-stt-model">Modelo de Transcrição (STT):</label>
+										<select id="openai-stt-model" class="interactive-zone">
+											<option value="vosk-local">Vosk (Local/Offline)</option>
+											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
+										</select>
+										<small>Selecione o modelo para converter áudio em texto (Speech-to-Text).</small>
 									</div>
 
 									<div class="form-group">
-										<label for="openai-transcription-model">Modelo de Transcrição (STT):</label>
-										<input type="text" id="openai-transcription-model" value="whisper-1" placeholder="Ex: whisper-1" />
-										<small>Modelo usado para converter áudio em texto (Speech-to-Text).</small>
-									</div>
-
-									<div class="form-group">
-										<label for="openai-response-model">Modelo de Resposta (GPT):</label>
-										<input
-											type="text"
-											id="openai-response-model"
-											value="gpt-4o-mini"
-											placeholder="Ex: gpt-4o-mini, gpt-4, gpt-3.5-turbo"
-										/>
-										<small>Modelo usado para gerar respostas às perguntas.</small>
+										<label for="openai-llm-model">Modelo de Resposta (LLM):</label>
+										<select id="openai-llm-model" class="interactive-zone">
+											<option value="gpt-4o-mini">GPT-4o Mini</option>
+										</select>
+										<small>Selecione o modelo para gerar respostas às perguntas.</small>
 									</div>
 
 									<div class="action-buttons">
@@ -291,26 +275,20 @@
 
 									<!-- 🔥 NOVO: Campo de modelo de transcrição -->
 									<div class="form-group">
-										<label for="google-transcription-model">Modelo de Transcrição (STT):</label>
-										<input
-											type="text"
-											id="google-transcription-model"
-											value=""
-											placeholder="Ex: chirp (se disponível)"
-										/>
-										<small>Deixe vazio se o Google não oferecer modelo de transcrição específico.</small>
+										<label for="google-stt-model">Modelo de Transcrição (STT):</label>
+										<select id="google-stt-model" class="interactive-zone">
+											<option value="vosk-local">Vosk (Local/Offline)</option>
+										</select>
+										<small>Atualmente apenas Vosk está disponível para transcrição no Google.</small>
 									</div>
 
 									<!-- 🔥 MODIFICADO: Campo de modelo de resposta -->
 									<div class="form-group">
-										<label for="google-response-model">Modelo de Resposta:</label>
-										<input
-											type="text"
-											id="google-response-model"
-											value="gemini-pro"
-											placeholder="Ex: gemini-pro, gemini-1.5-pro"
-										/>
-										<small>Modelo Gemini usado para gerar respostas.</small>
+										<label for="google-llm-model">Modelo de Resposta:</label>
+										<select id="google-llm-model" class="interactive-zone">
+											<option value="gemini-pro">Gemini Pro</option>
+										</select>
+										<small>Selecione o modelo Gemini para gerar respostas.</small>
 									</div>
 
 									<div class="action-buttons">
@@ -356,25 +334,19 @@
 									</div>
 
 									<div class="form-group">
-										<label for="openrouter-transcription-model">Modelo de Transcrição (STT):</label>
-										<input
-											type="text"
-											id="openrouter-transcription-model"
-											value=""
-											placeholder="Ex: openai/whisper-large-v3"
-										/>
-										<small>Modelo de transcrição disponível via OpenRouter (se aplicável).</small>
+										<label for="openrouter-stt-model">Modelo de Transcrição (STT):</label>
+										<select id="openrouter-stt-model" class="interactive-zone">
+											<option value="vosk-local">Vosk (Local/Offline)</option>
+										</select>
+										<small>Atualmente apenas Vosk está disponível para transcrição no OpenRouter.</small>
 									</div>
 
 									<div class="form-group">
-										<label for="openrouter-response-model">Modelo de Resposta:</label>
-										<input
-											type="text"
-											id="openrouter-response-model"
-											value=""
-											placeholder="Ex: anthropic/claude-3-opus"
-										/>
-										<small>Modelo usado para gerar respostas via OpenRouter.</small>
+										<label for="openrouter-llm-model">Modelo de Resposta:</label>
+										<select id="openrouter-llm-model" class="interactive-zone">
+											<option value="">-- Selecione um modelo --</option>
+										</select>
+										<small>Configure o modelo para gerar respostas via OpenRouter.</small>
 									</div>
 
 									<div class="action-buttons">

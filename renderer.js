@@ -26,7 +26,7 @@ const MIN_INPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a 
 const MIN_INPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo de tamanho de áudio para a entrevista = 350
 
 const OUTPUT_SPEECH_THRESHOLD = 20; // Valor limite (threshold) para detectar fala mais cedo = 8
-const OUTPUT_SILENCE_TIMEOUT = 100; // Tempo de espera para silêncio = 250
+const OUTPUT_SILENCE_TIMEOUT = 100; // 🔥 Aumentado de 100ms para 500ms para evitar cortar palavras no fim (pausas naturais)
 const MIN_OUTPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a normal = 2500
 const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo para enviar parcial (~3-4 chunks, ~3KB)
 // controla intervalo mínimo entre requisições STT parciais (ms) - mantém rate-limit para não sobrecarregar API
@@ -59,7 +59,7 @@ let isRunning = false;
 let audioContext;
 let mockInterviewRunning = false;
 
-let USE_LOCAL_WHISPER = false; // false = OpenAI, true = Whisper local
+// 🔥 MODIFICADO: STT model vem da config agora (removido USE_LOCAL_WHISPER)
 let transcriptionMetrics = {
 	audioStartTime: null,
 	whisperStartTime: null,
@@ -115,6 +115,12 @@ let lastInputPlaceholderEl = null;
 let lastOutputPlaceholderEl = null;
 let lastAskedQuestionNormalized = null;
 let lastPartialSttAt = null;
+let lastOutputPlaceholderId = null; // 🔥 ID único para rastrear qual placeholder atualizar
+
+// 🔥 Variáveis temporárias para transcrição atual (imunes a race conditions)
+// Armazenam os timestamps capturados NO MOMENTO de onstop() para uso exclusivo por transcribeOutput()
+let pendingOutputStartAt = null;
+let pendingOutputStopAt = null;
 
 /* ===============================
    CALLBACKS / OBSERVERS SYSTEM
@@ -483,12 +489,35 @@ function isEndingPhrase(text) {
 }
 
 /* ===============================
-   TRANSCRIÇÃO LOCAL
+   TRANSCRIÇÃO (STT) - MODELO DINÂMICO
 =============================== */
 
-function setTranscriptionMode(useLocal) {
-	USE_LOCAL_WHISPER = useLocal;
-	console.log(`🎤 Modo de transcrição: ${useLocal ? 'WHISPER LOCAL' : 'OPENAI'}`);
+/**
+ * Obtém o modelo STT configurado para o provider ativo
+ * @returns {string} 'vosk-local' | 'whisper-1' | 'google-stt' etc
+ */
+function getConfiguredSTTModel() {
+	try {
+		if (!window.configManager || !window.configManager.config) {
+			console.warn('⚠️ configManager não disponível, usando padrão: whisper-1');
+			return 'whisper-1';
+		}
+
+		const config = window.configManager.config;
+		const activeProvider = config.api?.activeProvider || 'openai';
+		const sttModel = config.api?.[activeProvider]?.selectedSTTModel;
+
+		if (!sttModel) {
+			console.warn(`⚠️ Modelo STT não configurado para ${activeProvider}, usando padrão: whisper-1`);
+			return 'whisper-1';
+		}
+
+		console.log(`🎤 STT Model selecionado: ${sttModel} (provider: ${activeProvider})`);
+		return sttModel;
+	} catch (err) {
+		console.error('❌ Erro ao obter modelo STT da config:', err);
+		return 'whisper-1'; // fallback
+	}
 }
 
 async function transcribeAudio(blob) {
@@ -496,65 +525,97 @@ async function transcribeAudio(blob) {
 	transcriptionMetrics.audioSize = blob.size;
 
 	const buffer = Buffer.from(await blob.arrayBuffer());
-	console.log(`🎤 Transcrição (${USE_LOCAL_WHISPER ? 'Local' : 'OpenAI'}): ${blob.size} bytes`);
+	const sttModel = getConfiguredSTTModel();
+	console.log(`🎤 Transcrição (${sttModel}): ${blob.size} bytes`);
 	console.log(
 		`⏱️ Início: ${new Date(transcriptionMetrics.audioStartTime).toLocaleTimeString()}.${
 			transcriptionMetrics.audioStartTime % 1000
 		}`,
 	);
 
-	if (USE_LOCAL_WHISPER) {
+	// Roteia para o modelo configurado
+	if (sttModel === 'vosk-local') {
 		try {
-			console.log(`🚀 Enviando para Whisper local...`);
+			console.log(`🚀 Enviando para Vosk (local)...`);
 			transcriptionMetrics.whisperStartTime = Date.now();
 
-			const result = await ipcRenderer.invoke('transcribe-local', buffer);
+			// Primeiro envia o áudio para processar
+			await ipcRenderer.invoke('vosk-transcribe', buffer);
+
+			// Depois finaliza para obter o resultado final acumulado
+			const finalResult = await ipcRenderer.invoke('vosk-finalize');
 
 			transcriptionMetrics.whisperEndTime = Date.now();
 			const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
 
-			console.log(`✅ Whisper local concluído em ${whisperTime}ms`);
-			console.log(`📝 Resultado (${result.length} chars): "${result.substring(0, 80)}..."`);
+			console.log(`✅ Vosk concluído em ${whisperTime}ms`);
 
-			// Log intermediário
-			console.log(
-				`📊 Whisper: ${whisperTime}ms para ${blob.size} bytes (${Math.round(blob.size / whisperTime)} bytes/ms)`,
-			);
+			// Vosk retorna um objeto: { final: string, partial: string, isFinal: boolean }
+			// Extrai o texto final
+			let transcribedText = '';
+			if (typeof finalResult === 'string') {
+				transcribedText = finalResult;
+			} else if (typeof finalResult === 'object' && finalResult !== null) {
+				// Usa final (que agora contém o resultado acumulado)
+				transcribedText = finalResult.final || '';
+			}
 
-			return result;
+			console.log(`📝 Resultado (${transcribedText.length} chars): "${transcribedText.substring(0, 80)}..."`);
+
+			return transcribedText;
 		} catch (error) {
-			console.error('❌ Whisper local falhou:', error.message);
+			console.error('❌ Vosk falhou:', error.message);
 			// Fallback para OpenAI
 			try {
+				console.log('🔄 Fallback para OpenAI...');
 				return await ipcRenderer.invoke('transcribe-audio', buffer);
 			} catch (openaiError) {
 				throw new Error(`Falha na transcrição: ${openaiError.message}`);
 			}
 		}
-	} else {
+	} else if (sttModel === 'whisper-1') {
 		transcriptionMetrics.whisperStartTime = Date.now();
 		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
 		transcriptionMetrics.whisperEndTime = Date.now();
 
 		const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
-		console.log(`✅ OpenAI concluído em ${whisperTime}ms`);
+		console.log(`✅ Whisper-1 concluído em ${whisperTime}ms`);
 
+		return result;
+	} else {
+		// Modelo desconhecido - tenta OpenAI como fallback
+		console.warn(`⚠️ Modelo STT desconhecido: ${sttModel}, usando OpenAI`);
+		transcriptionMetrics.whisperStartTime = Date.now();
+		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
+		transcriptionMetrics.whisperEndTime = Date.now();
 		return result;
 	}
 }
 
 async function transcribeAudioPartial(blob) {
 	const buffer = Buffer.from(await blob.arrayBuffer());
+	const sttModel = getConfiguredSTTModel();
 
-	if (USE_LOCAL_WHISPER) {
+	if (sttModel === 'vosk-local') {
+		// ⚠️ Para Vosk, não fazemos transcrição parcial em tempo real
+		// Vosk acumula e retorna parciais, mas não queremos enviá-las para a UI
+		// A transcrição real será feita em transcribeAudio() quando a gravação terminar
+		return '';
+	} else if (sttModel === 'whisper-1') {
 		try {
-			return await ipcRenderer.invoke('transcribe-local-partial', buffer);
+			return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
 		} catch (error) {
-			console.warn('⚠️ Whisper local parcial falhou:', error.message);
+			console.warn('⚠️ Whisper-1 parcial falhou:', error.message);
 			return '';
 		}
 	} else {
-		return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
+		// Modelo desconhecido - tenta OpenAI como fallback
+		try {
+			return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
+		} catch (error) {
+			console.warn('⚠️ Transcrição parcial falhou:', error.message);
+			return '';
+		}
 	}
 }
 
@@ -914,8 +975,22 @@ async function startInput() {
 
 			// marca o momento exato em que a gravação parou
 			lastInputStopAt = Date.now();
-			const recordingDuration = lastInputStopAt - lastInputStartAt;
+
+			// PROTEÇÃO CRÍTICA: Se lastInputStartAt for null/undefined, usar stopAt como fallback
+			// MAS não usar para calcular duration (isso causaria grav 0ms)
+			const actualStartTime =
+				lastInputStartAt !== null && lastInputStartAt !== undefined ? lastInputStartAt : lastInputStopAt;
+
+			const recordingDuration = lastInputStopAt - actualStartTime;
+
+			// Logs detalhados para debug
 			console.log('⏱️ Parada:', new Date(lastInputStopAt).toLocaleTimeString());
+			if (lastInputStartAt !== null && lastInputStartAt !== undefined) {
+				console.log('⏱️ Início:', new Date(lastInputStartAt).toLocaleTimeString());
+			} else {
+				console.warn('⚠️ AVISO: lastInputStartAt é null/undefined! Usando lastInputStopAt como fallback.');
+				lastInputStartAt = lastInputStopAt;
+			}
 			console.log('⏱️ Duração da gravação:', recordingDuration, 'ms');
 
 			// Cancela qualquer timer pendente de transcrição parcial
@@ -936,9 +1011,16 @@ async function startInput() {
 			lastInputPlaceholderEl = addTranscript(YOU, '...', timeForPlaceholder);
 			if (lastInputPlaceholderEl) {
 				lastInputPlaceholderEl.dataset.stopAt = lastInputStopAt;
-				if (lastInputStartAt) lastInputPlaceholderEl.dataset.startAt = lastInputStartAt;
+				// SEMPRE salvar startAt se estiver disponível (até que 0 é válido, não null)
+				if (lastInputStartAt !== null && lastInputStartAt !== undefined) {
+					lastInputPlaceholderEl.dataset.startAt = lastInputStartAt;
+				} else {
+					// Se startAt não foi setado corretamente, usar stopAt como fallback
+					lastInputPlaceholderEl.dataset.startAt = lastInputStopAt;
+				}
 			}
 
+			// ✅ CHAMADA CRÍTICA: Transcreve o áudio capturado
 			transcribeInput();
 		};
 
@@ -990,6 +1072,8 @@ function updateInputVolume() {
 				console.log(
 					'🎙️ iniciando gravação de entrada (inputRecorder.start) - startAt',
 					new Date(lastInputStartAt).toLocaleTimeString(),
+					'| inputSpeaking =',
+					inputSpeaking,
 				);
 				slice ? inputRecorder.start(slice) : inputRecorder.start();
 			}
@@ -1001,7 +1085,10 @@ function updateInputVolume() {
 			inputSilenceTimer = setTimeout(() => {
 				inputSpeaking = false;
 				inputSilenceTimer = null;
-				console.log('⏹️ parando gravação de entrada por silêncio (inputRecorder.stop)');
+				console.log(
+					'⏹️ parando gravação de entrada por silêncio (inputRecorder.stop) | lastInputStartAt =',
+					lastInputStartAt ? new Date(lastInputStartAt).toLocaleTimeString() : 'NULL',
+				);
 				if (inputRecorder && inputRecorder.state === 'recording') {
 					inputRecorder.stop();
 				}
@@ -1166,7 +1253,27 @@ async function startOutput() {
 
 			// Marca o momento exato em que a gravação parou
 			lastOutputStopAt = Date.now();
-			const recordingDuration = lastOutputStopAt - lastOutputStartAt;
+
+			// 🔥 CRÍTICO: Capturar timestamps AGORA em variáveis temporárias
+			// Essas variáveis são isoladas e NÃO serão sobrescritas por updateOutputVolume()
+			pendingOutputStartAt = lastOutputStartAt;
+			pendingOutputStopAt = lastOutputStopAt;
+
+			// Debug: Verificar valores de lastOutputStartAt
+			console.log('🔍 DEBUG outputRecorder.onstop:');
+			console.log('  → lastOutputStartAt:', lastOutputStartAt, `(tipo: ${typeof lastOutputStartAt})`);
+			console.log('  → lastOutputStopAt:', lastOutputStopAt, `(tipo: ${typeof lastOutputStopAt})`);
+			console.log('  → 🔥 Capturado em pending: start=', pendingOutputStartAt, 'stop=', pendingOutputStopAt);
+
+			// Calcula duração com proteção contra valores inválidos
+			let recordingDuration = 0;
+			if (lastOutputStartAt !== null && lastOutputStartAt !== undefined && typeof lastOutputStartAt === 'number') {
+				recordingDuration = lastOutputStopAt - lastOutputStartAt;
+			} else {
+				console.warn('⚠️ AVISO: lastOutputStartAt é inválido, usando 0 como duração');
+				recordingDuration = 0;
+			}
+
 			console.log('⏱️ Parada: ' + new Date(lastOutputStopAt).toLocaleTimeString());
 			console.log('⏱️ Duração da gravação:', recordingDuration, 'ms');
 
@@ -1182,17 +1289,8 @@ async function startOutput() {
 			outputPartialChunks = [];
 			console.log('🗑️ Limpos chunks parciais acumulados (outputPartialChunks)');
 
-			// Fluxo padrão (Whisper): Adiciona placeholder visual para indicar que estamos aguardando a transcrição
-			const timeForPlaceholder = lastOutputStartAt || lastOutputStopAt;
-			lastOutputPlaceholderEl = addTranscript(OTHER, '...', timeForPlaceholder);
-
-			// Se o placeholder foi criado, define os atributos de startAt e stopAt
-			if (lastOutputPlaceholderEl) {
-				lastOutputPlaceholderEl.dataset.stopAt = lastOutputStopAt;
-				if (lastOutputStartAt) lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
-			}
-
-			// Inicia a transcrição do áudio de saída (Whisper)
+			// Inicia a transcrição do áudio de saída (Vosk)
+			// ⚠️ O placeholder será criado direto no transcribeOutput() com as métricas corretas
 			transcribeOutput();
 		};
 
@@ -1251,6 +1349,12 @@ function updateOutputVolume() {
 		if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
 			// Se o outputSpeaking for false, inicia a gravação de saída
 			if (!outputSpeaking) {
+				// RESET: Limpa valores da frase anterior ANTES de iniciar nova frase
+				lastOutputPlaceholderEl = null;
+				lastOutputStopAt = null;
+				// Nota: lastOutputStartAt será atualizado abaixo
+				console.log('🧹 LIMPAR: Resetando lastOutputPlaceholderEl e lastOutputStopAt ANTES de nova frase');
+
 				// Define o estado de outputSpeaking como true
 				outputSpeaking = true;
 				// Limpa o array de chunks de saída
@@ -1260,6 +1364,23 @@ function updateOutputVolume() {
 				lastOutputStartAt = Date.now();
 
 				console.log('🎙️ Início: ' + new Date(lastOutputStartAt).toLocaleTimeString());
+				console.log('📊 lastOutputStartAt definido para:', lastOutputStartAt);
+
+				// 🔥 PASSO 1: Criar placeholder IMEDIATAMENTE quando fala inicia
+				// Isso garante que "Outros: ..." apareça na tela assim que detecta fala
+				try {
+					// 🔥 Gerar ID ANTES de criar o placeholder
+					lastOutputPlaceholderId = 'placeholder-' + lastOutputStartAt + '-' + Math.random();
+					// 🔥 Passar o ID para ser atribuído ao elemento real no DOM
+					lastOutputPlaceholderEl = addTranscript(OTHER, '...', lastOutputStartAt, lastOutputPlaceholderId);
+					if (lastOutputPlaceholderEl && lastOutputPlaceholderEl.dataset) {
+						lastOutputPlaceholderEl.dataset.startAt = lastOutputStartAt;
+						lastOutputPlaceholderEl.dataset.stopAt = lastOutputStartAt; // provisório, será atualizado
+					}
+					console.log('✨ Placeholder criado no início da fala para "Outros" (id=' + lastOutputPlaceholderId + ')');
+				} catch (err) {
+					console.warn('⚠️ Falha ao criar placeholder no início:', err);
+				}
 
 				// Usar o mesmo timeslice que INPUT para manter consistência
 				const slice = ModeController.mediaRecorderTimeslice();
@@ -1659,12 +1780,19 @@ async function transcribeInput() {
 
 	// Se existia um placeholder (timestamp do stop), calcula métricas e emite evento para atualizar
 	if (lastInputPlaceholderEl && lastInputPlaceholderEl.dataset) {
+		// Extrai timestamps do dataset (sempre como números, nunca null)
 		const stop = lastInputPlaceholderEl.dataset.stopAt
 			? Number(lastInputPlaceholderEl.dataset.stopAt)
 			: lastInputStopAt;
-		const start = lastInputPlaceholderEl.dataset.startAt
-			? Number(lastInputPlaceholderEl.dataset.startAt)
-			: lastInputStartAt || stop;
+
+		// Para startAt, SEMPRE preferir dataset (mesmo que seja 0), nunca deixar undefined
+		const start =
+			lastInputPlaceholderEl.dataset.startAt !== undefined
+				? Number(lastInputPlaceholderEl.dataset.startAt)
+				: lastInputStartAt !== null && lastInputStartAt !== undefined
+				? lastInputStartAt
+				: stop;
+
 		const now = Date.now();
 		const recordingDuration = stop - start;
 		const latency = now - stop;
@@ -1693,6 +1821,7 @@ async function transcribeInput() {
 
 		lastInputPlaceholderEl = null;
 		lastInputStopAt = null;
+		console.log('🗑️ Resetando timestamps: lastInputStartAt = null, lastInputStopAt = null');
 		lastInputStartAt = null;
 	} else {
 		addTranscript(YOU, text);
@@ -1757,15 +1886,18 @@ async function transcribeOutput() {
 		if (lastOutputPlaceholderEl && lastOutputPlaceholderEl.dataset) {
 			console.log('🔄 Atualizando placeholder com transcrição final...');
 
-			// obtém os timestamps de stop do dataset do placeholder, ou usa os valores globais
-			const stop = lastOutputPlaceholderEl.dataset.stopAt
-				? Number(lastOutputPlaceholderEl.dataset.stopAt)
-				: lastOutputStopAt;
+			// 🔥 USAR VARIÁVEIS PENDENTES (imunes a race condition)
+			// Essas variáveis foram capturadas em onstop() e não foram sobrescritas por updateOutputVolume()
+			const stop = pendingOutputStopAt || lastOutputStopAt;
+			const start = pendingOutputStartAt || lastOutputStartAt || stop;
 
-			// obtém os timestamps de start do dataset do placeholder, ou usa os valores globais
-			const start = lastOutputPlaceholderEl.dataset.startAt
-				? Number(lastOutputPlaceholderEl.dataset.startAt)
-				: lastOutputStartAt || stop;
+			// Debug: verificar se pending* foi usada
+			console.log(
+				'🔥 DEBUG transcribeOutput: pendingOutputStopAt=' +
+					pendingOutputStopAt +
+					', pendingOutputStartAt=' +
+					pendingOutputStartAt,
+			);
 
 			// calcula métricas
 			const now = Date.now();
@@ -1784,6 +1916,7 @@ async function transcribeOutput() {
 			console.log(`  📊 Duração gravação: ${recordingDuration}ms | Latência: ${latency}ms | Total: ${total}ms`);
 
 			// Emite atualização de UI ao placeholder com texto final e métricas
+			// 🔥 PASSA O ID DO PLACEHOLDER para que config-manager atualize o elemento CORRETO
 			emitUIChange('onPlaceholderFulfill', {
 				speaker: OTHER,
 				text,
@@ -1792,24 +1925,36 @@ async function transcribeOutput() {
 				recordingDuration,
 				latency,
 				total,
+				placeholderId: lastOutputPlaceholderId, // 🔥 ESSENCIAL para encontrar o placeholder correto
 			});
 
 			// reseta variáveis de placeholder
 			lastOutputPlaceholderEl = null;
-			lastOutputStopAt = null;
-			lastOutputStartAt = null;
+			// NÃO resetar lastOutputStopAt e lastOutputStartAt aqui!
+			// Eles serão preservados para timing correto da próxima frase
+			// Serão resetados apenas quando uma NOVA frase inicia em updateOutputVolume()
+			console.log(
+				'🧹 RESET #1: lastOutputPlaceholderEl resetado | lastOutputStartAt/StopAt PRESERVADOS para próxima frase',
+			);
 
 			// processa a fala transcrita (consolidação de perguntas)
 			// Usa Date.now() para pegar o tempo exato que chegou no renderer
 			handleSpeech(OTHER, text);
 		} else {
-			addTranscript(OTHER, text);
-
 			// Sem placeholder - cria placeholder e emite fulfill para garantir métricas
 			console.log('➕ Nenhum placeholder existente - criando e preenchendo com métricas');
-			// obtém timestamps de fallback
-			const stop = lastOutputStopAt || Date.now();
-			const start = lastOutputStartAt || stop;
+			// 🔥 USAR VARIÁVEIS PENDENTES (imunes a race condition)
+			const stop = pendingOutputStopAt || lastOutputStopAt || Date.now();
+			const start = pendingOutputStartAt || lastOutputStartAt || stop;
+
+			// Debug: verificar se pending* foi usada
+			console.log(
+				'🔥 DEBUG transcribeOutput: pendingOutputStopAt=' +
+					pendingOutputStopAt +
+					', pendingOutputStartAt=' +
+					pendingOutputStartAt,
+			);
+
 			const now = Date.now();
 			const recordingDuration = stop - start;
 			const latency = now - stop;
@@ -1826,7 +1971,8 @@ async function transcribeOutput() {
 			console.log(`  📊 Duração gravação: ${recordingDuration}ms | Latência: ${latency}ms | Total: ${total}ms`);
 
 			// cria um placeholder visível antes de preencher (garante consistência com fluxo parcial)
-			const placeholderEl = addTranscript(OTHER, '...', start);
+			const elIdForFallback = 'placeholder-' + start + '-' + Math.random();
+			const placeholderEl = addTranscript(OTHER, '...', start, elIdForFallback);
 
 			if (placeholderEl && placeholderEl.dataset) {
 				placeholderEl.dataset.startAt = start;
@@ -1834,6 +1980,7 @@ async function transcribeOutput() {
 			}
 
 			// Emite atualização final para preencher o placeholder com texto e métricas
+			// 🔥 PASSA O ID DO PLACEHOLDER para que config-manager atualize o elemento CORRETO
 			emitUIChange('onPlaceholderFulfill', {
 				speaker: OTHER,
 				text,
@@ -1842,17 +1989,27 @@ async function transcribeOutput() {
 				recordingDuration,
 				latency,
 				total,
+				placeholderId: elIdForFallback, // 🔥 ESSENCIAL para encontrar o placeholder correto
 			});
 
 			// reseta variáveis de placeholder
+			console.log(
+				'🧹 RESET #2: lastOutputPlaceholderEl resetado | lastOutputStartAt/StopAt PRESERVADOS para próxima frase',
+			);
 			lastOutputPlaceholderEl = null;
-			lastOutputStopAt = null;
-			lastOutputStartAt = null;
+			// NÃO resetar lastOutputStopAt e lastOutputStartAt aqui!
+			// Eles serão preservados para timing correto da próxima frase
 
 			// processa a fala transcrita (consolidação de perguntas)
 			// Usa Date.now() para pegar o tempo exato que chegou no renderer
 			handleSpeech(OTHER, text);
 		}
+
+		// 🔥 Limpar variáveis pendentes após transcrição completa
+		// Elas já foram usadas para calcular métricas, agora podem ser limpas
+		console.log('🧹 RESET #3: Limpando pendingOutputStartAt e pendingOutputStopAt');
+		pendingOutputStartAt = null;
+		pendingOutputStopAt = null;
 
 		// MODO ENTREVISTA: Se a transcrição final indicar claramente uma pergunta, fechar e enviar ao GPT imediatamente
 		// if (ModeController.isInterviewMode() && isQuestionReady(text)) {
@@ -2381,7 +2538,7 @@ async function askGpt() {
    UI (RENDER / SELEÇÃO / SCROLL)
 =============================== */
 
-function addTranscript(author, text, time) {
+function addTranscript(author, text, time, elementId = null) {
 	debugLogRenderer('Início da função: "addTranscript"');
 	let timeStr;
 	if (time) {
@@ -2399,6 +2556,7 @@ function addTranscript(author, text, time) {
 		text,
 		timeStr,
 		elementId: 'conversation',
+		placeholderId: elementId, // 🔥 PASSAR ID PARA SER ATRIBUÍDO AO ELEMENTO REAL
 	};
 
 	emitUIChange('onTranscriptAdd', transcriptData);
@@ -3036,15 +3194,6 @@ const RendererAPI = {
 			console.error('Falha ao enviar RENDERER_ERROR', err);
 		}
 	},
-
-	///////////////////////////////////
-	// FUNÇÕES PARA WHISPER LOCAL
-	///////////////////////////////////
-	setTranscriptionMode: useLocal => {
-		setTranscriptionMode(useLocal);
-	},
-
-	getTranscriptionMode: () => USE_LOCAL_WHISPER,
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -3055,8 +3204,6 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
 	window.RendererAPI = RendererAPI;
 }
-
-// Função de log debug estilizado
 function debugLogRenderer(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: brown; font-weight: bold;');
 }
