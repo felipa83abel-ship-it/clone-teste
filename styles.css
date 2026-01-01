@@ -329,11 +329,48 @@ body {
     background: rgba(var(--bg-panel-rgb), var(--app-opacity));    
 }
 
+/* VU meters no home - compactos e horizontais */
+.home-vu-meters {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 4px;
+  background: rgba(var(--bg-panel-rgb), 0.5);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.vu-meter-home {
+  /* flex: 1; */
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.vu-meter-home label {
+  margin: 0 !important;
+  font-size: 12px !important;
+}
+
+.vu-meter-home .vu-meter {
+  height: 16px !important;
+  min-width: 16px;
+  border-radius: 16px;
+  margin: 0 !important;
+  border: 1px solid var(--border-default);
+}
+
+/* Efeito visual quando isRunning = true */
+.home-vu-meters.listening {
+  animation: pulse-glow 2s infinite;
+  border: 2px solid rgba(var(--color-active-rgb), 0.5);
+}
+
 /* SPAN STATUS */
 #status {
     display: flex;
-    justify-content: center;
+    flex: 1;
     color: rgb(var(--text-main-rgb));
+    font-size: 12px;
 }
 
 /* TRANSCRIÇÃO */
@@ -630,6 +667,43 @@ textarea:focus {
     background: rgba(var(--color-active-hover-rgb), var(--app-opacity));
 }
 
+/* Feedback visual quando o botão está ouvindo */
+.btn-activate.listening {
+    background: rgba(var(--color-danger-rgb), var(--app-opacity));
+    animation: pulse 1s infinite;
+}
+
+.btn-activate.listening:hover {
+    background: rgba(var(--color-danger-hover-rgb), var(--app-opacity));
+}
+
+/* 🔥 Botão Reset Temporário */
+.btn-reset-home {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 16px;
+    height: 16px;
+    background: rgba(255, 107, 107, 0.9); /* Vermelho alertante */
+    color: white;
+    border: 1px solid rgba(200, 50, 50, 0.8);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-reset-home:hover {
+    background: rgba(255, 70, 70, 0.95);
+    box-shadow: 0 0 10px rgba(255, 70, 70, 0.5);
+}
+
+.btn-reset-home:active {
+    transform: scale(0.98);
+}
+
 .btn-save {
     display: inline-flex;
     align-items: center;
@@ -842,6 +916,7 @@ input:checked + .slider:before { transform: translateX(22px); }
     padding: 6px 10px;
     font-size: 12px;
     color: rgba(var(--text-main-rgb), var(--app-opacity));
+    margin-left: 32px;
 }
 
 .opacity-control input[type="range"] { flex: 1; cursor: pointer; }
@@ -977,4 +1052,33 @@ input:checked + .slider:before { transform: translateX(22px); }
     0% { opacity: 0.5; }
     50% { opacity: 1; }
     100% { opacity: 0.5; }
+}
+
+@keyframes pulse-glow {
+    0%, 100% { 
+        box-shadow: 0 0 5px rgba(var(--color-active-rgb), 0.3);
+    }
+    50% { 
+        box-shadow: 0 0 15px rgba(var(--color-active-rgb), 0.6);
+    }
+}
+
+/* ajustar depois */
+
+.form-group-top {
+    display: flex;
+    align-items: center;
+    gap: 32px;
+}
+
+.interviewMode {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+}
+
+.interviewMode .interactive-zone{
+    padding: 4px 4px;
+    font-size: 10px;
 }
