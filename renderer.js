@@ -513,6 +513,12 @@ function getConfiguredSTTModel() {
 		}
 
 		console.log(`🎤 STT Model selecionado: ${sttModel} (provider: ${activeProvider})`);
+		console.log(`   [DEBUG] config.api.${activeProvider}.selectedSTTModel = "${sttModel}"`);
+		console.log(
+			`   [DEBUG] select#${activeProvider}-stt-model.value = "${
+				document.getElementById(activeProvider + '-stt-model')?.value
+			}"`,
+		);
 		return sttModel;
 	} catch (err) {
 		console.error('❌ Erro ao obter modelo STT da config:', err);
@@ -520,6 +526,16 @@ function getConfiguredSTTModel() {
 	}
 }
 
+/**
+ * Roteia transcrição de áudio para o modelo STT configurado
+ *
+ * Modelos suportados (via config-manager):
+ * 1. vosk-local          → main.js handlers: vosk-transcribe + vosk-finalize
+ * 2. whisper-cpp-local   → main.js handler: transcribe-local (alta precisão)
+ * 3. whisper-1           → main.js handler: transcribe-audio (online, OpenAI)
+ *
+ * Retorna: texto transcrito ou erro
+ */
 async function transcribeAudio(blob) {
 	transcriptionMetrics.audioStartTime = Date.now();
 	transcriptionMetrics.audioSize = blob.size;
@@ -535,6 +551,11 @@ async function transcribeAudio(blob) {
 
 	// Roteia para o modelo configurado
 	if (sttModel === 'vosk-local') {
+		// Modelo: Vosk local
+		// Vantagem: Rápido (500-1000ms), offline, leve
+		// Desvantagem: Menor precisão (modelo pequeno ~50MB)
+		// Handlers: main.js → vosk-transcribe (envia), vosk-finalize (recupera resultado acumulado)
+		// Processo: WebM → Buffer → Vosk server Python → Texto
 		try {
 			console.log(`🚀 Enviando para Vosk (local)...`);
 			transcriptionMetrics.whisperStartTime = Date.now();
@@ -573,7 +594,41 @@ async function transcribeAudio(blob) {
 				throw new Error(`Falha na transcrição: ${openaiError.message}`);
 			}
 		}
+	} else if (sttModel === 'whisper-cpp-local') {
+		// Modelo: Whisper.cpp local
+		// Vantagem: Alta precisão (modelo maior), offline
+		// Desvantagem: Mais lento (2-4s), requer arquivos locais
+		// Handler: main.js → transcribe-local (buffer enviado via IPC)
+		// Processo: WebM → WAV → Whisper.cpp CLI → Texto
+		try {
+			console.log(`🚀 Enviando para Whisper.cpp (local, alta precisão)...`);
+			transcriptionMetrics.whisperStartTime = Date.now();
+
+			const result = await ipcRenderer.invoke('transcribe-local', buffer);
+
+			transcriptionMetrics.whisperEndTime = Date.now();
+			const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
+
+			console.log(`✅ Whisper.cpp concluído em ${whisperTime}ms`);
+			console.log(`📝 Resultado (${result.length} chars): "${result.substring(0, 80)}..."`);
+
+			return result;
+		} catch (error) {
+			console.error('❌ Whisper.cpp falhou:', error.message);
+			// Fallback para OpenAI
+			try {
+				console.log('🔄 Fallback para OpenAI...');
+				return await ipcRenderer.invoke('transcribe-audio', buffer);
+			} catch (openaiError) {
+				throw new Error(`Falha na transcrição: ${openaiError.message}`);
+			}
+		}
 	} else if (sttModel === 'whisper-1') {
+		// Modelo: OpenAI Whisper-1 (online)
+		// Vantagem: Melhor precisão (modelo grande), multilíngue
+		// Desvantagem: Requer conexão, custo ($0.02/min), latência
+		// Handler: main.js → transcribe-audio (requer OpenAI API key configurada)
+		// Processo: WebM → Arquivo temp → OpenAI API → Texto
 		transcriptionMetrics.whisperStartTime = Date.now();
 		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
 		transcriptionMetrics.whisperEndTime = Date.now();
@@ -3241,5 +3296,128 @@ function logTranscriptionMetrics() {
 		audioSize: 0,
 	};
 }
+
+/* ===============================
+   RESET COMPLETO (TEMPORÁRIO PARA TESTES)
+=============================== */
+
+/**
+ * 🔄 Limpa tudo na seção home como se o app tivesse aberto agora
+ * Funcionalidade TEMPORÁRIA para facilitar testes sem fechar a aplicação
+ */
+function resetHomeSection() {
+	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('🔄 RESET COMPLETO ACIONADO');
+	console.log('════════════════════════════════════════════════════════════════════════════════════════');
+
+	// Garante que a escuta está parada
+	if (isRunning) {
+		isRunning = false;
+		stopAudio();
+		emitUIChange('onListenButtonToggle', {
+			isRunning: false,
+			buttonText: 'Começar a Ouvir... (Ctrl+d)',
+		});
+	}
+
+	// 1️⃣ LIMPA TRANSCRIÇÃO
+	currentQuestion = {
+		text: '',
+		lastUpdate: 0,
+		finalized: false,
+		lastUpdateTime: null,
+		createdAt: null,
+	};
+	questionsHistory = [];
+	selectedQuestionId = null;
+	lastInputPlaceholderEl = null;
+	lastInputStopAt = null;
+	lastInputStartAt = null;
+	lastOutputPlaceholderEl = null;
+	lastOutputStopAt = null;
+	lastOutputStartAt = null;
+	lastOutputPlaceholderId = null;
+	pendingOutputStartAt = null;
+	pendingOutputStopAt = null;
+
+	// 2️⃣ LIMPA HISTÓRICO
+	inputChunks = [];
+	outputChunks = [];
+	inputPartialChunks = [];
+	outputPartialChunks = [];
+	outputPartialText = '';
+
+	// 3️⃣ LIMPA RESPOSTAS (GPT)
+	answeredQuestions.clear();
+	gptAnsweredTurnId = -1;
+	gptRequestedTurnId = null;
+	lastAskedQuestionNormalized = null;
+	lastSentQuestionText = null;
+
+	// 4️⃣ LIMPA ESTADO VOSK
+	voskAccumulatedText = '';
+	if (voskPartialTimer) {
+		clearTimeout(voskPartialTimer);
+		voskPartialTimer = null;
+	}
+
+	// 5️⃣ LIMPA ESTADO ENTREVISTA
+	interviewTurnId = 0;
+	resetInterviewTurnState();
+
+	// 6️⃣ REDEFINE TIMERS
+	if (inputPartialTimer) {
+		clearTimeout(inputPartialTimer);
+		inputPartialTimer = null;
+	}
+	if (outputPartialTimer) {
+		clearTimeout(outputPartialTimer);
+		outputPartialTimer = null;
+	}
+	if (autoCloseQuestionTimer) {
+		clearTimeout(autoCloseQuestionTimer);
+		autoCloseQuestionTimer = null;
+	}
+
+	// 7️⃣ REDEFINE MÉTRICAS
+	transcriptionMetrics = {
+		audioStartTime: null,
+		whisperStartTime: null,
+		whisperEndTime: null,
+		gptStartTime: null,
+		gptEndTime: null,
+		totalTime: null,
+		audioSize: 0,
+	};
+
+	// 8️⃣ REDEFINE STATUS
+	updateStatusMessage('Status: parado');
+
+	// 9️⃣ LIMPA UI
+	emitUIChange('onTranscriptionCleared', {});
+	emitUIChange('onAnswersCleared', {});
+	clearAllSelections();
+	renderQuestionsHistory();
+	renderCurrentQuestion();
+
+	console.log('✅ Reset completo finalizado!');
+	console.log('════════════════════════════════════════════════════════════════════════════════════════\n');
+}
+
+// 🔥 LISTENER DO BOTÃO RESET
+document.addEventListener('DOMContentLoaded', () => {
+	const resetBtn = document.getElementById('resetHomeBtn');
+	if (resetBtn) {
+		resetBtn.addEventListener('click', () => {
+			const confirmed = confirm('⚠️ Isso vai limpar toda transcrição, histórico e respostas.\n\nTem certeza?');
+			if (confirmed) {
+				resetHomeSection();
+			}
+		});
+		console.log('✅ Listener do botão reset instalado');
+	} else {
+		console.warn('⚠️ Botão reset não encontrado no DOM');
+	}
+});
 
 //console.log('🚀 Entrou no renderer.js');

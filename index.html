@@ -103,8 +103,10 @@
 										<div id="outputVuHome" class="vu-fill"></div>
 									</div>
 								</div>
-
+								
 								<span id="status">Status: parado</span>
+								<!-- 🔥 BOTÃO TEMPORÁRIO: RESET COMPLETO -->
+								<button id="resetHomeBtn" class="btn-reset-home" title="Limpa transcrição, histórico e respostas (temporário para testes)"></button>
 							</div>
 						</div>
 
@@ -217,7 +219,8 @@
 									<div class="form-group">
 										<label for="openai-stt-model">Modelo de Transcrição (STT):</label>
 										<select id="openai-stt-model" class="interactive-zone">
-											<option value="vosk-local">Vosk (Local/Offline)</option>
+											<option value="vosk-local">Vosk (Local/Offline, Rápido)</option>
+											<option value="whisper-cpp-local">Whisper.cpp (Local/Offline, Alta Precisão)</option>
 											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
 										</select>
 										<small>Selecione o modelo para converter áudio em texto (Speech-to-Text).</small>
@@ -277,9 +280,11 @@
 									<div class="form-group">
 										<label for="google-stt-model">Modelo de Transcrição (STT):</label>
 										<select id="google-stt-model" class="interactive-zone">
-											<option value="vosk-local">Vosk (Local/Offline)</option>
+											<option value="vosk-local">Vosk (Rápido)</option>
+											<option value="whisper-cpp-local">Whisper.cpp (Alta Precisão)</option>
+											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
 										</select>
-										<small>Atualmente apenas Vosk está disponível para transcrição no Google.</small>
+										<small>Escolha entre transcrição rápida (Vosk), offline (Whisper.cpp) ou nuvem (Whisper-1).</small>
 									</div>
 
 									<!-- 🔥 MODIFICADO: Campo de modelo de resposta -->
@@ -336,9 +341,11 @@
 									<div class="form-group">
 										<label for="openrouter-stt-model">Modelo de Transcrição (STT):</label>
 										<select id="openrouter-stt-model" class="interactive-zone">
-											<option value="vosk-local">Vosk (Local/Offline)</option>
+											<option value="vosk-loccpp-local">Whisper.cpp (Alta Precisão)</option>
+											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
 										</select>
-										<small>Atualmente apenas Vosk está disponível para transcrição no OpenRouter.</small>
+										<small>Escolha entre transcrição rápida (Vosk), offline (Whisper.cpp
+										<small>Escolha entre transcrição rápida (Vosk) ou nuvem (Whisper-1).</small>
 									</div>
 
 									<div class="form-group">

@@ -677,6 +677,33 @@ textarea:focus {
     background: rgba(var(--color-danger-hover-rgb), var(--app-opacity));
 }
 
+/* 🔥 Botão Reset Temporário */
+.btn-reset-home {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    max-width: 16px;
+    height: 16px;
+    background: rgba(255, 107, 107, 0.9); /* Vermelho alertante */
+    color: white;
+    border: 1px solid rgba(200, 50, 50, 0.8);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s;
+}
+
+.btn-reset-home:hover {
+    background: rgba(255, 70, 70, 0.95);
+    box-shadow: 0 0 10px rgba(255, 70, 70, 0.5);
+}
+
+.btn-reset-home:active {
+    transform: scale(0.98);
+}
+
 .btn-save {
     display: inline-flex;
     align-items: center;

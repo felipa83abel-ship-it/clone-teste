@@ -26,6 +26,7 @@ class ConfigManager {
 	// Carrega configurações salvas
 	loadConfig() {
 		debugLogConfig('Início da função: "loadConfig"');
+		console.log('📂 INICIANDO CARREGAMENTO DE CONFIG...');
 		try {
 			const defaultConfig = {
 				api: {
@@ -81,8 +82,15 @@ class ConfigManager {
 			};
 
 			const saved = localStorage.getItem('appConfig');
+			console.log(
+				`🔍 localStorage.getItem('appConfig'): ${saved ? 'ENCONTRADO (' + saved.length + ' bytes)' : 'NÃO ENCONTRADO'}`,
+			);
 			if (saved) {
 				const parsed = JSON.parse(saved);
+				console.log('📂 Configurações encontradas no localStorage');
+				console.log('   OpenAI STT:', parsed.api?.openai?.selectedSTTModel);
+				console.log('   Google STT:', parsed.api?.google?.selectedSTTModel);
+				console.log('   OpenRouter STT:', parsed.api?.openrouter?.selectedSTTModel);
 				// 🔥 Merge profundo para preservar estados salvos
 				const merged = { ...defaultConfig };
 				if (parsed.api) {
@@ -289,6 +297,7 @@ class ConfigManager {
 			if (input.id && !input.classList.contains('api-key-input')) {
 				input.addEventListener('change', () => {
 					this.saveField(input.id, input.value);
+					this.saveConfig(); // 🔥 CRÍTICO: Salva configuração para persistir mudanças
 
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
 					if (input.id === 'audio-input-device') {
@@ -479,11 +488,15 @@ class ConfigManager {
 	saveConfig() {
 		debugLogConfig('Início da função: "saveConfig"');
 		try {
-			localStorage.setItem('appConfig', JSON.stringify(this.config));
+			const configStr = JSON.stringify(this.config);
+			localStorage.setItem('appConfig', configStr);
+			console.log('💾 Configurações salvas com sucesso');
+			console.log('   OpenAI STT:', this.config.api.openai.selectedSTTModel);
+			console.log('   Google STT:', this.config.api.google.selectedSTTModel);
+			console.log('   OpenRouter STT:', this.config.api.openrouter.selectedSTTModel);
 			this.showSaveFeedback();
-			console.log('Configurações salvas com sucesso');
 		} catch (error) {
-			console.error('Erro ao salvar configurações:', error);
+			console.error('❌ Erro ao salvar configurações:', error);
 			this.showError('Erro ao salvar configurações');
 		}
 
@@ -642,6 +655,44 @@ class ConfigManager {
 		});
 
 		debugLogConfig('Fim da função: "restoreDevices"');
+	}
+
+	// 🔥 NOVO: Restaura modelos STT e LLM salvos
+	restoreSTTLLMModels() {
+		debugLogConfig('Início da função: "restoreSTTLLMModels"');
+		console.log('🔄 INICIANDO RESTAURAÇÃO DE MODELOS STT/LLM...');
+		const providers = ['openai', 'google', 'openrouter'];
+
+		providers.forEach(provider => {
+			// Restaurar STT Model
+			const sttSelectId = `${provider}-stt-model`;
+			const sttSelect = document.getElementById(sttSelectId);
+			const savedSTTModel = this.config.api[provider]?.selectedSTTModel || 'vosk-local';
+
+			if (sttSelect) {
+				console.log(`   📝 ${sttSelectId}: antes="${sttSelect.value}" → depois="${savedSTTModel}"`);
+				sttSelect.value = savedSTTModel;
+				console.log(`   ✅ STT restaurado - ${provider}: ${savedSTTModel}`);
+			} else {
+				console.log(`   ⚠️ Select ${sttSelectId} não encontrado no DOM`);
+			}
+
+			// Restaurar LLM Model
+			const llmSelectId = `${provider}-llm-model`;
+			const llmSelect = document.getElementById(llmSelectId);
+			const savedLLMModel = this.config.api[provider]?.selectedLLMModel || '';
+
+			if (llmSelect) {
+				console.log(`   📝 ${llmSelectId}: antes="${llmSelect.value}" → depois="${savedLLMModel}"`);
+				llmSelect.value = savedLLMModel;
+				console.log(`   ✅ LLM restaurado - ${provider}: ${savedLLMModel}`);
+			} else {
+				console.log(`   ⚠️ Select ${llmSelectId} não encontrado no DOM`);
+			}
+		});
+
+		console.log('🎉 RESTAURAÇÃO CONCLUÍDA');
+		debugLogConfig('Fim da função: "restoreSTTLLMModels"');
 	}
 
 	// Alterna entre seções de configuração
@@ -818,12 +869,17 @@ class ConfigManager {
 		debugLogConfig('Início da função: "saveField"');
 		const path = this.getConfigPath(fieldId);
 		if (path) {
+			console.log(`💾 saveField("${fieldId}", "${value}")`);
+			console.log(`   caminho: ${path.join(' → ')}`);
 			this.setNestedValue(this.config, path, value);
+			console.log(`   ✅ Valor atualizado em this.config`);
 
 			// 🔥 SE FOR A CHAVE DA API, ENVIA PARA O MAIN
 			if (fieldId === 'openai-api-key') {
 				setTimeout(() => this.sendApiKeyToMain(), 100);
 			}
+		} else {
+			console.warn(`⚠️ saveField: fieldId "${fieldId}" não encontrado no pathMap`);
 		}
 
 		debugLogConfig('Fim da função: "saveField"');
@@ -1182,6 +1238,9 @@ class ConfigManager {
 
 			// ✅ 9. Restaura dispositivos de áudios salvos
 			this.restoreDevices();
+
+			// 🔥 NOVO: 10. Restaura modelos STT e LLM salvos
+			this.restoreSTTLLMModels();
 
 			// ✅ 11. Sincronizar API key
 			await this.syncApiKeyOnStart();

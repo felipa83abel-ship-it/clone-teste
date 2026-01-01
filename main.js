@@ -46,8 +46,12 @@ const VOSK_CONFIG = {
 	// Alternativa: 'vosk-models/vosk-model-pt-fb-v0.1.1' (modelo maior, mais preciso, mas mais lento)
 };
 
-// 🔥 MODIFICADO: Removidas constantes do Whisper.cpp local
-// (Whisper local será substituído por Vosk para STT)
+// Configuração do Whisper.cpp local (restaurado para oferecer opção de alta precisão)
+// Referências:
+//   - Chamado por: renderer.js → transcribeAudio() com sttModel === 'whisper-cpp-local'
+//   - Handler IPC: 'transcribe-whisper-cpp' (chamado de renderer.js)
+const WHISPER_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
+const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
 
 /* ================================
    ESTADO GLOBAL
@@ -110,6 +114,48 @@ function initializeOpenAIClient(apiKey = null) {
 		openaiClient = null;
 		return false;
 	}
+}
+
+/**
+ * Verifica se os arquivos do Whisper.cpp local existem
+ */
+function checkWhisperFiles() {
+	const exeExists = fs.existsSync(WHISPER_EXE);
+	const modelExists = fs.existsSync(WHISPER_MODEL);
+
+	console.log('🔍 Verificando arquivos Whisper:');
+	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_EXE}`);
+	console.log(`   Modelo: ${modelExists ? '✅' : '❌'} ${WHISPER_MODEL}`);
+
+	return exeExists && modelExists;
+}
+
+/**
+ * Converte WebM para WAV usando ffmpeg (para Whisper.cpp)
+ * Trabalha com caminhos de arquivo (não buffers)
+ * Origem: commit 9545a76
+ */
+function convertWebMToWAVFile(inputPath, outputPath) {
+	return new Promise((resolve, reject) => {
+		// Usa ffmpeg estático se disponível
+		const ffmpeg = require('fluent-ffmpeg');
+		const ffmpegPath = require('ffmpeg-static');
+		ffmpeg(inputPath)
+			.setFfmpegPath(ffmpegPath)
+			.audioCodec('pcm_s16le')
+			.audioFrequency(16000) // Whisper usa 16kHz
+			.audioChannels(1) // Mono
+			.format('wav')
+			.on('end', () => {
+				console.log('✅ Conversão WebM → WAV concluída');
+				resolve();
+			})
+			.on('error', err => {
+				console.error('❌ Erro na conversão WebM → WAV:', err);
+				reject(err);
+			})
+			.save(outputPath);
+	});
 }
 
 /**
@@ -315,7 +361,15 @@ ipcMain.handle('initialize-api-client', async (_, apiKey) => {
    HANDLERS IPC - TRANSCRIÇÃO ONLINE (OpenAI)
 =============================== */
 
+/**
+ * Transcrição com OpenAI Whisper-1 (online)
+ * Chamado por: renderer.js → transcribeAudio() quando sttModel === 'whisper-1'
+ * Referência: handlers IPC 'transcribe-audio' e 'transcribe-audio-partial'
+ */
 async function transcribeAudioCommon(audioBuffer, isPartial = false) {
+	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('📋 STT HANDLER ATIVO: WHISPER-1 OPENAI (Cloud, Versátil)');
+	console.log('════════════════════════════════════════════════════════════════════════════════════════');
 	// Verifica se o cliente está inicializado
 	if (!openaiClient) {
 		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
@@ -366,9 +420,172 @@ async function transcribeAudioCommon(audioBuffer, isPartial = false) {
 	}
 }
 
-// Handlers específicos
+/**
+ * Transcrição local com Whisper.cpp
+ * Origem: commit 9545a76
+ * Processa WebM → WAV → Whisper.cpp
+ */
+/**
+ * Transcrição com Whisper.cpp local (alta precisão, offline)
+ * Chamado por: renderer.js → transcribeAudio() quando sttModel === 'whisper-cpp-local'
+ * Referência: handlers IPC 'transcribe-local' e 'transcribe-local-partial'
+ * Processo: WebM → WAV → Whisper.cpp → Texto
+ */
+async function transcribeLocalCommon(audioBuffer, isPartial = false) {
+	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('📋 STT HANDLER ATIVO: WHISPER.CPP LOCAL (Offline, Alta Precisão)');
+	console.log('════════════════════════════════════════════════════════════════════════════════════════');
+	const startTime = Date.now();
+	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
+	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes`);
+
+	if (!checkWhisperFiles()) {
+		if (isPartial) return '';
+		throw new Error('Arquivos do Whisper.cpp não encontrados!');
+	}
+
+	const tempDir = app.getPath('temp');
+
+	// Salva como WebM primeiro
+	const tempWebmPath = path.join(tempDir, `whisper-${isPartial ? 'partial' : 'temp'}-${Date.now()}.webm`);
+	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
+
+	try {
+		// 1. Salva o buffer WebM
+		const saveStart = Date.now();
+		fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
+		const saveTime = Date.now() - saveStart;
+		console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
+
+		// 2. Converte WebM para WAV
+		const convertStart = Date.now();
+		await convertWebMToWAVFile(tempWebmPath, tempWavPath);
+		const convertTime = Date.now() - convertStart;
+		console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
+
+		// 3. Verifica se o arquivo WAV existe
+		if (!fs.existsSync(tempWavPath)) {
+			throw new Error('Arquivo WAV não foi criado');
+		}
+
+		const wavStats = fs.statSync(tempWavPath);
+		console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
+
+		if (wavStats.size < 1000) {
+			console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
+		}
+
+		// 4. Executar Whisper.cpp COM ARGUMENTOS BÁSICOS ESTÁVEIS
+		const whisperStart = Date.now();
+
+		// 🔥 ARGUMENTOS OTIMIZADOS (conforme commit 9545a76 que funcionava)
+		const args = [
+			'-m',
+			WHISPER_MODEL,
+			'-f',
+			tempWavPath,
+			'-l',
+			'pt', // idioma português
+			'-otxt', // saída em texto
+			'-t',
+			'4', // 4 threads
+			'-np', // não imprimir logs (no-prints)
+			'-nt', // não imprimir timestamps
+		];
+
+		// Se for parcial, ajusta parâmetros para ser mais rápido
+		if (isPartial) {
+			args.push('-d', '3000'); // máximo 3 segundos
+			args.push('-ml', '50'); // máximo 50 caracteres por segmento
+		}
+
+		console.log(`🚀 4. Executando Whisper: ${WHISPER_EXE} ${args.join(' ')}`);
+
+		let result = '';
+		try {
+			const { stdout, stderr } = await execFileAsync(WHISPER_EXE, args, {
+				timeout: isPartial ? 2000 : 4000, // Timeout maior para garantir
+				maxBuffer: 1024 * 1024 * 5, // 5MB buffer
+			});
+
+			const whisperTime = Date.now() - whisperStart;
+			console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
+
+			// Debug detalhado
+			if (stdout && stdout.trim()) {
+				console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
+			} else {
+				console.log(`📝 STDOUT: vazio ou nulo`);
+			}
+
+			if (stderr) {
+				console.log(`⚠️ STDERR (primeiros 200 chars):`, stderr.substring(0, 200));
+			}
+
+			// Extrai texto da saída
+			result = (stdout || '').trim();
+			const elapsedTotal = Date.now() - startTime;
+			console.log(`📊 Tempo total: ${elapsedTotal}ms`);
+			console.log(
+				`✨ Resultado (${result.length} chars): "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
+			);
+
+			return result;
+		} catch (execError) {
+			// 🔥 Log detalhado quando execFile falha
+			console.error(`❌ ERRO NA EXECUÇÃO DO WHISPER:`);
+			console.error(`   Código: ${execError.code}`);
+			console.error(`   Sinal: ${execError.signal}`);
+			console.error(`   Mensagem: ${execError.message}`);
+			if (execError.stderr) {
+				console.error(`   STDERR do processo: ${execError.stderr}`);
+			}
+			if (execError.stdout) {
+				console.error(`   STDOUT do processo: ${execError.stdout}`);
+			}
+
+			// Verifica se o arquivo WAV existe e seu tamanho
+			if (fs.existsSync(tempWavPath)) {
+				const stats = fs.statSync(tempWavPath);
+				console.error(`   📝 WAV file existe: ${stats.size} bytes`);
+			} else {
+				console.error(`   ❌ WAV file NÃO EXISTE!`);
+			}
+
+			throw execError;
+		}
+	} finally {
+		// Limpa arquivos temporários
+		try {
+			if (fs.existsSync(tempWebmPath)) {
+				fs.unlinkSync(tempWebmPath);
+				console.log(`🗑️ Deletado WebM temp`);
+			}
+			if (fs.existsSync(tempWavPath)) {
+				fs.unlinkSync(tempWavPath);
+				console.log(`🗑️ Deletado WAV temp`);
+			}
+		} catch (cleanupError) {
+			console.warn('⚠️ Erro ao limpar arquivos temp:', cleanupError.message);
+		}
+	}
+}
+
+// ==========================================
+// HANDLERS IPC - STT (Speech-to-Text)
+// ==========================================
+// Referências de quem chama:
+//   - OpenAI Whisper-1: renderer.js → transcribeAudio() com sttModel === 'whisper-1'
+//   - Whisper.cpp Local: renderer.js → transcribeAudio() com sttModel === 'whisper-cpp-local'
+//   - Vosk Local: renderer.js → transcribeAudio() com sttModel === 'vosk-local'
+
+// Handler: Transcrição OpenAI Whisper-1 (online)
 ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, false));
 ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, true));
+
+// Handlers para Whisper.cpp (local, alta precisão)
+ipcMain.handle('transcribe-local', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, false));
+ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, true));
 
 /* ================================
    HANDLERS IPC - GPT
@@ -584,6 +801,9 @@ function startVoskServer() {
  * Envia comando JSON para servidor Python
  */
 ipcMain.handle('vosk-transcribe', async (_, audioBuffer) => {
+	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('📋 STT HANDLER ATIVO: VOSK LOCAL (Python Server)');
+	console.log('════════════════════════════════════════════════════════════════════════════════════════');
 	try {
 		// Inicia servidor se não estiver rodando
 		if (!voskReady || !voskProcess) {
