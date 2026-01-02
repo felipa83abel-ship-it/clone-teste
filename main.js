@@ -732,7 +732,7 @@ const SCREENSHOT_RETENTION = 5 * 60 * 1000; // 5 minutos
 
 /**
  * Captura screenshot da tela sem indicadores visíveis
- * Exclui a própria janela do Perssua da captura
+ * Exclui a própria janela do App da captura
  */
 ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 	const now = Date.now();
@@ -749,15 +749,17 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 	try {
 		console.log('📸 Iniciando captura de tela discreta...');
 
-		// 1️⃣ Esconde a própria janela temporariamente
-		const wasVisible = mainWindow?.isVisible();
+		// 1️⃣ Salva estado original e torna janela invisível (sem flash)
+		const originalOpacity = mainWindow?.getOpacity();
+
 		if (mainWindow) {
-			mainWindow.hide();
-			console.log('🙈 Janela escondida para captura');
+			// ✅ Usa opacidade ZERO ao invés de hide() - MUITO mais discreto
+			mainWindow.setOpacity(0);
+			console.log('👻 Janela invisível (opacity=0)');
 		}
 
-		// Aguarda 150ms para garantir que a janela foi escondida
-		await new Promise(resolve => setTimeout(resolve, 150));
+		// Aguarda apenas 25ms (suficiente para compositor aplicar mudança)
+		await new Promise(resolve => setTimeout(resolve, 25));
 
 		// 2️⃣ Captura a tela usando desktopCapturer
 		const sources = await desktopCapturer.getSources({
@@ -766,7 +768,10 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 		});
 
 		if (!sources || sources.length === 0) {
-			if (wasVisible && mainWindow) mainWindow.show();
+			// Restaura janela antes de retornar erro
+			if (mainWindow && originalOpacity !== undefined) {
+				mainWindow.setOpacity(originalOpacity);
+			}
 			console.error('❌ Nenhuma tela encontrada');
 			return { success: false, error: 'Nenhuma tela encontrada' };
 		}
@@ -777,16 +782,16 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 		// 3️⃣ Salva no diretório temp
 		const tempDir = app.getPath('temp');
 		const timestamp = Date.now();
-		const filename = `perssua-screenshot-${timestamp}.png`;
+		const filename = `my-screenshot-${timestamp}.png`;
 		const filepath = path.join(tempDir, filename);
 
 		fs.writeFileSync(filepath, screenshot);
 		console.log(`✅ Screenshot salvo: ${filepath} (${Math.round(screenshot.length / 1024)}KB)`);
 
-		// 4️⃣ Restaura a janela
-		if (wasVisible && mainWindow) {
-			mainWindow.show();
-			console.log('👀 Janela restaurada');
+		// 4️⃣ Restaura opacidade original
+		if (mainWindow && originalOpacity !== undefined) {
+			mainWindow.setOpacity(originalOpacity);
+			console.log(`👀 Janela restaurada (opacity=${originalOpacity})`);
 		}
 
 		// Atualiza timestamp
@@ -802,9 +807,14 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 	} catch (error) {
 		console.error('❌ Erro ao capturar screenshot:', error);
 
-		// 🛡️ Garante que a janela seja restaurada em caso de erro
-		if (mainWindow && !mainWindow.isVisible()) {
-			mainWindow.show();
+		// 🛡️ Garante restauração em caso de erro
+		if (mainWindow) {
+			const originalOpacity = mainWindow.getOpacity();
+			if (originalOpacity === 0) {
+				// Se está em 0, restaura para valor padrão da app
+				const savedOpacity = parseFloat(localStorage.getItem('overlayOpacity') || '0.75');
+				mainWindow.setOpacity(savedOpacity);
+			}
 		}
 
 		return {
@@ -865,7 +875,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 				content: [
 					{
 						type: 'text',
-						text: 'Analise estas capturas de tela e ajude a resolver o problema apresentado. Se houver código ou questão técnica, forneça a solução completa, estruturada e com comentários em português para que eu saiba explicar cada trecho do código.',
+						text: 'Analise estas capturas de tela e ajude a resolver o problema apresentado. Se houver código ou questão técnica e não seja identificada a linguagem use Java como padrão, forneça a solução completa, estruturada e com comentários em português para que eu saiba explicar cada trecho do código.',
 					},
 					...images,
 				],
@@ -875,7 +885,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 		// 🚀 Envia para OpenAI Vision (gpt-4o)
 		console.log('🚀 Enviando para OpenAI Vision API...');
 		const response = await openaiClient.chat.completions.create({
-			model: 'gpt-4o-mini', // Modelo com suporte a visão
+			model: 'gpt-4o-mini', // Modelo com suporte a visão (gpt-4o)
 			messages,
 			max_tokens: 2000,
 			temperature: 0.3,
@@ -885,6 +895,9 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 
 		console.log('✅ Análise concluída');
 		console.log(`📝 Resposta: ${analysis.substring(0, 100)}...`);
+
+		// 🔄 Limpeza de imagens antigas maior que 5 minutos
+		cleanupScreenshots();
 
 		return {
 			success: true,
@@ -910,7 +923,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 /**
  * Limpa screenshots antigos (> 5 minutos)
  */
-ipcMain.handle('CLEANUP_SCREENSHOTS', async () => {
+async function cleanupScreenshots() {
 	try {
 		const tempDir = app.getPath('temp');
 
@@ -919,12 +932,11 @@ ipcMain.handle('CLEANUP_SCREENSHOTS', async () => {
 		}
 
 		const files = fs.readdirSync(tempDir);
-
 		const now = Date.now();
 		let cleaned = 0;
 
 		files.forEach(file => {
-			if (file.startsWith('perssua-screenshot-')) {
+			if (file.startsWith('my-screenshot-')) {
 				const filepath = path.join(tempDir, file);
 
 				try {
@@ -947,33 +959,15 @@ ipcMain.handle('CLEANUP_SCREENSHOTS', async () => {
 			console.log(`✅ Limpeza concluída: ${cleaned} arquivo(s) removido(s)`);
 		}
 
-		return {
-			success: true,
-			cleaned,
-		};
+		return { success: true, cleaned };
 	} catch (error) {
 		console.error('❌ Erro na limpeza:', error);
-		return {
-			success: false,
-			error: error.message,
-		};
+		return { success: false, error: error.message };
 	}
-});
+}
 
-// 🔄 Limpeza automática a cada 2 minutos
-setInterval(async () => {
-	try {
-		await ipcMain.invoke('CLEANUP_SCREENSHOTS');
-	} catch (err) {
-		console.warn('⚠️ Erro na limpeza automática:', err);
-	}
-}, 2 * 60 * 1000);
-
-/* ================================
-   HANDLER DE TESTE (DEPRECATED)
-=============================== */
-// 🔥 COMENTADO: Handler de teste do Whisper.cpp removido (migramos para Vosk)
-// Para testar Whisper local, usar o arquivo whisper-server.js ou whisper-local/
+// Handler para chamadas vindas do renderer
+ipcMain.handle('CLEANUP_SCREENSHOTS', cleanupScreenshots);
 
 /* ================================
    HANDLERS IPC - VOSK (VIA PYTHON SUBPROCESS)
