@@ -50,7 +50,7 @@ const VOSK_CONFIG = {
 // Referências:
 //   - Chamado por: renderer.js → transcribeAudio() com sttModel === 'whisper-cpp-local'
 //   - Handler IPC: 'transcribe-whisper-cpp' (chamado de renderer.js)
-const WHISPER_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
+const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
 const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
 
 /* ================================
@@ -120,11 +120,11 @@ function initializeOpenAIClient(apiKey = null) {
  * Verifica se os arquivos do Whisper.cpp local existem
  */
 function checkWhisperFiles() {
-	const exeExists = fs.existsSync(WHISPER_EXE);
+	const exeExists = fs.existsSync(WHISPER_CLI_EXE);
 	const modelExists = fs.existsSync(WHISPER_MODEL);
 
 	console.log('🔍 Verificando arquivos Whisper:');
-	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_EXE}`);
+	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_CLI_EXE}`);
 	console.log(`   Modelo: ${modelExists ? '✅' : '❌'} ${WHISPER_MODEL}`);
 
 	return exeExists && modelExists;
@@ -499,11 +499,11 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 			args.push('-ml', '50'); // máximo 50 caracteres por segmento
 		}
 
-		console.log(`🚀 4. Executando Whisper: ${WHISPER_EXE} ${args.join(' ')}`);
+		console.log(`🚀 4. Executando Whisper: ${WHISPER_CLI_EXE} ${args.join(' ')}`);
 
 		let result = '';
 		try {
-			const { stdout, stderr } = await execFileAsync(WHISPER_EXE, args, {
+			const { stdout, stderr } = await execFileAsync(WHISPER_CLI_EXE, args, {
 				timeout: isPartial ? 2000 : 4000, // Timeout maior para garantir
 				maxBuffer: 1024 * 1024 * 5, // 5MB buffer
 			});
@@ -719,6 +719,255 @@ ipcMain.on('APP_CLOSE', () => {
 	console.log('❌ APP_CLOSE recebido — encerrando aplicação');
 	app.quit();
 });
+
+/* ===============================
+   SCREENSHOT CAPTURE - DISCRETO E INDETECTÁVEL
+=============================== */
+
+const { desktopCapturer } = require('electron');
+
+let lastCaptureTime = 0;
+const CAPTURE_COOLDOWN = 2000; // 2 segundos
+const SCREENSHOT_RETENTION = 5 * 60 * 1000; // 5 minutos
+
+/**
+ * Captura screenshot da tela sem indicadores visíveis
+ * Exclui a própria janela do Perssua da captura
+ */
+ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
+	const now = Date.now();
+
+	// 🛡️ Cooldown check
+	if (now - lastCaptureTime < CAPTURE_COOLDOWN) {
+		const waitTime = Math.ceil((CAPTURE_COOLDOWN - (now - lastCaptureTime)) / 1000);
+		return {
+			success: false,
+			error: `Aguarde ${waitTime}s antes de capturar novamente`,
+		};
+	}
+
+	try {
+		console.log('📸 Iniciando captura de tela discreta...');
+
+		// 1️⃣ Esconde a própria janela temporariamente
+		const wasVisible = mainWindow?.isVisible();
+		if (mainWindow) {
+			mainWindow.hide();
+			console.log('🙈 Janela escondida para captura');
+		}
+
+		// Aguarda 150ms para garantir que a janela foi escondida
+		await new Promise(resolve => setTimeout(resolve, 150));
+
+		// 2️⃣ Captura a tela usando desktopCapturer
+		const sources = await desktopCapturer.getSources({
+			types: ['screen'],
+			thumbnailSize: { width: 1920, height: 1080 },
+		});
+
+		if (!sources || sources.length === 0) {
+			if (wasVisible && mainWindow) mainWindow.show();
+			console.error('❌ Nenhuma tela encontrada');
+			return { success: false, error: 'Nenhuma tela encontrada' };
+		}
+
+		// Pega a primeira tela (tela principal)
+		const screenshot = sources[0].thumbnail.toPNG();
+
+		// 3️⃣ Salva no diretório temp
+		const tempDir = app.getPath('temp');
+		const timestamp = Date.now();
+		const filename = `perssua-screenshot-${timestamp}.png`;
+		const filepath = path.join(tempDir, filename);
+
+		fs.writeFileSync(filepath, screenshot);
+		console.log(`✅ Screenshot salvo: ${filepath} (${Math.round(screenshot.length / 1024)}KB)`);
+
+		// 4️⃣ Restaura a janela
+		if (wasVisible && mainWindow) {
+			mainWindow.show();
+			console.log('👀 Janela restaurada');
+		}
+
+		// Atualiza timestamp
+		lastCaptureTime = now;
+
+		return {
+			success: true,
+			filepath,
+			filename,
+			size: screenshot.length,
+			timestamp,
+		};
+	} catch (error) {
+		console.error('❌ Erro ao capturar screenshot:', error);
+
+		// 🛡️ Garante que a janela seja restaurada em caso de erro
+		if (mainWindow && !mainWindow.isVisible()) {
+			mainWindow.show();
+		}
+
+		return {
+			success: false,
+			error: error.message,
+		};
+	}
+});
+
+/**
+ * Analisa screenshots com OpenAI Vision API (gpt-4o)
+ */
+ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
+	try {
+		await ensureOpenAIClient();
+
+		if (!screenshotPaths || screenshotPaths.length === 0) {
+			return {
+				success: false,
+				error: 'Nenhum screenshot para analisar',
+			};
+		}
+
+		console.log(`🔍 Analisando ${screenshotPaths.length} screenshot(s)...`);
+
+		// 📸 Converte screenshots para base64
+		const images = screenshotPaths
+			.map(filepath => {
+				if (!fs.existsSync(filepath)) {
+					console.warn(`⚠️ Screenshot não encontrado: ${filepath}`);
+					return null;
+				}
+
+				const buffer = fs.readFileSync(filepath);
+				const base64 = buffer.toString('base64');
+				console.log(`  ✓ Carregado: ${path.basename(filepath)} (${Math.round(buffer.length / 1024)}KB)`);
+
+				return {
+					type: 'image_url',
+					image_url: {
+						url: `data:image/png;base64,${base64}`,
+					},
+				};
+			})
+			.filter(Boolean); // Remove nulls
+
+		if (images.length === 0) {
+			return {
+				success: false,
+				error: 'Nenhum screenshot válido encontrado',
+			};
+		}
+
+		// 🤖 Monta mensagens para a API
+		const messages = [
+			{
+				role: 'user',
+				content: [
+					{
+						type: 'text',
+						text: 'Analise estas capturas de tela e ajude a resolver o problema apresentado. Se houver código ou questão técnica, forneça a solução completa, estruturada e com comentários em português para que eu saiba explicar cada trecho do código.',
+					},
+					...images,
+				],
+			},
+		];
+
+		// 🚀 Envia para OpenAI Vision (gpt-4o)
+		console.log('🚀 Enviando para OpenAI Vision API...');
+		const response = await openaiClient.chat.completions.create({
+			model: 'gpt-4o-mini', // Modelo com suporte a visão
+			messages,
+			max_tokens: 2000,
+			temperature: 0.3,
+		});
+
+		const analysis = response.choices[0].message.content;
+
+		console.log('✅ Análise concluída');
+		console.log(`📝 Resposta: ${analysis.substring(0, 100)}...`);
+
+		return {
+			success: true,
+			analysis,
+		};
+	} catch (error) {
+		console.error('❌ Erro ao analisar screenshots:', error);
+
+		if (error.status === 401) {
+			return {
+				success: false,
+				error: 'API key inválida ou expirada',
+			};
+		}
+
+		return {
+			success: false,
+			error: error.message,
+		};
+	}
+});
+
+/**
+ * Limpa screenshots antigos (> 5 minutos)
+ */
+ipcMain.handle('CLEANUP_SCREENSHOTS', async () => {
+	try {
+		const tempDir = app.getPath('temp');
+
+		if (!fs.existsSync(tempDir)) {
+			return { success: true, cleaned: 0 };
+		}
+
+		const files = fs.readdirSync(tempDir);
+
+		const now = Date.now();
+		let cleaned = 0;
+
+		files.forEach(file => {
+			if (file.startsWith('perssua-screenshot-')) {
+				const filepath = path.join(tempDir, file);
+
+				try {
+					const stats = fs.statSync(filepath);
+					const age = now - stats.mtimeMs;
+
+					// Remove se for mais antigo que 5 minutos
+					if (age > SCREENSHOT_RETENTION) {
+						fs.unlinkSync(filepath);
+						cleaned++;
+						console.log(`🗑️ Screenshot removido: ${file}`);
+					}
+				} catch (err) {
+					console.warn(`⚠️ Erro ao processar ${file}:`, err.message);
+				}
+			}
+		});
+
+		if (cleaned > 0) {
+			console.log(`✅ Limpeza concluída: ${cleaned} arquivo(s) removido(s)`);
+		}
+
+		return {
+			success: true,
+			cleaned,
+		};
+	} catch (error) {
+		console.error('❌ Erro na limpeza:', error);
+		return {
+			success: false,
+			error: error.message,
+		};
+	}
+});
+
+// 🔄 Limpeza automática a cada 2 minutos
+setInterval(async () => {
+	try {
+		await ipcMain.invoke('CLEANUP_SCREENSHOTS');
+	} catch (err) {
+		console.warn('⚠️ Erro na limpeza automática:', err);
+	}
+}, 2 * 60 * 1000);
 
 /* ================================
    HANDLER DE TESTE (DEPRECATED)
@@ -958,6 +1207,19 @@ app.whenReady().then(() => {
 	globalShortcut.register('Control+Enter', () => {
 		mainWindow.webContents.send('CMD_ASK_GPT');
 	});
+
+	// 📸 NOVO: Atalhos para screenshots
+	globalShortcut.register('Control+Shift+F', () => {
+		mainWindow.webContents.send('CMD_CAPTURE_SCREENSHOT');
+		console.log('⌨️ Atalho Ctrl+Shift+F acionado');
+	});
+
+	globalShortcut.register('Control+Shift+G', () => {
+		mainWindow.webContents.send('CMD_ANALYZE_SCREENSHOTS');
+		console.log('⌨️ Atalho Ctrl+Shift+G acionado');
+	});
+
+	console.log('✅ Atalhos de screenshot registrados');
 });
 
 app.on('will-quit', () => {

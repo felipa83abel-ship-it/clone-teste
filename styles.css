@@ -966,6 +966,50 @@ input:checked + .slider:before { transform: translateX(22px); }
 
 .mock-badge.hidden { display: none; }
 
+/* 📸 SCREENSHOT BADGE */
+.screenshot-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: bold;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    animation: pulse-glow 2s infinite;
+    user-select: none;
+    cursor: default;
+}
+
+.screenshot-badge.hidden {
+    display: none;
+}
+
+/* 🗑️ CLEAR SCREENSHOTS BUTTON */
+.btn-clear-screenshots {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    background: rgba(138, 43, 226, 0.9); /* Roxo para combinar com badge */
+    color: white;
+    border: 1px solid rgba(102, 126, 234, 0.8);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.btn-clear-screenshots:hover {
+    background: rgba(102, 126, 234, 0.95);
+    box-shadow: 0 0 10px rgba(102, 126, 234, 0.5);
+    transform: scale(1.05);
+}
+
+.btn-clear-screenshots:active {
+    transform: scale(0.98);
+}
+
 .save-feedback {
     position: fixed;
     bottom: 24px;

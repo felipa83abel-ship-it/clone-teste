@@ -73,6 +73,9 @@
 			<!-- MOCK BADGE -->
 			<div id="mockBadge" class="mock-badge hidden">🧪 MODO MOCK ATIVADO!!!</div>
 
+			<!-- 📸 NOVO: SCREENSHOT BADGE -->
+			<div id="screenshotBadge" class="screenshot-badge hidden">📸 0 screenshots</div>
+
 			<!-- 🔎 CONTROLE DE OPACIDADE DO OVERLAY -->
 			<div class="opacity-control interactive-zone">
 				<!-- <span class="menu-icon material-icons">opacity</span> -->
@@ -105,8 +108,19 @@
 								</div>
 								
 								<span id="status">Status: parado</span>
+
 								<!-- 🔥 BOTÃO TEMPORÁRIO: RESET COMPLETO -->
 								<button id="resetHomeBtn" class="btn-reset-home" title="Limpa transcrição, histórico e respostas (temporário para testes)"></button>
+
+								<!-- 📸 NOVO: Clear Screenshots Button -->
+								<button 
+									id="clearScreenshotsBtn" 
+									class="btn-clear-screenshots" 
+									title="Limpar screenshots capturados (Ctrl+Shift+F para capturar)"
+								>
+									🗑️
+								</button>
+								
 							</div>
 						</div>
 
