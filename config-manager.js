@@ -1239,23 +1239,20 @@ class ConfigManager {
 			// ✅ 9. Restaura dispositivos de áudios salvos
 			this.restoreDevices();
 
-			// 🔥 NOVO: 10. Restaura modelos STT e LLM salvos
+			// ✅ 10. Restaura modelos STT e LLM salvos
 			this.restoreSTTLLMModels();
 
 			// ✅ 11. Sincronizar API key
 			await this.syncApiKeyOnStart();
 
-			// ✅ 11. Inicializar Click-through
+			// ✅ 12. Inicializar Click-through
 			await this.initClickThroughController();
 
-			// ✅ 12. Registrar listeners de eventos DOM
+			// ✅ 13. Registrar listeners de eventos DOM
 			this.registerDOMEventListeners();
 
-			// ✅ 13. Registrar listeners de IPC
+			// ✅ 14. Registrar listeners de IPC
 			this.registerIPCListeners();
-
-			// ✅ 14. Registrar atalhos de teclado
-			window.RendererAPI.registerKeyboardShortcuts();
 
 			// ✅ 15. Inicializar drag handle
 			const dragHandle = document.getElementById('dragHandle');
@@ -1263,7 +1260,7 @@ class ConfigManager {
 				window.RendererAPI.initDragHandle(dragHandle, document);
 			}
 
-			// ✅ 17. Registrar listeners de erro global
+			// ✅ 16. Registrar listeners de erro global
 			this.registerErrorHandlers();
 
 			console.log('✅ Controller inicializado com sucesso');
@@ -2035,6 +2032,17 @@ class ConfigManager {
 				console.log('🔍 Atalho Ctrl+Shift+G detectado');
 				if (window.RendererAPI?.analyzeScreenshots) {
 					window.RendererAPI.analyzeScreenshots();
+				}
+			});
+		}
+
+		// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut)
+		if (window.RendererAPI?.onNavigateQuestions) {
+			window.RendererAPI.onNavigateQuestions(direction => {
+				console.log(`⬆️⬇️ Navegacao de perguntas: ${direction}`);
+				// Chama a função de navegação diretamente (sem disparar KeyboardEvent que não funciona com focusable: false)
+				if (window.RendererAPI?.navigateQuestions) {
+					window.RendererAPI.navigateQuestions(direction);
 				}
 			});
 		}
