@@ -1756,6 +1756,21 @@ class ConfigManager {
 			if (interviewModeSelect) interviewModeSelect.value = mode;
 		});
 
+		// 📸 NOVO: Screenshot badge
+		window.RendererAPI.onUIChange('onScreenshotBadgeUpdate', data => {
+			const { count, visible } = data;
+			const badge = document.getElementById('screenshotBadge');
+
+			if (!badge) return;
+
+			if (visible && count > 0) {
+				badge.textContent = `📸 ${count} screenshot${count > 1 ? 's' : ''}`;
+				badge.classList.remove('hidden');
+			} else {
+				badge.classList.add('hidden');
+			}
+		});
+
 		console.log('✅ registerRendererCallbacks: Todos os callbacks UI registrados com sucesso');
 
 		debugLogConfig('Fim da função: "registerRendererCallbacks"');
@@ -1913,6 +1928,26 @@ class ConfigManager {
 			});
 		}
 
+		// 📸 NOVO: Clear screenshots button
+		const clearScreenshotsBtn = document.getElementById('clearScreenshotsBtn');
+		if (clearScreenshotsBtn) {
+			clearScreenshotsBtn.addEventListener('click', () => {
+				if (!window.RendererAPI?.clearScreenshots) return;
+
+				const count = window.RendererAPI.getScreenshotCount();
+				if (count === 0) {
+					console.log('ℹ️ Nenhum screenshot para limpar');
+					return;
+				}
+
+				const confirmed = confirm(`Deseja limpar ${count} screenshot(s)?`);
+				if (confirmed) {
+					window.RendererAPI.clearScreenshots();
+					console.log('✅ Screenshots limpos pelo usuário');
+				}
+			});
+		}
+
 		console.log('✅ registerDOMEventListeners: Todos os listeners registrados com sucesso');
 
 		debugLogConfig('Fim da função: "registerDOMEventListeners"');
@@ -1981,6 +2016,26 @@ class ConfigManager {
 		if (window.RendererAPI?.onGptStreamEnd) {
 			window.RendererAPI.onGptStreamEnd(() => {
 				// Handled in renderer service
+			});
+		}
+
+		// 📸 NOVO: Screenshot shortcuts
+		if (window.RendererAPI?.onCaptureScreenshot) {
+			window.RendererAPI.onCaptureScreenshot(() => {
+				console.log('📸 Atalho Ctrl+Shift+F detectado');
+				if (window.RendererAPI?.captureScreenshot) {
+					window.RendererAPI.captureScreenshot();
+				}
+			});
+		}
+
+		//📸 NOVO: Analyze screenshots shortcut
+		if (window.RendererAPI?.onAnalyzeScreenshots) {
+			window.RendererAPI.onAnalyzeScreenshots(() => {
+				console.log('🔍 Atalho Ctrl+Shift+G detectado');
+				if (window.RendererAPI?.analyzeScreenshots) {
+					window.RendererAPI.analyzeScreenshots();
+				}
 			});
 		}
 

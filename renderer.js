@@ -45,6 +45,14 @@ Regras de resposta (priorize sempre estas):
 `;
 
 /* ===============================
+   SCREENSHOT CAPTURE - ESTADO E CONTROLE
+=============================== */
+
+let capturedScreenshots = []; // Array de { filepath, filename, timestamp }
+let isCapturing = false;
+let isAnalyzing = false;
+
+/* ===============================
    ESTADO GLOBAL
 =============================== */
 
@@ -149,6 +157,7 @@ const UICallbacks = {
 	onModeSelectUpdate: null,
 	onPlaceholderFulfill: null,
 	onPlaceholderUpdate: null,
+	onScreenshotBadgeUpdate: null,
 };
 
 // Função para config-manager se inscrever em eventos
@@ -3021,6 +3030,200 @@ Essa é uma resposta mock apenas para validar:
 `;
 }
 
+function getMockGptCaptureAnalysis() {
+	return `
+📸 Análise de 2 screenshot(s) 22:54:08
+Para resolver o problema apresentado na captura de tela, que é o "Remove Element" do LeetCode, vamos implementar uma função em Java que remove todas as ocorrências de um valor específico de um array. A função deve modificar o array in-place e retornar o novo comprimento do array.
+
+Resumo do Problema
+Entrada: Um array de inteiros nums e um inteiro val que queremos remover.
+Saída: O novo comprimento do array após remover todas as ocorrências de val.
+Passos para a Solução
+Iterar pelo array: Vamos percorrer o array e verificar cada elemento.
+Manter um índice: Usaremos um índice para rastrear a posição onde devemos colocar os elementos que não são iguais a val.
+Modificar o array in-place: Sempre que encontrarmos um elemento que não é igual a val, colocamos esse elemento na posição do índice e incrementamos o índice.
+Retornar o comprimento: No final, o índice representará o novo comprimento do array.
+Implementação do Código
+Aqui está a implementação em Java:
+
+class Solution {
+    public int removeElement(int[] nums, int val) {
+        // Inicializa um índice para rastrear a nova posição
+        int index = 0;
+
+    // Percorre todos os elementos do array
+    for (int i = 0; i &lt; nums.length; i++) {
+        // Se o elemento atual não é igual a val
+        if (nums[i] != val) {
+            // Coloca o elemento na posição do índice
+            nums[index] = nums[i];
+            // Incrementa o índice
+            index++;
+        }
+    }
+
+    // Retorna o novo comprimento do array
+    return index;
+}
+
+}
+
+Explicação do Código
+Classe e Método: Criamos uma classe chamada Solution e um método removeElement que recebe um array de inteiros nums e um inteiro val.
+Índice Inicial: Inicializamos uma variável index em 0.	
+	`;
+}
+
+/* ===============================
+   SCREENSHOT CAPTURE - FUNÇÕES
+=============================== */
+
+/**
+ * Captura screenshot discretamente e armazena em memória
+ */
+async function captureScreenshot() {
+	if (isCapturing) {
+		console.log('⏳ Captura já em andamento...');
+		return;
+	}
+
+	isCapturing = true;
+	updateStatusMessage('📸 Capturando tela...');
+
+	try {
+		const result = await ipcRenderer.invoke('CAPTURE_SCREENSHOT');
+
+		if (!result.success) {
+			console.warn('⚠️ Falha na captura:', result.error);
+			updateStatusMessage(`❌ ${result.error}`);
+			emitUIChange('onScreenshotBadgeUpdate', {
+				count: capturedScreenshots.length,
+				visible: capturedScreenshots.length > 0,
+			});
+			return;
+		}
+
+		// ✅ Armazena referência do screenshot
+		capturedScreenshots.push({
+			filepath: result.filepath,
+			filename: result.filename,
+			timestamp: result.timestamp,
+			size: result.size,
+		});
+
+		console.log(`✅ Screenshot capturado: ${result.filename}`);
+		console.log(`📦 Total em memória: ${capturedScreenshots.length}`);
+
+		// Atualiza UI
+		updateStatusMessage(`✅ ${capturedScreenshots.length} screenshot(s) capturado(s)`);
+		emitUIChange('onScreenshotBadgeUpdate', {
+			count: capturedScreenshots.length,
+			visible: true,
+		});
+	} catch (error) {
+		console.error('❌ Erro ao capturar screenshot:', error);
+		updateStatusMessage('❌ Erro na captura');
+	} finally {
+		isCapturing = false;
+	}
+}
+
+/**
+ * Envia screenshots para análise com OpenAI Vision
+ */
+async function analyzeScreenshots() {
+	if (isAnalyzing) {
+		console.log('⏳ Análise já em andamento...');
+		return;
+	}
+
+	if (capturedScreenshots.length === 0) {
+		console.warn('⚠️ Nenhum screenshot para analisar');
+		updateStatusMessage('⚠️ Nenhum screenshot para analisar (capture com Ctrl+Shift+F)');
+		return;
+	}
+
+	isAnalyzing = true;
+	updateStatusMessage(`🔍 Analisando ${capturedScreenshots.length} screenshot(s)...`);
+
+	try {
+		// Extrai caminhos dos arquivos
+		const filepaths = capturedScreenshots.map(s => s.filepath);
+
+		console.log('🚀 Enviando para análise:', filepaths);
+
+		// Envia para main.js
+		const result = await ipcRenderer.invoke('ANALYZE_SCREENSHOTS', filepaths);
+
+		if (!result.success) {
+			console.error('❌ Falha na análise:', result.error);
+			updateStatusMessage(`❌ ${result.error}`);
+			return;
+		}
+
+		// ✅ Renderiza resposta do GPT
+		const questionText = `📸 Análise de ${capturedScreenshots.length} screenshot(s)`;
+		const questionId = crypto.randomUUID();
+
+		// Adiciona "pergunta" ao histórico
+		questionsHistory.push({
+			id: questionId,
+			text: questionText,
+			createdAt: Date.now(),
+			lastUpdateTime: Date.now(),
+			answered: true,
+		});
+
+		renderQuestionsHistory();
+
+		// Renderiza resposta com markdown
+		const html = marked.parse(result.analysis);
+		renderGptAnswer(questionId, html);
+
+		console.log('✅ Análise concluída e renderizada');
+		updateStatusMessage('✅ Análise concluída');
+
+		// 🗑️ Limpa screenshots após análise
+		console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s) da memória...`);
+		capturedScreenshots = [];
+
+		// Atualiza badge
+		emitUIChange('onScreenshotBadgeUpdate', {
+			count: 0,
+			visible: false,
+		});
+
+		// Força limpeza no sistema
+		await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
+	} catch (error) {
+		console.error('❌ Erro ao analisar screenshots:', error);
+		updateStatusMessage('❌ Erro na análise');
+	} finally {
+		isAnalyzing = false;
+	}
+}
+
+/**
+ * Limpa todos os screenshots armazenados
+ */
+function clearScreenshots() {
+	if (capturedScreenshots.length === 0) return;
+
+	console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
+	capturedScreenshots = [];
+
+	updateStatusMessage('✅ Screenshots limpos');
+	emitUIChange('onScreenshotBadgeUpdate', {
+		count: 0,
+		visible: false,
+	});
+
+	// Força limpeza no sistema
+	ipcRenderer.invoke('CLEANUP_SCREENSHOTS').catch(err => {
+		console.warn('⚠️ Erro na limpeza:', err);
+	});
+}
+
 /* ===============================
    BOOT
 =============================== */
@@ -3248,6 +3451,20 @@ const RendererAPI = {
 		} catch (err) {
 			console.error('Falha ao enviar RENDERER_ERROR', err);
 		}
+	},
+
+	// 📸 NOVO: Screenshot functions
+	captureScreenshot,
+	analyzeScreenshots,
+	clearScreenshots,
+	getScreenshotCount: () => capturedScreenshots.length,
+
+	// 📸 NOVO: Screenshot shortcuts
+	onCaptureScreenshot: callback => {
+		ipcRenderer.on('CMD_CAPTURE_SCREENSHOT', callback);
+	},
+	onAnalyzeScreenshots: callback => {
+		ipcRenderer.on('CMD_ANALYZE_SCREENSHOTS', callback);
 	},
 };
 
