@@ -79,7 +79,7 @@
 			<!-- 🔎 CONTROLE DE OPACIDADE DO OVERLAY -->
 			<div class="opacity-control interactive-zone">
 				<!-- <span class="menu-icon material-icons">opacity</span> -->
-				<input type="range" id="opacityRange" min="0.1" max="1" step="0.01" value="0.75" />
+				<input type="range" id="opacityRange" min="0" max="1" step="0.01" value="0.75" />
 			</div>
 		</div>
 
@@ -106,21 +106,18 @@
 										<div id="outputVuHome" class="vu-fill"></div>
 									</div>
 								</div>
-								
+
 								<span id="status">Status: parado</span>
 
 								<!-- 🔥 BOTÃO TEMPORÁRIO: RESET COMPLETO -->
-								<button id="resetHomeBtn" class="btn-reset-home" title="Limpa transcrição, histórico e respostas (temporário para testes)"></button>
+								<button
+									id="resetHomeBtn"
+									class="btn-reset-home"
+									title="Limpa transcrição, histórico e respostas (temporário para testes)"
+								></button>
 
 								<!-- 📸 NOVO: Clear Screenshots Button -->
-								<button 
-									id="clearScreenshotsBtn" 
-									class="btn-clear-screenshots" 
-									title="Limpar screenshots capturados (Ctrl+Shift+F para capturar)"
-								>
-									🗑️
-								</button>
-								
+								<button id="clearScreenshotsBtn" class="btn-clear-screenshots">🗑️</button>
 							</div>
 						</div>
 
@@ -183,7 +180,10 @@
 
 				<!-- API e Modelos -->
 				<section id="api-models" class="config-section">
-					<h2><span class="material-icons">api</span> API e Modelos</h2>
+					<h2>
+						<span class="material-icons">api</span>
+						API e Modelos
+					</h2>
 
 					<div class="config-tabs">
 						<div class="tab-buttons">
@@ -224,10 +224,10 @@
 												<span class="material-icons">delete</span>
 											</button>
 										</div>
-										<small
-											>🔒 Sua chave é armazenada de forma criptografada localmente. Não é possível copiar ou visualizar
-											a chave após salvar.</small
-										>
+										<small>
+											🔒 Sua chave é armazenada de forma criptografada localmente. Não é possível copiar ou visualizar a
+											chave após salvar.
+										</small>
 									</div>
 
 									<div class="form-group">
@@ -358,8 +358,7 @@
 											<option value="vosk-loccpp-local">Whisper.cpp (Alta Precisão)</option>
 											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
 										</select>
-										<small>Escolha entre transcrição rápida (Vosk), offline (Whisper.cpp
-										<small>Escolha entre transcrição rápida (Vosk) ou nuvem (Whisper-1).</small>
+										<small>Escolha entre transcrição rápida (Vosk) ou nuvem (Whisper-1)</small>
 									</div>
 
 									<div class="form-group">
@@ -444,7 +443,10 @@
 
 				<!-- Áudio e Tela -->
 				<section id="audio-screen" class="config-section">
-					<h2><span class="material-icons">mic</span> Áudio e Tela</h2>
+					<h2>
+						<span class="material-icons">mic</span>
+						Áudio e Tela
+					</h2>
 
 					<div class="config-tabs">
 						<div class="tab-buttons">
@@ -475,10 +477,9 @@
 									<div class="form-group">
 										<label for="audio-output-device">Dispositivo de Saída (VoiceMeeter/Output):</label>
 										<select id="audio-output-device" class="device-select"></select>
-										<small
-											>Selecione a fonte de áudio de saída (ex: VoiceMeeter Output) para monitorar outros
-											participantes.</small
-										>
+										<small>
+											Selecione a fonte de áudio de saída (ex: VoiceMeeter Output) para monitorar outros participantes.
+										</small>
 									</div>
 
 									<!-- 📊 VU METER DE SAÍDA -->
@@ -531,7 +532,10 @@
 
 				<!-- Privacidade -->
 				<section id="privacy" class="config-section">
-					<h2><span class="material-icons">security</span> Privacidade</h2>
+					<h2>
+						<span class="material-icons">security</span>
+						Privacidade
+					</h2>
 
 					<div class="config-form">
 						<div class="form-group">
@@ -577,7 +581,10 @@
 
 				<!-- Outros -->
 				<section id="other" class="config-section">
-					<h2><span class="material-icons">more_horiz</span> Outras Configurações</h2>
+					<h2>
+						<span class="material-icons">more_horiz</span>
+						Outras Configurações
+					</h2>
 
 					<div class="config-form">
 						<div class="form-group" style="display: flex; gap: 16px">
@@ -672,7 +679,10 @@
 
 				<!-- Info -->
 				<section id="info" class="config-section">
-					<h2><span class="material-icons">info</span> Info</h2>
+					<h2>
+						<span class="material-icons">info</span>
+						Info
+					</h2>
 
 					<div class="config-form">
 						<div class="form-group"></div>

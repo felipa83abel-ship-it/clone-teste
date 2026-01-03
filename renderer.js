@@ -10,6 +10,50 @@ const DESABILITADO_TEMPORARIAMENTE = false;
 const ASK_GPT_DESABILITADO_TEMPORARIAMENTE = true;
 
 /* ===============================
+   🔐 PROTEÇÃO CONTRA CAPTURA DE TELA EXTERNA
+   Desabilita/limita APIs usadas por Zoom, Teams, Meet, OBS, Discord, Snipping Tool, etc.
+=============================== */
+(function protectAgainstScreenCapture() {
+	// ✅ Desabilita getDisplayMedia (usado por Zoom, Meet, Teams para capturar)
+	if (navigator && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
+		const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+		navigator.mediaDevices.getDisplayMedia = async function (...args) {
+			console.warn('🔐 BLOQUEADO: Tentativa de usar getDisplayMedia (captura de tela externa)');
+			throw new Error('Screen capture not available in this window');
+		};
+	}
+
+	// ✅ Desabilita captureStream (usado para captura de janela)
+	if (window.HTMLCanvasElement && window.HTMLCanvasElement.prototype.captureStream) {
+		Object.defineProperty(window.HTMLCanvasElement.prototype, 'captureStream', {
+			value: function () {
+				console.warn('🔐 BLOQUEADO: Tentativa de usar Canvas.captureStream()');
+				throw new Error('Capture stream not available');
+			},
+			writable: false,
+			configurable: false,
+		});
+	}
+
+	// ✅ Intercepta getUserMedia para avisar sobre tentativas de captura de áudio (pode ser usado em combo com vídeo)
+	if (navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+		const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+		navigator.mediaDevices.getUserMedia = async function (constraints) {
+			if (constraints && constraints.video) {
+				console.warn('🔐 AVISO: Tentativa de usar getUserMedia com vídeo detectada');
+				// Ainda permite áudio, mas bloqueia vídeo para captura
+				if (constraints.video) {
+					delete constraints.video;
+				}
+			}
+			return originalGetUserMedia(constraints);
+		};
+	}
+
+	console.log('✅ Proteção contra captura externa ativada');
+})();
+
+/* ===============================
    CONSTANTES
 =============================== */
 
@@ -3387,42 +3431,29 @@ const RendererAPI = {
 	},
 	getAppConfig: () => APP_CONFIG,
 
-	// Keyboard shortcuts
-	registerKeyboardShortcuts: () => {
-		window.addEventListener(
-			'keydown',
-			e => {
-				if (e.ctrlKey && e.shiftKey && (e.code === 'ArrowUp' || e.code === 'ArrowDown')) {
-					e.preventDefault();
-					e.stopPropagation();
+	// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut IPC)
+	navigateQuestions: direction => {
+		const all = getNavigableQuestionIds();
+		if (all.length === 0) return;
 
-					const all = getNavigableQuestionIds();
-					if (all.length === 0) return;
+		let index = all.indexOf(selectedQuestionId);
+		if (index === -1) {
+			index = direction === 'up' ? all.length - 1 : 0;
+		} else {
+			index += direction === 'up' ? -1 : 1;
+			index = Math.max(0, Math.min(index, all.length - 1));
+		}
 
-					let index = all.indexOf(selectedQuestionId);
-					if (index === -1) {
-						index = e.key === 'ArrowUp' ? all.length - 1 : 0;
-					} else {
-						index += e.key === 'ArrowUp' ? -1 : 1;
-						index = Math.max(0, Math.min(index, all.length - 1));
-					}
+		selectedQuestionId = all[index];
+		clearAllSelections();
+		renderQuestionsHistory();
+		renderCurrentQuestion();
 
-					selectedQuestionId = all[index];
-					clearAllSelections();
-					renderQuestionsHistory();
-					renderCurrentQuestion();
-
-					if (APP_CONFIG.MODE_DEBUG) {
-						const msg =
-							e.key === 'ArrowUp' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
-						updateStatusMessage(msg);
-						console.log('📌 Atalho Selecionou:', selectedQuestionId);
-						return;
-					}
-				}
-			},
-			true,
-		);
+		if (APP_CONFIG.MODE_DEBUG) {
+			const msg = direction === 'up' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
+			updateStatusMessage(msg);
+			console.log('📌 Atalho Selecionou:', selectedQuestionId);
+		}
 	},
 
 	// IPC Listeners
@@ -3465,6 +3496,12 @@ const RendererAPI = {
 	},
 	onAnalyzeScreenshots: callback => {
 		ipcRenderer.on('CMD_ANALYZE_SCREENSHOTS', callback);
+	},
+	// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut)
+	onNavigateQuestions: callback => {
+		ipcRenderer.on('CMD_NAVIGATE_QUESTIONS', (_, direction) => {
+			callback(direction);
+		});
 	},
 };
 
