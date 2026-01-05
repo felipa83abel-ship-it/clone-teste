@@ -100,7 +100,7 @@ let isAnalyzing = false;
 =============================== */
 
 let APP_CONFIG = {
-	MODE_DEBUG: false,
+	MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
 };
 
 // 🪟 Estado do Drag and Drop da janela
@@ -108,7 +108,7 @@ let isDraggingWindow = false;
 
 let isRunning = false;
 let audioContext;
-let mockInterviewRunning = false;
+// let mockInterviewRunning = false;
 
 // 🔥 MODIFICADO: STT model vem da config agora (removido USE_LOCAL_WHISPER)
 let transcriptionMetrics = {
@@ -269,6 +269,296 @@ const MODES = {
 
 // 🔄 modo atual (default = comportamento atual)
 let CURRENT_MODE = MODES.NORMAL;
+
+/* ===============================
+   🎭 MOCK SYSTEM - Intercepta ipcRenderer
+   Quando MODE_DEBUG=true, substitui respostas reais por mocks
+=============================== */
+
+// 🔍 Respostas mockadas por pergunta
+const MOCK_RESPONSES = {
+	'Mock - O que é JVM e para que serve?':
+		'Mock - A JVM (Java Virtual Machine) é uma máquina virtual que executa bytecode Java. Ela permite que programas Java rodem em qualquer plataforma sem modificação. A JVM gerencia memória, garbage collection e fornece um ambiente isolado e seguro para execução de código.',
+	'Mock - Qual a diferença entre JDK e JRE?':
+		'Mock - JDK (Java Development Kit) é o kit completo para desenvolvimento, incluindo compilador, ferramentas e bibliotecas. JRE (Java Runtime Environment) contém apenas o necessário para executar aplicações Java compiladas. Todo desenvolvedor precisa do JDK, mas usuários finais precisam apenas da JRE.',
+	'Mock - O que é uma classe em Java?':
+		'Mock - Uma classe é o molde ou blueprint para criar objetos. Define atributos (propriedades) e métodos (comportamentos). As classes são fundamentais na programação orientada a objetos. Por exemplo, uma classe Carro pode ter atributos como cor e velocidade, e métodos como acelerar e frear.',
+	'Mock - Explique sobre herança em Java':
+		'Mock - Herança permite que uma classe herde propriedades e métodos de outra classe. A classe filha estende a classe pai usando a palavra-chave extends. Isso promove reutilização de código e cria uma hierarquia de classes. Por exemplo, a classe Bicicleta pode herdar de Veiculo.',
+	'Mock - Como funciona polimorfismo?':
+		'Mock - Polimorfismo significa muitas formas. Permite que objetos de diferentes tipos respondam a mesma chamada de método de forma diferente. Pode ser através de sobrescrita de métodos (herança) ou interface. Exemplo: diferentes animais implementam o método fazer_som() diferentemente.',
+	'Mock - O que é encapsulamento?':
+		'Mock - Encapsulamento é o princípio de ocultar detalhes internos da implementação. Usa modificadores de acesso como private, protected e public. Protege dados e métodos críticos, permitindo controle sobre como são acessados. É uma pilar da segurança e manutenção do código orientado a objetos.',
+};
+
+// 🎬 Cenários automáticos para teste
+// screenshotsCount: 0 = sem screenshot, 1 = tira 1 foto, 2 = tira 2 fotos, etc
+const MOCK_SCENARIOS = [
+	{ question: 'Mock - O que é JVM e para que serve?', screenshotsCount: 1 },
+	{ question: 'Mock - Qual a diferença entre JDK e JRE?', screenshotsCount: 0 },
+	{ question: 'Mock - O que é uma classe em Java?', screenshotsCount: 0 },
+	{ question: 'Mock - Explique sobre herança em Java', screenshotsCount: 2 },
+	{ question: 'Mock - Como funciona polimorfismo?', screenshotsCount: 0 },
+	{ question: 'Mock - O que é encapsulamento?', screenshotsCount: 0 },
+];
+
+let mockScenarioIndex = 0;
+let mockAutoPlayActive = false;
+
+/**
+ * 🎭 Retorna resposta mockada para pergunta (busca exata ou parcial)
+ */
+function getMockResponse(question) {
+	// Match exato
+	if (MOCK_RESPONSES[question]) {
+		return MOCK_RESPONSES[question];
+	}
+
+	// Match parcial
+	for (const [key, value] of Object.entries(MOCK_RESPONSES)) {
+		if (question.toLowerCase().includes(key.toLowerCase())) {
+			return value;
+		}
+	}
+
+	// Fallback
+	return `Resposta mockada para: "${question}"\n\nEste é um teste do sistema em modo Mock.`;
+}
+
+/**
+ * 🎭 Intercepta ipcRenderer.invoke para mockar 'ask-gpt-stream'
+ * Emite eventos com pequenos delays para permitir processamento
+ */
+const originalInvoke = ipcRenderer.invoke;
+ipcRenderer.invoke = function (channel, ...args) {
+	// Intercepta análise de screenshots quando MODE_DEBUG
+	// IMPORTANTE: CAPTURE_SCREENSHOT é REAL (tira foto mesmo), ANALYZE_SCREENSHOTS é MOCK (simula resposta)
+	if (channel === 'ANALYZE_SCREENSHOTS' && APP_CONFIG.MODE_DEBUG) {
+		console.log('📸 [MOCK] Interceptando ANALYZE_SCREENSHOTS...');
+		const filepaths = args[0] || [];
+		const screenshotCount = filepaths.length;
+
+		// Retorna análise mockada
+		const mockAnalysis = `
+## 📸 Análise de ${screenshotCount} Screenshot(s) - MOCK
+
+Esta é uma resposta simulada para o teste do sistema.
+
+### Observações Detectadas:
+- Screenshot capturado com sucesso (arquivo real)
+- Interface renderizada corretamente
+- Componentes visuais identificados
+- Layout responsivo validado
+
+### Recomendações:
+- Sistema funcionando conforme esperado
+- Mock validando fluxo completo de screenshot
+- Análise GPT sendo simulada para teste
+
+**Nota**: Em produção, a análise viria do GPT real com visão de imagens.
+		`;
+
+		return Promise.resolve({
+			success: true,
+			analysis: mockAnalysis,
+			filesAnalyzed: screenshotCount,
+			timestamp: Date.now(),
+		});
+	}
+
+	// Intercepta ask-gpt-stream quando MODE_DEBUG
+	if (channel === 'ask-gpt-stream' && APP_CONFIG.MODE_DEBUG) {
+		console.log('🎭 [MOCK] Interceptando ask-gpt-stream...');
+
+		// Obtém a pergunta do primeiro argumento (array de mensagens)
+		const messages = args[0] || [];
+		const userMessage = messages.find(m => m.role === 'user');
+		const questionText = userMessage ? userMessage.content : 'Pergunta desconhecida';
+
+		// Busca resposta mockada
+		const mockResponse = getMockResponse(questionText);
+
+		// Divide em tokens (remove vazios)
+		const tokens = mockResponse.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
+
+		console.log(`🎭 [MOCK] Emitindo ${tokens.length} tokens para pergunta: "${questionText.substring(0, 50)}..."`);
+
+		// Função para emitir tokens com pequeno delay entre eles
+		async function emitTokens() {
+			let accumulated = '';
+			for (let i = 0; i < tokens.length; i++) {
+				const token = tokens[i];
+				accumulated += token;
+
+				// Emite o evento com delay mínimo
+				await new Promise(resolve => {
+					setTimeout(() => {
+						// ✅ CORRETO: Emite apenas o token como 2º argumento
+						ipcRenderer.emit('GPT_STREAM_CHUNK', null, token);
+						resolve();
+					}, 5); // 5ms entre tokens
+				});
+			}
+
+			// Sinaliza fim do stream após todos os tokens
+			await new Promise(resolve => {
+				setTimeout(() => {
+					ipcRenderer.emit('GPT_STREAM_END');
+					resolve();
+				}, 10);
+			});
+		}
+
+		// Inicia emissão de tokens de forma assíncrona
+		emitTokens().catch(err => {
+			console.error('❌ Erro ao emitir tokens mock:', err);
+		});
+
+		// Retorna promise resolvida imediatamente (esperado pela API)
+		return Promise.resolve({ success: true });
+	}
+
+	// Todas as outras chamadas passam para o invoke real
+	return originalInvoke.call(this, channel, ...args);
+};
+
+/**
+ * 🎭 Executa cenários de entrevista mock automaticamente
+ */
+async function runMockAutoPlay() {
+	if (mockAutoPlayActive) return;
+	mockAutoPlayActive = true;
+
+	while (mockScenarioIndex < MOCK_SCENARIOS.length && APP_CONFIG.MODE_DEBUG && mockAutoPlayActive) {
+		const scenario = MOCK_SCENARIOS[mockScenarioIndex];
+		console.log(
+			`\n🎬 ════════════════════════════════════════════════════\n🎬 MOCK CENÁRIO ${mockScenarioIndex + 1}/${
+				MOCK_SCENARIOS.length
+			}\n🎬 ════════════════════════════════════════════════════`,
+		);
+
+		// FASE 1: Simula captura de áudio (2-4s)
+		console.log(`🎤 [FASE-1] Capturando áudio da pergunta...`);
+		const audioStartTime = Date.now();
+		const placeholderId = `placeholder-${audioStartTime}-${Math.random()}`;
+
+		// Emite placeholder
+		emitUIChange('onTranscriptAdd', {
+			author: 'Outros',
+			text: '...',
+			timeStr: new Date().toLocaleTimeString(),
+			elementId: 'conversation',
+			placeholderId: placeholderId,
+		});
+
+		// Aguarda captura
+		await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
+
+		// 🔥 CHECK: Se modo debug foi desativado, para imediatamente
+		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+			console.log('🛑 [PARADA] Modo debug desativado - parando mock autoplay');
+			break;
+		}
+
+		const audioEndTime = Date.now();
+		console.log(`✅ [FASE-1] Áudio capturado`);
+
+		// Calcula latência (arredonda para inteiro - sem casas decimais)
+		const latencyMs = Math.round(800 + Math.random() * 400);
+		const totalMs = audioEndTime - audioStartTime + latencyMs;
+
+		// Atualiza placeholder com texto real
+		emitUIChange('onPlaceholderFulfill', {
+			speaker: 'Outros',
+			text: scenario.question,
+			startStr: new Date(audioStartTime).toLocaleTimeString(),
+			stopStr: new Date(audioEndTime).toLocaleTimeString(),
+			recordingDuration: audioEndTime - audioStartTime,
+			latency: latencyMs,
+			total: totalMs,
+			placeholderId: placeholderId,
+		});
+
+		// FASE 2: Processa pergunta (handleSpeech + closeCurrentQuestion)
+		console.log(`📝 [FASE-2] Processando pergunta...`);
+		handleSpeech(OTHER, scenario.question);
+
+		// Aguarda consolidação (800ms para garantir que pergunta saia do CURRENT)
+		await new Promise(resolve => setTimeout(resolve, 800));
+
+		// 🔥 CHECK: Se modo debug foi desativado, para imediatamente
+		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+			console.log('🛑 [PARADA] Modo debug desativado - parando mock autoplay');
+			break;
+		}
+
+		// Simula silêncio e fecha pergunta
+		console.log(`🔇 [FASE-2] Silêncio detectado, fechando pergunta...`);
+		closeCurrentQuestion();
+
+		// FASE 3: askGpt será acionado automaticamente, o interceptor (ask-gpt-stream) que irá mockar
+		console.log(`🤖 [FASE-3] askGpt acionado - mock stream será emitido pelo interceptor`);
+
+		// Aguarda stream terminar (~30ms por token)
+		const mockResponse = getMockResponse(scenario.question);
+		const estimatedTime = mockResponse.length * 30;
+		await new Promise(resolve => setTimeout(resolve, estimatedTime + 1000));
+
+		// 🔥 CHECK: Se modo debug foi desativado, para imediatamente SEM TIRAR SCREENSHOT
+		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+			console.log('🛑 [PARADA] Modo debug desativado - parando sem capturar screenshot');
+			break;
+		}
+
+		// FASE 4 (Opcional): Captura N screenshots REAIS e depois aciona análise
+		if (scenario.screenshotsCount && scenario.screenshotsCount > 0) {
+			// FASE 4A: Captura múltiplos screenshots
+			for (let i = 1; i <= scenario.screenshotsCount; i++) {
+				// 🔥 CHECK: Verifica antes de cada screenshot
+				if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+					console.log(
+						`🛑 [PARADA] Modo debug desativado - cancelando captura de screenshot ${i}/${scenario.screenshotsCount}`,
+					);
+					break;
+				}
+
+				console.log(`📸 [FASE-4A] Capturando screenshot ${i}/${scenario.screenshotsCount} REAL da resposta...`);
+				await captureScreenshot();
+
+				// Delay entre múltiplas capturas para respeitar cooldown de 2s do main.js
+				if (i < scenario.screenshotsCount) {
+					console.log(`   ⏳ Aguardando 2200ms antes da próxima captura (cooldown CAPTURE_COOLDOWN)...`);
+					await new Promise(resolve => setTimeout(resolve, 2200));
+				}
+			}
+
+			// 🔥 CHECK: Verifica antes de análise
+			if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+				console.log('🛑 [PARADA] Modo debug desativado - cancelando análise de screenshots');
+				break;
+			}
+
+			// Log de validação: quantas fotos tem antes de analisar
+			console.log(
+				`📸 [PRÉ-ANÁLISE] Total de screenshots em memória: ${capturedScreenshots.length}/${scenario.screenshotsCount}`,
+			);
+
+			// FASE 4B: Análise dos screenshots capturados
+			console.log(`📸 [FASE-4B] Analisando ${scenario.screenshotsCount} screenshot(s)...`);
+			await analyzeScreenshots();
+		}
+
+		mockScenarioIndex++;
+
+		if (mockScenarioIndex < MOCK_SCENARIOS.length) {
+			console.log(`\n⏳ Aguardando 1s antes do próximo cenário...\n`);
+			await new Promise(resolve => setTimeout(resolve, 1000));
+		}
+	}
+
+	console.log('✅ Mock autoplay finalizado');
+	mockAutoPlayActive = false;
+}
 
 // 🎼 controlador central de estratégia
 const ModeController = {
@@ -561,6 +851,199 @@ function isEndingPhrase(text) {
 
 	debugLogRenderer('Fim da função: "isEndingPhrase"');
 	return OUTPUT_ENDING_PHRASES.some(p => normalized === p);
+}
+
+/* ===============================
+   🔥 RESET COMPLETO DO APP
+   Função centralizada e reutilizável para limpar tudo
+   Pode ser chamada por: mock toggle, resetHomeBtn, ou qualquer outro
+=============================== */
+
+/**
+ * 🧹 Reseta o aplicativo completamente para estado inicial
+ * - Substitui resetInterviewState() e resetHomeSection()
+ * - Centraliza TODA lógica de limpeza em um único lugar
+ * - Pode ser reutilizada por qualquer botão/controle
+ *
+ * Uso:
+ *   await resetAppState(); // Completo e seguro
+ */
+async function resetAppState() {
+	console.log('🧹 ═══════════════════════════════════════════════════════════');
+	console.log('🧹 INICIANDO RESET COMPLETO DO APP');
+	console.log('🧹 ═══════════════════════════════════════════════════════════');
+
+	try {
+		// 1️⃣ PARAR AUTOPLAY DO MOCK (prevent async operations)
+		mockAutoPlayActive = false;
+		mockScenarioIndex = 0;
+		console.log('✅ Autoplay do mock parado');
+
+		// 2️⃣ PARAR ÁUDIO IMEDIATAMENTE (input/output)
+		if (isRunning) {
+			console.log('🎤 Parando captura de áudio...');
+			await stopInput();
+			await stopOutput();
+			isRunning = false;
+		}
+
+		// 3️⃣ RESET DE ESTADO DE ÁUDIO
+		inputSpeaking = false;
+		outputSpeaking = false;
+		console.log('✅ Estado de áudio resetado');
+
+		// 4️⃣ LIMPAR CHUNKS DE ÁUDIO
+		inputChunks = [];
+		outputChunks = [];
+		inputPartialChunks = [];
+		outputPartialChunks = [];
+		outputPartialText = '';
+		voskAccumulatedText = '';
+		console.log('✅ Chunks de áudio limpos');
+
+		// 5️⃣ LIMPAR TIMERS DE ÁUDIO
+		if (inputSilenceTimer) {
+			clearTimeout(inputSilenceTimer);
+			inputSilenceTimer = null;
+		}
+		if (outputSilenceTimer) {
+			clearTimeout(outputSilenceTimer);
+			outputSilenceTimer = null;
+		}
+		if (inputPartialTimer) {
+			clearTimeout(inputPartialTimer);
+			inputPartialTimer = null;
+		}
+		if (outputPartialTimer) {
+			clearTimeout(outputPartialTimer);
+			outputPartialTimer = null;
+		}
+		if (voskPartialTimer) {
+			clearTimeout(voskPartialTimer);
+			voskPartialTimer = null;
+		}
+		if (autoCloseQuestionTimer) {
+			clearTimeout(autoCloseQuestionTimer);
+			autoCloseQuestionTimer = null;
+		}
+		console.log('✅ Timers limpos');
+
+		// 6️⃣ LIMPAR PERGUNTAS E RESPOSTAS
+		currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
+		questionsHistory = [];
+		answeredQuestions.clear();
+		selectedQuestionId = null;
+		lastSentQuestionText = '';
+		lastAskedQuestionNormalized = null;
+		console.log('✅ Perguntas e respostas limpas');
+
+		// 7️⃣ LIMPAR ESTADO GPT/ENTREVISTA
+		interviewTurnId = 0;
+		gptAnsweredTurnId = null;
+		gptRequestedTurnId = null;
+		gptRequestedQuestionId = null;
+		console.log('✅ Estado de entrevista resetado');
+
+		// 8️⃣ LIMPAR PLACEHOLDERS
+		lastInputStartAt = null;
+		lastInputStopAt = null;
+		lastOutputStartAt = null;
+		lastOutputStopAt = null;
+		pendingOutputStartAt = null;
+		pendingOutputStopAt = null;
+		lastPartialSttAt = null;
+		lastOutputPlaceholderId = null;
+		lastInputPlaceholderEl = null;
+		lastOutputPlaceholderEl = null;
+		console.log('✅ Placeholders limpos');
+
+		// 9️⃣ RESETAR MÉTRICAS
+		transcriptionMetrics = {
+			audioStartTime: null,
+			whisperStartTime: null,
+			whisperEndTime: null,
+			gptStartTime: null,
+			gptEndTime: null,
+			totalTime: null,
+			audioSize: 0,
+		};
+		console.log('✅ Métricas resetadas');
+
+		// 🔟 LIMPAR SCREENSHOTS (sem chamar API!)
+		if (capturedScreenshots.length > 0) {
+			console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
+			capturedScreenshots = [];
+			emitUIChange('onScreenshotBadgeUpdate', {
+				count: 0,
+				visible: false,
+			});
+			// Força limpeza no sistema
+			try {
+				await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
+			} catch (err) {
+				console.warn('⚠️ Erro ao limpar screenshots no sistema:', err);
+			}
+		}
+		console.log('✅ Screenshots limpos');
+
+		// 1️⃣1️⃣ LIMPAR FLAGS
+		isCapturing = false;
+		isAnalyzing = false;
+		console.log('✅ Flags resetadas');
+
+		// 1️⃣2️⃣ ATUALIZAR UI - PERGUNTAS
+		emitUIChange('onCurrentQuestionUpdate', {
+			text: '',
+			isSelected: false,
+		});
+		emitUIChange('onQuestionsHistoryUpdate', []);
+		console.log('✅ Perguntas UI limpa');
+
+		// 1️⃣3️⃣ ATUALIZAR UI - TRANSCRIÇÕES E RESPOSTAS
+		emitUIChange('onTranscriptionCleared');
+		emitUIChange('onAnswersCleared');
+		console.log('✅ Transcrições e respostas UI limpas');
+
+		// 1️⃣4️⃣ ATUALIZAR UI - BOTÃO LISTEN
+		emitUIChange('onListenButtonToggle', {
+			isRunning: false,
+			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
+		});
+		console.log('✅ Botão listen resetado');
+
+		// 1️⃣5️⃣ ATUALIZAR UI - STATUS
+		emitUIChange('onStatusUpdate', {
+			status: 'ready',
+			message: '✅ Pronto',
+		});
+		console.log('✅ Status atualizado');
+
+		// 1️⃣6️⃣ LIMPAR SELEÇÕES
+		clearAllSelections();
+		console.log('✅ Seleções limpas');
+
+		// 1️⃣7️⃣ LOG FINAL
+		console.log('✅ ═══════════════════════════════════════════════════════════');
+		console.log('✅ RESET COMPLETO CONCLUÍDO COM SUCESSO');
+		console.log('✅ ═══════════════════════════════════════════════════════════');
+
+		return true;
+	} catch (error) {
+		console.error('❌ Erro ao resetar app:', error);
+		return false;
+	}
+}
+
+/**
+ * 🔧 Limpa parcialmente o estado de uma volta de entrevista (turn)
+ * Usado internamente durante streaming para não perder contexto
+ * NÃO substitui resetAppState() - é um helper minor
+ */
+function resetInterviewTurnState() {
+	// Limpa apenas o output parcial desta volta específica
+	outputPartialText = '';
+	outputPartialChunks = [];
+	// Não limpa lastAskedQuestionNormalized aqui - mantém para evitar duplicatas
 }
 
 /* ===============================
@@ -2405,18 +2888,6 @@ function closeCurrentQuestionForced() {
 	debugLogRenderer('Fim da função: "closeCurrentQuestionForced"');
 }
 
-function resetInterviewTurnState() {
-	debugLogRenderer('Início da função: "resetInterviewTurnState"');
-
-	outputPartialText = '';
-	outputPartialChunks = [];
-
-	// limpa fingerprint de pergunta enviada para evitar bloqueios indevidos
-	lastAskedQuestionNormalized = null;
-
-	debugLogRenderer('Fim da função: "resetInterviewTurnState"');
-}
-
 /* ===============================
    VALIDAÇÃO DE API KEY
 =============================== */
@@ -2512,33 +2983,7 @@ async function askGpt() {
 	// Inicia medição do GPT
 	transcriptionMetrics.gptStartTime = Date.now();
 
-	// 🧪 DEBUG
-	if (APP_CONFIG.MODE_DEBUG) {
-		updateStatusMessage('🧪 Pergunta enviada ao GPT (modo teste)');
-
-		const mock = getMockGptAnswer(text);
-		renderGptAnswer(null, mock);
-
-		if (isCurrent && gptRequestedTurnId === interviewTurnId) {
-			promoteCurrentToHistory(text);
-			resetInterviewTurnState();
-		}
-
-		// marca como respondido nesse turno (mock)
-		gptAnsweredTurnId = interviewTurnId;
-		gptRequestedTurnId = null;
-
-		// Finaliza medições
-		transcriptionMetrics.gptEndTime = Date.now();
-		transcriptionMetrics.totalTime = Date.now() - transcriptionMetrics.audioStartTime;
-
-		// Log métricas
-		logTranscriptionMetrics();
-
-		return;
-	}
-
-	// 🧠 MODO ENTREVISTA — STREAMING
+	// � MODO ENTREVISTA — STREAMING
 	if (ModeController.isInterviewMode()) {
 		const gptStartAt = ENABLE_INTERVIEW_TIMING_DEBUG ? Date.now() : null;
 		let streamedText = '';
@@ -2924,23 +3369,6 @@ function renderGptAnswer(questionId, markdownText) {
 }
 */
 
-function resetInterviewState() {
-	debugLogRenderer('Início da função: "resetInterviewState"');
-	currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
-	questionsHistory = [];
-	selectedQuestionId = null;
-
-	// Emit eventos para limpar UI
-	emitUIChange('onTranscriptionCleared', {});
-	emitUIChange('onAnswersCleared', {});
-
-	clearAllSelections();
-	renderQuestionsHistory();
-	renderCurrentQuestion();
-
-	debugLogRenderer('Fim da função: "resetInterviewState"');
-}
-
 // 🔥 NOVO: Verifica se existe um modelo de IA ativo e retorna o nome do modelo
 function hasActiveModel() {
 	debugLogRenderer('Início da função: "hasActiveModel"');
@@ -3098,111 +3526,6 @@ function updateStatusMessage(message) {
    MOCK / DEBUG
 =============================== */
 
-function startMockInterview() {
-	if (mockInterviewRunning) return;
-	mockInterviewRunning = true;
-
-	// 🔥 Emite atualização do mock badge
-	emitUIChange('onMockBadgeUpdate', { visible: true });
-
-	const mockQuestions = [
-		'O que é JVM e para que serve',
-		'Qual a diferença entre JDK e JRE',
-		'Explique o que é Garbage Collector',
-		'Como funciona o equals e hashCode',
-		'O que é imutabilidade em Java',
-		'Explique o que é POO',
-		'Quais são os pilares da POO',
-		'Qual a diferença entre Spring e Spring Boot',
-	];
-
-	let index = 0;
-
-	function sendNext() {
-		if (!APP_CONFIG.MODE_DEBUG || index >= mockQuestions.length) {
-			mockInterviewRunning = false;
-			return;
-		}
-
-		const text = mockQuestions[index];
-		addTranscript(OTHER, text); // 👈 simula fala real
-		handleSpeech(OTHER, text); // 👈 consolida pergunta
-
-		index++;
-
-		// simula silêncio → fechamento da pergunta
-		setTimeout(() => {
-			closeCurrentQuestion();
-		}, QUESTION_IDLE_TIMEOUT);
-
-		// próxima pergunta depois de um tempo
-		setTimeout(sendNext, 6000);
-	}
-
-	sendNext();
-}
-
-function getMockGptAnswer(question) {
-	return `
-### ✔️ Resposta simulada
-
-Você perguntou:
-
-> ${question}
-
-Essa é uma resposta mock apenas para validar:
-- fluxo
-- scroll
-- seleção
-- ritmo de uso
-
-`;
-}
-
-function getMockGptCaptureAnalysis() {
-	return `
-📸 Análise de 2 screenshot(s) 22:54:08
-Para resolver o problema apresentado na captura de tela, que é o "Remove Element" do LeetCode, vamos implementar uma função em Java que remove todas as ocorrências de um valor específico de um array. A função deve modificar o array in-place e retornar o novo comprimento do array.
-
-Resumo do Problema
-Entrada: Um array de inteiros nums e um inteiro val que queremos remover.
-Saída: O novo comprimento do array após remover todas as ocorrências de val.
-Passos para a Solução
-Iterar pelo array: Vamos percorrer o array e verificar cada elemento.
-Manter um índice: Usaremos um índice para rastrear a posição onde devemos colocar os elementos que não são iguais a val.
-Modificar o array in-place: Sempre que encontrarmos um elemento que não é igual a val, colocamos esse elemento na posição do índice e incrementamos o índice.
-Retornar o comprimento: No final, o índice representará o novo comprimento do array.
-Implementação do Código
-Aqui está a implementação em Java:
-
-class Solution {
-    public int removeElement(int[] nums, int val) {
-        // Inicializa um índice para rastrear a nova posição
-        int index = 0;
-
-    // Percorre todos os elementos do array
-    for (int i = 0; i &lt; nums.length; i++) {
-        // Se o elemento atual não é igual a val
-        if (nums[i] != val) {
-            // Coloca o elemento na posição do índice
-            nums[index] = nums[i];
-            // Incrementa o índice
-            index++;
-        }
-    }
-
-    // Retorna o novo comprimento do array
-    return index;
-}
-
-}
-
-Explicação do Código
-Classe e Método: Criamos uma classe chamada Solution e um método removeElement que recebe um array de inteiros nums e um inteiro val.
-Índice Inicial: Inicializamos uma variável index em 0.	
-	`;
-}
-
 /* ===============================
    SCREENSHOT CAPTURE - FUNÇÕES
 =============================== */
@@ -3292,9 +3615,10 @@ async function analyzeScreenshots() {
 
 		// ✅ Renderiza resposta do GPT
 		const questionText = `📸 Análise de ${capturedScreenshots.length} screenshot(s)`;
-		const questionId = crypto.randomUUID();
+		// 🔢 USA ID SEQUENCIAL COMO AS PERGUNTAS NORMAIS (não UUID)
+		const questionId = String(questionsHistory.length + 1);
 
-		// Adiciona "pergunta" ao histórico
+		// Adiciona "pergunta" ao histórico ANTES de renderizar respostas
 		questionsHistory.push({
 			id: questionId,
 			text: questionText,
@@ -3303,11 +3627,33 @@ async function analyzeScreenshots() {
 			answered: true,
 		});
 
+		// ✅ MARCA COMO RESPONDIDA (importante para clique não gerar duplicata)
+		answeredQuestions.add(questionId);
+
 		renderQuestionsHistory();
 
-		// Renderiza resposta com markdown
-		const html = marked.parse(result.analysis);
-		renderGptAnswer(questionId, html);
+		// ✅ RENDERIZA VIA STREAMING (fluxo real) - usa onAnswerStreamChunk como GPT normal
+		// Divide análise em tokens e emite como se fosse stream
+		const analysisText = result.analysis;
+		const tokens = analysisText.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
+
+		console.log(`📸 [ANÁLISE] Simulando stream: ${tokens.length} tokens`);
+
+		// Emite tokens assim como o GPT faz (permite UI renderizar em tempo real)
+		let accumulated = '';
+		for (const token of tokens) {
+			accumulated += token;
+
+			// ✅ USA O MESMO EVENTO onAnswerStreamChunk (fluxo real)
+			emitUIChange('onAnswerStreamChunk', {
+				questionId: questionId,
+				token: token,
+				accum: accumulated,
+			});
+
+			// Pequeno delay entre tokens para simular streaming real
+			await new Promise(resolve => setTimeout(resolve, 2));
+		}
 
 		console.log('✅ Análise concluída e renderizada');
 		updateStatusMessage('✅ Análise concluída');
@@ -3381,12 +3727,8 @@ const RendererAPI = {
 	startOutputVolumeMonitoring,
 	stopInputVolumeMonitoring,
 	stopOutputVolumeMonitoring,
-
-	// Entrevista
-	listenToggleBtn,
-	askGpt,
-	resetInterviewState,
-	startMockInterview,
+	// Entrevista - Reset (centralizado em resetAppState)
+	resetAppState,
 
 	// Modo
 	changeMode: mode => {
@@ -3597,6 +3939,9 @@ if (typeof module !== 'undefined' && module.exports) {
 // 🔥 Expor globalmente para que config-manager possa acessar
 if (typeof window !== 'undefined') {
 	window.RendererAPI = RendererAPI;
+	window.runMockAutoPlay = runMockAutoPlay; // 🎭 Exportar Mock autoplay
+	window.mockScenarioIndex = 0; // 🎭 Índice global para cenários
+	window.mockAutoPlayActive = false; // 🎭 Flag global para evitar múltiplas execuções
 }
 function debugLogRenderer(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: brown; font-weight: bold;');
@@ -3646,101 +3991,18 @@ function logTranscriptionMetrics() {
  */
 function resetHomeSection() {
 	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
-	console.log('🔄 RESET COMPLETO ACIONADO');
+	console.log('🔄 RESET COMPLETO ACIONADO PELO BOTÃO resetHomeBtn');
 	console.log('════════════════════════════════════════════════════════════════════════════════════════');
 
-	// Garante que a escuta está parada
-	if (isRunning) {
-		isRunning = false;
-		stopAudio();
-		emitUIChange('onListenButtonToggle', {
-			isRunning: false,
-			buttonText: 'Começar a Ouvir... (Ctrl+d)',
-		});
-	}
-
-	// 1️⃣ LIMPA TRANSCRIÇÃO
-	currentQuestion = {
-		text: '',
-		lastUpdate: 0,
-		finalized: false,
-		lastUpdateTime: null,
-		createdAt: null,
-	};
-	questionsHistory = [];
-	selectedQuestionId = null;
-	lastInputPlaceholderEl = null;
-	lastInputStopAt = null;
-	lastInputStartAt = null;
-	lastOutputPlaceholderEl = null;
-	lastOutputStopAt = null;
-	lastOutputStartAt = null;
-	lastOutputPlaceholderId = null;
-	pendingOutputStartAt = null;
-	pendingOutputStopAt = null;
-
-	// 2️⃣ LIMPA HISTÓRICO
-	inputChunks = [];
-	outputChunks = [];
-	inputPartialChunks = [];
-	outputPartialChunks = [];
-	outputPartialText = '';
-
-	// 3️⃣ LIMPA RESPOSTAS (GPT)
-	answeredQuestions.clear();
-	gptAnsweredTurnId = -1;
-	gptRequestedTurnId = null;
-	lastAskedQuestionNormalized = null;
-	lastSentQuestionText = null;
-
-	// 4️⃣ LIMPA ESTADO VOSK
-	voskAccumulatedText = '';
-	if (voskPartialTimer) {
-		clearTimeout(voskPartialTimer);
-		voskPartialTimer = null;
-	}
-
-	// 5️⃣ LIMPA ESTADO ENTREVISTA
-	interviewTurnId = 0;
-	resetInterviewTurnState();
-
-	// 6️⃣ REDEFINE TIMERS
-	if (inputPartialTimer) {
-		clearTimeout(inputPartialTimer);
-		inputPartialTimer = null;
-	}
-	if (outputPartialTimer) {
-		clearTimeout(outputPartialTimer);
-		outputPartialTimer = null;
-	}
-	if (autoCloseQuestionTimer) {
-		clearTimeout(autoCloseQuestionTimer);
-		autoCloseQuestionTimer = null;
-	}
-
-	// 7️⃣ REDEFINE MÉTRICAS
-	transcriptionMetrics = {
-		audioStartTime: null,
-		whisperStartTime: null,
-		whisperEndTime: null,
-		gptStartTime: null,
-		gptEndTime: null,
-		totalTime: null,
-		audioSize: 0,
-	};
-
-	// 8️⃣ REDEFINE STATUS
-	updateStatusMessage('Status: parado');
-
-	// 9️⃣ LIMPA UI
-	emitUIChange('onTranscriptionCleared', {});
-	emitUIChange('onAnswersCleared', {});
-	clearAllSelections();
-	renderQuestionsHistory();
-	renderCurrentQuestion();
-
-	console.log('✅ Reset completo finalizado!');
-	console.log('════════════════════════════════════════════════════════════════════════════════════════\n');
+	// 🔥 Usar a função centralizada de reset
+	resetAppState().then(success => {
+		if (success) {
+			console.log('✅ Reset via resetAppState() concluído com sucesso!');
+		} else {
+			console.error('❌ Erro ao executar resetAppState()');
+		}
+		console.log('════════════════════════════════════════════════════════════════════════════════════════\n');
+	});
 }
 
 // 🔥 LISTENER DO BOTÃO RESET

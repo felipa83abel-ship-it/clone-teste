@@ -1,6 +1,16 @@
 /* ================================
    IMPORTS E CONFIGURAÇÕES INICIAIS
 =============================== */
+
+const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
+const OpenAI = require('openai');
+const fs = require('fs');
+const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
+
+// Habilita reload automático em desenvolvimento
 if (process.env.NODE_ENV === 'development') {
 	try {
 		require('electron-reload')(__dirname, {
@@ -11,15 +21,7 @@ if (process.env.NODE_ENV === 'development') {
 	}
 }
 
-const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
-const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
-
-// Importações condicionais
+// Importa electron-store para armazenamento seguro
 let ElectronStore;
 try {
 	ElectronStore = require('electron-store');
@@ -35,17 +37,14 @@ try {
 /* ================================
    CONSTANTES
 =============================== */
-const APP_CONFIG = {
-	MODE_DEBUG: false,
-};
 
-// Configuração de modelo Vosk
+// Configuração de modelo Vosk (local)
 const VOSK_CONFIG = {
 	// MODEL: 'vosk-models/vosk-model-small-pt-0.3' ( Modelo pequeno, rápido, menos preciso)
 	MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3',
 };
 
-// Configuração do Whisper.cpp local
+// Configuração do modelo Whisper.cpp (local)
 const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
 // Modelo Tiny (Modelo menor, rápido, menos preciso)
 const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
@@ -218,9 +217,6 @@ ipcMain.on('RENDERER_ERROR', (_, info) => {
 	console.error('Renderer reported error:', info && (info.message || info));
 	if (info && info.stack) console.error(info.stack);
 });
-
-// Configuração do app
-ipcMain.handle('GET_APP_CONFIG', () => APP_CONFIG);
 
 // Status do cliente OpenAI
 ipcMain.handle('GET_OPENAI_API_STATUS', () => ({
@@ -1072,7 +1068,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 });
 
 /**
- * Limpa screenshots antigos (> 5 minutos)
+ * Limpa screenshots antigos do diretório temp
  */
 async function cleanupScreenshots() {
 	try {
@@ -1117,7 +1113,7 @@ async function cleanupScreenshots() {
 	}
 }
 
-// Handler para chamadas vindas do renderer
+// Handler IPC para limpeza manual de screenshots
 ipcMain.handle('CLEANUP_SCREENSHOTS', cleanupScreenshots);
 
 /* ================================

@@ -1217,9 +1217,8 @@ class ConfigManager {
 			// ✅ 2. Registrar callbacks do renderer
 			this.registerRendererCallbacks();
 
-			// ✅ 3. Obter APP_CONFIG
-			const appConfig = await _ipc.invoke('GET_APP_CONFIG');
-			window.RendererAPI.setAppConfig(appConfig);
+			// ✅ 3. Inicializar APP_CONFIG no renderer
+			window.RendererAPI.setAppConfig({ MODE_DEBUG: true });
 
 			// ✅ 4. Restaurar tema
 			this.restoreTheme();
@@ -1921,16 +1920,46 @@ class ConfigManager {
 
 				if (isEnabled) {
 					window.RendererAPI?.updateMockBadge(true);
-					window.RendererAPI?.resetInterviewState();
-					window.RendererAPI?.startMockInterview();
+					// 🔥 Usa resetAppState() para limpar TUDO antes de iniciar mock
+					if (window.RendererAPI?.resetAppState && typeof window.RendererAPI.resetAppState === 'function') {
+						console.log('🧹 Disparando resetAppState() - limpeza antes do mock');
+						await window.RendererAPI.resetAppState();
+					}
+					// 🎭 Resetar índice e iniciar autoplay com delay
+					window.mockScenarioIndex = 0;
+					window.mockAutoPlayActive = false;
+					console.log('🎭 Mock mode ATIVADO - autoplay iniciará em 2 segundos...');
+
+					// Chamar runMockAutoPlay() após delay para deixar UI resetar
+					setTimeout(() => {
+						if (window.runMockAutoPlay && typeof window.runMockAutoPlay === 'function') {
+							console.log('🎭 Disparando runMockAutoPlay() do config-manager');
+							window.runMockAutoPlay();
+						} else {
+							console.warn('⚠️ runMockAutoPlay() não está disponível em window');
+						}
+					}, 2000);
 				} else {
 					window.RendererAPI?.updateMockBadge(false);
-					window.RendererAPI?.resetInterviewState();
-					if (window.RendererAPI?.restartAudioPipeline) {
-						await window.RendererAPI.restartAudioPipeline();
+					// 🔥 NOVO: Usar resetAppState() para limpar TUDO completamente
+					if (window.RendererAPI?.resetAppState && typeof window.RendererAPI.resetAppState === 'function') {
+						console.log('🧹 Disparando resetAppState() - limpeza completa ao desativar mock');
+						await window.RendererAPI.resetAppState();
+					} else {
+						console.warn('⚠️ resetAppState() não está disponível em window.RendererAPI');
 					}
 				}
 			});
+
+			// 🔥 NOVO: Sincronizar toggle com APP_CONFIG inicial (MODE_DEBUG)
+			// Faz DEPOIS de registrar o listener para disparar o evento se necessário
+			const currentConfig = window.RendererAPI?.getAppConfig?.();
+			if (currentConfig && currentConfig.MODE_DEBUG) {
+				mockToggle.checked = true;
+				// Dispara o evento change para REALMENTE ativar o modo debug
+				mockToggle.dispatchEvent(new Event('change', { bubbles: true }));
+				console.log('✅ Mock toggle inicializado como ATIVO e modo debug DISPARADO');
+			}
 		}
 
 		// Listen button click (Começar a Ouvir... (Ctrl+d))
