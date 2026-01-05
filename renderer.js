@@ -2819,7 +2819,7 @@ async function askGpt() {
 			}
 
 			// 🔥 Notificar config-manager que stream terminou (para limpar info de streaming)
-			window.RendererAPI?.emitUIChange?.('onAnswerStreamEnd', {});
+			globalThis.RendererAPI?.emitUIChange?.('onAnswerStreamEnd', {});
 		};
 
 		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
@@ -3426,6 +3426,8 @@ const RendererAPI = {
 	// Áudio - Gravação
 	startInput,
 	stopInput: stopInputMonitor,
+	listenToggleBtn,
+	askGpt,
 	startOutput,
 	stopOutput: stopOutputMonitor,
 	restartAudioPipeline,
@@ -3638,6 +3640,9 @@ const RendererAPI = {
 			callback(direction);
 		});
 	},
+
+	// Emit UI changes (para config-manager enviar eventos para renderer)
+	emitUIChange,
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -3645,11 +3650,11 @@ if (typeof module !== 'undefined' && module.exports) {
 }
 
 // 🔥 Expor globalmente para que config-manager possa acessar
-if (typeof window !== 'undefined') {
-	window.RendererAPI = RendererAPI;
-	window.runMockAutoPlay = runMockAutoPlay; // 🎭 Exportar Mock autoplay
-	window.mockScenarioIndex = 0; // 🎭 Índice global para cenários
-	window.mockAutoPlayActive = false; // 🎭 Flag global para evitar múltiplas execuções
+if (typeof globalThis !== 'undefined') {
+	globalThis.RendererAPI = RendererAPI;
+	globalThis.runMockAutoPlay = runMockAutoPlay; // 🎭 Exportar Mock autoplay
+	globalThis.mockScenarioIndex = 0; // 🎭 Índice global para cenários
+	globalThis.mockAutoPlayActive = false; // 🎭 Flag global para evitar múltiplas execuções
 }
 function debugLogRenderer(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: brown; font-weight: bold;');
