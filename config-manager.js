@@ -1,15 +1,20 @@
-/* =========================================================
+﻿/* =========================================================
    CONFIG MANAGER
    Gerencia configurações da aplicação com persistência segura
 ========================================================= */
 
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
-const _ipc =
-	typeof window !== 'undefined' && window.electron && window.electron.ipcRenderer
-		? window.electron.ipcRenderer
-		: typeof require === 'function'
-		? require('electron').ipcRenderer
-		: null;
+const _getIpcRenderer = () => {
+	if (typeof globalThis !== 'undefined' && globalThis.electron && globalThis.electron.ipcRenderer) {
+		return globalThis.electron.ipcRenderer;
+	}
+	if (typeof require === 'function') {
+		return require('electron').ipcRenderer;
+	}
+	return null;
+};
+
+const _ipc = _getIpcRenderer();
 
 // 🔥 NOVO: RendererAPI será definido globalmente após renderer.js carregar
 // (não precisa fazer require pois renderer.js é carregado primeiro no index.html)
@@ -182,9 +187,7 @@ class ConfigManager {
 
 			// 🔥 Quando o campo recebe foco
 			input.addEventListener('focus', async e => {
-				const hasKey = e.target.getAttribute('data-has-key') === 'true';
-				const isMasked = e.target.value.includes('••••');
-
+				const hasKey = e.target.dataset.hasKey === 'true';
 				if (hasKey && isMasked) {
 					// 🔥 OPÇÃO 1: Limpa para permitir nova chave
 					e.target.value = '';
@@ -199,7 +202,7 @@ class ConfigManager {
 
 			// 🔥 Ao sair do campo sem alterar, restaura máscara
 			input.addEventListener('blur', e => {
-				const hasKey = e.target.getAttribute('data-has-key') === 'true';
+				const hasKey = e.target.dataset.hasKey === 'true';
 				const isEmpty = e.target.value === '' || e.target.value.trim() === '';
 
 				if (hasKey && isEmpty) {
@@ -247,7 +250,7 @@ class ConfigManager {
 				}
 
 				const provider = targetId.replace('-api-key', ''); // 'openai-api-key' -> 'openai'
-				const hasKey = input.getAttribute('data-has-key') === 'true';
+				const hasKey = input.dataset.hasKey === 'true';
 				const isMasked = input.value.includes('•');
 				const hasNewValue = input.value && input.value.trim().length > 0 && !isMasked;
 
@@ -302,15 +305,15 @@ class ConfigManager {
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
 					if (input.id === 'audio-input-device') {
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
-						if (window.RendererAPI?.stopInput) {
-							window.RendererAPI.stopInput().catch(err => {
+						if (globalThis.RendererAPI?.stopInput) {
+							globalThis.RendererAPI.stopInput().catch(err => {
 								console.warn('⚠️ Erro ao parar input monitor:', err);
 							});
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
 							setTimeout(() => {
-								if (window.RendererAPI?.startInputVolumeMonitoring) {
-									window.RendererAPI.startInputVolumeMonitoring().catch(err => {
+								if (globalThis.RendererAPI?.startInputVolumeMonitoring) {
+									globalThis.RendererAPI.startInputVolumeMonitoring().catch(err => {
 										console.error('❌ Erro ao reiniciar monitoramento input:', err);
 									});
 								}
@@ -318,15 +321,15 @@ class ConfigManager {
 						}
 					} else if (input.id === 'audio-output-device') {
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
-						if (window.RendererAPI?.stopOutput) {
-							window.RendererAPI.stopOutput().catch(err => {
+						if (globalThis.RendererAPI?.stopOutput) {
+							globalThis.RendererAPI.stopOutput().catch(err => {
 								console.warn('⚠️ Erro ao parar output monitor:', err);
 							});
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
 							setTimeout(() => {
-								if (window.RendererAPI?.startOutputVolumeMonitoring) {
-									window.RendererAPI.startOutputVolumeMonitoring().catch(err => {
+								if (globalThis.RendererAPI?.startOutputVolumeMonitoring) {
+									globalThis.RendererAPI.startOutputVolumeMonitoring().catch(err => {
 										console.error('❌ Erro ao reiniciar monitoramento output:', err);
 									});
 								}
@@ -391,7 +394,7 @@ class ConfigManager {
 			if (hasKey) {
 				// 🔥 CORRIGIDO: Mostra como configurada (mascarada)
 				input.value = '••••••••••••••••••••••••••';
-				input.setAttribute('data-has-key', 'true');
+				input.dataset.hasKey = 'true';
 				input.placeholder = 'API key configurada (clique para alterar)';
 				input.type = 'password'; // 🔥 Garante que inicie mascarado
 
@@ -399,7 +402,7 @@ class ConfigManager {
 			} else {
 				// 🔥 CORRIGIDO: Mostra como vazia
 				input.value = '';
-				input.setAttribute('data-has-key', 'false');
+				input.dataset.hasKey = 'false';
 				input.placeholder = 'Insira sua API key';
 				input.type = 'password';
 
@@ -731,16 +734,16 @@ class ConfigManager {
 		const outputSelect = document.getElementById('audio-output-device');
 
 		// Verifica se o RendererAPI está disponível (carregado via renderer.js)
-		if (!window.RendererAPI) return;
+		if (!globalThis.RendererAPI) return;
 
 		if (inputSelect?.value) {
 			console.log('📊 [Tab Audio] Iniciando monitoramento input:', inputSelect.value);
-			await window.RendererAPI.startInputVolumeMonitoring();
+			await globalThis.RendererAPI.startInputVolumeMonitoring();
 		}
 
 		if (outputSelect?.value) {
 			console.log('📊 [Tab Audio] Iniciando monitoramento output:', outputSelect.value);
-			await window.RendererAPI.startOutputVolumeMonitoring();
+			await globalThis.RendererAPI.startOutputVolumeMonitoring();
 		}
 
 		debugLogConfig('Fim da função: "initAudioMonitoring"');
@@ -748,11 +751,11 @@ class ConfigManager {
 
 	// Método opcional para desligar os medidores ao sair da aba
 	stopAudioMonitoring() {
-		if (window.RendererAPI?.stopInputVolumeMonitoring) {
-			window.RendererAPI.stopInputVolumeMonitoring();
+		if (globalThis.RendererAPI?.stopInputVolumeMonitoring) {
+			globalThis.RendererAPI.stopInputVolumeMonitoring();
 		}
-		if (window.RendererAPI?.stopOutputVolumeMonitoring) {
-			window.RendererAPI.stopOutputVolumeMonitoring();
+		if (globalThis.RendererAPI?.stopOutputVolumeMonitoring) {
+			globalThis.RendererAPI.stopOutputVolumeMonitoring();
 		}
 	}
 
@@ -1062,10 +1065,10 @@ class ConfigManager {
 			// Remove listeners
 			button.classList.remove('recording');
 			button.textContent = 'Gravar Atalho';
-			window.removeEventListener('keydown', handleKeyDown);
+			globalThis.removeEventListener('keydown', handleKeyDown);
 		};
 
-		window.addEventListener('keydown', handleKeyDown);
+		globalThis.addEventListener('keydown', handleKeyDown);
 
 		debugLogConfig('Fim da função: "recordHotkey"');
 	}
@@ -1106,6 +1109,7 @@ class ConfigManager {
 					// Recarrega a página para aplicar as configurações
 					setTimeout(() => location.reload(), 1500);
 				} catch (error) {
+					console.error('Erro ao fazer parse do arquivo de configurações:', error);
 					this.showError('Erro ao importar configurações: arquivo inválido');
 				}
 			};
@@ -1218,7 +1222,7 @@ class ConfigManager {
 			this.registerRendererCallbacks();
 
 			// ✅ 3. Inicializar APP_CONFIG no renderer
-			window.RendererAPI.setAppConfig({ MODE_DEBUG: true });
+			globalThis.RendererAPI.setAppConfig({ MODE_DEBUG: false }); // true para iniciar com debug
 
 			// ✅ 4. Restaurar tema
 			this.restoreTheme();
@@ -1256,7 +1260,7 @@ class ConfigManager {
 			// ✅ 15. Inicializar drag handle
 			const dragHandle = document.getElementById('dragHandle');
 			if (dragHandle) {
-				window.RendererAPI.initDragHandle(dragHandle, document);
+				globalThis.RendererAPI.initDragHandle(dragHandle, document);
 			}
 
 			// ✅ 16. Registrar listeners de erro global
@@ -1298,7 +1302,7 @@ class ConfigManager {
 			opacitySlider: document.getElementById('opacityRange'),
 		};
 
-		window.RendererAPI.registerUIElements(elements);
+		globalThis.RendererAPI.registerUIElements(elements);
 
 		debugLogConfig('Fim da função: "registerUIElements"');
 	}
@@ -1309,19 +1313,19 @@ class ConfigManager {
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
 
 		// VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
-		if (!window.RendererAPI || typeof window.RendererAPI.onUIChange !== 'function') {
-			console.error('❌ ERRO CRÍTICO: window.RendererAPI.onUIChange não disponível!');
+		if (!globalThis.RendererAPI || typeof globalThis.RendererAPI.onUIChange !== 'function') {
+			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI.onUIChange não disponível!');
 			return;
 		}
 
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
-		window.RendererAPI.onUIChange('onError', message => {
+		globalThis.RendererAPI.onUIChange('onError', message => {
 			console.error(`❌ Erro renderizado: ${message}`);
 			this.showError(message);
 		});
 
 		// Transcrição
-		window.RendererAPI.onUIChange('onTranscriptAdd', data => {
+		globalThis.RendererAPI.onUIChange('onTranscriptAdd', data => {
 			const { author, text, timeStr, elementId, placeholderId } = data;
 			const transcriptionBox = document.getElementById(elementId || 'conversation');
 			if (!transcriptionBox) {
@@ -1334,7 +1338,7 @@ class ConfigManager {
 
 			// Se for placeholder (texto = "..."), marca para ser atualizado depois
 			if (text === '...') {
-				div.setAttribute('data-is-placeholder', 'true');
+				div.dataset.isPlaceholder = 'true';
 				// 🔥 ATRIBUIR ID AO ELEMENTO REAL DO DOM
 				if (placeholderId) {
 					div.id = placeholderId;
@@ -1365,14 +1369,14 @@ class ConfigManager {
 		});
 
 		// Status
-		window.RendererAPI.onUIChange('onStatusUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onStatusUpdate', data => {
 			const { message } = data;
 			const statusText = document.getElementById('status');
 			if (statusText) statusText.innerText = message;
 		});
 
 		// Input Volume
-		window.RendererAPI.onUIChange('onInputVolumeUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onInputVolumeUpdate', data => {
 			const { percent } = data;
 			const inputVu = document.getElementById('inputVu');
 			if (inputVu) inputVu.style.width = percent + '%';
@@ -1382,7 +1386,7 @@ class ConfigManager {
 		});
 
 		// Output Volume
-		window.RendererAPI.onUIChange('onOutputVolumeUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onOutputVolumeUpdate', data => {
 			const { percent } = data;
 			const outputVu = document.getElementById('outputVu');
 			if (outputVu) outputVu.style.width = percent + '%';
@@ -1392,7 +1396,7 @@ class ConfigManager {
 		});
 
 		// Mock Badge
-		window.RendererAPI.onUIChange('onMockBadgeUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onMockBadgeUpdate', data => {
 			const { visible } = data;
 			const mockBadge = document.getElementById('mockBadge');
 			if (mockBadge) {
@@ -1401,7 +1405,7 @@ class ConfigManager {
 		});
 
 		// Listen Button Toggle (altera o texto do botão "Começar a Ouvir... (Ctrl+d)")
-		window.RendererAPI.onUIChange('onListenButtonToggle', data => {
+		globalThis.RendererAPI.onUIChange('onListenButtonToggle', data => {
 			const { isRunning, buttonText } = data;
 			const listenBtn = document.getElementById('listenBtn');
 			if (listenBtn) {
@@ -1423,7 +1427,7 @@ class ConfigManager {
 		});
 
 		// Clear All Selections
-		window.RendererAPI.onUIChange('onClearAllSelections', () => {
+		globalThis.RendererAPI.onUIChange('onClearAllSelections', () => {
 			const currentQuestionBox = document.getElementById('currentQuestion');
 			if (currentQuestionBox) currentQuestionBox.classList.remove('selected-question');
 
@@ -1436,7 +1440,7 @@ class ConfigManager {
 		});
 
 		// Scroll to Question
-		window.RendererAPI.onUIChange('onScrollToQuestion', data => {
+		globalThis.RendererAPI.onUIChange('onScrollToQuestion', data => {
 			const { questionId } = data;
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
@@ -1448,7 +1452,7 @@ class ConfigManager {
 		});
 
 		// Pergunta Atual
-		window.RendererAPI.onUIChange('onCurrentQuestionUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onCurrentQuestionUpdate', data => {
 			console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
 			const { text, isSelected } = data;
 			const currentQuestionBox = document.getElementById('currentQuestion');
@@ -1477,7 +1481,7 @@ class ConfigManager {
 		});
 
 		// Histórico de Perguntas
-		window.RendererAPI.onUIChange('onQuestionsHistoryUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onQuestionsHistoryUpdate', data => {
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
 
@@ -1495,7 +1499,7 @@ class ConfigManager {
 		});
 
 		// Answer Selected — exibe resposta existente e faz scroll
-		window.RendererAPI.onUIChange('onAnswerSelected', payload => {
+		globalThis.RendererAPI.onUIChange('onAnswerSelected', payload => {
 			console.log('📌 onAnswerSelected recebido:', payload);
 
 			if (!payload) return;
@@ -1537,79 +1541,6 @@ class ConfigManager {
 
 		// 🔥 COMENTADO: onAnswerAdd - Renderização formatada desabilitada
 		// Apenas streaming (tokens em tempo real) será exibido
-		/*
-		window.RendererAPI.onUIChange('onAnswerAdd', data => {
-			const { questionId, action, html, questionText } = data;
-
-			if (action === 'clearActive') {
-				const answersHistoryBox = document.getElementById('answersHistory');
-				if (answersHistoryBox) {
-					answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => {
-						el.classList.remove('active');
-					});
-				}
-			} else if (action === 'new') {
-				// Cria um novo bloco de resposta vazio
-				const answersHistoryBox = document.getElementById('answersHistory');
-				if (!answersHistoryBox) return;
-
-				const wrapper = document.createElement('div');
-				wrapper.className = 'answer-block active';
-				wrapper.dataset.questionId = questionId;
-				wrapper.innerHTML = `
-					<div class="answer-header">
-						<span class="answer-question">${questionText}</span>
-						<span class="answer-time">${new Date().toLocaleTimeString()}</span>
-					</div>
-					<div class="answer-content">⏳ Aguardando resposta...</div>
-				`;
-				answersHistoryBox.appendChild(wrapper);
-			} else if (action === 'showExisting') {
-				const answersHistoryBox = document.getElementById('answersHistory');
-				if (!answersHistoryBox) return;
-
-				const existingAnswer = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
-				if (existingAnswer) {
-					answersHistoryBox.querySelectorAll('.answer-block.active').forEach(el => el.classList.remove('active'));
-					existingAnswer.classList.add('active');
-					existingAnswer.scrollIntoView({
-						behavior: 'smooth',
-						block: 'nearest',
-					});
-				}
-			} else if (html) {
-				// Atualiza resposta FINAL - NÃO SOBRESCREVER SE JÁ FOI FEITO (STREAMING)
-				const answersHistoryBox = document.getElementById('answersHistory');
-				if (!answersHistoryBox) return;
-
-				let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
-				if (!wrapper) {
-					// Não existe - criar novo (renderização direta, sem streaming prévio)
-					wrapper = document.createElement('div');
-					wrapper.className = 'answer-block';
-					wrapper.dataset.questionId = questionId;
-					wrapper.innerHTML = `
-						<div class="answer-header">
-							<span class="answer-question">${questionText}</span>
-							<span class="answer-time">${new Date().toLocaleTimeString()}</span>
-						</div>
-						<div class="answer-content"></div>
-					`;
-					// 🔥 Inserir no INÍCIO (ordem decrescente)
-					answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
-				}
-
-				// Só atualizar se ainda está vazio ou com placeholder
-				const answerContent = wrapper.querySelector('.answer-content');
-				if (answerContent && (answerContent.textContent === '' || answerContent.textContent.includes('⏳'))) {
-					answerContent.innerHTML = html; // Usar HTML formatado
-				} else {
-					console.log('ℹ️ Resposta já preenchida por streaming, preservando');
-				}
-				wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			}
-		});
-		*/
 
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		// 📊 RASTREAMENTO SIMPLES - currentStreamingQuestionId é SUFICIENTE
@@ -1620,7 +1551,7 @@ class ConfigManager {
 		// 📥 LISTENER: onAnswerStreamChunk
 		// Chamado para CADA token que chega do GPT
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		window.RendererAPI.onUIChange('onAnswerStreamChunk', data => {
+		globalThis.RendererAPI.onUIChange('onAnswerStreamChunk', data => {
 			const { questionId, accum } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1656,10 +1587,12 @@ class ConfigManager {
 				console.log('📊 Total blocos agora:', answersHistoryBox.querySelectorAll('.answer-block').length);
 			}
 
-			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo
+			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
 			const answerContent = wrapper.querySelector('.answer-content');
 			if (answerContent) {
-				answerContent.textContent = accum;
+				// 🔥 Renderizar como markdown em tempo real (estilo GPT)
+				const htmlContent = marked.parse(accum);
+				answerContent.innerHTML = htmlContent;
 				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'auto' });
 			}
 		});
@@ -1668,7 +1601,7 @@ class ConfigManager {
 		// 🔄 LISTENER: onAnswerIdUpdate
 		// Chamado quando CURRENT → 1, 2, 3, etc
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		window.RendererAPI.onUIChange('onAnswerIdUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onAnswerIdUpdate', data => {
 			const { oldId, newId } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1693,13 +1626,13 @@ class ConfigManager {
 		// ⏹️ LISTENER: onAnswerStreamEnd
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		window.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
+		globalThis.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
 			console.log('✅ [STREAM_END] Limpando streamingQuestionId');
 			currentStreamingQuestionId = null;
 		});
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
-		window.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
+		globalThis.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
 			console.log('🔔 onPlaceholderFulfill recebido:', data);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
@@ -1743,7 +1676,7 @@ class ConfigManager {
 			}
 
 			targetPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
-			targetPlaceholder.removeAttribute('data-is-placeholder');
+			delete targetPlaceholder.dataset.isPlaceholder;
 
 			console.log('✅ Placeholder atualizado:', text.substring(0, 50) + '...');
 
@@ -1760,8 +1693,8 @@ class ConfigManager {
 		});
 
 		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
-		window.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
-			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total, provisional } = data;
+		globalThis.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
+			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total } = data;
 
 			const transcriptionBox = document.getElementById('conversation');
 			if (!transcriptionBox) return;
@@ -1771,7 +1704,7 @@ class ConfigManager {
 			if (!placeholders || placeholders.length === 0) {
 				const div = document.createElement('div');
 				div.className = 'transcript-item';
-				div.setAttribute('data-is-placeholder', 'true');
+				div.dataset.isPlaceholder = 'true';
 				const ts = timeStr || new Date().toLocaleTimeString();
 				div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
 				transcriptionBox.appendChild(div);
@@ -1822,26 +1755,26 @@ class ConfigManager {
 		});
 
 		// Clear Transcription
-		window.RendererAPI.onUIChange('onTranscriptionCleared', () => {
+		globalThis.RendererAPI.onUIChange('onTranscriptionCleared', () => {
 			const transcriptionBox = document.getElementById('conversation');
 			if (transcriptionBox) transcriptionBox.innerHTML = '';
 		});
 
 		// Clear Answers
-		window.RendererAPI.onUIChange('onAnswersCleared', () => {
+		globalThis.RendererAPI.onUIChange('onAnswersCleared', () => {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (answersHistoryBox) answersHistoryBox.innerHTML = '';
 		});
 
 		// Mode Select Update
-		window.RendererAPI.onUIChange('onModeSelectUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onModeSelectUpdate', data => {
 			const { mode } = data;
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			if (interviewModeSelect) interviewModeSelect.value = mode;
 		});
 
 		// 📸 NOVO: Screenshot badge
-		window.RendererAPI.onUIChange('onScreenshotBadgeUpdate', data => {
+		globalThis.RendererAPI.onUIChange('onScreenshotBadgeUpdate', data => {
 			const { count, visible } = data;
 			const badge = document.getElementById('screenshotBadge');
 
@@ -1866,8 +1799,8 @@ class ConfigManager {
 		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
 
 		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
-		if (!window.RendererAPI) {
-			console.error('❌ ERRO CRÍTICO: window.RendererAPI não disponível em registerDOMEventListeners!');
+		if (!globalThis.RendererAPI) {
+			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI não disponível em registerDOMEventListeners!');
 			return;
 		}
 
@@ -1877,12 +1810,12 @@ class ConfigManager {
 			inputSelect.addEventListener('change', async () => {
 				console.log('📝 Input device mudou');
 				this.saveDevices();
-				if (window.RendererAPI?.stopInput) {
-					window.RendererAPI.stopInput();
+				if (globalThis.RendererAPI?.stopInput) {
+					globalThis.RendererAPI.stopInput();
 				}
 				if (!inputSelect.value) return;
-				if (window.RendererAPI?.startInput) {
-					await window.RendererAPI.startInput();
+				if (globalThis.RendererAPI?.startInput) {
+					await globalThis.RendererAPI.startInput();
 				}
 			});
 		}
@@ -1893,12 +1826,12 @@ class ConfigManager {
 			outputSelect.addEventListener('change', async () => {
 				console.log('📝 Output device mudou');
 				this.saveDevices();
-				if (window.RendererAPI?.stopOutput) {
-					window.RendererAPI.stopOutput();
+				if (globalThis.RendererAPI?.stopOutput) {
+					globalThis.RendererAPI.stopOutput();
 				}
 				if (!outputSelect.value) return;
-				if (window.RendererAPI?.startOutput) {
-					await window.RendererAPI.startOutput();
+				if (globalThis.RendererAPI?.startOutput) {
+					await globalThis.RendererAPI.startOutput();
 				}
 			});
 		}
@@ -1908,52 +1841,52 @@ class ConfigManager {
 		if (mockToggle) {
 			mockToggle.addEventListener('change', async () => {
 				console.log('📝 Mock toggle mudou');
-				if (!window.RendererAPI) return;
+				if (!globalThis.RendererAPI) return;
 
 				const isEnabled = mockToggle.checked;
-				if (window.RendererAPI?.setAppConfig) {
-					window.RendererAPI.setAppConfig({
-						...window.RendererAPI.getAppConfig(),
+				if (globalThis.RendererAPI?.setAppConfig) {
+					globalThis.RendererAPI.setAppConfig({
+						...globalThis.RendererAPI.getAppConfig(),
 						MODE_DEBUG: isEnabled,
 					});
 				}
 
 				if (isEnabled) {
-					window.RendererAPI?.updateMockBadge(true);
+					globalThis.RendererAPI?.updateMockBadge(true);
 					// 🔥 Usa resetAppState() para limpar TUDO antes de iniciar mock
-					if (window.RendererAPI?.resetAppState && typeof window.RendererAPI.resetAppState === 'function') {
+					if (globalThis.RendererAPI?.resetAppState && typeof globalThis.RendererAPI.resetAppState === 'function') {
 						console.log('🧹 Disparando resetAppState() - limpeza antes do mock');
-						await window.RendererAPI.resetAppState();
+						await globalThis.RendererAPI.resetAppState();
 					}
 					// 🎭 Resetar índice e iniciar autoplay com delay
-					window.mockScenarioIndex = 0;
-					window.mockAutoPlayActive = false;
+					globalThis.mockScenarioIndex = 0;
+					globalThis.mockAutoPlayActive = false;
 					console.log('🎭 Mock mode ATIVADO - autoplay iniciará em 2 segundos...');
 
 					// Chamar runMockAutoPlay() após delay para deixar UI resetar
 					setTimeout(() => {
-						if (window.runMockAutoPlay && typeof window.runMockAutoPlay === 'function') {
+						if (globalThis.runMockAutoPlay && typeof globalThis.runMockAutoPlay === 'function') {
 							console.log('🎭 Disparando runMockAutoPlay() do config-manager');
-							window.runMockAutoPlay();
+							globalThis.runMockAutoPlay();
 						} else {
 							console.warn('⚠️ runMockAutoPlay() não está disponível em window');
 						}
 					}, 2000);
 				} else {
-					window.RendererAPI?.updateMockBadge(false);
+					globalThis.RendererAPI?.updateMockBadge(false);
 					// 🔥 NOVO: Usar resetAppState() para limpar TUDO completamente
-					if (window.RendererAPI?.resetAppState && typeof window.RendererAPI.resetAppState === 'function') {
+					if (globalThis.RendererAPI?.resetAppState && typeof globalThis.RendererAPI.resetAppState === 'function') {
 						console.log('🧹 Disparando resetAppState() - limpeza completa ao desativar mock');
-						await window.RendererAPI.resetAppState();
+						await globalThis.RendererAPI.resetAppState();
 					} else {
-						console.warn('⚠️ resetAppState() não está disponível em window.RendererAPI');
+						console.warn('⚠️ resetAppState() não está disponível em globalThis.RendererAPI');
 					}
 				}
 			});
 
 			// 🔥 NOVO: Sincronizar toggle com APP_CONFIG inicial (MODE_DEBUG)
 			// Faz DEPOIS de registrar o listener para disparar o evento se necessário
-			const currentConfig = window.RendererAPI?.getAppConfig?.();
+			const currentConfig = globalThis.RendererAPI?.getAppConfig?.();
 			if (currentConfig && currentConfig.MODE_DEBUG) {
 				mockToggle.checked = true;
 				// Dispara o evento change para REALMENTE ativar o modo debug
@@ -1968,10 +1901,10 @@ class ConfigManager {
 			listenBtn.addEventListener('click', e => {
 				console.log('Botão listenBtn clicado!');
 
-				if (window.RendererAPI?.listenToggleBtn) {
-					window.RendererAPI.listenToggleBtn();
+				if (globalThis.RendererAPI?.listenToggleBtn) {
+					globalThis.RendererAPI.listenToggleBtn();
 				} else {
-					console.error('❌ window.RendererAPI.listenToggleBtn não está disponível!');
+					console.error('❌ globalThis.RendererAPI.listenToggleBtn não está disponível!');
 				}
 			});
 		}
@@ -1981,8 +1914,8 @@ class ConfigManager {
 		if (askBtn) {
 			askBtn.addEventListener('click', () => {
 				console.log('🔊 DEBUG: askGptBtn clicado!');
-				if (window.RendererAPI?.askGpt) {
-					window.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+				if (globalThis.RendererAPI?.askGpt) {
+					globalThis.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 					// console.error(
 					// 	'registerDOMEventListeners: askGpt() 1759; 🔒 COMENTADA até transcrição em tempo real funcionar',
 					// );
@@ -2004,9 +1937,9 @@ class ConfigManager {
 		if (questionsHistoryBox) {
 			questionsHistoryBox.addEventListener('click', e => {
 				const questionBlock = e.target.closest('.question-block');
-				if (questionBlock && window.RendererAPI?.handleQuestionClick) {
+				if (questionBlock && globalThis.RendererAPI?.handleQuestionClick) {
 					const questionId = questionBlock.dataset.qid || questionBlock.id;
-					window.RendererAPI.handleQuestionClick(questionId);
+					globalThis.RendererAPI.handleQuestionClick(questionId);
 				}
 			});
 		}
@@ -2022,8 +1955,8 @@ class ConfigManager {
 			const saved = localStorage.getItem('useLocalWhisper') === 'true';
 			whisperToggle.checked = saved;
 
-			if (window.RendererAPI?.setTranscriptionMode) {
-				window.RendererAPI.setTranscriptionMode(saved);
+			if (globalThis.RendererAPI?.setTranscriptionMode) {
+				globalThis.RendererAPI.setTranscriptionMode(saved);
 			}
 			whisperStatus.textContent = saved ? '✅ Whisper Local (Ativo)' : '🌐 OpenAI (Ativo)';
 
@@ -2032,8 +1965,8 @@ class ConfigManager {
 				const useLocal = e.target.checked;
 				localStorage.setItem('useLocalWhisper', useLocal);
 
-				if (window.RendererAPI?.setTranscriptionMode) {
-					window.RendererAPI.setTranscriptionMode(useLocal);
+				if (globalThis.RendererAPI?.setTranscriptionMode) {
+					globalThis.RendererAPI.setTranscriptionMode(useLocal);
 				}
 
 				whisperStatus.textContent = useLocal ? '✅ Whisper Local (Ativo)' : '🌐 OpenAI (Ativo)';
@@ -2046,9 +1979,9 @@ class ConfigManager {
 		const clearScreenshotsBtn = document.getElementById('clearScreenshotsBtn');
 		if (clearScreenshotsBtn) {
 			clearScreenshotsBtn.addEventListener('click', () => {
-				if (!window.RendererAPI?.clearScreenshots) return;
+				if (!globalThis.RendererAPI?.clearScreenshots) return;
 
-				const count = window.RendererAPI.getScreenshotCount();
+				const count = globalThis.RendererAPI.getScreenshotCount();
 				if (count === 0) {
 					console.log('ℹ️ Nenhum screenshot para limpar');
 					return;
@@ -2056,7 +1989,7 @@ class ConfigManager {
 
 				const confirmed = confirm(`Deseja limpar ${count} screenshot(s)?`);
 				if (confirmed) {
-					window.RendererAPI.clearScreenshots();
+					globalThis.RendererAPI.clearScreenshots();
 					console.log('✅ Screenshots limpos pelo usuário');
 				}
 			});
@@ -2073,14 +2006,14 @@ class ConfigManager {
 		console.log('🔥 registerIPCListeners: Iniciando registro de IPC listeners...');
 
 		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
-		if (!window.RendererAPI) {
-			console.error('❌ ERRO CRÍTICO: window.RendererAPI não disponível em registerIPCListeners!');
+		if (!globalThis.RendererAPI) {
+			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI não disponível em registerIPCListeners!');
 			return;
 		}
 
 		// API Key updated
-		if (window.RendererAPI?.onApiKeyUpdated) {
-			window.RendererAPI.onApiKeyUpdated((_, success) => {
+		if (globalThis.RendererAPI?.onApiKeyUpdated) {
+			globalThis.RendererAPI.onApiKeyUpdated((_, success) => {
 				const statusText = document.getElementById('status');
 				if (success) {
 					console.log('✅ API key atualizada com sucesso');
@@ -2099,19 +2032,19 @@ class ConfigManager {
 		}
 
 		// Toggle audio (global shortcut)
-		if (window.RendererAPI?.onToggleAudio) {
-			window.RendererAPI.onToggleAudio(() => {
-				if (window.RendererAPI?.listenToggleBtn) {
-					window.RendererAPI.listenToggleBtn();
+		if (globalThis.RendererAPI?.onToggleAudio) {
+			globalThis.RendererAPI.onToggleAudio(() => {
+				if (globalThis.RendererAPI?.listenToggleBtn) {
+					globalThis.RendererAPI.listenToggleBtn();
 				}
 			});
 		}
 
 		// Ask GPT (global shortcut)
-		if (window.RendererAPI?.onAskGpt) {
-			window.RendererAPI.onAskGpt(() => {
-				if (window.RendererAPI?.askGpt) {
-					window.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+		if (globalThis.RendererAPI?.onAskGpt) {
+			globalThis.RendererAPI.onAskGpt(() => {
+				if (globalThis.RendererAPI?.askGpt) {
+					globalThis.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 					// console.error(
 					// 	'registerDOMEventListeners: askGpt() 1867; 🔒 COMENTADA até transcrição em tempo real funcionar',
 					// );
@@ -2120,46 +2053,46 @@ class ConfigManager {
 		}
 
 		// GPT Stream chunks
-		if (window.RendererAPI?.onGptStreamChunk) {
-			window.RendererAPI.onGptStreamChunk((_, token) => {
+		if (globalThis.RendererAPI?.onGptStreamChunk) {
+			globalThis.RendererAPI.onGptStreamChunk((_, token) => {
 				// Handled in renderer service
 			});
 		}
 
 		// GPT Stream end
-		if (window.RendererAPI?.onGptStreamEnd) {
-			window.RendererAPI.onGptStreamEnd(() => {
+		if (globalThis.RendererAPI?.onGptStreamEnd) {
+			globalThis.RendererAPI.onGptStreamEnd(() => {
 				// Handled in renderer service
 			});
 		}
 
 		// 📸 NOVO: Screenshot shortcuts
-		if (window.RendererAPI?.onCaptureScreenshot) {
-			window.RendererAPI.onCaptureScreenshot(() => {
+		if (globalThis.RendererAPI?.onCaptureScreenshot) {
+			globalThis.RendererAPI.onCaptureScreenshot(() => {
 				console.log('📸 Atalho Ctrl+Shift+F detectado');
-				if (window.RendererAPI?.captureScreenshot) {
-					window.RendererAPI.captureScreenshot();
+				if (globalThis.RendererAPI?.captureScreenshot) {
+					globalThis.RendererAPI.captureScreenshot();
 				}
 			});
 		}
 
 		//📸 NOVO: Analyze screenshots shortcut
-		if (window.RendererAPI?.onAnalyzeScreenshots) {
-			window.RendererAPI.onAnalyzeScreenshots(() => {
+		if (globalThis.RendererAPI?.onAnalyzeScreenshots) {
+			globalThis.RendererAPI.onAnalyzeScreenshots(() => {
 				console.log('🔍 Atalho Ctrl+Shift+G detectado');
-				if (window.RendererAPI?.analyzeScreenshots) {
-					window.RendererAPI.analyzeScreenshots();
+				if (globalThis.RendererAPI?.analyzeScreenshots) {
+					globalThis.RendererAPI.analyzeScreenshots();
 				}
 			});
 		}
 
 		// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut)
-		if (window.RendererAPI?.onNavigateQuestions) {
-			window.RendererAPI.onNavigateQuestions(direction => {
+		if (globalThis.RendererAPI?.onNavigateQuestions) {
+			globalThis.RendererAPI.onNavigateQuestions(direction => {
 				console.log(`⬆️⬇️ Navegacao de perguntas: ${direction}`);
 				// Chama a função de navegação diretamente (sem disparar KeyboardEvent que não funciona com focusable: false)
-				if (window.RendererAPI?.navigateQuestions) {
-					window.RendererAPI.navigateQuestions(direction);
+				if (globalThis.RendererAPI?.navigateQuestions) {
+					globalThis.RendererAPI.navigateQuestions(direction);
 				}
 			});
 		}
@@ -2171,15 +2104,15 @@ class ConfigManager {
 
 	registerErrorHandlers() {
 		debugLogConfig('Início da função: "registerErrorHandlers"');
-		window.addEventListener('error', e => {
-			window.RendererAPI.sendRendererError({
+		globalThis.addEventListener('error', e => {
+			globalThis.RendererAPI.sendRendererError({
 				message: String(e.message || e),
 				stack: e.error?.stack || null,
 			});
 		});
 
-		window.addEventListener('unhandledrejection', e => {
-			window.RendererAPI.sendRendererError({
+		globalThis.addEventListener('unhandledrejection', e => {
+			globalThis.RendererAPI.sendRendererError({
 				message: String(e.reason),
 				stack: e.reason?.stack || null,
 			});
@@ -2223,13 +2156,13 @@ class ConfigManager {
 			const savedOpacity = localStorage.getItem('overlayOpacity');
 			if (savedOpacity) {
 				opacitySlider.value = savedOpacity;
-				window.RendererAPI.applyOpacity(savedOpacity);
+				globalThis.RendererAPI.applyOpacity(savedOpacity);
 			} else {
-				window.RendererAPI.applyOpacity(opacitySlider.value || 0.75);
+				globalThis.RendererAPI.applyOpacity(opacitySlider.value || 0.75);
 			}
 
 			opacitySlider.addEventListener('input', e => {
-				window.RendererAPI.applyOpacity(e.target.value);
+				globalThis.RendererAPI.applyOpacity(e.target.value);
 			});
 		} catch (err) {
 			console.warn('⚠️ Erro ao restaurar opacidade:', err);
@@ -2244,13 +2177,13 @@ class ConfigManager {
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			const savedMode = localStorage.getItem('appMode') || 'NORMAL';
 
-			window.RendererAPI.changeMode(savedMode);
+			globalThis.RendererAPI.changeMode(savedMode);
 			if (interviewModeSelect) {
 				interviewModeSelect.value = savedMode;
 
 				interviewModeSelect.addEventListener('change', () => {
 					const newMode = interviewModeSelect.value;
-					window.RendererAPI.changeMode(newMode);
+					globalThis.RendererAPI.changeMode(newMode);
 					localStorage.setItem('appMode', newMode);
 					console.log('🎯 Modo alterado:', newMode);
 				});
@@ -2278,13 +2211,13 @@ class ConfigManager {
 				console.warn('⚠️ Erro ao recuperar click-through state:', err);
 			}
 
-			await window.RendererAPI.setClickThrough(enabled);
-			window.RendererAPI.updateClickThroughButton(enabled, btnToggle);
+			await globalThis.RendererAPI.setClickThrough(enabled);
+			globalThis.RendererAPI.updateClickThroughButton(enabled, btnToggle);
 
 			btnToggle.addEventListener('click', async () => {
 				enabled = !enabled;
-				await window.RendererAPI.setClickThrough(enabled);
-				window.RendererAPI.updateClickThroughButton(enabled, btnToggle);
+				await globalThis.RendererAPI.setClickThrough(enabled);
+				globalThis.RendererAPI.updateClickThroughButton(enabled, btnToggle);
 				localStorage.setItem('clickThroughEnabled', enabled.toString());
 				console.log('🖱️ Click-through alternado:', enabled);
 			});
@@ -2310,12 +2243,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 	debugLogConfig('Início da função: "DOMContentLoaded"');
 	// 🔥 Espera pela disponibilidade de RendererAPI (carregado via renderer.js)
 	let attempts = 0;
-	while (!window.RendererAPI && attempts < 50) {
+	while (!globalThis.RendererAPI && attempts < 50) {
 		await new Promise(resolve => setTimeout(resolve, 100));
 		attempts++;
 	}
 
-	if (!window.RendererAPI) {
+	if (!globalThis.RendererAPI) {
 		console.error('❌ RendererAPI não foi carregado após timeout');
 		return;
 	}
@@ -2325,15 +2258,15 @@ document.addEventListener('DOMContentLoaded', async () => {
 	// All event listeners and renderer service calls
 	// ======================================================
 
-	window.configManager = new ConfigManager();
+	globalThis.configManager = new ConfigManager();
 
-	await window.configManager.initializeController();
+	await globalThis.configManager.initializeController();
 
 	// 🔥 NOVO: Aguarda verificação inicial das API keys
-	await window.configManager.checkApiKeysStatus();
+	await globalThis.configManager.checkApiKeysStatus();
 
 	// 🔥 NOVO: Atualiza UI dos modelos após carregar keys
-	window.configManager.updateModelStatusUI();
+	globalThis.configManager.updateModelStatusUI();
 
 	console.log('✅ ConfigManager inicializado com sucesso');
 
@@ -2344,5 +2277,3 @@ document.addEventListener('DOMContentLoaded', async () => {
 function debugLogConfig(msg) {
 	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
 }
-
-//console.log('🚀 Entrou no config-manager.js');

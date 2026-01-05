@@ -484,6 +484,134 @@ body {
 	margin-top: 12px;
 }
 
+/* 🔥 MARKDOWN FORMATTING - Estilo GPT */
+.answer-content {
+	font-size: 14px;
+	line-height: 1.6;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+}
+
+.answer-content h1,
+.answer-content h2,
+.answer-content h3,
+.answer-content h4,
+.answer-content h5,
+.answer-content h6 {
+	margin: 16px 0 8px 0;
+	font-weight: 600;
+	color: rgba(var(--text-main-rgb), 1);
+}
+
+.answer-content h1 {
+	font-size: 24px;
+}
+
+.answer-content h2 {
+	font-size: 20px;
+}
+
+.answer-content h3 {
+	font-size: 18px;
+}
+
+.answer-content p {
+	margin: 8px 0;
+	color: rgba(var(--text-main-rgb), 1);
+}
+
+.answer-content ul,
+.answer-content ol {
+	margin: 8px 0;
+	padding-left: 20px;
+	color: rgba(var(--text-main-rgb), 1);
+}
+
+.answer-content li {
+	margin: 4px 0;
+}
+
+.answer-content blockquote {
+	border-left: 3px solid rgba(var(--color-active-rgb), 0.5);
+	padding-left: 12px;
+	margin: 8px 0;
+	color: var(--text-muted);
+	font-style: italic;
+}
+
+.answer-content pre {
+	background: rgba(var(--color-code-bg-rgb), var(--app-opacity));
+	border: 1px solid var(--border-default);
+	border-radius: 6px;
+	padding: 12px;
+	margin: 8px 0;
+	overflow-x: auto;
+	font-family: Consolas, 'Courier New', monospace;
+	font-size: 13px;
+}
+
+.answer-content pre code {
+	background: transparent;
+	padding: 0;
+	color: rgba(var(--color-code-text-rgb), 1);
+}
+
+.answer-content code {
+	background: rgba(var(--color-code-bg-rgb), 0.5);
+	color: rgba(var(--color-code-text-rgb), 1);
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-family: Consolas, monospace;
+	font-size: 13px;
+}
+
+.answer-content a {
+	color: rgba(var(--color-active-rgb), 1);
+	text-decoration: none;
+	cursor: pointer;
+	transition: opacity 0.2s;
+}
+
+.answer-content a:hover {
+	opacity: 0.8;
+	text-decoration: underline;
+}
+
+.answer-content strong {
+	font-weight: 600;
+	color: rgba(var(--text-main-rgb), 1);
+}
+
+.answer-content em {
+	font-style: italic;
+	color: rgba(var(--text-main-rgb), 1);
+}
+
+.answer-content table {
+	border-collapse: collapse;
+	margin: 8px 0;
+	width: 100%;
+	font-size: 13px;
+}
+
+.answer-content table th,
+.answer-content table td {
+	border: 1px solid var(--border-default);
+	padding: 8px;
+	text-align: left;
+}
+
+.answer-content table th {
+	background: rgba(var(--color-active-rgb), 0.15);
+	font-weight: 600;
+}
+
+.answer-content hr {
+	border: none;
+	border-top: 2px solid var(--border-muted);
+	margin: 16px 0;
+}
+
 /* =========================================================
    6. SEÇÕES DE CONFIGURAÇÃO E TABS
 ========================================================= */
