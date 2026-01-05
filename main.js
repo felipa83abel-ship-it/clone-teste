@@ -1146,7 +1146,7 @@ function createWindow() {
 		hasShadow: false, // Sem sombras
 
 		skipTaskbar: true, // Não aparece na barra de tarefas
-		focusable: false, // Não recebe foco (reduz detectabilidade)
+		// focusable: false, // Não recebe foco (reduz detectabilidade)
 		alwaysOnTop: true, // Janela sempre acima das outras
 		alwaysOnTopLevel: 'screen-saver', // Nível mais alto
 

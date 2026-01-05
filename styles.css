@@ -47,6 +47,7 @@
 	--color-vu-green-rgb: 76, 175, 80;
 	--color-vu-yellow-rgb: 255, 235, 59;
 	--color-vu-red-rgb: 244, 67, 54;
+	--color-click-through-rgb: 40, 40, 40;
 }
 
 body.dark {
@@ -87,9 +88,6 @@ body {
 	background: rgba(var(--color-black-rgb), 0);
 
 	border-radius: 12px;
-	overflow: hidden;
-
-	/* sombra continua funcionando no overlay */
 	box-shadow: 0 12px 32px rgba(var(--color-black-rgb), 0.45), 0 0 0 1px rgba(var(--color-white-rgb), 0.06);
 }
 
@@ -99,7 +97,8 @@ body {
 	transition: var(--menu-transition);
 	display: flex;
 	flex-direction: column;
-	height: calc(100vh - var(--app-top-bar-height));
+	height: 100%;
+	max-height: calc(100vh - var(--app-top-bar-height));
 }
 
 /* =========================================================
@@ -332,13 +331,12 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 16px;
-	padding: 4px;
 	background: rgba(var(--bg-panel-rgb), 0.5);
 	border-bottom: 1px solid var(--border-default);
+	padding-bottom: 5px;
 }
 
 .vu-meter-home {
-	/* flex: 1; */
 	display: flex;
 	gap: 4px;
 	align-items: center;
@@ -379,6 +377,7 @@ body {
 	overflow-y: auto;
 	background: rgba(var(--bg-panel-rgb), var(--app-opacity));
 	color: rgba(var(--text-main-rgb), var(--app-opacity));
+	border-top: 1px solid #ccc;
 }
 
 /* ÁREA DE PERGUNTAS (ESQUERDA) */
@@ -450,6 +449,14 @@ body {
 	background: rgba(var(--bg-highlight-rgb), var(--app-opacity));
 }
 
+.answer-block.selected-answer {
+	border-left: 6px solid rgba(var(--color-active-rgb), 1) !important;
+	background: rgba(var(--color-active-rgb), 0.2) !important;
+	padding-left: 12px;
+	box-shadow: inset -3px 0 0 0 rgba(var(--color-active-rgb), 0.5), 0 0 8px rgba(var(--color-active-rgb), 0.3) !important;
+	border-bottom: 2px solid rgba(var(--color-active-rgb), 0.4) !important;
+}
+
 .answer-question {
 	margin-bottom: 8px;
 	font-weight: bold;
@@ -486,18 +493,18 @@ body {
 	padding: 24px;
 	background: rgba(var(--bg-panel-rgb), var(--app-opacity));
 	box-shadow: 0 2px 8px rgba(var(--color-black-rgb), 0.1);
+	box-sizing: border-box;
 }
 
 .config-section.active {
 	display: block;
-	animation: fadeIn 0.3s ease;
 }
 
 .config-section h2 {
 	display: flex;
 	align-items: center;
 	gap: 12px;
-	margin: 0 0 24px 0;
+	margin: 0 0 16px 0;
 	color: rgba(var(--text-main-rgb), 0.9);
 	font-size: 20px;
 }
@@ -510,7 +517,6 @@ body {
 .config-tabs {
 	background: rgba(var(--bg-main-rgb), var(--app-opacity));
 	border-radius: 8px;
-	overflow: hidden;
 }
 
 .tab-buttons {
@@ -560,9 +566,6 @@ body {
 /* =========================================================
    7. ELEMENTOS DE FORMULÁRIO (INPUTS/BOTÕES)
 ========================================================= */
-.config-form {
-	max-width: 600px;
-}
 
 .form-group {
 	margin-bottom: 20px;
@@ -616,6 +619,7 @@ textarea:focus {
 	display: flex;
 	gap: 8px;
 	align-items: center;
+	width: 455px;
 }
 
 .api-key-input {
@@ -647,7 +651,7 @@ textarea:focus {
 	display: flex;
 	flex-wrap: wrap;
 	gap: 12px;
-	margin-top: 24px;
+	margin-top: 20px;
 }
 
 .btn-activate {
@@ -673,6 +677,10 @@ textarea:focus {
 
 .btn-activate.listening:hover {
 	background: rgba(var(--color-danger-hover-rgb), var(--app-opacity));
+}
+
+.model-status .btn-activate {
+	padding: 15px 16px;
 }
 
 /* 🔥 Botão Reset Temporário */
@@ -955,8 +963,8 @@ input:checked + .slider:before {
 }
 
 .status-badge {
-	padding: 6px 12px;
-	border-radius: 20px;
+	padding: 16px 16px;
+	border-radius: 6px;
 	font-size: 12px;
 	font-weight: 600;
 	display: inline-flex;
@@ -1106,6 +1114,7 @@ input:checked + .slider:before {
 	opacity: 0.5;
 	height: 48px;
 	border-top: 1px solid var(--border-muted);
+	background: rgba(var(--color-click-through-rgb), 0.2);
 }
 
 /* =========================================================
@@ -1178,7 +1187,7 @@ input:checked + .slider:before {
 	}
 }
 
-/* ajustar depois */
+/* colocar no local corretodepois */
 
 .form-group-top {
 	display: flex;
@@ -1196,4 +1205,41 @@ input:checked + .slider:before {
 .interviewMode .interactive-zone {
 	padding: 4px 4px;
 	font-size: 10px;
+}
+
+.flex {
+	display: flex;
+}
+.space-between {
+	justify-content: space-between;
+}
+
+/* =========================================================
+   HEADER SECTIONS (Questions & Answers)
+========================================================= */
+.questions-header {
+	border-bottom: 1px solid #ccc;
+	min-height: 32px;
+	display: flex;
+	justify-content: space-around;
+	align-items: center;
+	color: rgb(var(--text-main-rgb));
+}
+
+.answers-header {
+	border-bottom: 1px solid #ccc;
+	height: 32px;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	padding: 0 8px;
+	color: rgb(var(--text-main-rgb));
+}
+
+/* =========================================================
+   FORM GROUP FLEX LAYOUT
+========================================================= */
+.form-group-flex {
+	display: flex;
+	gap: 16px;
 }

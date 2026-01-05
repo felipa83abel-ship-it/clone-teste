@@ -7,7 +7,6 @@ const hljs = require('highlight.js');
 
 // 🔒 DESABILITADO TEMPORARIAMENTE
 const DESABILITADO_TEMPORARIAMENTE = false;
-const ASK_GPT_DESABILITADO_TEMPORARIAMENTE = true;
 
 /* ===============================
    🔐 PROTEÇÃO CONTRA CAPTURA DE TELA EXTERNA
@@ -157,6 +156,7 @@ let selectedQuestionId = null;
 let interviewTurnId = 0;
 let gptAnsweredTurnId = null;
 let gptRequestedTurnId = null;
+let gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta foi realmente solicitada ao GPT
 let lastSentQuestionText = '';
 let autoCloseQuestionTimer = null;
 let lastInputStartAt = null;
@@ -198,6 +198,7 @@ const UICallbacks = {
 	onTranscriptionCleared: null,
 	onAnswersCleared: null,
 	onAnswerStreamChunk: null,
+	onAnswerIdUpdate: null,
 	onModeSelectUpdate: null,
 	onPlaceholderFulfill: null,
 	onPlaceholderUpdate: null,
@@ -460,7 +461,7 @@ function promoteCurrentToHistory(text) {
 		return;
 	}
 
-	const newId = crypto.randomUUID();
+	const newId = String(questionsHistory.length + 1);
 
 	questionsHistory.push({
 		id: newId,
@@ -468,6 +469,27 @@ function promoteCurrentToHistory(text) {
 		createdAt: currentQuestion.createdAt || Date.now(),
 		lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
 	});
+
+	// 🔥 [IMPORTANTE] Migrar resposta de CURRENT para o novo ID no history
+	if (answeredQuestions.has(CURRENT_QUESTION_ID)) {
+		answeredQuestions.delete(CURRENT_QUESTION_ID);
+		answeredQuestions.add(newId);
+		console.log('🔄 [IMPORTANTE] Migrada resposta de CURRENT para newId:', newId);
+	}
+
+	// 🔥 [CRÍTICO] Atualizar o ID do bloco de resposta no DOM se ele foi criado com CURRENT
+	console.log('🔄 [IMPORTANTE] Emitindo onAnswerIdUpdate para atualizar bloco de resposta: CURRENT → ', newId);
+	emitUIChange('onAnswerIdUpdate', {
+		oldId: CURRENT_QUESTION_ID,
+		newId: newId,
+	});
+
+	// 🔥 [IMPORTANTE] Se uma pergunta CURRENT foi solicitada ao GPT,
+	// atualizar o rastreamento para apontar para o novo ID promovido
+	if (gptRequestedQuestionId === CURRENT_QUESTION_ID) {
+		gptRequestedQuestionId = newId;
+		console.log('🔄 [IMPORTANTE] gptRequestedQuestionId atualizado de CURRENT para newId:', newId);
+	}
 
 	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
 	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
@@ -2168,13 +2190,37 @@ function handleSpeech(author, text) {
 		}
 
 		// 🧠 Detecta início de NOVA pergunta e fecha a anterior
+		// ⚠️ IMPORTANTE: Consolida ANTES de fechar, para evitar perder falas intermidiárias
 		if (
 			currentQuestion.text &&
 			looksLikeQuestion(cleaned) &&
 			now - currentQuestion.lastUpdate > 500 &&
 			!currentQuestion.finalized
 		) {
+			// 🔀 CONSOLIDAÇÃO: Adiciona a fala atual antes de fechar a pergunta anterior
+			// Isso garante que "explique o que é... Y" seja parte da pergunta "Vou começar... X"
+			console.log('🔀 [IMPORTANTE] Consolidando nova fala com pergunta atual antes de fechar:', {
+				current: currentQuestion.text,
+				new: cleaned,
+				currentLength: currentQuestion.text.length,
+				newLength: cleaned.length,
+			});
+			const beforeConsolidate = currentQuestion.text;
+			currentQuestion.text += (currentQuestion.text ? ' ' : '') + cleaned;
+			currentQuestion.lastUpdateTime = now;
+			currentQuestion.lastUpdate = now;
+			console.log('🔀 [IMPORTANTE] Após consolidação:', {
+				before: beforeConsolidate,
+				after: currentQuestion.text,
+				finalLength: currentQuestion.text.length,
+			});
+
 			closeCurrentQuestion();
+
+			// 🛑 Retorna para evitar processar a mesma fala novamente abaixo
+			renderCurrentQuestion();
+			debugLogRenderer('Fim da função: "handleSpeech"');
+			return;
 		}
 
 		if (!currentQuestion.text) {
@@ -2238,7 +2284,7 @@ function closeCurrentQuestion() {
 	if (isIncompleteQuestion(currentQuestion.text)) {
 		console.log('⚠️ pergunta incompleta detectada — promovendo ao histórico como incompleta:', currentQuestion.text);
 
-		const newId = crypto.randomUUID();
+		const newId = String(questionsHistory.length + 1);
 		questionsHistory.push({
 			id: newId,
 			text: currentQuestion.text,
@@ -2279,8 +2325,8 @@ function closeCurrentQuestion() {
 					gptAnsweredTurnId,
 				});
 
-				console.error('closeCurrentQuestion: askGpt() 2017; 🔒 COMENTADA até transcrição em tempo real funcionar');
-				// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+				//console.error('closeCurrentQuestion: askGpt() 2281; 🔒 COMENTADA até transcrição em tempo real funcionar');
+				askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 			}
 
 			return;
@@ -2316,9 +2362,8 @@ function closeCurrentQuestion() {
 				gptAnsweredTurnId,
 			});
 
-			console.error('closeCurrentQuestion: askGpt() 2054; 🔒 COMENTADA até transcrição em tempo real funcionar');
-
-			// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+			//console.error('closeCurrentQuestion: askGpt() 2318; 🔒 COMENTADA até transcrição em tempo real funcionar');
+			askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 		}
 	} else {
 		console.log('🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT');
@@ -2447,6 +2492,7 @@ async function askGpt() {
 	console.log('🧾 askGpt diagnóstico', {
 		textLength: text.length,
 		selectedQuestionId,
+		questionId_variable: questionId, // 🔥 DEBUG: mostrar a variável questionId
 		isInterviewMode: ModeController.isInterviewMode(),
 		interviewTurnId,
 		gptAnsweredTurnId,
@@ -2455,8 +2501,10 @@ async function askGpt() {
 	// marca que este turno teve uma requisição ao GPT (apenas para CURRENT)
 	if (isCurrent) {
 		gptRequestedTurnId = interviewTurnId;
+		gptRequestedQuestionId = CURRENT_QUESTION_ID; // 🔥 [IMPORTANTE] Rastreia qual pergunta foi solicitada
 		lastAskedQuestionNormalized = normalizedText;
 		console.log('ℹ️ gptRequestedTurnId definido para turno', gptRequestedTurnId);
+		console.log('ℹ️ gptRequestedQuestionId definido para:', gptRequestedQuestionId);
 		lastSentQuestionText = text.trim();
 		console.log('ℹ️ lastSentQuestionText definido:', lastSentQuestionText);
 	}
@@ -2496,6 +2544,9 @@ async function askGpt() {
 		let streamedText = '';
 
 		console.log('⏳ enviando para o GPT via stream...');
+
+		// 🔥 Não preparar bloco antes - deixar o primeiro token criar (mais rápido!)
+
 		ipcRenderer
 			.invoke('ask-gpt-stream', [
 				{ role: 'system', content: SYSTEM_PROMPT },
@@ -2508,6 +2559,17 @@ async function askGpt() {
 
 		const onChunk = (_, token) => {
 			streamedText += token;
+
+			// 🔥 DEBUG: Log para rastrear qual questionId está sendo enviado
+			if (streamedText.length <= 50) {
+				console.log('🎬 [onChunk] Enviando para onAnswerStreamChunk:', {
+					questionId,
+					gptRequestedQuestionId,
+					token,
+					accumLength: streamedText.length,
+				});
+			}
+
 			emitUIChange('onAnswerStreamChunk', {
 				questionId,
 				token,
@@ -2542,49 +2604,67 @@ async function askGpt() {
 
 			// garante que o turno foi realmente fechado
 			const wasRequestedForThisTurn = gptRequestedTurnId === interviewTurnId;
+			const requestedQuestionId = gptRequestedQuestionId; // 🔥 Qual pergunta foi REALMENTE solicitada
 
 			gptAnsweredTurnId = interviewTurnId;
 			gptRequestedTurnId = null;
+			gptRequestedQuestionId = null; // 🔥 Limpa após usar
 
-			// 🔒 FECHAMENTO ATÔMICO DO CICLO
-			if (isCurrent && wasRequestedForThisTurn) {
-				const finalHtml = marked.parse(finalText);
+			// 🔒 RENDERIZAR A RESPOSTA COM O ID CORRETO
+			if (requestedQuestionId) {
+				// const finalHtml = marked.parse(finalText); // Resposta já renderizada via streaming
 
-				// 1️⃣ promove a pergunta primeiro (gera ID definitivo)
-				promoteCurrentToHistory(text);
+				console.log('✅ GPT_STREAM_END: Renderizando resposta para pergunta solicitada:', {
+					requestedQuestionId,
+					wasRequestedForThisTurn,
+				});
 
-				// 2️⃣ pega a pergunta recém-promovida
-				const promotedQuestion = questionsHistory[questionsHistory.length - 1];
+				// Se a pergunta solicitada foi CURRENT, promover para history ANTES de renderizar
+				if (requestedQuestionId === CURRENT_QUESTION_ID && currentQuestion.text) {
+					console.log('🔄 GPT_STREAM_END: Promovendo CURRENT para history antes de renderizar resposta');
+					promoteCurrentToHistory(currentQuestion.text);
 
-				if (promotedQuestion) {
-					// 3️⃣ cria a resposta já com o ID CORRETO
-					renderGptAnswer(promotedQuestion.id, finalHtml);
-
-					// 4️⃣ marca como respondida
-					promotedQuestion.answered = true;
-					renderQuestionsHistory();
-
-					console.log('✅ Pergunta respondida com ID definitivo:', promotedQuestion.id);
+					// Pega a pergunta recém-promovida
+					const promotedQuestion = questionsHistory[questionsHistory.length - 1];
+					if (promotedQuestion) {
+						// Renderiza com o ID da pergunta promovida
+						// renderGptAnswer(promotedQuestion.id, finalHtml); // Resposta já renderizada via streaming
+						promotedQuestion.answered = true;
+						answeredQuestions.add(promotedQuestion.id);
+						renderQuestionsHistory();
+						console.log('✅ Resposta renderizada para pergunta promovida:', promotedQuestion.id);
+					} else {
+						console.warn('⚠️ Pergunta promovida não encontrada');
+						// renderGptAnswer(requestedQuestionId, finalHtml); // Resposta já renderizada via streaming
+					}
 				} else {
-					console.warn('⚠️ pergunta promovida não encontrada');
+					// Para perguntas do histórico, renderiza com o ID recebido
+					// renderGptAnswer(requestedQuestionId, finalHtml); // Resposta já renderizada via streaming
+					answeredQuestions.add(requestedQuestionId);
+
+					// Se for do histórico, atualiza o flag também
+					if (requestedQuestionId !== CURRENT_QUESTION_ID) {
+						try {
+							const q = questionsHistory.find(x => x.id === requestedQuestionId);
+							if (q) {
+								q.answered = true;
+								renderQuestionsHistory();
+							}
+						} catch (err) {
+							console.warn('⚠️ falha ao marcar pergunta como respondida:', err);
+						}
+					}
 				}
 
 				resetInterviewTurnState();
-			} else if (questionId !== CURRENT_QUESTION_ID) {
-				const finalHtml = marked.parse(finalText);
-				renderGptAnswer(questionId, finalHtml);
-
-				// marca a pergunta como respondida no histórico (streaming path)
-				try {
-					const q = questionsHistory.find(x => x.id === questionId);
-					if (q) {
-						q.answered = true;
-						renderQuestionsHistory();
-					}
-				} catch (err) {
-					console.warn('⚠️ falha ao marcar pergunta como respondida (stream):', err);
-				}
+			} else {
+				// 🔥 Nenhuma pergunta foi rastreada como solicitada
+				console.warn('⚠️ GPT_STREAM_END mas nenhuma pergunta solicitada foi encontrada');
+				resetInterviewTurnState();
 			}
+
+			// 🔥 Notificar config-manager que stream terminou (para limpar info de streaming)
+			window.RendererAPI?.emitUIChange?.('onAnswerStreamEnd', {});
 		};
 
 		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
@@ -2608,7 +2688,8 @@ async function askGpt() {
 	// Log métricas
 	logTranscriptionMetrics();
 
-	renderGptAnswer(questionId, res);
+	// 🔥 COMENTADO: renderGptAnswer(questionId, res);
+	// Apenas streaming será exibido
 
 	const wasRequestedForThisTurn = gptRequestedTurnId === interviewTurnId;
 
@@ -2793,6 +2874,9 @@ function getSelectedQuestionText() {
 	return '';
 }
 
+/* 🔥 COMENTADO: renderGptAnswer - Renderização formatada desabilitada
+   Apenas streaming (tokens em tempo real) será exibido
+
 function renderGptAnswer(questionId, markdownText) {
 	debugLogRenderer('Início da função: "renderGptAnswer"');
 
@@ -2838,6 +2922,7 @@ function renderGptAnswer(questionId, markdownText) {
 
 	debugLogRenderer('Fim da função: "renderGptAnswer"');
 }
+*/
 
 function resetInterviewState() {
 	debugLogRenderer('Início da função: "resetInterviewState"');
@@ -2947,7 +3032,7 @@ function handleQuestionClick(questionId) {
 
 		if (existingAnswer) {
 			emitUIChange('onAnswerSelected', {
-				answerId: questionId,
+				questionId: questionId,
 				shouldScroll: true,
 			});
 
@@ -2977,8 +3062,8 @@ function handleQuestionClick(questionId) {
 	}
 
 	// ❓ Ainda não respondida → chama GPT (click ou atalho)
-	console.error('closeCurrentQuestion: askGpt() 2714; 🔒 COMENTADA até transcrição em tempo real funcionar');
-	// askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+	//console.error('closeCurrentQuestion: askGpt() 2978; 🔒 COMENTADA até transcrição em tempo real funcionar');
+	askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 
 	debugLogRenderer('Fim da função: "handleQuestionClick"');
 }

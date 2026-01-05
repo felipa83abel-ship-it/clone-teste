@@ -49,13 +49,13 @@ class ConfigManager {
 						selectedLLMModel: '',
 						enabled: false,
 					},
-					custom: {
-						// 🔥 MODIFICADO: API key não é mais salva aqui
-						endpoint: '',
-						selectedSTTModel: '',
-						selectedLLMModel: '',
-						enabled: false,
-					},
+					// custom: {
+					// 	// 🔥 MODIFICADO: API key não é mais salva aqui
+					// 	endpoint: '',
+					// 	selectedSTTModel: '',
+					// 	selectedLLMModel: '',
+					// 	enabled: false,
+					// },
 				},
 				audio: {
 					inputDevice: '',
@@ -352,7 +352,7 @@ class ConfigManager {
 	async checkApiKeysStatus() {
 		debugLogConfig('Início da função: "checkApiKeysStatus"');
 		try {
-			const providers = ['openai', 'google', 'openrouter', 'custom'];
+			const providers = ['openai', 'google', 'openrouter'];
 
 			for (const provider of providers) {
 				// 🔥 CORRIGIDO: Aguarda a promessa corretamente
@@ -950,9 +950,9 @@ class ConfigManager {
 			'openrouter-transcription-model': ['api', 'openrouter', 'selectedSTTModel'],
 			'openrouter-response-model': ['api', 'openrouter', 'selectedLLMModel'],
 
-			'custom-endpoint': ['api', 'custom', 'endpoint'],
-			'custom-transcription-model': ['api', 'custom', 'selectedSTTModel'],
-			'custom-response-model': ['api', 'custom', 'selectedLLMModel'],
+			// 'custom-endpoint': ['api', 'custom', 'endpoint'],
+			// 'custom-transcription-model': ['api', 'custom', 'selectedSTTModel'],
+			// 'custom-response-model': ['api', 'custom', 'selectedLLMModel'],
 
 			// Áudio
 			'audio-input-device': ['audio', 'inputDevice'],
@@ -1152,12 +1152,12 @@ class ConfigManager {
 					responseModel: '',
 					enabled: false,
 				},
-				custom: {
-					endpoint: '',
-					transcriptionModel: '',
-					responseModel: '',
-					enabled: false,
-				},
+				// custom: {
+				// 	endpoint: '',
+				// 	transcriptionModel: '',
+				// 	responseModel: '',
+				// 	enabled: false,
+				// },
 			},
 			audio: {
 				inputDevice: '',
@@ -1504,11 +1504,13 @@ class ConfigManager {
 			const { questionId, shouldScroll } = payload;
 			if (!questionId) return;
 
-			const answersBox = document.getElementById('answersContainer');
+			const answersBox = document.getElementById('answersHistory');
 			if (!answersBox) return;
 
+			console.log('🎨 [onAnswerSelected] Removendo destaque anterior');
 			// remove seleção anterior
 			answersBox.querySelectorAll('.selected-answer').forEach(el => {
+				console.log('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId);
 				el.classList.remove('selected-answer');
 			});
 
@@ -1521,10 +1523,12 @@ class ConfigManager {
 			}
 
 			// marca como selecionada
+			console.log('🎨 [onAnswerSelected] Adicionando destaque em:', questionId);
 			answerEl.classList.add('selected-answer');
 
-			// garante visibilidade
+			// garante visibilidade com scroll suave
 			if (shouldScroll) {
+				console.log('📜 [onAnswerSelected] Scrollando para resposta:', questionId);
 				answerEl.scrollIntoView({
 					behavior: 'smooth',
 					block: 'center',
@@ -1532,7 +1536,9 @@ class ConfigManager {
 			}
 		});
 
-		// Resposta GPT
+		// 🔥 COMENTADO: onAnswerAdd - Renderização formatada desabilitada
+		// Apenas streaming (tokens em tempo real) será exibido
+		/*
 		window.RendererAPI.onUIChange('onAnswerAdd', data => {
 			const { questionId, action, html, questionText } = data;
 
@@ -1573,14 +1579,15 @@ class ConfigManager {
 					});
 				}
 			} else if (html) {
-				// Atualiza resposta
+				// Atualiza resposta FINAL - NÃO SOBRESCREVER SE JÁ FOI FEITO (STREAMING)
 				const answersHistoryBox = document.getElementById('answersHistory');
 				if (!answersHistoryBox) return;
 
 				let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
 				if (!wrapper) {
+					// Não existe - criar novo (renderização direta, sem streaming prévio)
 					wrapper = document.createElement('div');
-					wrapper.className = 'answer-block active';
+					wrapper.className = 'answer-block';
 					wrapper.dataset.questionId = questionId;
 					wrapper.innerHTML = `
 						<div class="answer-header">
@@ -1589,26 +1596,107 @@ class ConfigManager {
 						</div>
 						<div class="answer-content"></div>
 					`;
-					answersHistoryBox.appendChild(wrapper);
+					// 🔥 Inserir no INÍCIO (ordem decrescente)
+					answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
 				}
 
+				// Só atualizar se ainda está vazio ou com placeholder
 				const answerContent = wrapper.querySelector('.answer-content');
-				if (answerContent) answerContent.innerHTML = html;
+				if (answerContent && (answerContent.textContent === '' || answerContent.textContent.includes('⏳'))) {
+					answerContent.innerHTML = html; // Usar HTML formatado
+				} else {
+					console.log('ℹ️ Resposta já preenchida por streaming, preservando');
+				}
 				wrapper.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 			}
 		});
+		*/
 
-		// Stream Chunk
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		// 📊 RASTREAMENTO SIMPLES - currentStreamingQuestionId é SUFICIENTE
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		let currentStreamingQuestionId = null; // Qual pergunta está sendo respondida AGORA
+
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		// 📥 LISTENER: onAnswerStreamChunk
+		// Chamado para CADA token que chega do GPT
+		// ═══════════════════════════════════════════════════════════════════════════════════
 		window.RendererAPI.onUIChange('onAnswerStreamChunk', data => {
 			const { questionId, accum } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
 
+			// 🔍 PROCURAR wrapper existente OU criar novo
 			let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
-			if (wrapper) {
-				const answerContent = wrapper.querySelector('.answer-content');
-				if (answerContent) answerContent.innerText = accum;
+
+			// ✅ PRIMEIRA CHUNK - não existe wrapper ainda
+			if (!wrapper) {
+				console.log('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId);
+
+				// Criar novo div de resposta
+				wrapper = document.createElement('div');
+				wrapper.className = 'answer-block';
+				wrapper.dataset.questionId = questionId;
+				wrapper.innerHTML = `<div class="answer-content"></div>`;
+
+				// Inserir NO TOPO
+				answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
+
+				// 🎨 Destaque: remover de outros, adicionar neste
+				answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach(el => {
+					el.classList.remove('selected-answer');
+				});
+				wrapper.classList.add('selected-answer');
+
+				// Auto-scroll para topo
+				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
+
+				// Registrar qual pergunta está sendo respondida
+				currentStreamingQuestionId = questionId;
+
+				console.log('📊 Total blocos agora:', answersHistoryBox.querySelectorAll('.answer-block').length);
 			}
+
+			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo
+			const answerContent = wrapper.querySelector('.answer-content');
+			if (answerContent) {
+				answerContent.textContent = accum;
+				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'auto' });
+			}
+		});
+
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		// 🔄 LISTENER: onAnswerIdUpdate
+		// Chamado quando CURRENT → 1, 2, 3, etc
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		window.RendererAPI.onUIChange('onAnswerIdUpdate', data => {
+			const { oldId, newId } = data;
+			const answersHistoryBox = document.getElementById('answersHistory');
+			if (!answersHistoryBox) return;
+
+			console.log('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId);
+
+			const wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${oldId}"]`);
+			if (wrapper) {
+				wrapper.dataset.questionId = newId;
+				console.log('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId);
+
+				// Atualizar rastreamento de streaming também
+				if (currentStreamingQuestionId === oldId) {
+					currentStreamingQuestionId = newId;
+				}
+			} else {
+				console.warn('⚠️ [ID_UPDATE] Wrapper não encontrado:', oldId);
+			}
+		});
+
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		// ⏹️ LISTENER: onAnswerStreamEnd
+		// Chamado quando stream termina
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		window.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
+			console.log('✅ [STREAM_END] Limpando streamingQuestionId');
+			currentStreamingQuestionId = null;
 		});
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
@@ -1865,10 +1953,10 @@ class ConfigManager {
 			askBtn.addEventListener('click', () => {
 				console.log('🔊 DEBUG: askGptBtn clicado!');
 				if (window.RendererAPI?.askGpt) {
-					//window.RendererAPI.askGpt();  // 🔒 COMENTADA até transcrição em tempo real funcionar
-					console.error(
-						'registerDOMEventListeners: askGpt() 1759; 🔒 COMENTADA até transcrição em tempo real funcionar',
-					);
+					window.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+					// console.error(
+					// 	'registerDOMEventListeners: askGpt() 1759; 🔒 COMENTADA até transcrição em tempo real funcionar',
+					// );
 				}
 			});
 		}
@@ -1994,10 +2082,10 @@ class ConfigManager {
 		if (window.RendererAPI?.onAskGpt) {
 			window.RendererAPI.onAskGpt(() => {
 				if (window.RendererAPI?.askGpt) {
-					//window.RendererAPI.askGpt();  // 🔒 COMENTADA até transcrição em tempo real funcionar
-					console.error(
-						'registerDOMEventListeners: askGpt() 1867; 🔒 COMENTADA até transcrição em tempo real funcionar',
-					);
+					window.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
+					// console.error(
+					// 	'registerDOMEventListeners: askGpt() 1867; 🔒 COMENTADA até transcrição em tempo real funcionar',
+					// );
 				}
 			});
 		}

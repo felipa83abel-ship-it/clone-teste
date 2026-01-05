@@ -78,7 +78,6 @@
 
 			<!-- 🔎 CONTROLE DE OPACIDADE DO OVERLAY -->
 			<div class="opacity-control interactive-zone">
-				<!-- <span class="menu-icon material-icons">opacity</span> -->
 				<input type="range" id="opacityRange" min="0" max="1" step="0.01" value="0.75" />
 			</div>
 		</div>
@@ -94,14 +93,14 @@
 
 							<div class="home-vu-meters">
 								<div class="vu-meter-home">
-									<label>🎤 Entrada:</label>
+									<label for="inputVuHome">🎤 Entrada:</label>
 									<div class="vu-meter">
 										<div id="inputVuHome" class="vu-fill"></div>
 									</div>
 								</div>
 
 								<div class="vu-meter-home">
-									<label>🔊 Saída:</label>
+									<label for="outputVuHome">🔊 Saída:</label>
 									<div class="vu-meter">
 										<div id="outputVuHome" class="vu-fill"></div>
 									</div>
@@ -131,16 +130,7 @@
 									<div id="conversation"></div>
 								</div>
 
-								<div
-									style="
-										border-bottom: 1px solid #ccc;
-										min-height: 32px;
-										display: flex;
-										justify-content: space-around;
-										align-items: center;
-										color: rgb(var(--text-main-rgb));
-									"
-								>
+								<div class="questions-header">
 									<strong>❔ Perguntas Consolidadas</strong>
 								</div>
 
@@ -153,17 +143,7 @@
 
 							<!-- RESPOSTAS (DIREITA) -->
 							<div id="answers">
-								<div
-									style="
-										border-bottom: 1px solid #ccc;
-										height: 32px;
-										display: flex;
-										justify-content: space-between;
-										align-items: center;
-										padding: 0 8px;
-										color: rgb(var(--text-main-rgb));
-									"
-								>
+								<div class="answers-header">
 									<strong>🤖 Respostas GPT</strong>
 
 									<button id="askGptBtn" class="btn-ask-gpt">
@@ -190,44 +170,42 @@
 							<button class="tab-button active" data-tab="openai">OpenAI</button>
 							<button class="tab-button" data-tab="google">Google</button>
 							<button class="tab-button" data-tab="openrouter">OpenRouter</button>
-							<button class="tab-button" data-tab="custom">Custom API</button>
 						</div>
 
 						<div class="tab-content">
 							<!-- OpenAI Tab -->
 							<div id="openai" class="tab-pane active">
 								<div class="config-form">
-									<div class="form-group">
-										<label>Status do Modelo:</label>
-										<div class="model-status">
-											<span class="status-badge active">Ativo</span>
-											<button class="btn-activate" data-model="openai">Desativar</button>
+									<div class="form-group flex space-between">
+										<div>
+											<label for="openai-api-key">Chave da API:</label>
+											<div class="input-with-action">
+												<input
+													type="password"
+													id="openai-api-key"
+													placeholder="Insira sua API key"
+													class="api-key-input"
+													autocomplete="off"
+													data-has-key="false"
+												/>
+												<button class="btn-toggle-visibility" data-target="openai-api-key">
+													<span class="material-icons">visibility</span>
+												</button>
+												<!-- 🔥 NOVO: Botão para deletar API key -->
+												<button class="btn-delete-api-key" data-provider="openai" title="Remover API key">
+													<span class="material-icons">delete</span>
+												</button>
+											</div>
+											<small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
 										</div>
-									</div>
 
-									<div class="form-group">
-										<label for="openai-api-key">Chave da API:</label>
-										<div class="input-with-action">
-											<input
-												type="password"
-												id="openai-api-key"
-												placeholder="Insira sua API key"
-												class="api-key-input"
-												autocomplete="off"
-												data-has-key="false"
-											/>
-											<button class="btn-toggle-visibility" data-target="openai-api-key">
-												<span class="material-icons">visibility</span>
-											</button>
-											<!-- 🔥 NOVO: Botão para deletar API key -->
-											<button class="btn-delete-api-key" data-provider="openai" title="Remover API key">
-												<span class="material-icons">delete</span>
-											</button>
+										<div>
+											<label>Status do Modelo:</label>
+											<div class="model-status">
+												<span class="status-badge active">Ativo</span>
+												<button class="btn-activate" data-model="openai">Desativar</button>
+											</div>
 										</div>
-										<small>
-											🔒 Sua chave é armazenada de forma criptografada localmente. Não é possível copiar ou visualizar a
-											chave após salvar.
-										</small>
 									</div>
 
 									<div class="form-group">
@@ -260,34 +238,36 @@
 							<!-- Google Tab -->
 							<div id="google" class="tab-pane">
 								<div class="config-form">
-									<div class="form-group">
-										<label>Status do Modelo:</label>
-										<div class="model-status">
-											<span class="status-badge inactive">Inativo</span>
-											<button class="btn-activate" data-model="google">Ativar</button>
+									<div class="form-group flex space-between">
+										<div>
+											<label for="google-api-key">Chave da API:</label>
+											<div class="input-with-action">
+												<input
+													type="password"
+													id="google-api-key"
+													placeholder="Insira sua API key"
+													class="api-key-input"
+													autocomplete="off"
+													data-has-key="false"
+												/>
+												<button class="btn-toggle-visibility" data-target="google-api-key">
+													<span class="material-icons">visibility</span>
+												</button>
+												<!-- 🔥 NOVO: Botão para deletar API key -->
+												<button class="btn-delete-api-key" data-provider="google" title="Remover API key">
+													<span class="material-icons">delete</span>
+												</button>
+											</div>
+											<small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
 										</div>
-									</div>
 
-									<div class="form-group">
-										<label for="google-api-key">Chave da API:</label>
-										<div class="input-with-action">
-											<input
-												type="password"
-												id="google-api-key"
-												placeholder="Insira sua API key"
-												class="api-key-input"
-												autocomplete="off"
-												data-has-key="false"
-											/>
-											<button class="btn-toggle-visibility" data-target="google-api-key">
-												<span class="material-icons">visibility</span>
-											</button>
-											<!-- 🔥 NOVO: Botão para deletar API key -->
-											<button class="btn-delete-api-key" data-provider="google" title="Remover API key">
-												<span class="material-icons">delete</span>
-											</button>
+										<div>
+											<label>Status do Modelo:</label>
+											<div class="model-status">
+												<span class="status-badge inactive">Inativo</span>
+												<button class="btn-activate" data-model="google">Ativar</button>
+											</div>
 										</div>
-										<small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
 									</div>
 
 									<!-- 🔥 NOVO: Campo de modelo de transcrição -->
@@ -322,34 +302,36 @@
 							<!-- OpenRouter Tab -->
 							<div id="openrouter" class="tab-pane">
 								<div class="config-form">
-									<div class="form-group">
-										<label>Status do Modelo:</label>
-										<div class="model-status">
-											<span class="status-badge inactive">Inativo</span>
-											<button class="btn-activate" data-model="openrouter">Ativar</button>
+									<div class="form-group flex space-between">
+										<div>
+											<label for="openrouter-api-key">Chave da API:</label>
+											<div class="input-with-action">
+												<input
+													type="password"
+													id="openrouter-api-key"
+													placeholder="Insira sua API key"
+													class="api-key-input"
+													autocomplete="off"
+													data-has-key="false"
+												/>
+												<button class="btn-toggle-visibility" data-target="openrouter-api-key">
+													<span class="material-icons">visibility</span>
+												</button>
+												<!-- 🔥 NOVO: Botão para deletar API key -->
+												<button class="btn-delete-api-key" data-provider="openrouter" title="Remover API key">
+													<span class="material-icons">delete</span>
+												</button>
+											</div>
+											<small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
 										</div>
-									</div>
 
-									<div class="form-group">
-										<label for="openrouter-api-key">Chave da API:</label>
-										<div class="input-with-action">
-											<input
-												type="password"
-												id="openrouter-api-key"
-												placeholder="Insira sua API key"
-												class="api-key-input"
-												autocomplete="off"
-												data-has-key="false"
-											/>
-											<button class="btn-toggle-visibility" data-target="openrouter-api-key">
-												<span class="material-icons">visibility</span>
-											</button>
-											<!-- 🔥 NOVO: Botão para deletar API key -->
-											<button class="btn-delete-api-key" data-provider="openrouter" title="Remover API key">
-												<span class="material-icons">delete</span>
-											</button>
+										<div>
+											<label>Status do Modelo:</label>
+											<div class="model-status">
+												<span class="status-badge inactive">Inativo</span>
+												<button class="btn-activate" data-model="openrouter">Ativar</button>
+											</div>
 										</div>
-										<small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
 									</div>
 
 									<div class="form-group">
@@ -371,66 +353,6 @@
 
 									<div class="action-buttons">
 										<button class="btn-save" data-section="openrouter">
-											<span class="material-icons">save</span>
-											Salvar Configurações
-										</button>
-									</div>
-								</div>
-							</div>
-
-							<!-- Custom API Tab -->
-							<div id="custom" class="tab-pane">
-								<div class="config-form">
-									<div class="form-group">
-										<label>Status do Modelo:</label>
-										<div class="model-status">
-											<span class="status-badge inactive">Inativo</span>
-											<button class="btn-activate" data-model="custom">Ativar</button>
-										</div>
-									</div>
-
-									<div class="form-group">
-										<label for="custom-api-key">Chave da API:</label>
-										<div class="input-with-action">
-											<input
-												type="password"
-												id="custom-api-key"
-												placeholder="Insira sua API key"
-												class="api-key-input"
-												autocomplete="off"
-												data-has-key="false"
-											/>
-											<button class="btn-toggle-visibility" data-target="custom-api-key">
-												<span class="material-icons">visibility</span>
-											</button>
-											<!-- 🔥 NOVO: Botão para deletar API key -->
-											<button class="btn-delete-api-key" data-provider="custom" title="Remover API key">
-												<span class="material-icons">delete</span>
-											</button>
-										</div>
-										<small>🔒 Sua chave é armazenada de forma criptografada localmente.</small>
-									</div>
-
-									<div class="form-group">
-										<label for="custom-endpoint">Endpoint da API:</label>
-										<input type="text" id="custom-endpoint" value="" placeholder="Ex: https://api.exemplo.com/v1" />
-										<small>URL base da sua API customizada.</small>
-									</div>
-
-									<div class="form-group">
-										<label for="custom-transcription-model">Modelo de Transcrição (STT):</label>
-										<input type="text" id="custom-transcription-model" value="" placeholder="Ex: whisper-model" />
-										<small>Modelo de transcrição da sua API customizada.</small>
-									</div>
-
-									<div class="form-group">
-										<label for="custom-response-model">Modelo de Resposta:</label>
-										<input type="text" id="custom-response-model" value="" placeholder="Ex: custom-gpt-model" />
-										<small>Modelo de resposta da sua API customizada.</small>
-									</div>
-
-									<div class="action-buttons">
-										<button class="btn-save" data-section="custom">
 											<span class="material-icons">save</span>
 											Salvar Configurações
 										</button>
@@ -489,14 +411,6 @@
 											<div id="outputVu" class="vu-fill"></div>
 										</div>
 										<small>Indicador visual do volume capturado do dispositivo de saída.</small>
-									</div>
-
-									<!-- ✅ DETECÇÃO AUTOMÁTICA (mantido do código original) -->
-									<div class="form-group">
-										<label>
-											<input type="checkbox" id="auto-detect-devices" />
-											Detectar dispositivos automaticamente
-										</label>
 									</div>
 								</div>
 							</div>
@@ -587,7 +501,7 @@
 					</h2>
 
 					<div class="config-form">
-						<div class="form-group" style="display: flex; gap: 16px">
+						<div class="form-group form-group-flex">
 							<!-- 🌙 TOGGLE DARK MODE -->
 							<div class="controls-mock interactive-zone">
 								<label>Dark Mode</label>
@@ -608,15 +522,6 @@
 						</div>
 
 						<div class="form-group">
-							<!-- Modo (combobox) abaixo do mock -->
-							<!-- <label for="interviewModeSelect">Modo Perguntas:</label>
-							<select id="interviewModeSelect" class="interactive-zone">
-								<option value="NORMAL">Padrão</option>
-								<option value="INTERVIEW" selected>Entrevista</option>
-							</select> -->
-						</div>
-
-						<div class="form-group">
 							<label for="language">Idioma da Interface:</label>
 							<select id="language">
 								<option value="pt-BR" selected>Português (Brasil)</option>
@@ -624,15 +529,6 @@
 								<option value="es-ES">Español</option>
 							</select>
 						</div>
-
-						<!-- <div class="form-group">
-                        <label for="theme">Tema:</label>
-                        <select id="theme">
-                            <option value="auto">Automático (sistema)</option>
-                            <option value="light">Claro</option>
-                            <option value="dark">Escuro</option>
-                        </select>
-                    </div> -->
 
 						<div class="form-group">
 							<label>
@@ -650,31 +546,7 @@
 								<option value="debug">Debug (detalhado)</option>
 							</select>
 						</div>
-
-						<!-- <div class="action-buttons">
-                        <button class="btn-export-config">
-                            <span class="material-icons">download</span>
-                            Exportar Configurações
-                        </button>
-                        <button class="btn-import-config">
-                            <span class="material-icons">upload</span>
-                            Importar Configurações
-                        </button>
-                        <button class="btn-reset-config danger">
-                            <span class="material-icons">delete</span>
-                            Restaurar Padrões
-                        </button>
-                    </div> -->
 					</div>
-
-					<!-- <div id="controls">
-                    <div class="controls-top">
-
-                        <div class="controls-mock">
-                           
-                        </div>
-                    </div>
-                </div> -->
 				</section>
 
 				<!-- Info -->
