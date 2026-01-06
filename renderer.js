@@ -1859,6 +1859,625 @@ function stopOutputMonitor() {
 }
 
 /* ===============================
+   DEEPGRAM - FLUXO SEPARADO (STT)
+=============================== */
+
+// 🔥 DEEPGRAM: Variáveis de controle de gravação
+let isListeningDeepgram = false; // Controla se os ciclos de gravação devem continuar
+let isRecordingDeepgram = false;
+let inputRecorderDeepgram = null;
+let outputRecorderDeepgram = null;
+let inputStreamDeepgram = null;
+let outputStreamDeepgram = null;
+let inputAnalyserDeepgram = null;
+let outputAnalyserDeepgram = null;
+let lastInputVolumeDeepgram = 0; // Rastreia volume de entrada
+let lastOutputVolumeDeepgram = 0; // Rastreia volume de saída
+
+// 🔥 DEEPGRAM: Verifica se houve áudio significativo no últimos 3 segundos
+// Usa volume monitorado (mais confiável que analisar o Blob)
+function hadSignificantAudio(isInput) {
+	const lastVolume = isInput ? lastInputVolumeDeepgram : lastOutputVolumeDeepgram;
+	// Se o volume foi > 10% em algum momento, considera que há áudio (threshold aumentado para evitar ruído)
+	return lastVolume > 10;
+}
+
+// 🔥 DEEPGRAM: Inicia captura de áudio de ENTRADA
+async function startInputDeepgram() {
+	debugLogRenderer('Início da função: "startInputDeepgram"');
+
+	if (APP_CONFIG.MODE_DEBUG) {
+		const text = 'Iniciando monitoramento de entrada Deepgram (modo teste)...';
+		addTranscript(YOU, text);
+		return;
+	}
+
+	if (!UIElements.inputSelect?.value) return;
+
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
+
+	if (inputStreamDeepgram) {
+		inputStreamDeepgram.getTracks().forEach(t => t.stop());
+		inputStreamDeepgram = null;
+	}
+
+	try {
+		inputStreamDeepgram = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: UIElements.inputSelect.value } },
+		});
+
+		// Função recursiva que implementa o ciclo de gravação (igual ao exemplo)
+		// 🔥 NOVO: Cria analyser AQUI (não apenas na função visual)
+		const source = audioContext.createMediaStreamSource(inputStreamDeepgram);
+		inputAnalyserDeepgram = audioContext.createAnalyser();
+		inputAnalyserDeepgram.fftSize = 256;
+		source.connect(inputAnalyserDeepgram);
+		console.log('🎤 Analyser de entrada criado para volume tracking');
+
+		// Função recursiva que implementa o ciclo de gravação (igual ao exemplo)
+		const recordInputChunk = () => {
+			// Se não estamos mais ouvindo, não inicia novo ciclo
+			if (!isListeningDeepgram) {
+				return;
+			}
+
+			// 🔇 RESET: Começa o rastreamento de volume ANTES de gravar
+			lastInputVolumeDeepgram = 0;
+
+			inputRecorderDeepgram = new MediaRecorder(inputStreamDeepgram, {
+				mimeType: 'audio/webm;codecs=opus',
+			});
+			// 🔥 NOVO: Inicia o loop de atualização de volume PARA ESTE CICLO
+			// (não depende de isRunning, roda enquanto estamos ouvindo)
+			const volumeCheckInterval = setInterval(() => {
+				if (!inputAnalyserDeepgram) {
+					clearInterval(volumeCheckInterval);
+					return;
+				}
+				try {
+					const data = new Uint8Array(inputAnalyserDeepgram.frequencyBinCount);
+					inputAnalyserDeepgram.getByteFrequencyData(data);
+					const avg = data.reduce((a, b) => a + b, 0) / data.length;
+					const percent = Math.min(100, Math.round((avg / 80) * 100));
+					// Rastreia o MÁXIMO volume visto durante este ciclo
+					lastInputVolumeDeepgram = Math.max(lastInputVolumeDeepgram, percent);
+
+					// 🔥 DEBUG: Log apenas quando há volume ou primeiro ciclo
+					if (percent > 0 || lastInputVolumeDeepgram === 0) {
+						console.log(`📊 Volume de entrada: ${percent}% (máx: ${lastInputVolumeDeepgram}%)`);
+					}
+				} catch (e) {
+					console.error('❌ Erro ao ler volume de entrada:', e);
+					clearInterval(volumeCheckInterval);
+				}
+			}, 100); // Atualiza a cada 100ms
+
+			// 🔥 Processa cada chunk QUANDO O RECORDER PARAR (não com timeslice)
+			inputRecorderDeepgram.ondataavailable = async e => {
+				// Para o loop de volume quando chunk fica pronto
+				clearInterval(volumeCheckInterval);
+
+				console.log('🎤 inputDeepgram.ondataavailable - chunk tamanho:', e.data?.size || 0);
+
+				if (e.data.size > 0) {
+					try {
+						// 🔇 NOVO: Verifica se houve áudio significativo
+						if (!hadSignificantAudio(true)) {
+							console.log(
+								'🔇 Descartando chunk de entrada - nenhum áudio detectado (máx volume foi: ' +
+									lastInputVolumeDeepgram +
+									'%)',
+							);
+							return;
+						}
+
+						console.log(
+							'✅ Enviando chunk para API Deepgram (volume máximo detectado: ' + lastInputVolumeDeepgram + '%)',
+						);
+
+						// 📊 Log detalhado para diagnóstico
+						const chunkDurationMs = 3000;
+						const expectedBytesPerSecond = (48000 * 16 * 2) / 8; // 48kHz, 16-bit, stereo
+						const expectedBytes = (expectedBytesPerSecond * chunkDurationMs) / 1000;
+						const percentageOfExpected = Math.round((e.data.size / expectedBytes) * 100);
+
+						console.log(
+							'📊 INPUT - tamanho: ' +
+								e.data.size +
+								' bytes, esperado: ~' +
+								Math.round(expectedBytes) +
+								' bytes = ' +
+								percentageOfExpected +
+								'%',
+						);
+
+						// Converte Blob para base64
+						const arrayBuffer = await e.data.arrayBuffer();
+						const base64 = Buffer.from(arrayBuffer).toString('base64');
+						const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', base64))?.trim();
+
+						console.log('📝 [DEEPGRAM INPUT] Transcrição recebida:', { text, textLength: text?.length });
+
+						if (!text) {
+							console.log('⚠️ [DEEPGRAM INPUT] Texto vazio - ignorando');
+							return;
+						}
+
+						// ✅ Enviar TUDO para handleSpeech, que chamará addTranscript para mostrar na UI
+						// handleSpeech já checa isGarbageSentence para consolidação em currentQuestion
+						console.log('✅ [DEEPGRAM INPUT] Enviando para handleSpeech:', text);
+						handleSpeech(YOU, text);
+					} catch (err) {
+						console.error('❌ Erro ao transcrever chunk entrada Deepgram:', err);
+					}
+				}
+			};
+
+			inputRecorderDeepgram.onstop = () => {
+				console.log('⏹️ inputRecorderDeepgram.onstop - reiniciando ciclo');
+				// Para o interval se ainda estiver rodando
+				clearInterval(volumeCheckInterval);
+				// Após parar, reinicia o ciclo imediatamente
+				recordInputChunk();
+			};
+
+			// Inicia gravação
+			console.log('▶️ inputRecorderDeepgram.start()');
+			inputRecorderDeepgram.start();
+
+			// Para o recorder após 3 segundos
+			setTimeout(() => {
+				if (inputRecorderDeepgram && inputRecorderDeepgram.state === 'recording') {
+					console.log('⏸️ Parando inputRecorderDeepgram após 3 segundos');
+					inputRecorderDeepgram.stop();
+				}
+			}, 3000);
+		};
+
+		// Inicia o ciclo de gravação
+		recordInputChunk();
+		inputAnalyserDeepgram.fftSize = 256;
+		source.connect(inputAnalyserDeepgram);
+
+		console.log('✅ startInputDeepgram: Ciclo de gravação iniciado com sucesso');
+	} catch (error) {
+		console.error('❌ Erro em startInputDeepgram:', error);
+		inputStreamDeepgram = null;
+		inputRecorderDeepgram = null;
+		throw error;
+	}
+
+	debugLogRenderer('Fim da função: "startInputDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Para captura de entrada
+function stopInputMonitorDeepgram() {
+	debugLogRenderer('Início da função: "stopInputMonitorDeepgram"');
+
+	// Sinaliza que o ciclo de gravação deve parar
+	isListeningDeepgram = false;
+
+	if (inputRecorderDeepgram && inputRecorderDeepgram.state === 'recording') {
+		inputRecorderDeepgram.stop();
+	}
+
+	if (inputStreamDeepgram) {
+		inputStreamDeepgram.getTracks().forEach(t => t.stop());
+		inputStreamDeepgram = null;
+	}
+
+	inputRecorderDeepgram = null;
+	inputAnalyserDeepgram = null;
+	inputChunksDeepgram = [];
+
+	console.log('🛑 Entrada Deepgram parada');
+	debugLogRenderer('Fim da função: "stopInputMonitorDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Inicia captura de áudio de SAÍDA
+async function startOutputDeepgram() {
+	debugLogRenderer('Início da função: "startOutputDeepgram"');
+
+	if (APP_CONFIG.MODE_DEBUG) {
+		const text = 'Iniciando monitoramento de saída Deepgram (modo teste)...';
+		addTranscript(OTHER, text);
+		return;
+	}
+
+	if (!UIElements.outputSelect?.value) return;
+
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
+
+	try {
+		await createOutputStreamDeepgram();
+
+		// 🔥 NOVO: Cria analyser AQUI (não apenas na função visual)
+		if (!outputAnalyserDeepgram) {
+			const source = audioContext.createMediaStreamSource(outputStreamDeepgram);
+			outputAnalyserDeepgram = audioContext.createAnalyser();
+			outputAnalyserDeepgram.fftSize = 256;
+			source.connect(outputAnalyserDeepgram);
+			console.log('🔊 Analyser de saída criado para volume tracking');
+		}
+
+		// Função recursiva que implementa o ciclo de gravação (igual ao exemplo)
+		const recordOutputChunk = () => {
+			// Se não estamos mais ouvindo, não inicia novo ciclo
+			if (!isListeningDeepgram) {
+				return;
+			}
+
+			// 🔇 RESET: Começa o rastreamento de volume ANTES de gravar
+			lastOutputVolumeDeepgram = 0;
+
+			outputRecorderDeepgram = new MediaRecorder(outputStreamDeepgram, {
+				mimeType: 'audio/webm;codecs=opus',
+			});
+			const volumeCheckInterval = setInterval(() => {
+				if (!outputAnalyserDeepgram) {
+					clearInterval(volumeCheckInterval);
+					return;
+				}
+				try {
+					const data = new Uint8Array(outputAnalyserDeepgram.frequencyBinCount);
+					outputAnalyserDeepgram.getByteFrequencyData(data);
+					const avg = data.reduce((a, b) => a + b, 0) / data.length;
+					const percent = Math.min(100, Math.round((avg / 80) * 100));
+					// Rastreia o MÁXIMO volume visto durante este ciclo
+					lastOutputVolumeDeepgram = Math.max(lastOutputVolumeDeepgram, percent);
+
+					// 🔥 DEBUG: Log apenas a cada 10 atualizações para evitar spam
+					if (percent > 0 || lastOutputVolumeDeepgram === 0) {
+						console.log(`📊 Volume de saída: ${percent}% (máx: ${lastOutputVolumeDeepgram}%)`);
+					}
+				} catch (e) {
+					console.error('❌ Erro ao ler volume de saída:', e);
+					clearInterval(volumeCheckInterval);
+				}
+			}, 100); // Atualiza a cada 100ms
+
+			// 🔥 Processa cada chunk QUANDO O RECORDER PARAR (não com timeslice)
+			outputRecorderDeepgram.ondataavailable = async e => {
+				// Para o loop de volume quando chunk fica pronto
+				clearInterval(volumeCheckInterval);
+
+				console.log('🔊 outputDeepgram.ondataavailable - chunk tamanho:', e.data?.size || 0);
+
+				if (e.data.size > 0) {
+					try {
+						// 🔇 NOVO: Verifica se houve áudio significativo
+						if (!hadSignificantAudio(false)) {
+							console.log(
+								'🔇 Descartando chunk de saída - nenhum áudio detectado (máx volume foi: ' +
+									lastOutputVolumeDeepgram +
+									'%)',
+							);
+							return;
+						}
+
+						// 📊 Log detalhado para diagnóstico
+						const chunkDurationMs = 3000;
+						const expectedBytesPerSecond = (48000 * 16 * 2) / 8; // 48kHz, 16-bit, stereo
+						const expectedBytes = (expectedBytesPerSecond * chunkDurationMs) / 1000;
+						const percentageOfExpected = Math.round((e.data.size / expectedBytes) * 100);
+
+						console.log(
+							'✅ Enviando chunk para API Deepgram (volume máximo detectado: ' +
+								lastOutputVolumeDeepgram +
+								'%, tamanho: ' +
+								e.data.size +
+								' bytes, esperado: ~' +
+								Math.round(expectedBytes) +
+								' bytes = ' +
+								percentageOfExpected +
+								'%)',
+						);
+
+						// Converte Blob para base64
+						const arrayBuffer = await e.data.arrayBuffer();
+						const base64 = Buffer.from(arrayBuffer).toString('base64');
+						const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', base64))?.trim();
+
+						console.log('📝 [DEEPGRAM] Transcrição recebida:', { text, textLength: text?.length });
+
+						if (!text) {
+							console.log('⚠️ [DEEPGRAM] Texto vazio - ignorando');
+							return;
+						}
+
+						// ✅ Enviar TUDO para handleSpeech, que chamará addTranscript para mostrar na UI
+						// handleSpeech já checa isGarbageSentence para consolidação em currentQuestion
+						console.log('✅ [DEEPGRAM] Enviando para handleSpeech:', text);
+						handleSpeech(OTHER, text);
+					} catch (err) {
+						console.error('❌ Erro ao transcrever chunk saída Deepgram:', err);
+					}
+				}
+			};
+
+			outputRecorderDeepgram.onstop = () => {
+				console.log('⏹️ outputRecorderDeepgram.onstop - reiniciando ciclo');
+				// Para o interval se ainda estiver rodando
+				clearInterval(volumeCheckInterval);
+				// Após parar, reinicia o ciclo imediatamente
+				recordOutputChunk();
+			};
+
+			// Inicia gravação
+			console.log('▶️ outputRecorderDeepgram.start()');
+			outputRecorderDeepgram.start();
+
+			// Para o recorder após 3 segundos
+			setTimeout(() => {
+				if (outputRecorderDeepgram && outputRecorderDeepgram.state === 'recording') {
+					console.log('⏸️ Parando outputRecorderDeepgram após 3 segundos');
+					outputRecorderDeepgram.stop();
+				}
+			}, 3000);
+		};
+
+		// Inicia o ciclo de gravação
+		recordOutputChunk();
+
+		console.log('✅ startOutputDeepgram: Ciclo de gravação iniciado com sucesso');
+	} catch (error) {
+		console.error('❌ Erro em startOutputDeepgram:', error);
+		outputStreamDeepgram = null;
+		outputRecorderDeepgram = null;
+		throw error;
+	}
+
+	debugLogRenderer('Fim da função: "startOutputDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Cria stream de áudio de saída (loopback)
+async function createOutputStreamDeepgram() {
+	try {
+		// Usa o mesmo método que createOutputStream - captura via getUserMedia
+		outputStreamDeepgram = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: UIElements.outputSelect.value } },
+		});
+
+		// Cria o source de áudio
+		const source = audioContext.createMediaStreamSource(outputStreamDeepgram);
+
+		// Cria o analisador de frequência
+		outputAnalyserDeepgram = audioContext.createAnalyser();
+		outputAnalyserDeepgram.fftSize = 256;
+		source.connect(outputAnalyserDeepgram);
+
+		console.log('✅ createOutputStreamDeepgram criado com sucesso');
+	} catch (error) {
+		console.error('❌ Erro ao criar output stream Deepgram:', error);
+		throw error;
+	}
+}
+
+// 🔥 DEEPGRAM: Para captura de saída
+function stopOutputMonitorDeepgram() {
+	debugLogRenderer('Início da função: "stopOutputMonitorDeepgram"');
+
+	// Sinaliza que o ciclo de gravação deve parar
+	isListeningDeepgram = false;
+
+	if (outputRecorderDeepgram && outputRecorderDeepgram.state === 'recording') {
+		outputRecorderDeepgram.stop();
+	}
+
+	if (outputStreamDeepgram) {
+		outputStreamDeepgram.getTracks().forEach(t => t.stop());
+		outputStreamDeepgram = null;
+	}
+
+	outputRecorderDeepgram = null;
+	outputAnalyserDeepgram = null;
+	outputChunksDeepgram = [];
+
+	console.log('🛑 Saída Deepgram parada');
+	debugLogRenderer('Fim da função: "stopOutputMonitorDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Transcreve entrada
+async function transcribeInputDeepgram() {
+	debugLogRenderer('Início da função: "transcribeInputDeepgram"');
+
+	if (!inputChunksDeepgram.length) {
+		console.log('⚠️ Nenhum chunk de entrada Deepgram para transcrever');
+		return;
+	}
+
+	const blob = new Blob(inputChunksDeepgram, { type: 'audio/webm' });
+	console.log('🎵 transcribeInputDeepgram: blob.size =', blob.size, 'bytes');
+
+	const minSize = ModeController.isInterviewMode() ? MIN_INPUT_AUDIO_SIZE_INTERVIEW : MIN_INPUT_AUDIO_SIZE;
+	if (blob.size < minSize) {
+		console.log('⚠️ Blob muito pequeno, ignorando:', blob.size, 'bytes');
+		inputChunksDeepgram = [];
+		return;
+	}
+
+	inputChunksDeepgram = [];
+
+	try {
+		const buffer = Buffer.from(await blob.arrayBuffer());
+		const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', buffer))?.trim();
+
+		if (!text || isGarbageSentence(text)) {
+			console.log('⚠️ Transcrição Deepgram vazia ou lixo:', text);
+			return;
+		}
+
+		handleSpeech(YOU, text);
+	} catch (err) {
+		console.error('❌ Erro ao transcrever entrada Deepgram:', err);
+		updateStatusMessage('❌ Erro na transcrição (Deepgram)');
+	}
+
+	debugLogRenderer('Fim da função: "transcribeInputDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Transcreve saída
+async function transcribeOutputDeepgram() {
+	debugLogRenderer('Início da função: "transcribeOutputDeepgram"');
+
+	if (!outputChunksDeepgram.length) {
+		console.log('⚠️ Nenhum chunk de saída Deepgram para transcrever');
+		return;
+	}
+
+	const blob = new Blob(outputChunksDeepgram, { type: 'audio/webm' });
+	console.log('🎵 transcribeOutputDeepgram: blob.size =', blob.size, 'bytes');
+
+	const minSize = ModeController.isInterviewMode() ? MIN_OUTPUT_AUDIO_SIZE_INTERVIEW : MIN_OUTPUT_AUDIO_SIZE;
+	if (blob.size < minSize) {
+		console.log('⚠️ Blob muito pequeno, ignorando:', blob.size, 'bytes');
+		outputChunksDeepgram = [];
+		return;
+	}
+
+	outputChunksDeepgram = [];
+
+	try {
+		const buffer = Buffer.from(await blob.arrayBuffer());
+		const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', buffer))?.trim();
+
+		if (!text || isGarbageSentence(text)) {
+			console.log('⚠️ Transcrição Deepgram vazia ou lixo:', text);
+			return;
+		}
+
+		handleSpeech(OTHER, text);
+	} catch (err) {
+		console.error('❌ Erro ao transcrever saída Deepgram:', err);
+		updateStatusMessage('❌ Erro na transcrição (Deepgram)');
+	}
+
+	debugLogRenderer('Fim da função: "transcribeOutputDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Inicia captura (wrapper)
+async function startAudioDeepgram() {
+	debugLogRenderer('Início da função: "startAudioDeepgram"');
+
+	// Sinaliza que os ciclos de gravação devem continuar
+	isListeningDeepgram = true;
+
+	if (UIElements.inputSelect?.value) await startInputDeepgram();
+	if (UIElements.outputSelect?.value) await startOutputDeepgram();
+
+	// 🔥 NOTA: Monitoramento de volume agora acontece DENTRO dos ciclos de gravação
+	// (função startInputVolumeMonitoringDeepgram() / startOutputVolumeMonitoringDeepgram()
+	// não são mais necessárias porque cada ciclo tem seu próprio setInterval)
+
+	debugLogRenderer('Fim da função: "startAudioDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Loop de atualização de volume entrada
+function updateInputVolumeDeepgram() {
+	if (!inputAnalyserDeepgram) {
+		if (inputVolumeAnimationId) {
+			cancelAnimationFrame(inputVolumeAnimationId);
+			inputVolumeAnimationId = null;
+		}
+		return;
+	}
+
+	try {
+		const data = new Uint8Array(inputAnalyserDeepgram.frequencyBinCount);
+		inputAnalyserDeepgram.getByteFrequencyData(data);
+		const avg = data.reduce((a, b) => a + b, 0) / data.length;
+		const percent = Math.min(100, Math.round((avg / 80) * 100));
+
+		// 🔥 DEEPGRAM: Rastreia volume para detecção de silêncio
+		lastInputVolumeDeepgram = Math.max(lastInputVolumeDeepgram, percent);
+
+		emitUIChange('onInputVolumeUpdate', { percent });
+
+		if (isRunning) {
+			inputVolumeAnimationId = requestAnimationFrame(updateInputVolumeDeepgram);
+		}
+	} catch (error) {
+		console.error('❌ Erro em updateInputVolumeDeepgram:', error);
+	}
+}
+
+// 🔥 DEEPGRAM: Monitoramento de volume de saída (visual)
+async function startOutputVolumeMonitoringDeepgram() {
+	if (!UIElements.outputSelect?.value) return;
+
+	if (!audioContext) {
+		audioContext = new AudioContext();
+	}
+
+	if (outputAnalyserDeepgram) {
+		console.log('ℹ️ Monitoramento visual de saída Deepgram já ativo');
+		return;
+	}
+
+	try {
+		if (!outputStreamDeepgram) {
+			outputStreamDeepgram = await navigator.mediaDevices.getUserMedia({
+				audio: { deviceId: { exact: UIElements.outputSelect.value } },
+			});
+		}
+
+		const source = audioContext.createMediaStreamSource(outputStreamDeepgram);
+		outputAnalyserDeepgram = audioContext.createAnalyser();
+		outputAnalyserDeepgram.fftSize = 256;
+		source.connect(outputAnalyserDeepgram);
+
+		updateOutputVolumeDeepgram(); // Inicia loop visual
+	} catch (error) {
+		console.error('❌ Erro ao iniciar monitoramento visual saída Deepgram:', error);
+	}
+}
+
+// 🔥 DEEPGRAM: Loop de atualização de volume saída
+function updateOutputVolumeDeepgram() {
+	if (!outputAnalyserDeepgram) {
+		if (outputVolumeAnimationId) {
+			cancelAnimationFrame(outputVolumeAnimationId);
+			outputVolumeAnimationId = null;
+		}
+		return;
+	}
+
+	try {
+		const data = new Uint8Array(outputAnalyserDeepgram.frequencyBinCount);
+		outputAnalyserDeepgram.getByteFrequencyData(data);
+		const avg = data.reduce((a, b) => a + b, 0) / data.length;
+		const percent = Math.min(100, Math.round((avg / 80) * 100));
+
+		// 🔥 DEEPGRAM: Rastreia volume para detecção de silêncio
+		lastOutputVolumeDeepgram = Math.max(lastOutputVolumeDeepgram, percent);
+
+		emitUIChange('onOutputVolumeUpdate', { percent });
+
+		if (isRunning) {
+			outputVolumeAnimationId = requestAnimationFrame(updateOutputVolumeDeepgram);
+		}
+	} catch (error) {
+		console.error('❌ Erro em updateOutputVolumeDeepgram:', error);
+	}
+}
+
+// 🔥 DEEPGRAM: Para captura (wrapper)
+async function stopAudioDeepgram() {
+	debugLogRenderer('Início da função: "stopAudioDeepgram"');
+
+	if (currentQuestion.text) closeCurrentQuestionForced();
+
+	stopInputMonitorDeepgram();
+	stopOutputMonitorDeepgram();
+
+	debugLogRenderer('Fim da função: "stopAudioDeepgram"');
+}
+
+/* ===============================
    MODO ENTREVISTA - TRANSCRIÇÃO PARCIAL
 =============================== */
 
@@ -2540,6 +3159,11 @@ function handleSpeech(author, text) {
 			selectedQuestionId = CURRENT_QUESTION_ID;
 			clearAllSelections();
 		}
+
+		// 🔥 NOVO: Adiciona TUDO à conversa visual em tempo real
+		// (mesmo lixo, para o usuário ver o que foi transcrito)
+		console.log('💬 Adicionando à conversa:', cleaned);
+		addTranscript(OTHER, cleaned, now);
 
 		renderCurrentQuestion();
 	}
@@ -3306,10 +3930,18 @@ async function listenToggleBtn() {
 		}
 	} else if (sttModel === 'whisper-1') {
 		// inicia o medelo whisper-1
+	} else if (sttModel === 'deepgram') {
+		// 🔥 DEEPGRAM: Fluxo separado
+		console.log('🌊 Deepgram configurado - usando fluxo específico');
 	}
 
 	// Inicia ou para a captura de áudio
-	await (isRunning ? startAudio() : stopAudio());
+	// 🔥 DEEPGRAM: Roteia para startAudioDeepgram se sttModel === 'deepgram'
+	if (sttModel === 'deepgram') {
+		await (isRunning ? startAudioDeepgram() : stopAudioDeepgram());
+	} else {
+		await (isRunning ? startAudio() : stopAudio());
+	}
 
 	debugLogRenderer('Fim da função: "listenToggleBtn"');
 }

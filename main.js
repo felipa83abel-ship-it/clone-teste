@@ -2,6 +2,9 @@
    IMPORTS E CONFIGURAÇÕES INICIAIS
 =============================== */
 
+// 🔥 DEEPGRAM: Carrega variáveis de ambiente do .env
+require('dotenv').config();
+
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const OpenAI = require('openai');
 const fs = require('node:fs');
@@ -609,6 +612,47 @@ ipcMain.handle('stop-whisper-server', () => {
 	console.log('📡 Solicitação para parar servidor Whisper');
 	stopWhisperServer();
 	return true;
+});
+
+/* ================================
+   HANDLERS IPC - DEEPGRAM (STT)
+=============================== */
+
+// 🔥 DEEPGRAM: Transcrição via SDK com suporte a chunks
+ipcMain.handle('transcribe-audio-deepgram', async (_, audioDataBase64) => {
+	try {
+		const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+		if (!deepgramApiKey) {
+			throw new Error('DEEPGRAM_API_KEY não configurada no .env');
+		}
+
+		// Converte base64 (string) de volta para Buffer
+		const buffer = Buffer.from(audioDataBase64, 'base64');
+		console.log('🎤 Enviando chunk para Deepgram | size:', buffer.length);
+
+		// Usa Deepgram SDK com prerecorded (para chunks isolados)
+		const { createClient } = require('@deepgram/sdk');
+		const deepgram = createClient(deepgramApiKey);
+
+		const { result, error } = await deepgram.listen.prerecorded.transcribeFile(buffer, {
+			model: 'nova-2',
+			language: 'pt-BR',
+			smart_format: true,
+			container: 'webm',
+		});
+
+		if (error) {
+			console.error('❌ Erro Deepgram SDK:', error);
+			throw new Error(`Deepgram error: ${error.message}`);
+		}
+
+		const transcript = result?.results?.channels[0]?.alternatives[0]?.transcript || '';
+		console.log('✅ Transcrição Deepgram:', transcript || '(vazio)');
+		return transcript;
+	} catch (err) {
+		console.error('❌ Erro ao transcrever com Deepgram:', err.message);
+		throw err;
+	}
 });
 
 /* ================================
