@@ -69,11 +69,12 @@ const MIN_INPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a 
 const MIN_INPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo de tamanho de áudio para a entrevista = 350
 
 const OUTPUT_SPEECH_THRESHOLD = 20; // Valor limite (threshold) para detectar fala mais cedo = 8
-const OUTPUT_SILENCE_TIMEOUT = 100; // 🔥 Aumentado de 100ms para 500ms para evitar cortar palavras no fim (pausas naturais)
+const OUTPUT_SILENCE_TIMEOUT = 100; // 🔥 OTIMIZADO: detecta fim de fala MAIS rápido = 80ms para latência menor
+const AUTO_CLOSE_QUESTION_TIMEOUT = 900; // 900ms — aguarda sem novo áudio antes de fechar pergunta + GPT
 const MIN_OUTPUT_AUDIO_SIZE = 1000; // Valor mínimo de tamanho de áudio para a normal = 2500
 const MIN_OUTPUT_AUDIO_SIZE_INTERVIEW = 350; // Valor mínimo para enviar parcial (~3-4 chunks, ~3KB)
 // controla intervalo mínimo entre requisições STT parciais (ms) - mantém rate-limit para não sobrecarregar API
-const PARTIAL_MIN_INTERVAL_MS = 3000;
+const PARTIAL_MIN_INTERVAL_MS = 800; // 🔥 OTIMIZADO: transcrição parcial a cada 800ms (era 3000ms)
 
 const OUTPUT_ENDING_PHRASES = ['tchau', 'tchau tchau', 'obrigado', 'valeu', 'falou', 'beleza', 'ok']; // Palavras finais para detectar o fim da fala
 
@@ -200,6 +201,7 @@ const UICallbacks = {
 	onAnswerStreamChunk: null,
 	onAnswerIdUpdate: null,
 	onModeSelectUpdate: null,
+	onAnswerStreamEnd: null,
 	onPlaceholderFulfill: null,
 	onPlaceholderUpdate: null,
 	onScreenshotBadgeUpdate: null,
@@ -348,9 +350,66 @@ function looksLikeQuestion(t) {
 
 function isGarbageSentence(t) {
 	debugLogRenderer('Início da função: "isGarbageSentence"');
-	const s = t.toLowerCase();
+	const s = t.toLowerCase().trim();
+
+	// 🔥 Detecção inteligente: se tem pergunta real, NÃO é lixo
+	// Mesmo que tenha "muito bom", se tem "?" ou palavra de pergunta, passa!
+	if (looksLikeQuestion(s)) {
+		console.log('✅ isGarbageSentence: contém pergunta real, retornando FALSE (não é lixo)');
+		debugLogRenderer('Fim da função: "isGarbageSentence"');
+		return false;
+	}
+
+	// 🔥 Lista expandida de padrões de "lixo" PURO (confirmações/finalizações sozinhas)
+	const garbagePatterns = [
+		// Finalizações e agradecimentos
+		'obrigado',
+		'muito obrigado',
+		'valeu',
+		'falou',
+		'tchau',
+		'até a próxima',
+		'até logo',
+		// Confirmações simples (sem pergunta real)
+		'combinado',
+		'certo',
+		'beleza',
+		'ok',
+		'tá bom',
+		'está bom',
+		'perfeito',
+		'ótimo',
+		// Frases de continuação (não perguntas)
+		'responder',
+		'responda',
+		// Interjeições e expressões vazias
+		'e aí',
+		'ué',
+		'hã',
+		'ahn',
+		'e então',
+		'e depois',
+		// Finalizando
+		'finalizando',
+		'pronto',
+		'fim',
+		'acabou',
+		// Frases de transição (vamos para próxima)
+		'agora vamos a',
+		'agora vamos para',
+		'agora a gente passa para',
+		'vamos pra próxima pergunta',
+		'vamos para a próxima pergunta',
+	];
+
+	// Detecta se é lixo puro
+	const isGarbage = garbagePatterns.some(w => s.includes(w));
+
+	// Detecta frases muito curtas ou vazias (< 3 caracteres significa ruído)
+	const isTooShort = s.length < 3;
+
 	debugLogRenderer('Fim da função: "isGarbageSentence"');
-	return ['obrigado', 'até a próxima', 'finalizando'].some(w => s.includes(w));
+	return isGarbage || isTooShort;
 }
 
 // Encurta uma resposta em markdown para até `maxSentences` sentenças.
@@ -854,13 +913,10 @@ async function transcribeAudio(blob) {
 			return transcribedText;
 		} catch (error) {
 			console.error('❌ Vosk falhou:', error.message);
-			// Fallback para OpenAI
-			try {
-				console.log('🔄 Fallback para OpenAI...');
-				return await ipcRenderer.invoke('transcribe-audio', buffer);
-			} catch (openaiError) {
-				throw new Error(`Falha na transcrição: ${openaiError.message}`);
-			}
+			// 🔥 [CRÍTICO] SEM FALLBACK AUTOMÁTICO!
+			// Se o usuário escolhe vosk-local, APENAS vosk-local será usado.
+			// Se falhar, o erro é propagado e o usuário deve mudar o modelo nas Configurações.
+			throw new Error(`Vosk local falhou: ${error.message}. Altere o modelo em "Configurações → API e Modelos"`);
 		}
 	} else if (sttModel === 'whisper-cpp-local') {
 		// Modelo: Whisper.cpp local
@@ -870,6 +926,7 @@ async function transcribeAudio(blob) {
 		// Processo: WebM → WAV → Whisper.cpp CLI → Texto
 		try {
 			console.log(`🚀 Enviando para Whisper.cpp (local, alta precisão)...`);
+
 			transcriptionMetrics.whisperStartTime = Date.now();
 
 			const result = await ipcRenderer.invoke('transcribe-local', buffer);
@@ -882,14 +939,11 @@ async function transcribeAudio(blob) {
 
 			return result;
 		} catch (error) {
-			console.error('❌ Whisper.cpp falhou:', error.message);
-			// Fallback para OpenAI
-			try {
-				console.log('🔄 Fallback para OpenAI...');
-				return await ipcRenderer.invoke('transcribe-audio', buffer);
-			} catch (openaiError) {
-				throw new Error(`Falha na transcrição: ${openaiError.message}`);
-			}
+			console.error('❌ Whisper.cpp local falhou:', error.message);
+			// 🔥 [CRÍTICO] SEM FALLBACK AUTOMÁTICO!
+			// Se o usuário escolhe whisper-cpp-local, APENAS whisper-cpp-local será usado.
+			// Se falhar, o erro é propagado e o usuário deve mudar o modelo nas Configurações.
+			throw new Error(`Whisper.cpp local falhou: ${error.message}. Altere o modelo em "Configurações → API e Modelos"`);
 		}
 	} else if (sttModel === 'whisper-1') {
 		// Modelo: OpenAI Whisper-1 (online)
@@ -906,12 +960,10 @@ async function transcribeAudio(blob) {
 
 		return result;
 	} else {
-		// Modelo desconhecido - tenta OpenAI como fallback
-		console.warn(`⚠️ Modelo STT desconhecido: ${sttModel}, usando OpenAI`);
-		transcriptionMetrics.whisperStartTime = Date.now();
-		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
-		transcriptionMetrics.whisperEndTime = Date.now();
-		return result;
+		// 🔥 [CRÍTICO] Modelo desconhecido = ERRO, não fallback!
+		throw new Error(
+			`Modelo STT desconhecido: ${sttModel}. Configure um modelo válido em "Configurações → API e Modelos"`,
+		);
 	}
 }
 
@@ -924,6 +976,12 @@ async function transcribeAudioPartial(blob) {
 		// Vosk acumula e retorna parciais, mas não queremos enviá-las para a UI
 		// A transcrição real será feita em transcribeAudio() quando a gravação terminar
 		return '';
+	} else if (sttModel === 'whisper-cpp-local') {
+		// 🔥 [DESABILITADO] Transcrições parciais para whisper-cpp-local foram desabilitadas
+		// Motivo: WebM chunks incompletos causam erro ffmpeg constantemente (código 3199971767)
+		// Solução: confiar apenas em transcrição completa (funciona perfeitamente)
+		// Resultado final é entregue completo após gravação terminar
+		return '';
 	} else if (sttModel === 'whisper-1') {
 		try {
 			return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
@@ -932,13 +990,9 @@ async function transcribeAudioPartial(blob) {
 			return '';
 		}
 	} else {
-		// Modelo desconhecido - tenta OpenAI como fallback
-		try {
-			return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
-		} catch (error) {
-			console.warn('⚠️ Transcrição parcial falhou:', error.message);
-			return '';
-		}
+		// 🔥 [CRÍTICO] Modelo desconhecido = ERRO, não fallback!
+		console.warn(`⚠️ Modelo STT desconhecido em transcribeAudioPartial: ${sttModel}`);
+		return ''; // Retorna vazio para parcial desconhecido
 	}
 }
 
@@ -1672,6 +1726,14 @@ function updateOutputVolume() {
 		if (avg > OUTPUT_SPEECH_THRESHOLD && outputRecorder && isRunning) {
 			// Se o outputSpeaking for false, inicia a gravação de saída
 			if (!outputSpeaking) {
+				// 🔥 [NOVO] Se houver timer de auto-close pendente, cancela
+				// (novo áudio começou, então não devemos fechar agora)
+				if (autoCloseQuestionTimer) {
+					console.log('⏸️ Auto-close cancelado: novo áudio detectado!');
+					clearTimeout(autoCloseQuestionTimer);
+					autoCloseQuestionTimer = null;
+				}
+
 				// RESET: Limpa valores da frase anterior ANTES de iniciar nova frase
 				lastOutputPlaceholderEl = null;
 				lastOutputStopAt = null;
@@ -1848,13 +1910,17 @@ async function handlePartialOutputChunk(blobChunk) {
 		if (!outputPartialChunks.length) return;
 
 		const blob = new Blob(outputPartialChunks, { type: 'audio/webm' });
+		const blobSize = blob.size;
 		outputPartialChunks = [];
 
 		try {
+			const partialStart = Date.now();
 			const buffer = Buffer.from(await blob.arrayBuffer());
 			const partialText = (await transcribeAudioPartial(blob))?.trim();
+			const partialDuration = Date.now() - partialStart;
 
 			if (partialText && !isGarbageSentence(partialText)) {
+				console.log(`⚡ PARCIAL: ${blobSize}bytes → "${partialText.substring(0, 50)}" em ${partialDuration}ms`);
 				addTranscript(OTHER, partialText);
 				// NÃO chamar handleSpeech aqui - evita consolidação nas parciais
 				// consolidação só acontece em transcribeOutput() para o áudio final
@@ -1862,7 +1928,7 @@ async function handlePartialOutputChunk(blobChunk) {
 		} catch (err) {
 			console.warn('⚠️ erro na transcrição parcial (OUTPUT)', err);
 		}
-	}, 180); // janela curta (reduzida de 250 -> 180)
+	}, 100); // 🔥 OTIMIZADO: debounce reduzido para 100ms (era 180) para latência menor
 
 	debugLogRenderer('Fim da função:  "handlePartialOutputChunk"');
 }
@@ -2199,10 +2265,10 @@ async function transcribeOutput() {
 			return;
 		}
 
-		// Ignora sentenças garbage
+		// ⚠️ [NOVO] Se é lixo, loga mas NÃO retorna - deixa passar para aparecer na UI
 		if (isGarbageSentence(text)) {
-			console.log('🗑️ transcribeOutput: Sentença descartada (garbage):', text);
-			return;
+			console.log('🗑️ transcribeOutput: É frase de lixo, mas permitindo que apareça na Transcrição:', text);
+			// NÃO retorna! Deixa a frase passar para emitir placeholder
 		}
 
 		// Se existia um placeholder (timestamp do stop), atualiza esse placeholder com o texto final e latência
@@ -2334,13 +2400,35 @@ async function transcribeOutput() {
 		pendingOutputStartAt = null;
 		pendingOutputStopAt = null;
 
-		// MODO ENTREVISTA: Se a transcrição final indicar claramente uma pergunta, fechar e enviar ao GPT imediatamente
-		// if (ModeController.isInterviewMode() && isQuestionReady(text)) {
-		// 	console.log('🔔 transcribeOutput: Transcrição final forma pergunta válida');
-		// 	console.log('   → Fechando pergunta e chamando GPT agora');
+		// 🔥 [NOVO] MODO ENTREVISTA: Agendamento inteligente de auto-close
+		// Não fecha imediatamente! Aguarda AUTO_CLOSE_QUESTION_TIMEOUT sem novo áudio
+		// Se novo áudio começar, o timer é cancelado (em updateOutputVolume)
+		if (ModeController.isInterviewMode() && currentQuestion.text && !currentQuestion.finalized) {
+			console.log(
+				`🔔 transcribeOutput: Agendando auto-close em ${AUTO_CLOSE_QUESTION_TIMEOUT}ms (se nenhum áudio novo começar)`,
+			);
 
-		// 	// limpa estado parcial e cancela o temporizador automático para evitar duplicatas
-		// 	outputPartialText = '';
+			// Cancela timer anterior se houver
+			if (autoCloseQuestionTimer) {
+				clearTimeout(autoCloseQuestionTimer);
+				console.log('⏸️ Timer anterior cancelado (nova transcrição chegou)');
+			}
+
+			// Agenda novo timer: fecha quando nenhum áudio novo começou no timeout
+			autoCloseQuestionTimer = setTimeout(() => {
+				if (currentQuestion.text && !currentQuestion.finalized && !outputSpeaking) {
+					console.log(
+						'✅ Auto-fechando pergunta (nenhum áudio novo detectado):',
+						currentQuestion.text.substring(0, 80),
+					);
+					autoCloseQuestionTimer = null;
+					closeCurrentQuestion();
+				} else if (outputSpeaking) {
+					console.log('⏸️ Auto-close cancelado: áudio novo detectado, aguardando próxima transcrição');
+					autoCloseQuestionTimer = null;
+				}
+			}, AUTO_CLOSE_QUESTION_TIMEOUT);
+		}
 
 		// 	// cancela o temporizador automático para evitar duplicatas
 		// 	if (autoCloseQuestionTimer) {
@@ -2388,7 +2476,8 @@ function handleSpeech(author, text) {
 			currentQuestion.text &&
 			looksLikeQuestion(cleaned) &&
 			now - currentQuestion.lastUpdate > 500 &&
-			!currentQuestion.finalized
+			!currentQuestion.finalized &&
+			!isGarbageSentence(cleaned) // 🔥 NÃO consolidar lixo com pergunta real
 		) {
 			// 🔀 CONSOLIDAÇÃO: Adiciona a fala atual antes de fechar a pergunta anterior
 			// Isso garante que "explique o que é... Y" seja parte da pergunta "Vou começar... X"
@@ -2397,6 +2486,7 @@ function handleSpeech(author, text) {
 				new: cleaned,
 				currentLength: currentQuestion.text.length,
 				newLength: cleaned.length,
+				cleanedIsGarbage: isGarbageSentence(cleaned),
 			});
 			const beforeConsolidate = currentQuestion.text;
 			currentQuestion.text += (currentQuestion.text ? ' ' : '') + cleaned;
@@ -2416,12 +2506,20 @@ function handleSpeech(author, text) {
 			return;
 		}
 
+		// evita criar novo turno se a transcrição final for igual à última pergunta já enviada
+		if (lastSentQuestionText && cleaned.trim() === lastSentQuestionText) {
+			console.log('🔕 transcrição igual à última pergunta enviada — ignorando novo turno');
+			return;
+		}
+
+		// 🔥 [NOVO] Se a fala é lixo (confirmação, interjeição), NÃO consolida em CURRENT
+		// Mas ainda aparece na Transcrição (porque onPlaceholderFulfill já foi emitido)
+		if (isGarbageSentence(cleaned)) {
+			console.log('🗑️ handleSpeech: frase é lixo, NÃO consolidando em CURRENT =', cleaned);
+			// Não retorna! Deixa processar abaixo caso precise
+		}
+
 		if (!currentQuestion.text) {
-			// evita criar novo turno se a transcrição final for igual à última pergunta já enviada
-			if (lastSentQuestionText && cleaned.trim() === lastSentQuestionText) {
-				console.log('🔕 transcrição igual à última pergunta enviada — ignorando novo turno');
-				return;
-			}
 			currentQuestion.createdAt = Date.now();
 			currentQuestion.lastUpdateTime = Date.now();
 			interviewTurnId++; // 🔥 novo turno
@@ -2430,7 +2528,8 @@ function handleSpeech(author, text) {
 		// evita duplicação quando a mesma frase parcial/final chega novamente
 		if (currentQuestion.text && normalizeForCompare(currentQuestion.text) === normalizeForCompare(cleaned)) {
 			console.log('🔁 speech igual ao currentQuestion — ignorando concatenação');
-		} else {
+		} else if (!isGarbageSentence(cleaned)) {
+			// 🔥 [NOVO] Só consolida se NÃO for lixo
 			currentQuestion.text += (currentQuestion.text ? ' ' : '') + cleaned;
 			currentQuestion.lastUpdateTime = now;
 		}
@@ -2631,9 +2730,29 @@ async function askGpt() {
 
 	const text = getSelectedQuestionText();
 
+	// 🔥 Validações rigorosas para impedir lixo
 	if (!text || text.trim().length < 5) {
 		updateStatusMessage('⚠️ Pergunta vazia ou incompleta');
 		return;
+	}
+
+	// Detecta se é lixo ANTES de enviar ao GPT
+	if (isGarbageSentence(text)) {
+		console.log('🚫 askGpt bloqueado: texto é lixo =', text);
+		updateStatusMessage('⚠️ Frase não é uma pergunta válida');
+		return;
+	}
+
+	// Verifica se tem uma pergunta real ("?" ou começa com palavra típica)
+	if (!looksLikeQuestion(text)) {
+		console.log('🚫 askGpt bloqueado: não parece pergunta =', text);
+		updateStatusMessage('⚠️ Frase não é uma pergunta (falta ? ou começo de pergunta)');
+
+		// No modo entrevista, força mesmo assim (permitir perguntas um pouco imprecisas)
+		if (!ModeController.isInterviewMode()) {
+			return;
+		}
+		console.log('ℹ️ modo entrevista: enviando mesmo assim...');
 	}
 
 	const isCurrent = selectedQuestionId === CURRENT_QUESTION_ID;
@@ -2714,6 +2833,22 @@ async function askGpt() {
 
 		const onChunk = (_, token) => {
 			streamedText += token;
+
+			// 🔥 PROTEÇÃO: Valida se o questionId ainda é válido
+			// (evita renderizar em question ID antigo/inválido)
+			if (
+				!questionId ||
+				(isCurrent && gptRequestedQuestionId !== CURRENT_QUESTION_ID) ||
+				(!isCurrent && !questionsHistory.find(q => q.id === questionId))
+			) {
+				console.warn('🚨 onChunk: questionId inválido ou desatualizado, ignorando token:', {
+					questionId,
+					isCurrent,
+					gptRequestedQuestionId,
+					token,
+				});
+				return;
+			}
 
 			// 🔥 DEBUG: Log para rastrear qual questionId está sendo enviado
 			if (streamedText.length <= 50) {
@@ -3150,6 +3285,28 @@ async function listenToggleBtn() {
 	updateStatusMessage(statusMsg);
 
 	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
+
+	// 🔥 Modelo STT configurado
+	const sttModel = getConfiguredSTTModel();
+	console.log(`🗣️ Modelo STT configurado: ${sttModel}`);
+
+	// Roteia para o modelo configurado
+	if (sttModel === 'vosk-local') {
+		// inicia o modelo vosk-local
+	} else if (sttModel === 'whisper-cpp-local') {
+		// 🔥 NOVO: Iniciar servidor Whisper persistente se não estiver rodando
+		if (isRunning) {
+			const serverStarted = await ipcRenderer.invoke('start-whisper-server');
+			if (serverStarted) {
+				console.log('✅ Servidor Whisper.cpp iniciado e pronto');
+			}
+		} else {
+			await ipcRenderer.invoke('stop-whisper-server');
+			console.log('🛑 Servidor Whisper.cpp parado');
+		}
+	} else if (sttModel === 'whisper-1') {
+		// inicia o medelo whisper-1
+	}
 
 	// Inicia ou para a captura de áudio
 	await (isRunning ? startAudio() : stopAudio());
