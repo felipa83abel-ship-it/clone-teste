@@ -43,6 +43,19 @@ let deepgramOutputProcessor = null;
 let deepgramLastInputInterimShown = null; // Último interim que foi adicionado ao DOM
 let deepgramLastOutputInterimShown = null; // Último interim OUTPUT adicionado
 
+// Placeholder IDs (usados com onPlaceholderUpdate / onPlaceholderFulfill)
+let deepgramLastInputPlaceholderId = null;
+let deepgramLastOutputPlaceholderId = null;
+
+// Mapeamento placeholderId -> utterance start timestamp (ms since epoch)
+const deepgramPlaceholderStartById = {};
+
+// estado adicional para evitar duplicações
+let deepgramLastInputInterimShownNorm = null;
+let deepgramLastOutputInterimShownNorm = null;
+let deepgramLastInputAddedAt = 0;
+let deepgramLastOutputAddedAt = 0;
+
 // Timestamps para sincronizar com padrão de outros modelos
 let deepgramInputStartAt = null;
 let deepgramInputStopAt = null;
@@ -633,47 +646,72 @@ function stopAllDeepgram() {
  * @returns {string} - Apenas a parte NOVA (delta)
  */
 function extractDelta(previousText, newText) {
-	if (!previousText || previousText.length === 0) {
-		return newText; // Primeiro interim = texto completo é o delta
-	}
-
-	// Se o novo é igual ao anterior, não há delta
-	if (newText === previousText) {
-		return '';
-	}
+	if (!previousText || previousText.length === 0) return newText;
+	if (newText === previousText) return '';
 
 	const prevWords = previousText.trim().split(/\s+/);
 	const newWords = newText.trim().split(/\s+/);
+	const prevNormWords = prevWords.map(w => normalizeForCompare(w));
+	const newNormWords = newWords.map(w => normalizeForCompare(w));
 
-	// 🔄 Encontrar primeira divergência word-by-word
+	// Helper: encontra subarray needle dentro de haystack (retorna índice ou -1)
+	function indexOfSubarray(haystack, needle) {
+		if (needle.length === 0) return 0;
+		for (let i = 0; i <= haystack.length - needle.length; i++) {
+			let ok = true;
+			for (let j = 0; j < needle.length; j++) {
+				if (haystack[i + j] !== needle[j]) {
+					ok = false;
+					break;
+				}
+			}
+			if (ok) return i;
+		}
+		return -1;
+	}
+
+	// 1) Se previous aparece como sequência contínua em new, retorna só o que vem depois
+	const foundIndex = indexOfSubarray(newNormWords, prevNormWords);
+	if (foundIndex !== -1) {
+		const delta = newWords.slice(foundIndex + prevWords.length).join(' ');
+		if (delta) console.log(`   [extractDelta DEBUG] previous found in new at ${foundIndex}, delta="${delta}"`);
+		return delta || '';
+	}
+
+	// 2) Fallback: encontrar primeira divergência word-by-word (prefix-match)
 	let divergenceIndex = 0;
 	for (let i = 0; i < Math.min(prevWords.length, newWords.length); i++) {
-		// Comparar ignoring case E removendo pontuação final
-		const pWord = prevWords[i].toLowerCase().replace(/[,.!?;]$/, '');
-		const nWord = newWords[i].toLowerCase().replace(/[,.!?;]$/, '');
-		if (pWord === nWord) {
-			divergenceIndex = i + 1; // Próxima palavra após match
+		const p = prevNormWords[i];
+		const n = newNormWords[i];
+		if (p === n) {
+			divergenceIndex = i + 1;
 		} else {
-			// Encontrou divergência
-			console.log(`   [extractDelta DEBUG] Divergência em i=${i}: "${pWord}" vs "${nWord}"`);
+			console.log(`   [extractDelta DEBUG] Divergência em i=${i}: "${p}" vs "${n}"`);
 			break;
 		}
 	}
 
-	// 📍 Se todas as palavras do previous estão no new (prefix match)
-	// divergenceIndex será = prevWords.length
-	// Então o delta é apenas o que vem depois
 	if (divergenceIndex >= prevWords.length) {
-		// Caso normal: novo é extensão do anterior
 		const delta = newWords.slice(divergenceIndex).join(' ');
 		if (delta) console.log(`   [extractDelta DEBUG] Extensão: delta="${delta}"`);
 		return delta || '';
 	}
 
-	// 🔄 Houve mudança: retorna a partir do ponto de divergência
 	const delta = newWords.slice(divergenceIndex).join(' ');
 	console.log(`   [extractDelta DEBUG] Mudança detectada em i=${divergenceIndex}: delta="${delta}"`);
 	return delta || '';
+}
+
+// Normaliza texto para comparação (remove pontuação/acentos leves, caixa e espaços)
+function normalizeForCompare(s) {
+	if (!s) return '';
+	return s
+		.normalize('NFD')
+		.replace(/[\u0300-\u036f]/g, '') // remove diacríticos
+		.toLowerCase()
+		.replace(/[^\w\s]/g, '') // remove pontuação
+		.replace(/\s+/g, ' ')
+		.trim();
 }
 
 /**
@@ -694,11 +732,6 @@ function handleDeepgramMessage(data, source = 'input') {
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
 
-	// 🛑 EM MODO NORMAL: Ignora OUTPUT
-	if (!isInput && !ModeController?.isInterviewMode?.()) {
-		return;
-	}
-
 	// ================================
 	// 🔍 DETECÇÃO DE DELTA (INCREMENTO)
 	// ================================
@@ -710,55 +743,210 @@ function handleDeepgramMessage(data, source = 'input') {
 		`[handleDeepgramMessage] source="${source}" | lastShown="${lastShown}" | transcript="${transcript}" | delta="${delta}" | isFinal=${isFinal}`,
 	);
 
+	const now = Date.now();
+
+	// Normaliza delta para filtros
+	const normDelta = delta ? normalizeForCompare(delta) : '';
+	const lastNorm = isInput ? deepgramLastInputInterimShownNorm : deepgramLastOutputInterimShownNorm;
+	const lastAddedAt = isInput ? deepgramLastInputAddedAt : deepgramLastOutputAddedAt;
+
 	if (isFinal) {
 		// ✅ FINAL CONSOLIDADO
 		console.log(`📝 ✅ FINAL [${source.toUpperCase()}]: "${transcript}" (${(confidence * 100).toFixed(1)}%)`);
 
-		// 🔴 Se houver delta (mudança detectada na última atualização), adiciona como linha nova também
-		if (delta && delta.length > 0) {
-			console.log(`🔴 Delta final detectado [${source}]: delta = "${delta}"`);
-			const timeForDelta = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
-			addTranscript(author, delta, timeForDelta);
+		// Não adicionamos fragmentos delta ao chegar o final (evita duplicação fragmento + final).
+		// Em vez de manipular DOM, usamos o fluxo de placeholders do UI: onPlaceholderFulfill
+		const normTranscript = normalizeForCompare(transcript);
+		let hadPlaceholder = false;
+		if (isInput) {
+			hadPlaceholder = !!deepgramLastInputPlaceholderId;
+			const pid = deepgramLastInputPlaceholderId;
+			if (pid && globalThis.RendererAPI?.emitUIChange) {
+				// calcula start/stop a partir do placeholder start (se disponível) e palavras finais
+				const sessionStart = deepgramInputStartAt;
+				const words = data.channel?.alternatives?.[0]?.words;
+				let startAt = deepgramPlaceholderStartById[pid] || sessionStart || Date.now();
+				let stopAt = Date.now();
+				if (words && words.length > 0 && typeof words[words.length - 1].end === 'number' && sessionStart) {
+					stopAt = sessionStart + Math.round(words[words.length - 1].end * 1000);
+				}
+				const recordingDuration = Math.max(0, stopAt - startAt);
+				const latency = Math.max(0, Date.now() - stopAt);
+				const total = Math.max(0, Date.now() - startAt);
+				globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
+					speaker: author,
+					text: transcript,
+					placeholderId: pid,
+					startStr: new Date(startAt).toLocaleTimeString(),
+					stopStr: new Date(stopAt).toLocaleTimeString(),
+					recordingDuration,
+					latency,
+					total,
+				});
+				delete deepgramPlaceholderStartById[pid];
+			}
+			deepgramLastInputPlaceholderId = null;
+			deepgramLastInputInterimShown = null;
+			deepgramLastInputInterimShownNorm = normTranscript;
+			deepgramLastInputAddedAt = now;
+		} else {
+			hadPlaceholder = !!deepgramLastOutputPlaceholderId;
+			const pid = deepgramLastOutputPlaceholderId;
+			if (pid && globalThis.RendererAPI?.emitUIChange) {
+				const sessionStart = deepgramOutputStartAt;
+				const words = data.channel?.alternatives?.[0]?.words;
+				let startAt = deepgramPlaceholderStartById[pid] || sessionStart || Date.now();
+				let stopAt = Date.now();
+				if (words && words.length > 0 && typeof words[words.length - 1].end === 'number' && sessionStart) {
+					stopAt = sessionStart + Math.round(words[words.length - 1].end * 1000);
+				}
+				const recordingDuration = Math.max(0, stopAt - startAt);
+				const latency = Math.max(0, Date.now() - stopAt);
+				const total = Math.max(0, Date.now() - startAt);
+				globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
+					speaker: author,
+					text: transcript,
+					placeholderId: pid,
+					startStr: new Date(startAt).toLocaleTimeString(),
+					stopStr: new Date(stopAt).toLocaleTimeString(),
+					recordingDuration,
+					latency,
+					total,
+				});
+				delete deepgramPlaceholderStartById[pid];
+			}
+			deepgramLastOutputPlaceholderId = null;
+			deepgramLastOutputInterimShown = null;
+			deepgramLastOutputInterimShownNorm = normTranscript;
+			deepgramLastOutputAddedAt = now;
 		}
 
 		// Envia TEXTO CONSOLIDADO para processar (sem fragments)
-		handleSpeech(author, transcript);
-
-		// 🔄 RESET: Prepara para próxima frase
-		if (isInput) {
-			deepgramLastInputInterimShown = null;
+		// Se já cumprimos placeholder, evitamos dupla adição ao UI (handleSpeech suporta skip)
+		if (hadPlaceholder) {
+			console.log('   Placeholder já cumprido, enviando final sem adicionar ao UI novamente');
+			handleSpeech(author, transcript, { skipAddToUI: true });
 		} else {
-			deepgramLastOutputInterimShown = null;
+			handleSpeech(author, transcript);
 		}
 	} else if (isFirstInterim) {
-		// 🟢 PRIMEIRA INTERIM - Adiciona texto completo
-		console.log(`🟢 PRIMEIRA interim [${source}]: "${transcript}"`);
-
-		const timeForTranscript = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
-		const el = addTranscript(author, transcript, timeForTranscript);
-		if (el && el.dataset) {
-			el.dataset.startAt = timeForTranscript;
+		// 🟢 PRIMEIRA INTERIM - Adiciona texto completo, mas filtra ruído muito curto
+		const normTranscript = normalizeForCompare(transcript);
+		if (!normTranscript || normTranscript.length < 2) {
+			console.log(`⏭️ PRIMEIRA interim trivial/curta, ignorando: "${transcript}"`);
+			return;
 		}
 
-		// Marca como mostrado
+		console.log(`🟢 PRIMEIRA interim [${source}]: "${transcript}"`);
+		const timeForTranscript = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
+
+		// Cria um placeholder reservado no DOM (texto = '...') e guarda o placeholderId
+		const placeholderId = `dg-${source}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+		addTranscript(author, '...', timeForTranscript, placeholderId);
+		// Guarda o placeholderId para futuras atualizações
+		if (isInput) deepgramLastInputPlaceholderId = placeholderId;
+		else deepgramLastOutputPlaceholderId = placeholderId;
+
+		// Estima o timestamp de início da fala para este placeholder
+		let placeholderStartAt = timeForTranscript || Date.now();
+		const words = data.channel?.alternatives?.[0]?.words;
+		if (words && words.length > 0) {
+			const firstWordStart = words[0].start; // seconds offset from stream start
+			const sessionStart = isInput ? deepgramInputStartAt : deepgramOutputStartAt;
+			if (typeof firstWordStart === 'number' && sessionStart) {
+				placeholderStartAt = sessionStart + Math.round(firstWordStart * 1000);
+			}
+		}
+		deepgramPlaceholderStartById[placeholderId] = placeholderStartAt;
+
+		// Atualiza imediatamente o placeholder com o texto interim completo (sem adicionar novo elemento)
+		if (globalThis.RendererAPI?.emitUIChange) {
+			const sessionStart = isInput ? deepgramInputStartAt : deepgramOutputStartAt;
+			const wordsNow = data.channel?.alternatives?.[0]?.words;
+			let stopAt = now;
+			if (wordsNow && wordsNow.length > 0 && typeof wordsNow[wordsNow.length - 1].end === 'number' && sessionStart) {
+				stopAt = sessionStart + Math.round(wordsNow[wordsNow.length - 1].end * 1000);
+			}
+			const startStr = new Date(placeholderStartAt).toLocaleTimeString();
+			const stopStr = new Date(stopAt).toLocaleTimeString();
+			const recordingDuration = Math.max(0, stopAt - placeholderStartAt);
+			const latency = Math.max(0, now - stopAt);
+			const total = Math.max(0, now - placeholderStartAt);
+			globalThis.RendererAPI.emitUIChange('onPlaceholderUpdate', {
+				speaker: author,
+				text: transcript,
+				timeStr: stopStr, // exibido como hora final
+				startStr,
+				stopStr,
+				recordingDuration,
+				latency,
+				total,
+				placeholderId: placeholderId,
+			});
+		}
+
+		// Marca como mostrado (texto completo)
 		if (isInput) {
 			deepgramLastInputInterimShown = transcript;
+			deepgramLastInputInterimShownNorm = normTranscript;
+			deepgramLastInputAddedAt = now;
 		} else {
 			deepgramLastOutputInterimShown = transcript;
+			deepgramLastOutputInterimShownNorm = normTranscript;
+			deepgramLastOutputAddedAt = now;
 		}
 	} else if (delta && delta.length > 0) {
-		// 🟡 ATUALIZAÇÃO INTERIM com DELTA - Adiciona incremento
+		// 🟡 ATUALIZAÇÃO INTERIM com DELTA - Filtra deltas triviais e duplicações recentes
+		if (!normDelta || normDelta.length < 2) {
+			console.log(`⏭️ Delta trivial/curto, ignorando: "${delta}"`);
+			return;
+		}
+
+		// Ignora se já adicionamos o mesmo delta recentemente
+		if (lastNorm && normDelta === lastNorm && now - lastAddedAt < 5000) {
+			console.log(`⏭️ Delta duplicado recentemente, ignorando: "${delta}"`);
+			return;
+		}
+
 		console.log(`🟡 Atualizando interim [${source}]: delta = "${delta}"`);
 
-		// Adiciona APENAS a parte nova
-		const timeForDelta = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
-		addTranscript(author, delta, timeForDelta);
+		// Atualiza placeholder existente via evento (não adiciona/remover elementos direto)
+		// calcula métricas usando o placeholder start se disponível e palavras para stop
+		const pid = isInput ? deepgramLastInputPlaceholderId : deepgramLastOutputPlaceholderId;
+		const pStart = pid
+			? deepgramPlaceholderStartById[pid]
+			: (isInput ? deepgramInputStartAt : deepgramOutputStartAt) || Date.now();
+		const sessionStart = isInput ? deepgramInputStartAt : deepgramOutputStartAt;
+		const wordsNow = data.channel?.alternatives?.[0]?.words;
+		let stopAt = now;
+		if (wordsNow && wordsNow.length > 0 && typeof wordsNow[wordsNow.length - 1].end === 'number' && sessionStart) {
+			stopAt = sessionStart + Math.round(wordsNow[wordsNow.length - 1].end * 1000);
+		}
+		const recordingDuration = Math.max(0, stopAt - pStart);
+		const latency = Math.max(0, now - stopAt);
+		const total = Math.max(0, now - pStart);
+		if (globalThis.RendererAPI?.emitUIChange) {
+			globalThis.RendererAPI.emitUIChange('onPlaceholderUpdate', {
+				speaker: author,
+				text: transcript,
+				timeStr: new Date(stopAt).toLocaleTimeString(),
+				startStr: new Date(pStart).toLocaleTimeString(),
+				stopStr: new Date(stopAt).toLocaleTimeString(),
+				recordingDuration,
+				latency,
+				total,
+				placeholderId: pid,
+			});
+		}
 
-		// Atualiza rastreamento
 		if (isInput) {
 			deepgramLastInputInterimShown = transcript;
+			deepgramLastInputInterimShownNorm = normDelta;
+			deepgramLastInputAddedAt = now;
 		} else {
 			deepgramLastOutputInterimShown = transcript;
+			deepgramLastOutputInterimShownNorm = normDelta;
+			deepgramLastOutputAddedAt = now;
 		}
 	} else {
 		// Sem delta = sem mudança = ignora

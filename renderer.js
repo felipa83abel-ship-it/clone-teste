@@ -421,39 +421,6 @@ function isGarbageSentence(t) {
 	return isGarbage || isTooShort;
 }
 
-// Encurta uma resposta em markdown para até `maxSentences` sentenças.
-function shortenAnswer(markdownText, maxSentences = 2) {
-	debugLogRenderer('Início da função: "shortenAnswer"');
-	if (!markdownText) return markdownText;
-
-	// remove blocos de código temporariamente para evitar cortes ruins
-	const codeBlocks = [];
-	const withoutCode = markdownText.replace(/```[\s\S]*?```/g, match => {
-		codeBlocks.push(match);
-		return `__CODEBLOCK_${codeBlocks.length - 1}__`;
-	});
-
-	// remove inline code
-	const tmp = withoutCode.replace(/`([^`]*)`/g, '$1');
-
-	// extrai sentenças por pontuação final
-	const parts = tmp.split(/(?<=[\.\?!])\s+/);
-
-	const take = parts.slice(0, maxSentences).join(' ').trim();
-
-	// restaura blocos de código, caso existam (apendados ao final)
-	let result = take;
-	if (codeBlocks.length) {
-		result += '\n\n' + codeBlocks.join('\n\n');
-	}
-
-	// garante pontuação final
-	if (!/[\.\?!]$/.test(result)) result = result + '.';
-
-	debugLogRenderer('Fim da função: "shortenAnswer"');
-	return result;
-}
-
 function isIncompleteQuestion(t) {
 	debugLogRenderer('Início da função: "isIncompleteQuestion"');
 	if (!t) return false;
@@ -1013,68 +980,6 @@ let voskAccumulatedText = ''; // Acumula resultado parcial do Vosk
 let voskPartialTimer = null;
 let voskScriptProcessor = null; // ScriptProcessorNode para capturar PCM bruto
 let voskAudioBuffer = []; // Acumula PCM entre envios
-
-/**
- * Converte array de floats PCM para Int16Array
- */
-function floatToPCM16(floatArray) {
-	const pcm16 = new Int16Array(floatArray.length);
-	for (let i = 0; i < floatArray.length; i++) {
-		pcm16[i] = Math.max(-1, Math.min(1, floatArray[i])) * 0x7fff;
-	}
-	return pcm16;
-}
-
-/**
- * Inicia captura de PCM bruto do áudio (substitui MediaRecorder para Vosk)
- * @param {MediaStreamAudioSourceNode} source - Source do áudio da stream
- * @deprecated Usar MediaRecorder com timeslice ao invés de ScriptProcessorNode
- */
-function startVoskPcmCapture(source) {
-	console.warn('⚠️ startVoskPcmCapture deprecated - use MediaRecorder timeslice instead');
-}
-
-/**
- * Para captura de PCM bruto do Vosk
- */
-function stopVoskPcmCapture() {
-	try {
-		if (voskScriptProcessor) {
-			voskScriptProcessor.disconnect();
-			voskScriptProcessor.onaudioprocess = null;
-			voskScriptProcessor = null;
-		}
-		voskAudioBuffer = [];
-		console.log('✅ Captura PCM para Vosk parada');
-	} catch (error) {
-		console.error('❌ Erro ao parar captura PCM:', error);
-	}
-}
-
-/**
- * Transcreve chunk de blob com Vosk (modo entrevista - padrão Deepgram)
- * Envia blobs WebM diretamente para Vosk via IPC
- */
-/**
- * 🚫 DEPRECADO: Vosk não funciona com chunks WebM fragmentados do MediaRecorder
- * MediaRecorder gera blobs WebM incompletos que ffmpeg/Vosk rejeitam
- * Solução: usar apenas Whisper para OUTPUT (funciona bem com WebM fragmentado)
- * @deprecated
- */
-async function voskTranscribeChunkFromBlob(blob) {
-	console.warn('⚠️ voskTranscribeChunkFromBlob deprecado - usar Whisper ao invés');
-	// Função removida - ver transcribeOutput() para transcrição final de saída
-}
-
-/**
- * Inicia captura de PCM bruto do áudio (substitui MediaRecorder para Vosk)
- * @param {MediaStreamAudioSourceNode} source - Source do áudio da stream
- * @deprecated Usar MediaRecorder com timeslice ao invés de ScriptProcessorNode
- */
-function startVoskPcmCapture(source) {
-	console.warn('⚠️ startVoskPcmCapture deprecated - usar MediaRecorder com timeslice ao invés de ScriptProcessorNode');
-	// Função deprecada mantida para compatibilidade reversa
-}
 
 /* ===============================
    DISPOSITIVOS / CONTROLE DE ÁUDIO
@@ -1871,503 +1776,6 @@ function stopOutputMonitor() {
    DEEPGRAM - FLUXO SEPARADO (STT)
 =============================== */
 
-// 🔥 DEEPGRAM: Variáveis de controle de gravação
-let isListeningDeepgram = false; // Controla se os ciclos de gravação devem continuar
-let isRecordingDeepgram = false;
-let inputRecorderDeepgram = null;
-let outputRecorderDeepgram = null;
-let inputStreamDeepgram = null;
-let outputStreamDeepgram = null;
-let inputAnalyserDeepgram = null;
-let outputAnalyserDeepgram = null;
-let lastInputVolumeDeepgram = 0; // Rastreia volume de entrada
-let lastOutputVolumeDeepgram = 0; // Rastreia volume de saída
-
-// 🔥 DEEPGRAM: Verifica se houve áudio significativo no últimos 3 segundos
-// Usa volume monitorado (mais confiável que analisar o Blob)
-function hadSignificantAudio(isInput) {
-	const lastVolume = isInput ? lastInputVolumeDeepgram : lastOutputVolumeDeepgram;
-	// Se o volume foi > 10% em algum momento, considera que há áudio (threshold aumentado para evitar ruído)
-	return lastVolume > 10;
-}
-
-// 🔥 DEEPGRAM: Inicia captura de áudio de ENTRADA
-async function startInputDeepgram() {
-	debugLogRenderer('Início da função: "startInputDeepgram"');
-
-	if (APP_CONFIG.MODE_DEBUG) {
-		const text = 'Iniciando monitoramento de entrada Deepgram (modo teste)...';
-		addTranscript(YOU, text);
-		return;
-	}
-
-	if (!UIElements.inputSelect?.value) return;
-
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
-
-	if (inputStreamDeepgram) {
-		inputStreamDeepgram.getTracks().forEach(t => t.stop());
-		inputStreamDeepgram = null;
-	}
-
-	try {
-		inputStreamDeepgram = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: UIElements.inputSelect.value } },
-		});
-
-		// Função recursiva que implementa o ciclo de gravação (igual ao exemplo)
-		// 🔥 NOVO: Cria analyser AQUI (não apenas na função visual)
-		const source = audioContext.createMediaStreamSource(inputStreamDeepgram);
-		inputAnalyserDeepgram = audioContext.createAnalyser();
-		inputAnalyserDeepgram.fftSize = 256;
-		source.connect(inputAnalyserDeepgram);
-		console.log('🎤 Analyser de entrada criado para volume tracking');
-
-		// Função recursiva que implementa o ciclo de gravação (igual ao exemplo)
-		const recordInputChunk = () => {
-			// Se não estamos mais ouvindo, não inicia novo ciclo
-			if (!isListeningDeepgram) {
-				return;
-			}
-
-			// 🔇 RESET: Começa o rastreamento de volume ANTES de gravar
-			lastInputVolumeDeepgram = 0;
-
-			inputRecorderDeepgram = new MediaRecorder(inputStreamDeepgram, {
-				mimeType: 'audio/webm;codecs=opus',
-			});
-			// 🔥 NOVO: Inicia o loop de atualização de volume PARA ESTE CICLO
-			// (não depende de isRunning, roda enquanto estamos ouvindo)
-			const volumeCheckInterval = setInterval(() => {
-				if (!inputAnalyserDeepgram) {
-					clearInterval(volumeCheckInterval);
-					return;
-				}
-				try {
-					const data = new Uint8Array(inputAnalyserDeepgram.frequencyBinCount);
-					inputAnalyserDeepgram.getByteFrequencyData(data);
-					const avg = data.reduce((a, b) => a + b, 0) / data.length;
-					const percent = Math.min(100, Math.round((avg / 80) * 100));
-					// Rastreia o MÁXIMO volume visto durante este ciclo
-					lastInputVolumeDeepgram = Math.max(lastInputVolumeDeepgram, percent);
-
-					// 🔥 DEBUG: Log apenas quando há volume ou primeiro ciclo
-					if (percent > 0 || lastInputVolumeDeepgram === 0) {
-						console.log(`📊 Volume de entrada: ${percent}% (máx: ${lastInputVolumeDeepgram}%)`);
-					}
-				} catch (e) {
-					console.error('❌ Erro ao ler volume de entrada:', e);
-					clearInterval(volumeCheckInterval);
-				}
-			}, 100); // Atualiza a cada 100ms
-
-			// 🔥 Processa cada chunk QUANDO O RECORDER PARAR (não com timeslice)
-			inputRecorderDeepgram.ondataavailable = async e => {
-				// Para o loop de volume quando chunk fica pronto
-				clearInterval(volumeCheckInterval);
-
-				console.log('🎤 inputDeepgram.ondataavailable - chunk tamanho:', e.data?.size || 0);
-
-				if (e.data.size > 0) {
-					try {
-						// 🔇 NOVO: Verifica se houve áudio significativo
-						if (!hadSignificantAudio(true)) {
-							console.log(
-								'🔇 Descartando chunk de entrada - nenhum áudio detectado (máx volume foi: ' +
-									lastInputVolumeDeepgram +
-									'%)',
-							);
-							return;
-						}
-
-						console.log(
-							'✅ Enviando chunk para API Deepgram (volume máximo detectado: ' + lastInputVolumeDeepgram + '%)',
-						);
-
-						// 📊 Log detalhado para diagnóstico
-						const chunkDurationMs = 3000;
-						const expectedBytesPerSecond = (48000 * 16 * 2) / 8; // 48kHz, 16-bit, stereo
-						const expectedBytes = (expectedBytesPerSecond * chunkDurationMs) / 1000;
-						const percentageOfExpected = Math.round((e.data.size / expectedBytes) * 100);
-
-						console.log(
-							'📊 INPUT - tamanho: ' +
-								e.data.size +
-								' bytes, esperado: ~' +
-								Math.round(expectedBytes) +
-								' bytes = ' +
-								percentageOfExpected +
-								'%',
-						);
-
-						// Converte Blob para base64
-						const arrayBuffer = await e.data.arrayBuffer();
-						const base64 = Buffer.from(arrayBuffer).toString('base64');
-						const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', base64))?.trim();
-
-						console.log('📝 [DEEPGRAM INPUT] Transcrição recebida:', { text, textLength: text?.length });
-
-						if (!text) {
-							console.log('⚠️ [DEEPGRAM INPUT] Texto vazio - ignorando');
-							return;
-						}
-
-						// ✅ Enviar TUDO para handleSpeech, que chamará addTranscript para mostrar na UI
-						// handleSpeech já checa isGarbageSentence para consolidação em currentQuestion
-						console.log('✅ [DEEPGRAM INPUT] Enviando para handleSpeech:', text);
-						handleSpeech(YOU, text);
-					} catch (err) {
-						console.error('❌ Erro ao transcrever chunk entrada Deepgram:', err);
-					}
-				}
-			};
-
-			inputRecorderDeepgram.onstop = () => {
-				console.log('⏹️ inputRecorderDeepgram.onstop - reiniciando ciclo');
-				// Para o interval se ainda estiver rodando
-				clearInterval(volumeCheckInterval);
-				// Após parar, reinicia o ciclo imediatamente
-				recordInputChunk();
-			};
-
-			// Inicia gravação
-			console.log('▶️ inputRecorderDeepgram.start()');
-			inputRecorderDeepgram.start();
-
-			// Para o recorder após 3 segundos
-			setTimeout(() => {
-				if (inputRecorderDeepgram && inputRecorderDeepgram.state === 'recording') {
-					console.log('⏸️ Parando inputRecorderDeepgram após 3 segundos');
-					inputRecorderDeepgram.stop();
-				}
-			}, 3000);
-		};
-
-		// Inicia o ciclo de gravação
-		recordInputChunk();
-		inputAnalyserDeepgram.fftSize = 256;
-		source.connect(inputAnalyserDeepgram);
-
-		console.log('✅ startInputDeepgram: Ciclo de gravação iniciado com sucesso');
-	} catch (error) {
-		console.error('❌ Erro em startInputDeepgram:', error);
-		inputStreamDeepgram = null;
-		inputRecorderDeepgram = null;
-		throw error;
-	}
-
-	debugLogRenderer('Fim da função: "startInputDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Para captura de entrada
-function stopInputMonitorDeepgram() {
-	debugLogRenderer('Início da função: "stopInputMonitorDeepgram"');
-
-	// Sinaliza que o ciclo de gravação deve parar
-	isListeningDeepgram = false;
-
-	if (inputRecorderDeepgram && inputRecorderDeepgram.state === 'recording') {
-		inputRecorderDeepgram.stop();
-	}
-
-	if (inputStreamDeepgram) {
-		inputStreamDeepgram.getTracks().forEach(t => t.stop());
-		inputStreamDeepgram = null;
-	}
-
-	inputRecorderDeepgram = null;
-	inputAnalyserDeepgram = null;
-	inputChunksDeepgram = [];
-
-	console.log('🛑 Entrada Deepgram parada');
-	debugLogRenderer('Fim da função: "stopInputMonitorDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Inicia captura de áudio de SAÍDA
-async function startOutputDeepgram() {
-	debugLogRenderer('Início da função: "startOutputDeepgram"');
-
-	if (APP_CONFIG.MODE_DEBUG) {
-		const text = 'Iniciando monitoramento de saída Deepgram (modo teste)...';
-		addTranscript(OTHER, text);
-		return;
-	}
-
-	if (!UIElements.outputSelect?.value) return;
-
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
-
-	try {
-		await createOutputStreamDeepgram();
-
-		// 🔥 NOVO: Cria analyser AQUI (não apenas na função visual)
-		if (!outputAnalyserDeepgram) {
-			const source = audioContext.createMediaStreamSource(outputStreamDeepgram);
-			outputAnalyserDeepgram = audioContext.createAnalyser();
-			outputAnalyserDeepgram.fftSize = 256;
-			source.connect(outputAnalyserDeepgram);
-			console.log('🔊 Analyser de saída criado para volume tracking');
-		}
-
-		// Função recursiva que implementa o ciclo de gravação (igual ao exemplo)
-		const recordOutputChunk = () => {
-			// Se não estamos mais ouvindo, não inicia novo ciclo
-			if (!isListeningDeepgram) {
-				return;
-			}
-
-			// 🔇 RESET: Começa o rastreamento de volume ANTES de gravar
-			lastOutputVolumeDeepgram = 0;
-
-			outputRecorderDeepgram = new MediaRecorder(outputStreamDeepgram, {
-				mimeType: 'audio/webm;codecs=opus',
-			});
-			const volumeCheckInterval = setInterval(() => {
-				if (!outputAnalyserDeepgram) {
-					clearInterval(volumeCheckInterval);
-					return;
-				}
-				try {
-					const data = new Uint8Array(outputAnalyserDeepgram.frequencyBinCount);
-					outputAnalyserDeepgram.getByteFrequencyData(data);
-					const avg = data.reduce((a, b) => a + b, 0) / data.length;
-					const percent = Math.min(100, Math.round((avg / 80) * 100));
-					// Rastreia o MÁXIMO volume visto durante este ciclo
-					lastOutputVolumeDeepgram = Math.max(lastOutputVolumeDeepgram, percent);
-
-					// 🔥 DEBUG: Log apenas a cada 10 atualizações para evitar spam
-					if (percent > 0 || lastOutputVolumeDeepgram === 0) {
-						console.log(`📊 Volume de saída: ${percent}% (máx: ${lastOutputVolumeDeepgram}%)`);
-					}
-				} catch (e) {
-					console.error('❌ Erro ao ler volume de saída:', e);
-					clearInterval(volumeCheckInterval);
-				}
-			}, 100); // Atualiza a cada 100ms
-
-			// 🔥 Processa cada chunk QUANDO O RECORDER PARAR (não com timeslice)
-			outputRecorderDeepgram.ondataavailable = async e => {
-				// Para o loop de volume quando chunk fica pronto
-				clearInterval(volumeCheckInterval);
-
-				console.log('🔊 outputDeepgram.ondataavailable - chunk tamanho:', e.data?.size || 0);
-
-				if (e.data.size > 0) {
-					try {
-						// 🔇 NOVO: Verifica se houve áudio significativo
-						if (!hadSignificantAudio(false)) {
-							console.log(
-								'🔇 Descartando chunk de saída - nenhum áudio detectado (máx volume foi: ' +
-									lastOutputVolumeDeepgram +
-									'%)',
-							);
-							return;
-						}
-
-						// 📊 Log detalhado para diagnóstico
-						const chunkDurationMs = 3000;
-						const expectedBytesPerSecond = (48000 * 16 * 2) / 8; // 48kHz, 16-bit, stereo
-						const expectedBytes = (expectedBytesPerSecond * chunkDurationMs) / 1000;
-						const percentageOfExpected = Math.round((e.data.size / expectedBytes) * 100);
-
-						console.log(
-							'✅ Enviando chunk para API Deepgram (volume máximo detectado: ' +
-								lastOutputVolumeDeepgram +
-								'%, tamanho: ' +
-								e.data.size +
-								' bytes, esperado: ~' +
-								Math.round(expectedBytes) +
-								' bytes = ' +
-								percentageOfExpected +
-								'%)',
-						);
-
-						// Converte Blob para base64
-						const arrayBuffer = await e.data.arrayBuffer();
-						const base64 = Buffer.from(arrayBuffer).toString('base64');
-						const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', base64))?.trim();
-
-						console.log('📝 [DEEPGRAM] Transcrição recebida:', { text, textLength: text?.length });
-
-						if (!text) {
-							console.log('⚠️ [DEEPGRAM] Texto vazio - ignorando');
-							return;
-						}
-
-						// ✅ Enviar TUDO para handleSpeech, que chamará addTranscript para mostrar na UI
-						// handleSpeech já checa isGarbageSentence para consolidação em currentQuestion
-						console.log('✅ [DEEPGRAM] Enviando para handleSpeech:', text);
-						handleSpeech(OTHER, text);
-					} catch (err) {
-						console.error('❌ Erro ao transcrever chunk saída Deepgram:', err);
-					}
-				}
-			};
-
-			outputRecorderDeepgram.onstop = () => {
-				console.log('⏹️ outputRecorderDeepgram.onstop - reiniciando ciclo');
-				// Para o interval se ainda estiver rodando
-				clearInterval(volumeCheckInterval);
-				// Após parar, reinicia o ciclo imediatamente
-				recordOutputChunk();
-			};
-
-			// Inicia gravação
-			console.log('▶️ outputRecorderDeepgram.start()');
-			outputRecorderDeepgram.start();
-
-			// Para o recorder após 3 segundos
-			setTimeout(() => {
-				if (outputRecorderDeepgram && outputRecorderDeepgram.state === 'recording') {
-					console.log('⏸️ Parando outputRecorderDeepgram após 3 segundos');
-					outputRecorderDeepgram.stop();
-				}
-			}, 3000);
-		};
-
-		// Inicia o ciclo de gravação
-		recordOutputChunk();
-
-		console.log('✅ startOutputDeepgram: Ciclo de gravação iniciado com sucesso');
-	} catch (error) {
-		console.error('❌ Erro em startOutputDeepgram:', error);
-		outputStreamDeepgram = null;
-		outputRecorderDeepgram = null;
-		throw error;
-	}
-
-	debugLogRenderer('Fim da função: "startOutputDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Cria stream de áudio de saída (loopback)
-async function createOutputStreamDeepgram() {
-	try {
-		// Usa o mesmo método que createOutputStream - captura via getUserMedia
-		outputStreamDeepgram = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: UIElements.outputSelect.value } },
-		});
-
-		// Cria o source de áudio
-		const source = audioContext.createMediaStreamSource(outputStreamDeepgram);
-
-		// Cria o analisador de frequência
-		outputAnalyserDeepgram = audioContext.createAnalyser();
-		outputAnalyserDeepgram.fftSize = 256;
-		source.connect(outputAnalyserDeepgram);
-
-		console.log('✅ createOutputStreamDeepgram criado com sucesso');
-	} catch (error) {
-		console.error('❌ Erro ao criar output stream Deepgram:', error);
-		throw error;
-	}
-}
-
-// 🔥 DEEPGRAM: Para captura de saída
-function stopOutputMonitorDeepgram() {
-	debugLogRenderer('Início da função: "stopOutputMonitorDeepgram"');
-
-	// Sinaliza que o ciclo de gravação deve parar
-	isListeningDeepgram = false;
-
-	if (outputRecorderDeepgram && outputRecorderDeepgram.state === 'recording') {
-		outputRecorderDeepgram.stop();
-	}
-
-	if (outputStreamDeepgram) {
-		outputStreamDeepgram.getTracks().forEach(t => t.stop());
-		outputStreamDeepgram = null;
-	}
-
-	outputRecorderDeepgram = null;
-	outputAnalyserDeepgram = null;
-	outputChunksDeepgram = [];
-
-	console.log('🛑 Saída Deepgram parada');
-	debugLogRenderer('Fim da função: "stopOutputMonitorDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Transcreve entrada
-async function transcribeInputDeepgram() {
-	debugLogRenderer('Início da função: "transcribeInputDeepgram"');
-
-	if (!inputChunksDeepgram.length) {
-		console.log('⚠️ Nenhum chunk de entrada Deepgram para transcrever');
-		return;
-	}
-
-	const blob = new Blob(inputChunksDeepgram, { type: 'audio/webm' });
-	console.log('🎵 transcribeInputDeepgram: blob.size =', blob.size, 'bytes');
-
-	const minSize = ModeController.isInterviewMode() ? MIN_INPUT_AUDIO_SIZE_INTERVIEW : MIN_INPUT_AUDIO_SIZE;
-	if (blob.size < minSize) {
-		console.log('⚠️ Blob muito pequeno, ignorando:', blob.size, 'bytes');
-		inputChunksDeepgram = [];
-		return;
-	}
-
-	inputChunksDeepgram = [];
-
-	try {
-		const buffer = Buffer.from(await blob.arrayBuffer());
-		const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', buffer))?.trim();
-
-		if (!text || isGarbageSentence(text)) {
-			console.log('⚠️ Transcrição Deepgram vazia ou lixo:', text);
-			return;
-		}
-
-		handleSpeech(YOU, text);
-	} catch (err) {
-		console.error('❌ Erro ao transcrever entrada Deepgram:', err);
-		updateStatusMessage('❌ Erro na transcrição (Deepgram)');
-	}
-
-	debugLogRenderer('Fim da função: "transcribeInputDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Transcreve saída
-async function transcribeOutputDeepgram() {
-	debugLogRenderer('Início da função: "transcribeOutputDeepgram"');
-
-	if (!outputChunksDeepgram.length) {
-		console.log('⚠️ Nenhum chunk de saída Deepgram para transcrever');
-		return;
-	}
-
-	const blob = new Blob(outputChunksDeepgram, { type: 'audio/webm' });
-	console.log('🎵 transcribeOutputDeepgram: blob.size =', blob.size, 'bytes');
-
-	const minSize = ModeController.isInterviewMode() ? MIN_OUTPUT_AUDIO_SIZE_INTERVIEW : MIN_OUTPUT_AUDIO_SIZE;
-	if (blob.size < minSize) {
-		console.log('⚠️ Blob muito pequeno, ignorando:', blob.size, 'bytes');
-		outputChunksDeepgram = [];
-		return;
-	}
-
-	outputChunksDeepgram = [];
-
-	try {
-		const buffer = Buffer.from(await blob.arrayBuffer());
-		const text = (await ipcRenderer.invoke('transcribe-audio-deepgram', buffer))?.trim();
-
-		if (!text || isGarbageSentence(text)) {
-			console.log('⚠️ Transcrição Deepgram vazia ou lixo:', text);
-			return;
-		}
-
-		handleSpeech(OTHER, text);
-	} catch (err) {
-		console.error('❌ Erro ao transcrever saída Deepgram:', err);
-		updateStatusMessage('❌ Erro na transcrição (Deepgram)');
-	}
-
-	debugLogRenderer('Fim da função: "transcribeOutputDeepgram"');
-}
-
 // 🔥 DEEPGRAM: Inicia captura (wrapper)
 // Chama o módulo isolado transcribe-deepgram.js
 async function startAudioDeepgram() {
@@ -2394,95 +1802,6 @@ async function startAudioDeepgram() {
 	}
 
 	debugLogRenderer('Fim da função: "startAudioDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Loop de atualização de volume entrada
-function updateInputVolumeDeepgram() {
-	if (!inputAnalyserDeepgram) {
-		if (inputVolumeAnimationId) {
-			cancelAnimationFrame(inputVolumeAnimationId);
-			inputVolumeAnimationId = null;
-		}
-		return;
-	}
-
-	try {
-		const data = new Uint8Array(inputAnalyserDeepgram.frequencyBinCount);
-		inputAnalyserDeepgram.getByteFrequencyData(data);
-		const avg = data.reduce((a, b) => a + b, 0) / data.length;
-		const percent = Math.min(100, Math.round((avg / 80) * 100));
-
-		// 🔥 DEEPGRAM: Rastreia volume para detecção de silêncio
-		lastInputVolumeDeepgram = Math.max(lastInputVolumeDeepgram, percent);
-
-		emitUIChange('onInputVolumeUpdate', { percent });
-
-		if (isRunning) {
-			inputVolumeAnimationId = requestAnimationFrame(updateInputVolumeDeepgram);
-		}
-	} catch (error) {
-		console.error('❌ Erro em updateInputVolumeDeepgram:', error);
-	}
-}
-
-// 🔥 DEEPGRAM: Monitoramento de volume de saída (visual)
-async function startOutputVolumeMonitoringDeepgram() {
-	if (!UIElements.outputSelect?.value) return;
-
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
-
-	if (outputAnalyserDeepgram) {
-		console.log('ℹ️ Monitoramento visual de saída Deepgram já ativo');
-		return;
-	}
-
-	try {
-		if (!outputStreamDeepgram) {
-			outputStreamDeepgram = await navigator.mediaDevices.getUserMedia({
-				audio: { deviceId: { exact: UIElements.outputSelect.value } },
-			});
-		}
-
-		const source = audioContext.createMediaStreamSource(outputStreamDeepgram);
-		outputAnalyserDeepgram = audioContext.createAnalyser();
-		outputAnalyserDeepgram.fftSize = 256;
-		source.connect(outputAnalyserDeepgram);
-
-		updateOutputVolumeDeepgram(); // Inicia loop visual
-	} catch (error) {
-		console.error('❌ Erro ao iniciar monitoramento visual saída Deepgram:', error);
-	}
-}
-
-// 🔥 DEEPGRAM: Loop de atualização de volume saída
-function updateOutputVolumeDeepgram() {
-	if (!outputAnalyserDeepgram) {
-		if (outputVolumeAnimationId) {
-			cancelAnimationFrame(outputVolumeAnimationId);
-			outputVolumeAnimationId = null;
-		}
-		return;
-	}
-
-	try {
-		const data = new Uint8Array(outputAnalyserDeepgram.frequencyBinCount);
-		outputAnalyserDeepgram.getByteFrequencyData(data);
-		const avg = data.reduce((a, b) => a + b, 0) / data.length;
-		const percent = Math.min(100, Math.round((avg / 80) * 100));
-
-		// 🔥 DEEPGRAM: Rastreia volume para detecção de silêncio
-		lastOutputVolumeDeepgram = Math.max(lastOutputVolumeDeepgram, percent);
-
-		emitUIChange('onOutputVolumeUpdate', { percent });
-
-		if (isRunning) {
-			outputVolumeAnimationId = requestAnimationFrame(updateOutputVolumeDeepgram);
-		}
-	} catch (error) {
-		console.error('❌ Erro em updateOutputVolumeDeepgram:', error);
-	}
 }
 
 // 🔥 DEEPGRAM: Para captura (wrapper)
@@ -2533,7 +1852,7 @@ async function handlePartialInputChunk(blobChunk) {
 
 			if (partialText && !isGarbageSentence(partialText)) {
 				addTranscript(YOU, partialText);
-				handleSpeech(YOU, partialText);
+				handleSpeech(YOU, partialText, { skipAddToUI: true });
 			}
 		} catch (err) {
 			console.warn('⚠️ erro na transcrição parcial (INPUT)', err);
@@ -2864,7 +2183,7 @@ async function transcribeInput() {
 		addTranscript(YOU, text);
 	}
 
-	handleSpeech(YOU, text);
+	handleSpeech(YOU, text, { skipAddToUI: true });
 
 	debugLogRenderer('Fim da função: "transcribeInput"');
 }
@@ -2976,7 +2295,8 @@ async function transcribeOutput() {
 
 			// processa a fala transcrita (consolidação de perguntas)
 			// Usa Date.now() para pegar o tempo exato que chegou no renderer
-			handleSpeech(OTHER, text);
+			console.log('entrou aqui no if do placeholder existente');
+			handleSpeech(OTHER, text, { skipAddToUI: true });
 		} else {
 			// Sem placeholder - cria placeholder e emite fulfill para garantir métricas
 			console.log('➕ Nenhum placeholder existente - criando e preenchendo com métricas');
@@ -3039,7 +2359,8 @@ async function transcribeOutput() {
 
 			// processa a fala transcrita (consolidação de perguntas)
 			// Usa Date.now() para pegar o tempo exato que chegou no renderer
-			handleSpeech(OTHER, text);
+			console.log('entrou aqui no else do placeholder inexistente');
+			handleSpeech(OTHER, text, { skipAddToUI: true });
 		}
 
 		// 🔥 Limpar variáveis pendentes após transcrição completa
@@ -3099,10 +2420,13 @@ async function transcribeOutput() {
    CONSOLIDAÇÃO DE PERGUNTAS
 =============================== */
 
-function handleSpeech(author, text) {
+function handleSpeech(author, text, options = {}) {
 	debugLogRenderer('Início da função: "handleSpeech"');
+
 	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
 	console.log('🔊 handleSpeech', { author, raw: text, cleaned });
+
+	// ignora frases muito curtas
 	if (cleaned.length < 3) return;
 
 	// Usa o tempo exato que chegou no renderer (Date.now)
@@ -3192,7 +2516,11 @@ function handleSpeech(author, text) {
 		// 🔥 NOVO: Adiciona TUDO à conversa visual em tempo real
 		// (mesmo lixo, para o usuário ver o que foi transcrito)
 		console.log('💬 Adicionando à conversa:', cleaned);
-		addTranscript(OTHER, cleaned, now);
+		if (!options.skipAddToUI) {
+			addTranscript(OTHER, cleaned, now);
+		} else {
+			console.log('⚪ addTranscript pulado por skipAddToUI');
+		}
 
 		renderCurrentQuestion();
 	}
@@ -3348,25 +2676,6 @@ function closeCurrentQuestionForced() {
 	renderCurrentQuestion();
 
 	debugLogRenderer('Fim da função: "closeCurrentQuestionForced"');
-}
-
-/* ===============================
-   VALIDAÇÃO DE API KEY
-=============================== */
-
-// 🔥 Verifica o Status da API
-async function checkApiKeyStatus() {
-	debugLogRenderer('Início da função: "checkApiKeyStatus"');
-	try {
-		const status = await ipcRenderer.invoke('GET_OPENAI_API_STATUS');
-		console.log('🔑 Status da API key:', status);
-
-		debugLogRenderer('Fim da função: "checkApiKeyStatus"');
-		return status;
-	} catch (error) {
-		console.warn('⚠️ Não foi possível verificar status da API:', error);
-		return { initialized: false, hasKey: false };
-	}
 }
 
 /* ===============================
@@ -3816,56 +3125,6 @@ function getSelectedQuestionText() {
 	debugLogRenderer('Fim da função: "getSelectedQuestionText"');
 	return '';
 }
-
-/* 🔥 COMENTADO: renderGptAnswer - Renderização formatada desabilitada
-   Apenas streaming (tokens em tempo real) será exibido
-
-function renderGptAnswer(questionId, markdownText) {
-	debugLogRenderer('Início da função: "renderGptAnswer"');
-
-	// 🔥 Renderiza markdown e retorna HTML - config-manager aplica ao DOM
-	const short = shortenAnswer(markdownText, 2);
-	const html = marked.parse(short);
-
-	// Encontra texto da pergunta no histórico ou na pergunta atual
-	let questionText = '';
-	if (questionId === CURRENT_QUESTION_ID) {
-		questionText = currentQuestion?.text || '';
-	} else {
-		const q = questionsHistory.find(x => x.id === questionId);
-		questionText = q?.text || '';
-	}
-
-	// 🔒 Marca pergunta como respondida na primeira resposta
-	if (questionId) {
-		answeredQuestions.add(questionId);
-		console.log('✅ Pergunta marcada como respondida:', questionId);
-	}
-
-	const answerData = {
-		questionText,
-		questionId,
-		html,
-	};
-
-	emitUIChange('onAnswerAdd', answerData);
-
-	// marca a pergunta como respondida no histórico (se vinculada)
-	try {
-		if (questionId && questionId !== CURRENT_QUESTION_ID) {
-			const q = questionsHistory.find(x => x.id === questionId);
-			if (q) {
-				q.answered = true;
-				renderQuestionsHistory();
-			}
-		}
-	} catch (err) {
-		console.warn('⚠️ falha ao marcar pergunta como respondida:', err);
-	}
-
-	debugLogRenderer('Fim da função: "renderGptAnswer"');
-}
-*/
 
 // 🔥 NOVO: Verifica se existe um modelo de IA ativo e retorna o nome do modelo
 function hasActiveModel() {
@@ -4626,47 +3885,47 @@ ipcRenderer.invoke = function (channel, ...args) {
 
 		// Retorna análise mockada
 		const mockAnalysis = `
-## 📸 Análise de ${screenshotCount} Screenshot(s) - MOCK
+		## 📸 Análise de ${screenshotCount} Screenshot(s) - MOCK
 
-### Esta é uma resposta simulada para o teste do sistema.
+		### Esta é uma resposta simulada para o teste do sistema.
 
-Para resolver o problema apresentado na captura de tela, que é o "Remove Element" do LeetCode, vamos implementar uma função em Java que remove todas as ocorrências de um valor específico de um array. A função deve modificar o array in-place e retornar o novo comprimento do array.
+		Para resolver o problema apresentado na captura de tela, que é o "Remove Element" do LeetCode, vamos implementar uma função em Java que remove todas as ocorrências de um valor específico de um array. A função deve modificar o array in-place e retornar o novo comprimento do array.
 
-Resumo do Problema
-Entrada: Um array de inteiros nums e um inteiro val que queremos remover.
-Saída: O novo comprimento do array após remover todas as ocorrências de val.
-Passos para a Solução
-Iterar pelo array: Vamos percorrer o array e verificar cada elemento.
-Manter um índice: Usaremos um índice para rastrear a posição onde devemos colocar os elementos que não são iguais a val.
-Modificar o array in-place: Sempre que encontrarmos um elemento que não é igual a val, colocamos esse elemento na posição do índice e incrementamos o índice.
-Retornar o comprimento: No final, o índice representará o novo comprimento do array.
-Implementação do Código
-Aqui está a implementação em Java:
+		Resumo do Problema
+		Entrada: Um array de inteiros nums e um inteiro val que queremos remover.
+		Saída: O novo comprimento do array após remover todas as ocorrências de val.
+		Passos para a Solução
+		Iterar pelo array: Vamos percorrer o array e verificar cada elemento.
+		Manter um índice: Usaremos um índice para rastrear a posição onde devemos colocar os elementos que não são iguais a val.
+		Modificar o array in-place: Sempre que encontrarmos um elemento que não é igual a val, colocamos esse elemento na posição do índice e incrementamos o índice.
+		Retornar o comprimento: No final, o índice representará o novo comprimento do array.
+		Implementação do Código
+		Aqui está a implementação em Java:
 
-class Solution {
-    public int removeElement(int[] nums, int val) {
-        // Inicializa um índice para rastrear a nova posição
-        int index = 0;
+		class Solution {
+			public int removeElement(int[] nums, int val) {
+				// Inicializa um índice para rastrear a nova posição
+				int index = 0;
 
-		// Percorre todos os elementos do array
-		for (int i = 0; i &lt; nums.length; i++) {
-			// Se o elemento atual não é igual a val
-			if (nums[i] != val) {
-				// Coloca o elemento na posição do índice
-				nums[index] = nums[i];
-				// Incrementa o índice
-				index++;
+				// Percorre todos os elementos do array
+				for (int i = 0; i &lt; nums.length; i++) {
+					// Se o elemento atual não é igual a val
+					if (nums[i] != val) {
+						// Coloca o elemento na posição do índice
+						nums[index] = nums[i];
+						// Incrementa o índice
+						index++;
+					}
+				}
+
+				// Retorna o novo comprimento do array
+				return index;
 			}
 		}
 
-		// Retorna o novo comprimento do array
-		return index;
-	}
-}
-
-Explicação do Código
-Classe e Método: Criamos uma classe chamada Solution e um método removeElement que recebe um array de inteiros nums e um inteiro val.
-Índice Inicial: Inicializamos uma variável index em 0.
+		Explicação do Código
+		Classe e Método: Criamos uma classe chamada Solution e um método removeElement que recebe um array de inteiros nums e um inteiro val.
+		Índice Inicial: Inicializamos uma variável index em 0.
 		`;
 
 		return Promise.resolve({
@@ -4792,7 +4051,7 @@ async function runMockAutoPlay() {
 
 		// FASE 2: Processa pergunta (handleSpeech + closeCurrentQuestion)
 		console.log(`📝 [FASE-2] Processando pergunta...`);
-		handleSpeech(OTHER, scenario.question);
+		handleSpeech(OTHER, scenario.question, { skipAddToUI: true });
 
 		// Aguarda consolidação (800ms para garantir que pergunta saia do CURRENT)
 		await new Promise(resolve => setTimeout(resolve, 800));

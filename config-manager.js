@@ -1338,6 +1338,14 @@ class ConfigManager {
 
 			// Se for placeholder (texto = "..."), marca para ser atualizado depois
 			if (text === '...') {
+				// Evita duplicar placeholder caso já exista um criado por onPlaceholderUpdate (race)
+				if (placeholderId) {
+					const existing = document.getElementById(placeholderId);
+					if (existing) {
+						console.log('⚪ Placeholder já existe, ignorando criação duplicada:', placeholderId);
+						return;
+					}
+				}
 				div.dataset.isPlaceholder = 'true';
 				// 🔥 ATRIBUIR ID AO ELEMENTO REAL DO DOM
 				if (placeholderId) {
@@ -1675,26 +1683,38 @@ class ConfigManager {
 				return;
 			}
 
+			// Atualiza conteúdo do placeholder
 			targetPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
 			delete targetPlaceholder.dataset.isPlaceholder;
 
 			console.log('✅ Placeholder atualizado:', text.substring(0, 50) + '...');
 
-			// Adiciona metadados
-			const meta = document.createElement('div');
-			meta.style.fontSize = '0.8em';
-			meta.style.color = '#888';
-			meta.style.marginTop = '2px';
-			meta.style.marginBottom = '2px';
-			meta.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
-			targetPlaceholder.parentNode.insertBefore(meta, targetPlaceholder.nextSibling);
-
-			console.log('✅ Metadados adicionados');
+			// Só cria/atualiza metadados se houver texto visível no placeholder
+			const hasVisibleText = text && String(text).trim().length > 0;
+			if (hasVisibleText) {
+				// Insere metadados DENTRO do placeholder para evitar órfãos caso o elemento pai seja removido
+				let meta = targetPlaceholder.querySelector('.transcript-meta');
+				if (!meta) {
+					meta = document.createElement('div');
+					meta.className = 'transcript-meta';
+					meta.style.fontSize = '0.8em';
+					meta.style.color = '#888';
+					meta.style.marginTop = '2px';
+					meta.style.marginBottom = '2px';
+					targetPlaceholder.appendChild(meta);
+				}
+				meta.innerText = `[${startStr} - ${stopStr}] (grav ${recordingDuration}ms, lat ${latency}ms, total ${total}ms)`;
+				console.log('✅ Metadados adicionados/atualizados');
+			} else {
+				// Remove metadados existentes se o placeholder não tem texto
+				const existingMeta = targetPlaceholder.querySelector('.transcript-meta');
+				if (existingMeta) existingMeta.remove();
+			}
 		});
 
 		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
 		globalThis.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
-			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total } = data;
+			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total, placeholderId } = data;
 
 			const transcriptionBox = document.getElementById('conversation');
 			if (!transcriptionBox) return;
@@ -1707,48 +1727,59 @@ class ConfigManager {
 				div.dataset.isPlaceholder = 'true';
 				const ts = timeStr || new Date().toLocaleTimeString();
 				div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+				// Se um placeholderId foi fornecido, atribui para evitar criação duplicada por race
+				if (placeholderId) {
+					div.id = placeholderId;
+					console.log('📍 Criando placeholder com ID (fallback):', placeholderId);
+				}
 				transcriptionBox.appendChild(div);
 
-				// cria meta provisório se houver métricas
-				if (startStr || stopStr || recordingDuration) {
+				// cria meta provisório DENTRO do placeholder SOMENTE se houver texto visível
+				const hasVisibleText = text && String(text).trim().length > 0;
+				if (hasVisibleText && (startStr || stopStr || recordingDuration)) {
 					const meta = document.createElement('div');
 					meta.className = 'transcript-meta';
-					meta.style.fontSize = '0.8em';
-					meta.style.color = '#888';
-					meta.style.marginTop = '2px';
-					meta.style.marginBottom = '2px';
 					meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
 						latency || 0
 					}ms, total ${total || 0}ms)`;
-					transcriptionBox.appendChild(meta);
+					div.appendChild(meta);
 				}
 
 				return;
 			}
 
-			const lastPlaceholder = placeholders[placeholders.length - 1];
+			// se placeholderId foi fornecido, preferir o elemento com esse id
+			let lastPlaceholder = null;
+			if (placeholderId) {
+				lastPlaceholder = document.getElementById(placeholderId);
+				if (lastPlaceholder) console.log('📍 Atualizando placeholder por ID:', placeholderId);
+			}
+			if (!lastPlaceholder) lastPlaceholder = placeholders[placeholders.length - 1];
+
 			const ts = timeStr || new Date().toLocaleTimeString();
 			lastPlaceholder.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
 
-			// Atualiza ou cria o elemento de meta imediatamente após o placeholder
-			let meta = lastPlaceholder.nextElementSibling;
-			if (!meta || !meta.classList || !meta.classList.contains('transcript-meta')) {
+			// Atualiza ou cria o elemento de meta DENTRO do placeholder
+			let meta = lastPlaceholder.querySelector('.transcript-meta');
+			const hasVisibleText = text && String(text).trim().length > 0;
+			if (!meta && hasVisibleText && (startStr || stopStr || recordingDuration)) {
 				meta = document.createElement('div');
 				meta.className = 'transcript-meta';
 				meta.style.fontSize = '0.8em';
 				meta.style.color = '#888';
 				meta.style.marginTop = '2px';
 				meta.style.marginBottom = '2px';
-				lastPlaceholder.parentNode.insertBefore(meta, lastPlaceholder.nextSibling);
+				lastPlaceholder.appendChild(meta);
 			}
 
-			// exibe métricas provisórias (se disponíveis)
-			if (startStr || stopStr || recordingDuration) {
+			// exibe métricas provisórias (se disponíveis e houver texto)
+			if (meta && hasVisibleText && (startStr || stopStr || recordingDuration)) {
 				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
 					latency || 0
 				}ms, total ${total || 0}ms)`;
-			} else {
-				meta.innerText = '';
+			} else if (meta && !hasVisibleText) {
+				// limpa/remova metadados se não há texto visível
+				meta.remove();
 			}
 
 			// mantém data-is-placeholder até receber onPlaceholderFulfill
