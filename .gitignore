@@ -61,3 +61,6 @@ exemplo-deepgram/
 copiar dll/
 backup/
 audio/
+backup-deepgram-old/
+microfone.html
+transcriber-test.html
