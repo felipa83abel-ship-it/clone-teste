@@ -20,12 +20,13 @@ const { ipcRenderer } = require('electron');
    CONSTANTES
 ================================ */
 const YOU = 'Você'; // Autor das transcrições de entrada
+const OTHER = 'Outros'; // Autor das transcrições de saída
 
 /* ================================
    ESTADO DO DEEPGRAM
 ================================ */
 
-let deepgramWebSocket = null;
+let deepgramInpuWebSocket = null;
 let deepgramOutputWebSocket = null; // ⚠️ WebSocket SEPARADO para OUTPUT
 let isDeepgramInputActive = false;
 let isDeepgramOutputActive = false;
@@ -38,31 +39,15 @@ let deepgramOutputAudioContext = null;
 let deepgramOutputStream = null;
 let deepgramOutputProcessor = null;
 
-// Buffer de consolidação
-let deepgramInputInterimBuffer = '';
-let deepgramOutputInterimBuffer = '';
-
 // 🔍 Rastreamento de último interim enviado para evitar duplicação
 let deepgramLastInputInterimShown = null; // Último interim que foi adicionado ao DOM
 let deepgramLastOutputInterimShown = null; // Último interim OUTPUT adicionado
-
-// Rastreamento de volume para heurística de "final"
-let deepgramLastInputVolume = 0;
-let deepgramLastOutputVolume = 0;
 
 // Timestamps para sincronizar com padrão de outros modelos
 let deepgramInputStartAt = null;
 let deepgramInputStopAt = null;
 let deepgramOutputStartAt = null;
 let deepgramOutputStopAt = null;
-
-// Rastreamento para exibição em tempo real
-let deepgramCurrentInputElement = null; // Elemento sendo atualizado em tempo real
-let deepgramInputStartedShowing = false; // Se já começou a mostrar algo
-
-// Rastreamento para OUTPUT
-let deepgramCurrentOutputElement = null;
-let deepgramOutputStartedShowing = false;
 
 // 🛑 Detecção de silêncio prolongado para parar envio
 let deepgramLastSoundTime = null;
@@ -75,10 +60,10 @@ const DEEPGRAM_SILENCE_TIMEOUT = 3000; // 3 segundos de silêncio = para
 /**
  * Inicializa conexão WebSocket com Deepgram
  */
-async function initDeepgramWebSocket() {
-	if (deepgramWebSocket && deepgramWebSocket.readyState === WebSocket.OPEN) {
+async function initDeepgramInputWebSocket() {
+	if (deepgramInpuWebSocket && deepgramInpuWebSocket.readyState === WebSocket.OPEN) {
 		console.log('🌊 WebSocket Deepgram já aberto');
-		return deepgramWebSocket;
+		return deepgramInpuWebSocket;
 	}
 
 	// Pega chave Deepgram salva
@@ -102,10 +87,10 @@ async function initDeepgramWebSocket() {
 	const wsUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 
 	return new Promise((resolve, reject) => {
-		deepgramWebSocket = new WebSocket(wsUrl, ['token', apiKey.trim()]);
+		deepgramInpuWebSocket = new WebSocket(wsUrl, ['token', apiKey.trim()]);
 
-		deepgramWebSocket.onopen = () => {
-			console.log('✅ WebSocket Deepgram aberto! readyState:', deepgramWebSocket.readyState);
+		deepgramInpuWebSocket.onopen = () => {
+			console.log('✅ WebSocket Deepgram aberto! readyState:', deepgramInpuWebSocket.readyState);
 
 			// Testa envio imediato de dados
 			try {
@@ -116,22 +101,22 @@ async function initDeepgramWebSocket() {
 				for (let i = 0; i < testSilence.length; i++) {
 					view[i] = testSilence[i]; // todos zeros = silêncio
 				}
-				deepgramWebSocket.send(buffer);
+				deepgramInpuWebSocket.send(buffer);
 				console.log('🧪 [TEST] Enviado 1 segundo de silêncio (teste de transmissão):', buffer.byteLength, 'bytes');
 			} catch (e) {
 				console.error('❌ [TEST] Erro ao enviar teste:', e);
 			}
 
-			resolve(deepgramWebSocket);
+			resolve(deepgramInpuWebSocket);
 		};
 
-		deepgramWebSocket.onerror = err => {
+		deepgramInpuWebSocket.onerror = err => {
 			console.error('❌ Erro WebSocket Deepgram:', err);
 			console.error('   Event:', err.type, err.message);
 			reject(new Error('Falha ao conectar Deepgram'));
 		};
 
-		deepgramWebSocket.onmessage = event => {
+		deepgramInpuWebSocket.onmessage = event => {
 			console.log('💬 Mensagem Deepgram INPUT recebida (tamanho:', event.data.length, 'bytes)');
 			try {
 				const data = JSON.parse(event.data);
@@ -146,7 +131,7 @@ async function initDeepgramWebSocket() {
 			}
 		};
 
-		deepgramWebSocket.onclose = event => {
+		deepgramInpuWebSocket.onclose = event => {
 			console.log(
 				`🛑 WebSocket Deepgram fechado | Code: ${event.code} | Reason: ${event.reason || 'nenhum'} | Clean: ${
 					event.wasClean
@@ -155,12 +140,12 @@ async function initDeepgramWebSocket() {
 			console.log(
 				'   Code meanings: 1000=Normal, 1001=GoingAway, 1002=ProtocolError, 1006=AbnormalClosure, 1011=ServerError',
 			);
-			deepgramWebSocket = null;
+			deepgramInpuWebSocket = null;
 		};
 
 		// Timeout de 15 segundos
 		setTimeout(() => {
-			if (deepgramWebSocket && deepgramWebSocket.readyState !== WebSocket.OPEN) {
+			if (deepgramInpuWebSocket && deepgramInpuWebSocket.readyState !== WebSocket.OPEN) {
 				reject(new Error('Timeout ao conectar Deepgram'));
 			}
 		}, 15000);
@@ -237,167 +222,11 @@ async function initDeepgramOutputWebSocket() {
 }
 
 /* ================================
-   PROCESSAMENTO DE MENSAGENS
-================================ */
-
-/**
- * 🔍 Detecta o DELTA (texto novo) entre um interim anterior e o novo
- * Usa word-by-word comparison para encontrar exatamente onde começou a mudança
- *
- * @param {string} previousText - Texto interim anterior armazenado
- * @param {string} newText - Novo texto interim completo
- * @returns {string} - Apenas a parte NOVA (delta)
- */
-function extractDelta(previousText, newText) {
-	if (!previousText || previousText.length === 0) {
-		return newText; // Primeiro interim = texto completo é o delta
-	}
-
-	// Se o novo é igual ao anterior, não há delta
-	if (newText === previousText) {
-		return '';
-	}
-
-	const prevWords = previousText.trim().split(/\s+/);
-	const newWords = newText.trim().split(/\s+/);
-
-	// 🔄 Encontrar primeira divergência word-by-word
-	let divergenceIndex = 0;
-	for (let i = 0; i < Math.min(prevWords.length, newWords.length); i++) {
-		// Comparar ignoring case E removendo pontuação final
-		const pWord = prevWords[i].toLowerCase().replace(/[,.!?;]$/, '');
-		const nWord = newWords[i].toLowerCase().replace(/[,.!?;]$/, '');
-		if (pWord === nWord) {
-			divergenceIndex = i + 1; // Próxima palavra após match
-		} else {
-			// Encontrou divergência
-			console.log(`   [extractDelta DEBUG] Divergência em i=${i}: "${pWord}" vs "${nWord}"`);
-			break;
-		}
-	}
-
-	// 📍 Se todas as palavras do previous estão no new (prefix match)
-	// divergenceIndex será = prevWords.length
-	// Então o delta é apenas o que vem depois
-	if (divergenceIndex >= prevWords.length) {
-		// Caso normal: novo é extensão do anterior
-		const delta = newWords.slice(divergenceIndex).join(' ');
-		if (delta) console.log(`   [extractDelta DEBUG] Extensão: delta="${delta}"`);
-		return delta || '';
-	}
-
-	// 🔄 Houve mudança: retorna a partir do ponto de divergência
-	const delta = newWords.slice(divergenceIndex).join(' ');
-	console.log(`   [extractDelta DEBUG] Mudança detectada em i=${divergenceIndex}: delta="${delta}"`);
-	return delta || '';
-}
-
-/**
- * Processa mensagens do Deepgram para INPUT ou OUTPUT
- * INPUT = Microfone do usuário (Você)
- * OUTPUT = Saída de áudio do PC (Sistema, em modo entrevista)
- */
-function handleDeepgramMessage(data, source = 'input') {
-	const transcript = data.channel?.alternatives?.[0]?.transcript || '';
-	const confidence = data.channel?.alternatives?.[0]?.confidence || 0;
-	const isFinal = data.is_final || false;
-
-	if (!transcript || !transcript.trim()) {
-		return; // Ignora transcrições vazias
-	}
-
-	// 🎤 Determina autor baseado na fonte
-	const isInput = source === 'input';
-	const author = isInput ? YOU : 'Sistema';
-
-	// 🛑 EM MODO NORMAL: Ignora OUTPUT
-	if (!isInput && !ModeController?.isInterviewMode?.()) {
-		return;
-	}
-
-	// ================================
-	// 🔍 DETECÇÃO DE DELTA (INCREMENTO)
-	// ================================
-	const lastShown = isInput ? deepgramLastInputInterimShown : deepgramLastOutputInterimShown;
-	const delta = extractDelta(lastShown, transcript);
-	const isFirstInterim = !lastShown;
-
-	console.log(
-		`[handleDeepgramMessage] source="${source}" | lastShown="${lastShown}" | transcript="${transcript}" | delta="${delta}" | isFinal=${isFinal}`,
-	);
-
-	if (isFinal) {
-		// ✅ FINAL CONSOLIDADO
-		console.log(`📝 ✅ FINAL [${source.toUpperCase()}]: "${transcript}" (${(confidence * 100).toFixed(1)}%)`);
-
-		// 🔴 Se houver delta (mudança detectada na última atualização), adiciona como linha nova também
-		if (delta && delta.length > 0) {
-			console.log(`🔴 Delta final detectado [${source}]: delta = "${delta}"`);
-			const timeForDelta = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
-			addTranscript(author, delta, timeForDelta);
-		}
-
-		// Envia TEXTO CONSOLIDADO para processar (sem fragments)
-		handleSpeech(author, transcript);
-
-		// 🔄 RESET: Prepara para próxima frase
-		if (isInput) {
-			deepgramLastInputInterimShown = null;
-			deepgramInputInterimBuffer = '';
-			deepgramInputStartedShowing = false;
-			deepgramCurrentInputElement = null;
-		} else {
-			deepgramLastOutputInterimShown = null;
-			deepgramOutputInterimBuffer = '';
-			deepgramOutputStartedShowing = false;
-			deepgramCurrentOutputElement = null;
-		}
-	} else if (isFirstInterim) {
-		// 🟢 PRIMEIRA INTERIM - Adiciona texto completo
-		console.log(`🟢 PRIMEIRA interim [${source}]: "${transcript}"`);
-
-		const timeForTranscript = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
-		const el = addTranscript(author, transcript, timeForTranscript);
-		if (el && el.dataset) {
-			el.dataset.startAt = timeForTranscript;
-		}
-
-		// Marca como mostrado
-		if (isInput) {
-			deepgramInputStartedShowing = true;
-			deepgramCurrentInputElement = el;
-			deepgramLastInputInterimShown = transcript;
-		} else {
-			deepgramOutputStartedShowing = true;
-			deepgramCurrentOutputElement = el;
-			deepgramLastOutputInterimShown = transcript;
-		}
-	} else if (delta && delta.length > 0) {
-		// 🟡 ATUALIZAÇÃO INTERIM com DELTA - Adiciona incremento
-		console.log(`🟡 Atualizando interim [${source}]: delta = "${delta}"`);
-
-		// Adiciona APENAS a parte nova
-		const timeForDelta = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
-		addTranscript(author, delta, timeForDelta);
-
-		// Atualiza rastreamento
-		if (isInput) {
-			deepgramLastInputInterimShown = transcript;
-		} else {
-			deepgramLastOutputInterimShown = transcript;
-		}
-	} else {
-		// Sem delta = sem mudança = ignora
-		console.log(`⏭️ Sem delta em [${source}], ignorando`);
-	}
-}
-
-/* ================================
    CAPTURA DE ÁUDIO - INPUT
 ================================ */
 
 /**
- * Inicia captura de áudio do microfone com Deepgram
+ * Inicia captura de áudio do dispositivo de entrada com Deepgram
  */
 async function startDeepgramInput() {
 	if (isDeepgramInputActive) {
@@ -408,8 +237,8 @@ async function startDeepgramInput() {
 	try {
 		// Inicializa WebSocket
 		console.log('🌊 startDeepgramInput: Iniciando...');
-		await initDeepgramWebSocket();
-		console.log('🌊 startDeepgramInput: WebSocket inicializado, readyState =', deepgramWebSocket?.readyState);
+		await initDeepgramInputWebSocket();
+		console.log('🌊 startDeepgramInput: WebSocket inicializado, readyState =', deepgramInpuWebSocket?.readyState);
 		isDeepgramInputActive = true;
 
 		// 📍 CAPTURA O MOMENTO EXATO que a captura começa (para timestamps como outros modelos)
@@ -417,9 +246,6 @@ async function startDeepgramInput() {
 		console.log('⏱️ startDeepgramInput: Timestamp capturado -', new Date(deepgramInputStartAt).toLocaleTimeString());
 
 		// 🔄 RESET do estado para nova sessão de transcrição
-		deepgramInputInterimBuffer = '';
-		deepgramInputStartedShowing = false;
-		deepgramCurrentInputElement = null;
 		deepgramInputStopAt = null;
 		deepgramLastSoundTime = Date.now(); // 🛑 Inicia contador de silêncio
 
@@ -453,7 +279,7 @@ async function startDeepgramInput() {
 			// Log na PRIMEIRA chamada e cada 100 frames
 			if (processCallCount === 1) {
 				console.log(
-					`🔧 [#1 CHAMADA] onaudioprocess iniciado | AC state: ${deepgramInputAudioContext.state} | WS: ${deepgramWebSocket?.readyState}`,
+					`🔧 [#1 CHAMADA] onaudioprocess iniciado | AC state: ${deepgramInputAudioContext.state} | WS: ${deepgramInpuWebSocket?.readyState}`,
 				);
 			}
 
@@ -465,7 +291,6 @@ async function startDeepgramInput() {
 				rms += inputData[i] * inputData[i];
 			}
 			rms = Math.sqrt(rms / inputData.length);
-			deepgramLastInputVolume = rms;
 
 			// 🛑 DETECÇÃO DE SILÊNCIO PROLONGADO
 			// Se tem som, atualiza o último momento que ouvi som
@@ -496,12 +321,12 @@ async function startDeepgramInput() {
 				return;
 			}
 
-			if (!deepgramWebSocket) {
+			if (!deepgramInpuWebSocket) {
 				if (processCallCount <= 2) console.error('❌ [#' + processCallCount + '] deepgramWebSocket = NULL');
 				return;
 			}
 
-			const wsState = deepgramWebSocket.readyState;
+			const wsState = deepgramInpuWebSocket.readyState;
 			if (processCallCount === 1) {
 				console.log(`🔌 [#1] WebSocket readyState: ${wsState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`);
 			}
@@ -556,7 +381,7 @@ async function startDeepgramInput() {
 						view[i] = pcmBuffer[i];
 					}
 
-					deepgramWebSocket.send(buffer);
+					deepgramInpuWebSocket.send(buffer);
 					console.log(`✅ [#${processCallCount}] CHUNK ENVIADO: ${buffer.byteLength} bytes`);
 
 					pcmBuffer = [];
@@ -581,7 +406,7 @@ async function startDeepgramInput() {
 }
 
 /**
- * Para captura de áudio do microfone
+ * Para captura de áudio do dispositivo de entrada
  */
 function stopDeepgramInput() {
 	isDeepgramInputActive = false;
@@ -601,7 +426,6 @@ function stopDeepgramInput() {
 		deepgramInputAudioContext = null;
 	}
 
-	deepgramInputInterimBuffer = '';
 	console.log('🛑 Captura Deepgram INPUT parada');
 }
 
@@ -640,9 +464,6 @@ async function startDeepgramOutput() {
 		console.log('⏱️ startDeepgramOutput: Timestamp capturado -', new Date(deepgramOutputStartAt).toLocaleTimeString());
 
 		// 🔄 RESET do estado para nova sessão de transcrição (OUTPUT)
-		deepgramOutputInterimBuffer = '';
-		deepgramOutputStartedShowing = false;
-		deepgramCurrentOutputElement = null;
 		deepgramOutputStopAt = null;
 
 		// Solicita acesso ao dispositivo OUTPUT selecionado
@@ -689,7 +510,6 @@ async function startDeepgramOutput() {
 				rms += inputData[i] * inputData[i];
 			}
 			rms = Math.sqrt(rms / inputData.length);
-			deepgramLastOutputVolume = rms;
 
 			// Debug: mostra RMS a cada 50 frames
 			if (processCallCount % 50 === 0) {
@@ -763,7 +583,6 @@ function stopDeepgramOutput() {
 		deepgramOutputAudioContext = null;
 	}
 
-	deepgramOutputInterimBuffer = '';
 	console.log('🛑 Captura Deepgram OUTPUT parada');
 }
 
@@ -779,13 +598,13 @@ function stopAllDeepgram() {
 	stopDeepgramOutput();
 
 	// Fecha WebSocket INPUT
-	if (deepgramWebSocket) {
+	if (deepgramInpuWebSocket) {
 		try {
-			deepgramWebSocket.close();
+			deepgramInpuWebSocket.close();
 		} catch (e) {
 			console.error('Erro ao fechar WebSocket INPUT:', e);
 		}
-		deepgramWebSocket = null;
+		deepgramInpuWebSocket = null;
 	}
 
 	// Fecha WebSocket OUTPUT (separado)
@@ -799,6 +618,152 @@ function stopAllDeepgram() {
 	}
 
 	console.log('🌊 Deepgram completamente parado');
+}
+
+/* ================================
+   PROCESSAMENTO DE MENSAGENS
+================================ */
+
+/**
+ * 🔍 Detecta o DELTA (texto novo) entre um interim anterior e o novo
+ * Usa word-by-word comparison para encontrar exatamente onde começou a mudança
+ *
+ * @param {string} previousText - Texto interim anterior armazenado
+ * @param {string} newText - Novo texto interim completo
+ * @returns {string} - Apenas a parte NOVA (delta)
+ */
+function extractDelta(previousText, newText) {
+	if (!previousText || previousText.length === 0) {
+		return newText; // Primeiro interim = texto completo é o delta
+	}
+
+	// Se o novo é igual ao anterior, não há delta
+	if (newText === previousText) {
+		return '';
+	}
+
+	const prevWords = previousText.trim().split(/\s+/);
+	const newWords = newText.trim().split(/\s+/);
+
+	// 🔄 Encontrar primeira divergência word-by-word
+	let divergenceIndex = 0;
+	for (let i = 0; i < Math.min(prevWords.length, newWords.length); i++) {
+		// Comparar ignoring case E removendo pontuação final
+		const pWord = prevWords[i].toLowerCase().replace(/[,.!?;]$/, '');
+		const nWord = newWords[i].toLowerCase().replace(/[,.!?;]$/, '');
+		if (pWord === nWord) {
+			divergenceIndex = i + 1; // Próxima palavra após match
+		} else {
+			// Encontrou divergência
+			console.log(`   [extractDelta DEBUG] Divergência em i=${i}: "${pWord}" vs "${nWord}"`);
+			break;
+		}
+	}
+
+	// 📍 Se todas as palavras do previous estão no new (prefix match)
+	// divergenceIndex será = prevWords.length
+	// Então o delta é apenas o que vem depois
+	if (divergenceIndex >= prevWords.length) {
+		// Caso normal: novo é extensão do anterior
+		const delta = newWords.slice(divergenceIndex).join(' ');
+		if (delta) console.log(`   [extractDelta DEBUG] Extensão: delta="${delta}"`);
+		return delta || '';
+	}
+
+	// 🔄 Houve mudança: retorna a partir do ponto de divergência
+	const delta = newWords.slice(divergenceIndex).join(' ');
+	console.log(`   [extractDelta DEBUG] Mudança detectada em i=${divergenceIndex}: delta="${delta}"`);
+	return delta || '';
+}
+
+/**
+ * Processa mensagens do Deepgram para INPUT ou OUTPUT
+ * INPUT = Microfone do usuário (Você / Microfone)
+ * OUTPUT = Saída de áudio do PC (Outros / VoiceMeter)
+ */
+function handleDeepgramMessage(data, source = 'input') {
+	const transcript = data.channel?.alternatives?.[0]?.transcript || '';
+	const confidence = data.channel?.alternatives?.[0]?.confidence || 0;
+	const isFinal = data.is_final || false;
+
+	if (!transcript || !transcript.trim()) {
+		return; // Ignora transcrições vazias
+	}
+
+	// 🎤 Determina autor baseado na fonte
+	const isInput = source === 'input';
+	const author = isInput ? YOU : OTHER;
+
+	// 🛑 EM MODO NORMAL: Ignora OUTPUT
+	if (!isInput && !ModeController?.isInterviewMode?.()) {
+		return;
+	}
+
+	// ================================
+	// 🔍 DETECÇÃO DE DELTA (INCREMENTO)
+	// ================================
+	const lastShown = isInput ? deepgramLastInputInterimShown : deepgramLastOutputInterimShown;
+	const delta = extractDelta(lastShown, transcript);
+	const isFirstInterim = !lastShown;
+
+	console.log(
+		`[handleDeepgramMessage] source="${source}" | lastShown="${lastShown}" | transcript="${transcript}" | delta="${delta}" | isFinal=${isFinal}`,
+	);
+
+	if (isFinal) {
+		// ✅ FINAL CONSOLIDADO
+		console.log(`📝 ✅ FINAL [${source.toUpperCase()}]: "${transcript}" (${(confidence * 100).toFixed(1)}%)`);
+
+		// 🔴 Se houver delta (mudança detectada na última atualização), adiciona como linha nova também
+		if (delta && delta.length > 0) {
+			console.log(`🔴 Delta final detectado [${source}]: delta = "${delta}"`);
+			const timeForDelta = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
+			addTranscript(author, delta, timeForDelta);
+		}
+
+		// Envia TEXTO CONSOLIDADO para processar (sem fragments)
+		handleSpeech(author, transcript);
+
+		// 🔄 RESET: Prepara para próxima frase
+		if (isInput) {
+			deepgramLastInputInterimShown = null;
+		} else {
+			deepgramLastOutputInterimShown = null;
+		}
+	} else if (isFirstInterim) {
+		// 🟢 PRIMEIRA INTERIM - Adiciona texto completo
+		console.log(`🟢 PRIMEIRA interim [${source}]: "${transcript}"`);
+
+		const timeForTranscript = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
+		const el = addTranscript(author, transcript, timeForTranscript);
+		if (el && el.dataset) {
+			el.dataset.startAt = timeForTranscript;
+		}
+
+		// Marca como mostrado
+		if (isInput) {
+			deepgramLastInputInterimShown = transcript;
+		} else {
+			deepgramLastOutputInterimShown = transcript;
+		}
+	} else if (delta && delta.length > 0) {
+		// 🟡 ATUALIZAÇÃO INTERIM com DELTA - Adiciona incremento
+		console.log(`🟡 Atualizando interim [${source}]: delta = "${delta}"`);
+
+		// Adiciona APENAS a parte nova
+		const timeForDelta = isInput ? deepgramInputStartAt : deepgramOutputStartAt || Date.now();
+		addTranscript(author, delta, timeForDelta);
+
+		// Atualiza rastreamento
+		if (isInput) {
+			deepgramLastInputInterimShown = transcript;
+		} else {
+			deepgramLastOutputInterimShown = transcript;
+		}
+	} else {
+		// Sem delta = sem mudança = ignora
+		console.log(`⏭️ Sem delta em [${source}], ignorando`);
+	}
 }
 
 /* ================================
