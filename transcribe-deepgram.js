@@ -776,6 +776,18 @@ function handleDeepgramMessage(data, source = 'input') {
 		} else {
 			handleSpeech(author, transcript);
 		}
+
+		// 🔥 [NOVO] Emitir evento para sistema unificado STT (apenas para OUTPUT, pois é INPUT que espera resposta)
+		if (source === 'output' && globalThis.emitSTTEvent) {
+			console.log('🌊 Deepgram OUTPUT: Emitindo evento onTranscriptionComplete');
+			globalThis.emitSTTEvent('transcriptionComplete', {
+				text: transcript,
+				speaker: author,
+				isFinal: true,
+				model: 'deepgram',
+				confidence: confidence,
+			});
+		}
 	} else if (isFirstInterim) {
 		const normTranscript = normalizeForCompare(transcript);
 		if (!normTranscript || normTranscript.length < 2) {

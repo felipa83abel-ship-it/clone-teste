@@ -234,6 +234,38 @@ function emitUIChange(eventName, data) {
 }
 
 /* ===============================
+   STT EVENTS - Sistema Unificado de Eventos
+   Disparado quando qualquer modelo STT termina uma transcrição
+=============================== */
+
+const STTEvents = {
+	onTranscriptionComplete: null, // Disparado quando STT termina
+};
+
+/**
+ * 🔥 Registra listener para eventos STT
+ * @param {string} eventName - Nome do evento ('transcriptionComplete')
+ * @param {function} callback - Callback a ser executado
+ */
+function onSTTEvent(eventName, callback) {
+	if (eventName === 'transcriptionComplete') {
+		STTEvents.onTranscriptionComplete = callback;
+		console.log('📡 STT Event listener registrado: transcriptionComplete');
+	}
+}
+
+/**
+ * 🔥 Emite evento STT para todas as camadas superiores
+ * @param {string} eventName - Nome do evento ('transcriptionComplete')
+ * @param {object} data - Dados do evento
+ */
+function emitSTTEvent(eventName, data) {
+	if (eventName === 'transcriptionComplete') {
+		STTEvents.onTranscriptionComplete?.(data);
+	}
+}
+
+/* ===============================
    ELEMENTOS UI - Solicitado por callback
    (config-manager.js fornece esses elementos)
 =============================== */
@@ -588,6 +620,54 @@ function isQuestionReady(text) {
 
 	debugLogRenderer('Fim da função: "isQuestionReady"'); // só dispara se houver indício real
 	return hasIndicator || hasQuestionMark;
+}
+
+/**
+ * 🔥 AUTO-ASK: Tenta chamar GPT automaticamente em modo entrevista
+ * Disparada por: STTEvents.onTranscriptionComplete (após 900ms sem áudio)
+ *
+ * Precondições:
+ * - Modo entrevista ativo
+ * - CURRENT tem texto
+ * - Pergunta ainda não foi respondida neste turno
+ * - Texto não é "lixo"
+ */
+function autoAskGptIfReady() {
+	debugLogRenderer('Início da função: "autoAskGptIfReady"');
+
+	// Validações básicas
+	if (!ModeController.isInterviewMode()) {
+		console.log('⏭️ autoAskGptIfReady: modo normal (não entrevista), abortando');
+		return;
+	}
+
+	if (!currentQuestion.text) {
+		console.log('⏭️ autoAskGptIfReady: CURRENT está vazio, abortando');
+		return;
+	}
+
+	if (gptRequestedTurnId === interviewTurnId) {
+		console.log('⏭️ autoAskGptIfReady: GPT já foi solicitado neste turno, abortando');
+		return;
+	}
+
+	if (gptAnsweredTurnId === interviewTurnId) {
+		console.log('⏭️ autoAskGptIfReady: GPT já respondeu neste turno, abortando');
+		return;
+	}
+
+	const text = currentQuestion.text.trim();
+
+	// Verifica se é lixo
+	if (isGarbageSentence(text)) {
+		console.log('❌ autoAskGptIfReady: pergunta é lixo, abortando');
+		return;
+	}
+
+	console.log('✅ autoAskGptIfReady: chamando askGpt automaticamente');
+	askGpt();
+
+	debugLogRenderer('Fim da função: "autoAskGptIfReady"');
 }
 
 function isEndingPhrase(text) {
@@ -988,12 +1068,55 @@ let voskAudioBuffer = []; // Acumula PCM entre envios
 async function startAudio() {
 	debugLogRenderer('Início da função: "startAudio"');
 
-	// Se houver dispositivo de entrada selecionado, inicia a captura de áudio
-	if (UIElements.inputSelect?.value) await startInput();
-	// Se houver dispositivo de saída selecionado, inicia a captura de áudio
-	if (UIElements.outputSelect?.value) await startOutput();
+	// 🔥 [NOVO ORQUESTRADOR] Detecta modelo STT e roteia
+	const sttModel = getConfiguredSTTModel();
+	console.log(`🎤 startAudio: Modelo STT = ${sttModel}`);
+
+	try {
+		// 🔥 Inicia servidor Whisper se necessário
+		if (sttModel === 'whisper-cpp-local') {
+			const serverStarted = await ipcRenderer.invoke('start-whisper-server');
+			if (serverStarted) {
+				console.log('✅ Servidor Whisper.cpp iniciado');
+			}
+		}
+
+		// 🔥 ROTEAMENTO: Por modelo STT
+		if (sttModel === 'deepgram') {
+			console.log('🌊 Rotando para startAudioDeepgram');
+			await startAudioDeepgram();
+		} else {
+			console.log('🎤 Rotando para startInputOutput (Vosk/OpenAI)');
+			await startInputOutput();
+		}
+	} catch (error) {
+		console.error('❌ Erro em startAudio:', error);
+		throw error;
+	}
 
 	debugLogRenderer('Fim da função: "startAudio"');
+}
+
+/**
+ * 🎤 Inicia captura INPUT (você) + OUTPUT (outros)
+ * Usado por Vosk, OpenAI, e qualquer modelo que não é Deepgram
+ */
+async function startInputOutput() {
+	debugLogRenderer('Início da função: "startInputOutput"');
+
+	try {
+		// Se houver dispositivo de entrada selecionado, inicia a captura de áudio
+		if (UIElements.inputSelect?.value) await startInput();
+		// Se houver dispositivo de saída selecionado, inicia a captura de áudio
+		if (UIElements.outputSelect?.value) await startOutput();
+
+		console.log('✅ startInputOutput: INPUT + OUTPUT iniciados');
+	} catch (error) {
+		console.error('❌ Erro em startInputOutput:', error);
+		throw error;
+	}
+
+	debugLogRenderer('Fim da função: "startInputOutput"');
 }
 
 async function stopAudio() {
@@ -1001,22 +1124,60 @@ async function stopAudio() {
 
 	if (currentQuestion.text) closeCurrentQuestionForced();
 
-	inputRecorder?.state === 'recording' && inputRecorder.stop();
-	outputRecorder?.state === 'recording' && outputRecorder.stop();
+	const sttModel = getConfiguredSTTModel();
+	console.log(`🛑 stopAudio: Modelo STT = ${sttModel}`);
 
-	// 🆕 VOSK: Reset do estado
-	if (ModeController.isInterviewMode()) {
-		voskAccumulatedText = '';
-		if (voskPartialTimer) {
-			clearTimeout(voskPartialTimer);
-			voskPartialTimer = null;
+	try {
+		// 🔥 ROTEAMENTO: Por modelo STT
+		if (sttModel === 'deepgram') {
+			console.log('🌊 Rotando para stopAudioDeepgram');
+			await stopAudioDeepgram();
+		} else {
+			console.log('🎤 Rotando para stopInputOutput (Vosk/OpenAI)');
+			await stopInputOutput();
 		}
+
+		// 🔥 Para servidor Whisper se necessário
+		if (sttModel === 'whisper-cpp-local') {
+			await ipcRenderer.invoke('stop-whisper-server');
+			console.log('🛑 Servidor Whisper.cpp parado');
+		}
+	} catch (error) {
+		console.error('❌ Erro em stopAudio:', error);
 	}
 
-	stopInputMonitor();
-	stopOutputMonitor();
-
 	debugLogRenderer('Fim da função: "stopAudio"');
+}
+
+/**
+ * 🛑 Para captura INPUT (você) + OUTPUT (outros)
+ * Usado por Vosk, OpenAI, e qualquer modelo que não é Deepgram
+ */
+async function stopInputOutput() {
+	debugLogRenderer('Início da função: "stopInputOutput"');
+
+	try {
+		inputRecorder?.state === 'recording' && inputRecorder.stop();
+		outputRecorder?.state === 'recording' && outputRecorder.stop();
+
+		// 🆕 VOSK: Reset do estado
+		if (ModeController.isInterviewMode()) {
+			voskAccumulatedText = '';
+			if (voskPartialTimer) {
+				clearTimeout(voskPartialTimer);
+				voskPartialTimer = null;
+			}
+		}
+
+		stopInputMonitor();
+		stopOutputMonitor();
+
+		console.log('✅ stopInputOutput: INPUT + OUTPUT parados');
+	} catch (error) {
+		console.error('❌ Erro em stopInputOutput:', error);
+	}
+
+	debugLogRenderer('Fim da função: "stopInputOutput"');
 }
 
 async function restartAudioPipeline() {
@@ -2369,46 +2530,19 @@ async function transcribeOutput() {
 		pendingOutputStartAt = null;
 		pendingOutputStopAt = null;
 
-		// 🔥 [NOVO] MODO ENTREVISTA: Agendamento inteligente de auto-close
-		// Não fecha imediatamente! Aguarda AUTO_CLOSE_QUESTION_TIMEOUT sem novo áudio
-		// Se novo áudio começar, o timer é cancelado (em updateOutputVolume)
-		if (ModeController.isInterviewMode() && currentQuestion.text && !currentQuestion.finalized) {
-			console.log(
-				`🔔 transcribeOutput: Agendando auto-close em ${AUTO_CLOSE_QUESTION_TIMEOUT}ms (se nenhum áudio novo começar)`,
-			);
+		// 🔥 [NOVO] MODO ENTREVISTA: Emitir evento de transcrição completa
+		// O listener em DOMContentLoaded cuidará do timer de auto-close
+		if (ModeController.isInterviewMode() && currentQuestion.text) {
+			console.log('🎤 transcribeOutput: Emitindo evento STT onTranscriptionComplete');
 
-			// Cancela timer anterior se houver
-			if (autoCloseQuestionTimer) {
-				clearTimeout(autoCloseQuestionTimer);
-				console.log('⏸️ Timer anterior cancelado (nova transcrição chegou)');
-			}
-
-			// Agenda novo timer: fecha quando nenhum áudio novo começou no timeout
-			autoCloseQuestionTimer = setTimeout(() => {
-				if (currentQuestion.text && !currentQuestion.finalized && !outputSpeaking) {
-					console.log(
-						'✅ Auto-fechando pergunta (nenhum áudio novo detectado):',
-						currentQuestion.text.substring(0, 80),
-					);
-					autoCloseQuestionTimer = null;
-					closeCurrentQuestion();
-				} else if (outputSpeaking) {
-					console.log('⏸️ Auto-close cancelado: áudio novo detectado, aguardando próxima transcrição');
-					autoCloseQuestionTimer = null;
-				}
-			}, AUTO_CLOSE_QUESTION_TIMEOUT);
+			// Emite evento para todas as camadas superiores (agnóstico ao modelo)
+			emitSTTEvent('transcriptionComplete', {
+				text: currentQuestion.text,
+				speaker: OTHER,
+				isFinal: true,
+				model: 'vosk-or-openai', // Vosk/OpenAI compartilham este fluxo
+			});
 		}
-
-		// 	// cancela o temporizador automático para evitar duplicatas
-		// 	if (autoCloseQuestionTimer) {
-		// 		clearTimeout(autoCloseQuestionTimer);
-		// 		autoCloseQuestionTimer = null;
-		// 		console.log('   → Timer automático cancelado');
-		// 	}
-
-		// 	// fecha a pergunta atual imediatamente
-		// 	closeCurrentQuestion();
-		// }
 	} catch (err) {
 		console.warn('⚠️ erro na transcrição (OUTPUT)', err);
 	}
@@ -3198,38 +3332,8 @@ async function listenToggleBtn() {
 
 	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
 
-	// 🔥 Modelo STT configurado
-	const sttModel = getConfiguredSTTModel();
-	console.log(`🗣️ Modelo STT configurado: ${sttModel}`);
-
-	// Roteia para o modelo configurado
-	if (sttModel === 'vosk-local') {
-		// inicia o modelo vosk-local
-	} else if (sttModel === 'whisper-cpp-local') {
-		// 🔥 NOVO: Iniciar servidor Whisper persistente se não estiver rodando
-		if (isRunning) {
-			const serverStarted = await ipcRenderer.invoke('start-whisper-server');
-			if (serverStarted) {
-				console.log('✅ Servidor Whisper.cpp iniciado e pronto');
-			}
-		} else {
-			await ipcRenderer.invoke('stop-whisper-server');
-			console.log('🛑 Servidor Whisper.cpp parado');
-		}
-	} else if (sttModel === 'whisper-1') {
-		// inicia o medelo whisper-1
-	} else if (sttModel === 'deepgram') {
-		// 🔥 DEEPGRAM: Fluxo separado
-		console.log('🌊 Deepgram configurado - usando fluxo específico');
-	}
-
-	// Inicia ou para a captura de áudio
-	// 🔥 DEEPGRAM: Roteia para startAudioDeepgram se sttModel === 'deepgram'
-	if (sttModel === 'deepgram') {
-		await (isRunning ? startAudioDeepgram() : stopAudioDeepgram());
-	} else {
-		await (isRunning ? startAudio() : stopAudio());
-	}
+	// 🔥 [REFATORADO] Roteamento centralizado em startAudio()/stopAudio()
+	await (isRunning ? startAudio() : stopAudio());
 
 	debugLogRenderer('Fim da função: "listenToggleBtn"');
 }
@@ -3797,6 +3901,27 @@ function resetHomeSection() {
 
 // 🔥 LISTENER DO BOTÃO RESET
 document.addEventListener('DOMContentLoaded', () => {
+	// 🔥 Registrar listener para eventos de transcrição completa (STT)
+	onSTTEvent('transcriptionComplete', data => {
+		if (!ModeController.isInterviewMode()) {
+			console.log('⏭️ STT Event: modo normal (não entrevista), ignorando auto-ask');
+			return;
+		}
+
+		console.log('🔊 STT Event: transcriptionComplete recebido');
+		console.log('   → Texto:', data.text?.substring(0, 50) + '...');
+		console.log('   → Speaker:', data.speaker);
+		console.log('   → Modelo:', data.model);
+
+		// Inicia o timer de auto-close/auto-ask
+		if (autoCloseQuestionTimer) clearTimeout(autoCloseQuestionTimer);
+
+		autoCloseQuestionTimer = setTimeout(() => {
+			console.log('⏰ AUTO_CLOSE_QUESTION_TIMEOUT disparado (900ms)');
+			autoAskGptIfReady();
+		}, AUTO_CLOSE_QUESTION_TIMEOUT);
+	});
+
 	const resetBtn = document.getElementById('resetHomeBtn');
 	if (resetBtn) {
 		resetBtn.addEventListener('click', () => {
