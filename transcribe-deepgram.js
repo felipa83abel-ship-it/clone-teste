@@ -66,17 +66,29 @@ let deepgramOutputStopAt = null;
 let deepgramLastSoundTime = null;
 const DEEPGRAM_SILENCE_TIMEOUT = 3000; // 3 segundos de silêncio = para
 
+// 🔥 Keepalive para evitar timeout 1011 do Deepgram
+// Envia mensagem JSON {"type": "KeepAlive"} a cada 5 segundos
+// Documentação: https://developers.deepgram.com/docs/audio-keep-alive
+let deepgramInputHeartbeatInterval = null;
+let deepgramOutputHeartbeatInterval = null;
+const DEEPGRAM_HEARTBEAT_INTERVAL = 5000; // 5 segundos (entre 3-5 segundos conforme recomendação)
+
 /* ================================
    INICIALIZAÇÃO DO WEBSOCKET
 ================================ */
 
 /**
- * Inicializa conexão WebSocket com Deepgram
+ * Inicializa conexão WebSocket com Deepgram (genérica para input/output)
+ * @param {string} source - 'input' ou 'output'
+ * @returns {Promise<WebSocket>}
  */
-async function initDeepgramInputWebSocket() {
-	if (deepgramInpuWebSocket && deepgramInpuWebSocket.readyState === WebSocket.OPEN) {
-		console.log('🌊 WebSocket Deepgram já aberto');
-		return deepgramInpuWebSocket;
+async function initDeepgramWS(source = 'input') {
+	const isInput = source === 'input';
+	const existingWS = isInput ? deepgramInpuWebSocket : deepgramOutputWebSocket;
+
+	if (existingWS && existingWS.readyState === WebSocket.OPEN) {
+		console.log(`🌊 WebSocket Deepgram ${source} já aberto`);
+		return existingWS;
 	}
 
 	// Pega chave Deepgram salva
@@ -85,9 +97,9 @@ async function initDeepgramInputWebSocket() {
 		throw new Error('❌ Chave Deepgram não configurada. Configure em "API e Modelos"');
 	}
 
-	console.log('🌊 Inicializando WebSocket Deepgram...');
+	console.log(`🌊 Inicializando WebSocket Deepgram ${source}...`);
 
-	// Monta URL com parâmetros
+	// Monta URL com parâmetros (token é passado na URL para evitar erros 401)
 	const params = new URLSearchParams({
 		model: 'nova-2',
 		language: 'pt-BR',
@@ -99,143 +111,102 @@ async function initDeepgramInputWebSocket() {
 
 	const wsUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
 
+	// O navegador converterá isso para o cabeçalho 'Sec-WebSocket-Protocol: token, YOUR_API_KEY'
+	const ws = new WebSocket(wsUrl, ['token', apiKey.trim()]);
+
 	return new Promise((resolve, reject) => {
-		deepgramInpuWebSocket = new WebSocket(wsUrl, ['token', apiKey.trim()]);
+		ws.onopen = () => {
+			console.log(`✅ WebSocket Deepgram ${source} conectado | readyState: ${ws.readyState}`);
 
-		deepgramInpuWebSocket.onopen = () => {
-			console.log('✅ WebSocket Deepgram aberto! readyState:', deepgramInpuWebSocket.readyState);
+			// Inicia heartbeat para manter conexão viva
+			startDeepgramHeartbeat(ws, source);
 
-			// Testa envio imediato de dados
-			try {
-				// Envia 1 segundo de SILENCE para testar transmissão
-				const testSilence = new Int16Array(16000); // 16000 samples = 1 segundo a 16kHz
-				const buffer = new ArrayBuffer(testSilence.length * 2);
-				const view = new Int16Array(buffer);
-				for (let i = 0; i < testSilence.length; i++) {
-					view[i] = testSilence[i]; // todos zeros = silêncio
-				}
-				deepgramInpuWebSocket.send(buffer);
-				console.log('🧪 [TEST] Enviado 1 segundo de silêncio (teste de transmissão):', buffer.byteLength, 'bytes');
-			} catch (e) {
-				console.error('❌ [TEST] Erro ao enviar teste:', e);
-			}
-
-			resolve(deepgramInpuWebSocket);
+			resolve(ws);
 		};
 
-		deepgramInpuWebSocket.onerror = err => {
-			console.error('❌ Erro WebSocket Deepgram:', err);
-			console.error('   Event:', err.type, err.message);
-			reject(new Error('Falha ao conectar Deepgram'));
-		};
-
-		deepgramInpuWebSocket.onmessage = event => {
-			console.log('💬 Mensagem Deepgram INPUT recebida (tamanho:', event.data.length, 'bytes)');
+		ws.onmessage = event => {
 			try {
 				const data = JSON.parse(event.data);
-				// 🔍 LOG COMPLETO DA RESPOSTA
-				console.log('📥 RESPOSTA COMPLETA DO DEEPGRAM INPUT:');
-				console.log(JSON.stringify(data, null, 2));
-				console.log('---');
-				// 🌊 Deepgram: Processa apenas INPUT neste WebSocket
-				handleDeepgramMessage(data, 'input');
+				handleDeepgramMessage(data, source);
 			} catch (e) {
-				console.error('❌ Erro ao processar mensagem Deepgram INPUT:', e);
+				console.error(`❌ Erro ao processar mensagem Deepgram ${source}:`, e);
 			}
 		};
 
-		deepgramInpuWebSocket.onclose = event => {
+		ws.onerror = err => {
+			console.error(`❌ Erro WebSocket Deepgram ${source}:`, err);
+			console.error('   Type:', err.type, 'Message:', err.message);
+
+			// Detectar erro de autenticação e dar dica útil
+			if (err.type === 'error' || err.message?.includes('Authentication')) {
+				console.error('\n⚠️  ERRO DE AUTENTICAÇÃO DETECTADO:');
+				console.error('   Causa provável: Chave API Deepgram inválida ou expirada');
+				console.error('   Solução:');
+				console.error('   1. Vá em Configurações > API e Modelos > Deepgram');
+				console.error('   2. Regenere uma nova chave em https://console.deepgram.com/api-keys');
+				console.error('   3. Certifique-se que começa com "dg_"');
+				console.error('   4. Salve a chave e tente novamente');
+			}
+
+			reject(new Error(`Falha ao conectar Deepgram ${source}`));
+		};
+
+		ws.onclose = event => {
 			console.log(
-				`🛑 WebSocket Deepgram fechado | Code: ${event.code} | Reason: ${event.reason || 'nenhum'} | Clean: ${
+				`🛑 WebSocket Deepgram ${source} fechado | Code: ${event.code} | Reason: ${event.reason || 'nenhum'} | Clean: ${
 					event.wasClean
 				}`,
 			);
-			console.log(
-				'   Code meanings: 1000=Normal, 1001=GoingAway, 1002=ProtocolError, 1006=AbnormalClosure, 1011=ServerError',
-			);
-			deepgramInpuWebSocket = null;
+			stopDeepgramHeartbeat(source);
+			if (isInput) deepgramInpuWebSocket = null;
+			else deepgramOutputWebSocket = null;
 		};
-
-		// Timeout de 15 segundos
-		setTimeout(() => {
-			if (deepgramInpuWebSocket && deepgramInpuWebSocket.readyState !== WebSocket.OPEN) {
-				reject(new Error('Timeout ao conectar Deepgram'));
-			}
-		}, 15000);
 	});
 }
 
 /**
- * Inicializa WebSocket SEPARADO para OUTPUT (saída de áudio)
- * Necessário porque Deepgram não diferencia múltiplos streams na mesma conexão
+ * Inicia heartbeat para manter WebSocket Deepgram vivo
+ * @param {WebSocket} ws - WebSocket aberto
+ * @param {string} source - 'input' ou 'output'
  */
-async function initDeepgramOutputWebSocket() {
-	if (deepgramOutputWebSocket && deepgramOutputWebSocket.readyState === WebSocket.OPEN) {
-		console.log('🌊 WebSocket OUTPUT Deepgram já aberto');
-		return deepgramOutputWebSocket;
-	}
-
-	const apiKey = await ipcRenderer.invoke('GET_API_KEY', 'deepgram');
-	if (!apiKey) {
-		throw new Error('❌ Chave Deepgram não configurada. Configure em "API e Modelos"');
-	}
-
-	console.log('🌊 Inicializando WebSocket OUTPUT Deepgram...');
-
-	const params = new URLSearchParams({
-		model: 'nova-2',
-		language: 'pt-BR',
-		smart_format: 'true',
-		interim_results: 'true',
-		encoding: 'linear16',
-		sample_rate: '16000',
-	});
-
-	const wsUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
-
-	return new Promise((resolve, reject) => {
-		deepgramOutputWebSocket = new WebSocket(wsUrl, ['token', apiKey.trim()]);
-
-		deepgramOutputWebSocket.onopen = () => {
-			console.log('✅ WebSocket OUTPUT Deepgram aberto! readyState:', deepgramOutputWebSocket.readyState);
-			resolve(deepgramOutputWebSocket);
-		};
-
-		deepgramOutputWebSocket.onerror = err => {
-			console.error('❌ Erro WebSocket OUTPUT Deepgram:', err);
-			reject(new Error('Falha ao conectar Deepgram OUTPUT'));
-		};
-
-		deepgramOutputWebSocket.onmessage = event => {
-			console.log('💬 Mensagem Deepgram OUTPUT recebida (tamanho:', event.data.length, 'bytes)');
+function startDeepgramHeartbeat(ws, source) {
+	const interval = setInterval(() => {
+		if (ws && ws.readyState === WebSocket.OPEN) {
 			try {
-				const data = JSON.parse(event.data);
-				// 🔍 LOG COMPLETO DA RESPOSTA
-				console.log('📥 RESPOSTA COMPLETA DO DEEPGRAM OUTPUT:');
-				console.log(JSON.stringify(data, null, 2));
-				console.log('---');
-				// 🌊 Deepgram: Processa apenas OUTPUT neste WebSocket
-				handleDeepgramMessage(data, 'output');
+				ws.send(JSON.stringify({ type: 'KeepAlive' }));
 			} catch (e) {
-				console.error('❌ Erro ao processar mensagem Deepgram OUTPUT:', e);
+				console.error(`❌ Erro ao enviar KeepAlive ${source}:`, e);
 			}
-		};
+		}
+	}, DEEPGRAM_HEARTBEAT_INTERVAL);
 
-		deepgramOutputWebSocket.onclose = event => {
-			console.log(`🛑 WebSocket OUTPUT Deepgram fechado | Code: ${event.code} | Reason: ${event.reason || 'nenhum'}`);
-			deepgramOutputWebSocket = null;
-		};
+	if (source === 'input') {
+		deepgramInputHeartbeatInterval = interval;
+	} else {
+		deepgramOutputHeartbeatInterval = interval;
+	}
+}
 
-		setTimeout(() => {
-			if (deepgramOutputWebSocket && deepgramOutputWebSocket.readyState !== WebSocket.OPEN) {
-				reject(new Error('Timeout ao conectar Deepgram OUTPUT'));
-			}
-		}, 15000);
-	});
+/**
+ * Para heartbeat de um WebSocket
+ * @param {string} source - 'input' ou 'output'
+ */
+function stopDeepgramHeartbeat(source) {
+	if (source === 'input') {
+		if (deepgramInputHeartbeatInterval) {
+			clearInterval(deepgramInputHeartbeatInterval);
+			deepgramInputHeartbeatInterval = null;
+		}
+	} else if (source === 'output') {
+		if (deepgramOutputHeartbeatInterval) {
+			clearInterval(deepgramOutputHeartbeatInterval);
+			deepgramOutputHeartbeatInterval = null;
+		}
+	}
 }
 
 /* ================================
-   CAPTURA DE ÁUDIO - INPUT
+   CAPTURA DE ÁUDIO
 ================================ */
 
 /**
@@ -248,19 +219,13 @@ async function startDeepgramInput() {
 	}
 
 	try {
-		// Inicializa WebSocket
-		console.log('🌊 startDeepgramInput: Iniciando...');
-		await initDeepgramInputWebSocket();
-		console.log('🌊 startDeepgramInput: WebSocket inicializado, readyState =', deepgramInpuWebSocket?.readyState);
+		// Inicializa WebSocket usando função genérica
+		const ws = await initDeepgramWS('input');
+		deepgramInpuWebSocket = ws;
 		isDeepgramInputActive = true;
-
-		// 📍 CAPTURA O MOMENTO EXATO que a captura começa (para timestamps como outros modelos)
 		deepgramInputStartAt = Date.now();
-		console.log('⏱️ startDeepgramInput: Timestamp capturado -', new Date(deepgramInputStartAt).toLocaleTimeString());
-
-		// 🔄 RESET do estado para nova sessão de transcrição
 		deepgramInputStopAt = null;
-		deepgramLastSoundTime = Date.now(); // 🛑 Inicia contador de silêncio
+		deepgramLastSoundTime = Date.now();
 
 		// Pede permissão do microfone
 		console.log('🎤 Solicitando acesso ao microfone...');
@@ -305,7 +270,15 @@ async function startDeepgramInput() {
 			}
 			rms = Math.sqrt(rms / inputData.length);
 
-			// 🛑 DETECÇÃO DE SILÊNCIO PROLONGADO
+			// � NOVO: Emitir volume UPDATE para UI (Deepgram INPUT) - frequência alta (5 frames)
+			if (processCallCount % 5 === 0) {
+				const percent = Math.min(100, Math.min(100, Math.round((rms / 0.0001) * 100)));
+				if (globalThis.RendererAPI?.emitUIChange) {
+					globalThis.RendererAPI?.emitUIChange('onInputVolumeUpdate', { percent });
+				}
+			}
+
+			// �🛑 DETECÇÃO DE SILÊNCIO PROLONGADO
 			// Se tem som, atualiza o último momento que ouvi som
 			if (rms >= 0.0001) {
 				deepgramLastSoundTime = Date.now();
@@ -424,6 +397,30 @@ async function startDeepgramInput() {
 function stopDeepgramInput() {
 	isDeepgramInputActive = false;
 
+	// Envia "CloseStream" antes de fechar WebSocket
+	if (deepgramInpuWebSocket && deepgramInpuWebSocket.readyState === WebSocket.OPEN) {
+		try {
+			deepgramInpuWebSocket.send(JSON.stringify({ type: 'CloseStream' }));
+			console.log('📤 CloseStream enviado para INPUT');
+		} catch (e) {
+			console.error('❌ Erro ao enviar CloseStream INPUT:', e);
+		}
+	}
+
+	// Para heartbeat
+	stopDeepgramHeartbeat('input');
+
+	// Fecha WebSocket
+	if (deepgramInpuWebSocket) {
+		try {
+			deepgramInpuWebSocket.close();
+		} catch (e) {
+			console.error('Erro ao fechar WebSocket INPUT:', e);
+		}
+		deepgramInpuWebSocket = null;
+	}
+
+	// Limpa recursos
 	if (deepgramInputProcessor) {
 		deepgramInputProcessor.disconnect();
 		deepgramInputProcessor = null;
@@ -451,6 +448,8 @@ function stopDeepgramInput() {
  * Usa o dispositivo selecionado no select #audio-output-device (mesma lógica do INPUT)
  */
 async function startDeepgramOutput() {
+	// Passo 1: Iniciar captura de áudio da saída
+
 	if (isDeepgramOutputActive) {
 		console.warn('⚠️ Deepgram OUTPUT já ativo');
 		return;
@@ -468,15 +467,11 @@ async function startDeepgramOutput() {
 
 		console.log(`🔊 Iniciando captura OUTPUT com dispositivo: ${outputDeviceId}`);
 
-		// ⚠️ Inicializa WebSocket SEPARADO para OUTPUT (não reutiliza INPUT)
-		await initDeepgramOutputWebSocket();
+		// Inicializa WebSocket usando função genérica
+		const ws = await initDeepgramWS('output');
+		deepgramOutputWebSocket = ws;
 		isDeepgramOutputActive = true;
-
-		// 📍 CAPTURA O MOMENTO EXATO que a captura começa
 		deepgramOutputStartAt = Date.now();
-		console.log('⏱️ startDeepgramOutput: Timestamp capturado -', new Date(deepgramOutputStartAt).toLocaleTimeString());
-
-		// 🔄 RESET do estado para nova sessão de transcrição (OUTPUT)
 		deepgramOutputStopAt = null;
 
 		// Solicita acesso ao dispositivo OUTPUT selecionado
@@ -529,8 +524,12 @@ async function startDeepgramOutput() {
 				console.log(`📊 [DEBUG OUTPUT] RMS: ${rms.toFixed(6)} | Threshold: 0.0001`);
 			}
 
-			// Skip apenas silêncio MUITO forte (ajustado: era 0.001, agora 0.0001)
-			if (rms < 0.0001) {
+			// 🔥 NOVO: Emitir volume UPDATE para UI (Deepgram OUTPUT)
+			if (processCallCount % 5 === 0) {
+				const percent = Math.min(100, Math.round((rms / 0.0001) * 100)); // 🔥 Divisor reduzido: 0.001 → 0.0001
+				if (processCallCount % 50 === 0) {
+					console.log(`📊 [VOLUME OUTPUT] RMS: ${rms.toFixed(6)}, Percent: ${percent}%`);
+				}
 				return;
 			}
 
@@ -581,6 +580,30 @@ async function startDeepgramOutput() {
 function stopDeepgramOutput() {
 	isDeepgramOutputActive = false;
 
+	// Envia "CloseStream" antes de fechar WebSocket
+	if (deepgramOutputWebSocket && deepgramOutputWebSocket.readyState === WebSocket.OPEN) {
+		try {
+			deepgramOutputWebSocket.send(JSON.stringify({ type: 'CloseStream' }));
+			console.log('📤 CloseStream enviado para OUTPUT');
+		} catch (e) {
+			console.error('❌ Erro ao enviar CloseStream OUTPUT:', e);
+		}
+	}
+
+	// Para heartbeat
+	stopDeepgramHeartbeat('output');
+
+	// Fecha WebSocket
+	if (deepgramOutputWebSocket) {
+		try {
+			deepgramOutputWebSocket.close();
+		} catch (e) {
+			console.error('Erro ao fechar WebSocket OUTPUT:', e);
+		}
+		deepgramOutputWebSocket = null;
+	}
+
+	// Limpa recursos
 	if (deepgramOutputProcessor) {
 		deepgramOutputProcessor.disconnect();
 		deepgramOutputProcessor = null;
@@ -610,26 +633,7 @@ function stopAllDeepgram() {
 	stopDeepgramInput();
 	stopDeepgramOutput();
 
-	// Fecha WebSocket INPUT
-	if (deepgramInpuWebSocket) {
-		try {
-			deepgramInpuWebSocket.close();
-		} catch (e) {
-			console.error('Erro ao fechar WebSocket INPUT:', e);
-		}
-		deepgramInpuWebSocket = null;
-	}
-
-	// Fecha WebSocket OUTPUT (separado)
-	if (deepgramOutputWebSocket) {
-		try {
-			deepgramOutputWebSocket.close();
-		} catch (e) {
-			console.error('Erro ao fechar WebSocket OUTPUT:', e);
-		}
-		deepgramOutputWebSocket = null;
-	}
-
+	// Recursos já são limpos em stopDeepgramInput/Output
 	console.log('🌊 Deepgram completamente parado');
 }
 
@@ -720,6 +724,8 @@ function normalizeForCompare(s) {
  * OUTPUT = Saída de áudio do PC (Outros / VoiceMeter)
  */
 function handleDeepgramMessage(data, source = 'input') {
+	// Passo 3: Processa mensagem Deepgram
+
 	const transcript = data.channel?.alternatives?.[0]?.transcript || '';
 	const confidence = data.channel?.alternatives?.[0]?.confidence || 0;
 	const isFinal = data.is_final || false;
@@ -858,6 +864,13 @@ function handleDeepgramMessage(data, source = 'input') {
 			deepgramLastOutputInterimShown = transcript;
 			deepgramLastOutputInterimShownNorm = normDelta;
 			deepgramLastOutputAddedAt = now;
+
+			// 🔥 NOVO: Chamar handleSpeech para INTERIM também (não só FINAL)
+			// Isso permite que CURRENT seja atualizado em tempo real
+			if (typeof globalThis.handleSpeechInterim === 'function') {
+				console.log(`🔄 [INTERIM] Atualizando CURRENT em tempo real com: "${transcript}"`);
+				globalThis.handleSpeechInterim(author, transcript, { isInterim: true, skipAddToUI: true });
+			}
 		}
 	} else {
 		console.log(`⏭️ Sem delta em [${source}], ignorando`);

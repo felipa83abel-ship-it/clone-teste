@@ -3289,6 +3289,7 @@ function hasActiveModel() {
 	return { active: false, model: null };
 }
 
+// Função principal para o botão de iniciar/parar escuta (Começar a Ouvir... (Ctrl+d))
 async function listenToggleBtn() {
 	debugLogRenderer('Início da função: "listenToggleBtn"');
 
