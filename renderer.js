@@ -195,7 +195,7 @@ const UICallbacks = {
 	onTranscriptAdd: null,
 	onCurrentQuestionUpdate: null,
 	onQuestionsHistoryUpdate: null,
-	onAnswerAdd: null,
+	// onAnswerAdd: null,
 	onStatusUpdate: null, // ← Adicionado: Para atualizar status na UI
 	onInputVolumeUpdate: null,
 	onOutputVolumeUpdate: null,
@@ -435,12 +435,6 @@ function isGarbageSentence(t) {
 		'pronto',
 		'fim',
 		'acabou',
-		// Frases de transição (vamos para próxima)
-		'agora vamos a',
-		'agora vamos para',
-		'agora a gente passa para',
-		'vamos pra próxima pergunta',
-		'vamos para a próxima pergunta',
 	];
 
 	// Detecta se é lixo puro
@@ -2866,20 +2860,20 @@ async function askGpt() {
 	if (ModeController.isInterviewMode() && !isCurrent) {
 		const existingAnswer = findAnswerByQuestionId(questionId);
 		if (existingAnswer) {
-			emitUIChange('onAnswerAdd', {
-				questionId,
-				action: 'showExisting',
-			});
+			// emitUIChange('onAnswerAdd', {
+			// 	questionId,
+			// 	action: 'showExisting',
+			// });
 			updateStatusMessage('📌 Essa pergunta já foi respondida');
 			return;
 		}
 	}
 
 	// limpa destaque
-	emitUIChange('onAnswerAdd', {
-		questionId,
-		action: 'clearActive',
-	});
+	// emitUIChange('onAnswerAdd', {
+	// 	questionId,
+	// 	action: 'clearActive',
+	// });
 
 	// log temporario para testar a aplicação só remover depois
 	console.log('🤖 askGpt chamado | questionId:', selectedQuestionId);

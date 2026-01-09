@@ -26,7 +26,7 @@ const OTHER = 'Outros'; // Autor das transcrições de saída
    ESTADO DO DEEPGRAM
 ================================ */
 
-let deepgramInpuWebSocket = null;
+let deepgramInputWebSocket = null;
 let deepgramOutputWebSocket = null; // ⚠️ WebSocket SEPARADO para OUTPUT
 let isDeepgramInputActive = false;
 let isDeepgramOutputActive = false;
@@ -84,7 +84,7 @@ const DEEPGRAM_HEARTBEAT_INTERVAL = 5000; // 5 segundos (entre 3-5 segundos conf
  */
 async function initDeepgramWS(source = 'input') {
 	const isInput = source === 'input';
-	const existingWS = isInput ? deepgramInpuWebSocket : deepgramOutputWebSocket;
+	const existingWS = isInput ? deepgramInputWebSocket : deepgramOutputWebSocket;
 
 	if (existingWS && existingWS.readyState === WebSocket.OPEN) {
 		console.log(`🌊 WebSocket Deepgram ${source} já aberto`);
@@ -107,11 +107,11 @@ async function initDeepgramWS(source = 'input') {
 		interim_results: 'true',
 		encoding: 'linear16',
 		sample_rate: '16000',
+		endpointing: '300', // Detecta pausas naturais
+		utterance_end_ms: '1000', // Finaliza a frase após 1s de silêncio
 	});
 
 	const wsUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
-
-	// O navegador converterá isso para o cabeçalho 'Sec-WebSocket-Protocol: token, YOUR_API_KEY'
 	const ws = new WebSocket(wsUrl, ['token', apiKey.trim()]);
 
 	return new Promise((resolve, reject) => {
@@ -120,7 +120,6 @@ async function initDeepgramWS(source = 'input') {
 
 			// Inicia heartbeat para manter conexão viva
 			startDeepgramHeartbeat(ws, source);
-
 			resolve(ws);
 		};
 
@@ -137,17 +136,6 @@ async function initDeepgramWS(source = 'input') {
 			console.error(`❌ Erro WebSocket Deepgram ${source}:`, err);
 			console.error('   Type:', err.type, 'Message:', err.message);
 
-			// Detectar erro de autenticação e dar dica útil
-			if (err.type === 'error' || err.message?.includes('Authentication')) {
-				console.error('\n⚠️  ERRO DE AUTENTICAÇÃO DETECTADO:');
-				console.error('   Causa provável: Chave API Deepgram inválida ou expirada');
-				console.error('   Solução:');
-				console.error('   1. Vá em Configurações > API e Modelos > Deepgram');
-				console.error('   2. Regenere uma nova chave em https://console.deepgram.com/api-keys');
-				console.error('   3. Certifique-se que começa com "dg_"');
-				console.error('   4. Salve a chave e tente novamente');
-			}
-
 			reject(new Error(`Falha ao conectar Deepgram ${source}`));
 		};
 
@@ -158,7 +146,7 @@ async function initDeepgramWS(source = 'input') {
 				}`,
 			);
 			stopDeepgramHeartbeat(source);
-			if (isInput) deepgramInpuWebSocket = null;
+			if (isInput) deepgramInputWebSocket = null;
 			else deepgramOutputWebSocket = null;
 		};
 	});
@@ -213,30 +201,33 @@ function stopDeepgramHeartbeat(source) {
  * Inicia captura de áudio do dispositivo de entrada com Deepgram
  */
 async function startDeepgramInput() {
+	// Passo 1: Iniciar captura de áudio da saída
+
 	if (isDeepgramInputActive) {
 		console.warn('⚠️ Deepgram INPUT já ativo');
 		return;
 	}
 
 	try {
+		// Obtém o dispositivo INPUT selecionado no UI (busca diretamente no DOM)
+		const inputSelectElement = document.getElementById('audio-input-device');
+		const inputDeviceId = inputSelectElement?.value;
+
+		console.log(`🔊 Iniciando captura INPUT com dispositivo: ${inputDeviceId}`);
+
 		// Inicializa WebSocket usando função genérica
 		const ws = await initDeepgramWS('input');
-		deepgramInpuWebSocket = ws;
+		deepgramInputWebSocket = ws;
 		isDeepgramInputActive = true;
 		deepgramInputStartAt = Date.now();
 		deepgramInputStopAt = null;
-		deepgramLastSoundTime = Date.now();
 
 		// Pede permissão do microfone
 		console.log('🎤 Solicitando acesso ao microfone...');
 
-		// Tenta usar dispositivo INPUT selecionado, se houver
-		const inputSelectElement = document.getElementById('audio-input-device');
-		const inputDeviceId = inputSelectElement?.value;
-
-		const audioConstraints = inputDeviceId ? { audio: { deviceId: { exact: inputDeviceId } } } : { audio: true }; // Usa padrão se nenhum selecionado
-
-		deepgramInputStream = await navigator.mediaDevices.getUserMedia(audioConstraints);
+		deepgramInputStream = await navigator.mediaDevices.getUserMedia({
+			audio: { deviceId: { exact: inputDeviceId } },
+		});
 
 		console.log('✅ Microfone autorizado');
 
@@ -246,137 +237,22 @@ async function startDeepgramInput() {
 		});
 
 		const source = deepgramInputAudioContext.createMediaStreamSource(deepgramInputStream);
+		// ScriptProcessor 4096 a 16kHz gera chunks de ~256ms (ideal para STT)
 		deepgramInputProcessor = deepgramInputAudioContext.createScriptProcessor(4096, 1, 1);
 
-		let pcmBuffer = [];
-		let processCallCount = 0; // DEBUG
-
-		deepgramInputProcessor.onaudioprocess = e => {
-			processCallCount++; // DEBUG
-
-			// Log na PRIMEIRA chamada e cada 100 frames
-			if (processCallCount === 1) {
-				console.log(
-					`🔧 [#1 CHAMADA] onaudioprocess iniciado | AC state: ${deepgramInputAudioContext.state} | WS: ${deepgramInpuWebSocket?.readyState}`,
-				);
-			}
+		deepgramOutputProcessor.onaudioprocess = e => {
+			if (deepgramInputWebSocket?.readyState !== WebSocket.OPEN) return;
 
 			const inputData = e.inputBuffer.getChannelData(0);
-
-			// Calcula RMS para heurística de silêncio
-			let rms = 0;
-			for (let i = 0; i < inputData.length; i++) {
-				rms += inputData[i] * inputData[i];
-			}
-			rms = Math.sqrt(rms / inputData.length);
-
-			// � NOVO: Emitir volume UPDATE para UI (Deepgram INPUT) - frequência alta (5 frames)
-			if (processCallCount % 5 === 0) {
-				const percent = Math.min(100, Math.min(100, Math.round((rms / 0.0001) * 100)));
-				if (globalThis.RendererAPI?.emitUIChange) {
-					globalThis.RendererAPI?.emitUIChange('onInputVolumeUpdate', { percent });
-				}
-			}
-
-			// �🛑 DETECÇÃO DE SILÊNCIO PROLONGADO
-			// Se tem som, atualiza o último momento que ouvi som
-			if (rms >= 0.0001) {
-				deepgramLastSoundTime = Date.now();
-			}
-
-			// Se passou muito tempo sem som, para de enviar
-			if (deepgramLastSoundTime && Date.now() - deepgramLastSoundTime > DEEPGRAM_SILENCE_TIMEOUT) {
-				if (processCallCount % 100 === 0) {
-					console.log(
-						`⏱️ [#${processCallCount}] SILÊNCIO PROLONGADO (${Math.round(
-							(Date.now() - deepgramLastSoundTime) / 1000,
-						)}s), parando envio`,
-					);
-				}
-				return;
-			}
-
-			// Debug detalhado na primeira chamada
-			if (processCallCount === 1) {
-				console.log(`📊 [#1 RMS] ${rms.toFixed(6)} | isActive: ${isDeepgramInputActive}`);
-			}
-
-			// ========== VERIFICAÇÕES ==========
-			if (!isDeepgramInputActive) {
-				if (processCallCount === 1) console.log('🛑 [#1] isDeepgramInputActive = FALSE, retornando');
-				return;
-			}
-
-			if (!deepgramInpuWebSocket) {
-				if (processCallCount <= 2) console.error('❌ [#' + processCallCount + '] deepgramWebSocket = NULL');
-				return;
-			}
-
-			const wsState = deepgramInpuWebSocket.readyState;
-			if (processCallCount === 1) {
-				console.log(`🔌 [#1] WebSocket readyState: ${wsState} (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED)`);
-			}
-
-			if (wsState !== WebSocket.OPEN) {
-				if (processCallCount <= 2) {
-					console.warn(`⚠️  [#${processCallCount}] WS state ${wsState}, esperado 1 (OPEN). Retornando.`);
-				}
-				return;
-			}
-
-			// RMS threshold
-			if (rms < 0.0001) {
-				if (processCallCount === 1) console.log(`🔇 [#1] RMS ${rms.toFixed(6)} < 0.0001 (silêncio), pulando`);
-				return;
-			}
-
-			if (processCallCount === 1) {
-				console.log(`✅ [#1] TODAS AS VERIFICAÇÕES PASSARAM! Prosseguindo com conversão PCM...`);
-			}
-
-			// Converte Float32 → Int16 (assimétrico)
 			const pcm16 = new Int16Array(inputData.length);
+
 			for (let i = 0; i < inputData.length; i++) {
 				const s = Math.max(-1, Math.min(1, inputData[i]));
 				pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
 			}
 
-			// Acumula em buffer
-			pcmBuffer.push(...Array.from(pcm16));
-
-			if (processCallCount === 1) {
-				console.log(
-					`📦 [#1] PCM buffer: ${pcmBuffer.length} samples, threshold: 16000 (${(
-						(pcmBuffer.length / 16000) *
-						100
-					).toFixed(1)}%)`,
-				);
-			}
-
-			// Envia quando atinge ~1 segundo (16KB a 16kHz) - mais agressivo
-			if (pcmBuffer.length >= 16000) {
-				try {
-					if (processCallCount <= 2) {
-						console.log(`🚀 [#${processCallCount}] ENVIANDO CHUNK: ${pcmBuffer.length} samples`);
-					}
-
-					// Cria ArrayBuffer para WebSocket
-					const buffer = new ArrayBuffer(pcmBuffer.length * 2);
-					const view = new Int16Array(buffer);
-					for (let i = 0; i < pcmBuffer.length; i++) {
-						view[i] = pcmBuffer[i];
-					}
-
-					deepgramInpuWebSocket.send(buffer);
-					console.log(`✅ [#${processCallCount}] CHUNK ENVIADO: ${buffer.byteLength} bytes`);
-
-					pcmBuffer = [];
-				} catch (err) {
-					if (isDeepgramInputActive) {
-						console.error('❌ Erro ao enviar chunk Deepgram:', err.message);
-					}
-				}
-			}
+			// Envio imediato do buffer PCM processado
+			deepgramInputWebSocket.send(pcm16.buffer);
 		};
 
 		source.connect(deepgramInputProcessor);
@@ -398,9 +274,9 @@ function stopDeepgramInput() {
 	isDeepgramInputActive = false;
 
 	// Envia "CloseStream" antes de fechar WebSocket
-	if (deepgramInpuWebSocket && deepgramInpuWebSocket.readyState === WebSocket.OPEN) {
+	if (deepgramInputWebSocket && deepgramInputWebSocket.readyState === WebSocket.OPEN) {
 		try {
-			deepgramInpuWebSocket.send(JSON.stringify({ type: 'CloseStream' }));
+			deepgramInputWebSocket.send(JSON.stringify({ type: 'CloseStream' }));
 			console.log('📤 CloseStream enviado para INPUT');
 		} catch (e) {
 			console.error('❌ Erro ao enviar CloseStream INPUT:', e);
@@ -411,13 +287,13 @@ function stopDeepgramInput() {
 	stopDeepgramHeartbeat('input');
 
 	// Fecha WebSocket
-	if (deepgramInpuWebSocket) {
+	if (deepgramInputWebSocket) {
 		try {
-			deepgramInpuWebSocket.close();
+			deepgramInputWebSocket.close();
 		} catch (e) {
 			console.error('Erro ao fechar WebSocket INPUT:', e);
 		}
-		deepgramInpuWebSocket = null;
+		deepgramInputWebSocket = null;
 	}
 
 	// Limpa recursos
@@ -489,77 +365,22 @@ async function startDeepgramOutput() {
 		});
 
 		const source = deepgramOutputAudioContext.createMediaStreamSource(deepgramOutputStream);
+		// ScriptProcessor 4096 a 16kHz gera chunks de ~256ms (ideal para STT)
 		deepgramOutputProcessor = deepgramOutputAudioContext.createScriptProcessor(4096, 1, 1);
 
-		let pcmBuffer = [];
-		let processCallCount = 0; // DEBUG
-
 		deepgramOutputProcessor.onaudioprocess = e => {
-			processCallCount++; // DEBUG
-			if (processCallCount === 1 || processCallCount % 100 === 0) {
-				console.log(
-					`🔧 [DEBUG OUTPUT] onaudioprocess chamado #${processCallCount} | AudioContext state: ${deepgramOutputAudioContext.state}`,
-				);
-			}
-
-			if (
-				!isDeepgramOutputActive ||
-				!deepgramOutputWebSocket ||
-				deepgramOutputWebSocket.readyState !== WebSocket.OPEN
-			) {
-				return;
-			}
+			if (deepgramOutputWebSocket?.readyState !== WebSocket.OPEN) return;
 
 			const inputData = e.inputBuffer.getChannelData(0);
-
-			// Calcula RMS
-			let rms = 0;
-			for (let i = 0; i < inputData.length; i++) {
-				rms += inputData[i] * inputData[i];
-			}
-			rms = Math.sqrt(rms / inputData.length);
-
-			// Debug: mostra RMS a cada 50 frames
-			if (processCallCount % 50 === 0) {
-				console.log(`📊 [DEBUG OUTPUT] RMS: ${rms.toFixed(6)} | Threshold: 0.0001`);
-			}
-
-			// 🔥 NOVO: Emitir volume UPDATE para UI (Deepgram OUTPUT)
-			if (processCallCount % 5 === 0) {
-				const percent = Math.min(100, Math.round((rms / 0.0001) * 100)); // 🔥 Divisor reduzido: 0.001 → 0.0001
-				if (processCallCount % 50 === 0) {
-					console.log(`📊 [VOLUME OUTPUT] RMS: ${rms.toFixed(6)}, Percent: ${percent}%`);
-				}
-				return;
-			}
-
-			// Converte Float32 → Int16
 			const pcm16 = new Int16Array(inputData.length);
+
 			for (let i = 0; i < inputData.length; i++) {
 				const s = Math.max(-1, Math.min(1, inputData[i]));
 				pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
 			}
 
-			pcmBuffer.push(...Array.from(pcm16));
-
-			if (pcmBuffer.length >= 16000) {
-				try {
-					const buffer = new ArrayBuffer(pcmBuffer.length * 2);
-					const view = new Int16Array(buffer);
-					for (let i = 0; i < pcmBuffer.length; i++) {
-						view[i] = pcmBuffer[i];
-					}
-
-					deepgramOutputWebSocket.send(buffer);
-					console.log(`📤 Chunk OUTPUT enviado: ${buffer.byteLength} bytes`);
-
-					pcmBuffer = [];
-				} catch (err) {
-					if (isDeepgramOutputActive) {
-						console.error('❌ Erro ao enviar chunk OUTPUT:', err);
-					}
-				}
-			}
+			// Envio imediato do buffer PCM processado
+			deepgramOutputWebSocket.send(pcm16.buffer);
 		};
 
 		source.connect(deepgramOutputProcessor);
@@ -729,8 +550,16 @@ function handleDeepgramMessage(data, source = 'input') {
 	const transcript = data.channel?.alternatives?.[0]?.transcript || '';
 	const confidence = data.channel?.alternatives?.[0]?.confidence || 0;
 	const isFinal = data.is_final || false;
+	const speechFinal = data.speech_final; // Importante para detectar fim de frase
 
 	if (!transcript || !transcript.trim()) return; // Ignora transcrições vazias
+
+	if (isFinal) {
+		console.log(`Palavras finalizadas (${source}):`, transcript);
+		if (speechFinal) {
+			console.log('Fim da sentença detectado pelo Deepgram.');
+		}
+	}
 
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
