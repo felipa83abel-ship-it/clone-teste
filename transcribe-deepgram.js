@@ -62,16 +62,12 @@ let deepgramInputStopAt = null;
 let deepgramOutputStartAt = null;
 let deepgramOutputStopAt = null;
 
-// 🛑 Detecção de silêncio prolongado para parar envio
-let deepgramLastSoundTime = null;
-const DEEPGRAM_SILENCE_TIMEOUT = 3000; // 3 segundos de silêncio = para
-
 // 🔥 Keepalive para evitar timeout 1011 do Deepgram
 // Envia mensagem JSON {"type": "KeepAlive"} a cada 5 segundos
 // Documentação: https://developers.deepgram.com/docs/audio-keep-alive
 let deepgramInputHeartbeatInterval = null;
 let deepgramOutputHeartbeatInterval = null;
-const DEEPGRAM_HEARTBEAT_INTERVAL = 5000; // 5 segundos (entre 3-5 segundos conforme recomendação)
+const DEEPGRAM_HEARTBEAT_INTERVAL = 5000; // 5 segundos (entre 3-5 segundos conforme documentação)
 
 /* ================================
    INICIALIZAÇÃO DO WEBSOCKET
@@ -230,14 +226,14 @@ async function startDeepgramInput() {
 		deepgramInputStartAt = Date.now();
 		deepgramInputStopAt = null;
 
-		// Pede permissão do microfone
-		console.log('🎤 Solicitando acesso ao microfone...');
+		// Solicita acesso ao dispositivo INPUT selecionado
+		console.log('🎤 Solicitando acesso à entrada de áudio (Microfone)...');
 
 		deepgramInputStream = await navigator.mediaDevices.getUserMedia({
 			audio: { deviceId: { exact: inputDeviceId } },
 		});
 
-		console.log('✅ Microfone autorizado');
+		console.log('✅ Entrada de áudio autorizada');
 
 		// Cria AudioContext com 16kHz
 		deepgramInputAudioContext = new (window.AudioContext || window.webkitAudioContext)({
@@ -252,15 +248,24 @@ async function startDeepgramInput() {
 			if (deepgramInputWebSocket?.readyState !== WebSocket.OPEN) return;
 
 			const inputData = e.inputBuffer.getChannelData(0);
-			const pcm16 = new Int16Array(inputData.length);
+			const { rms, percent } = analyzeVolume(inputData);
+			const thresholdRms = 0.002; // ajuste conforme ambiente
 
-			for (let i = 0; i < inputData.length; i++) {
-				const s = Math.max(-1, Math.min(1, inputData[i]));
-				pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
+			if (rms > thresholdRms) {
+				// Envia PCM16
+				const pcm16 = new Int16Array(inputData.length);
+
+				for (let i = 0; i < inputData.length; i++) {
+					const s = Math.max(-1, Math.min(1, inputData[i]));
+					pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
+				}
+
+				// Envio imediato do buffer PCM processado
+				deepgramInputWebSocket.send(pcm16.buffer);
 			}
 
-			// Envio imediato do buffer PCM processado
-			deepgramInputWebSocket.send(pcm16.buffer);
+			// Atualiza UI com volume OUTPUT
+			emitUIChange('onOutputVolumeUpdate', { percent });
 		};
 
 		source.connect(deepgramInputProcessor);
@@ -323,9 +328,30 @@ function stopDeepgramInput() {
 	console.log('🛑 Captura Deepgram INPUT parada');
 }
 
-/* ================================
-   CAPTURA DE ÁUDIO - OUTPUT
-================================ */
+/**
+ * Analisa volume RMS/dB/percentual de um buffer de áudio
+ * @param {Float32Array} inputData - Buffer de áudio
+ * @param {number} minDb - dB mínimo para 0%
+ * @returns {{rms: number, db: number, percent: number}}
+ */
+function analyzeVolume(inputData, minDb = -60) {
+	// RMS direto do buffer
+	let sum = 0;
+	for (let i = 0; i < inputData.length; i++) {
+		sum += inputData[i] * inputData[i];
+	}
+	const rms = Math.sqrt(sum / inputData.length);
+
+	// dBFS
+	const db = 20 * Math.log10(rms || 1e-8); // evita -Infinity
+
+	// Percentual 0–100%
+	const percent = Math.max(0, Math.min(100, ((db - minDb) / -minDb) * 100));
+
+	//console.log(`🔊 OUTPUT Volume: RMS=${rms.toFixed(4)} | dB=${db.toFixed(1)} | Percent=${percent.toFixed(1)}%`);
+
+	return { rms, db, percent };
+}
 
 /**
  * Inicia captura de áudio da saída (speaker/loopback via VoiceMeter ou Stereo Mix)
@@ -380,15 +406,24 @@ async function startDeepgramOutput() {
 			if (deepgramOutputWebSocket?.readyState !== WebSocket.OPEN) return;
 
 			const inputData = e.inputBuffer.getChannelData(0);
-			const pcm16 = new Int16Array(inputData.length);
+			const { rms, percent } = analyzeVolume(inputData);
+			const thresholdRms = 0.002; // ajuste conforme ambiente
 
-			for (let i = 0; i < inputData.length; i++) {
-				const s = Math.max(-1, Math.min(1, inputData[i]));
-				pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
+			if (rms > thresholdRms) {
+				// Envia PCM16
+				const pcm16 = new Int16Array(inputData.length);
+
+				for (let i = 0; i < inputData.length; i++) {
+					const s = Math.max(-1, Math.min(1, inputData[i]));
+					pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
+				}
+
+				// Envio imediato do buffer PCM processado
+				deepgramOutputWebSocket.send(pcm16.buffer);
 			}
 
-			// Envio imediato do buffer PCM processado
-			deepgramOutputWebSocket.send(pcm16.buffer);
+			// Atualiza UI com volume OUTPUT
+			emitUIChange('onOutputVolumeUpdate', { percent });
 		};
 
 		source.connect(deepgramOutputProcessor);
