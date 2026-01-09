@@ -7,8 +7,8 @@
  * - Converge para handleSpeech() como outros providers (Whisper, Vosk)
  *
  * Uso:
- * - startDeepgramInput() / stopDeepgramInput() para capturar microfone
- * - startDeepgramOutput() / stopDeepgramOutput() para capturar saída
+ * - startAudioDeepgram() -> startDeepgramInput() / stopDeepgramInput() para capturar microfone
+ * - startAudioDeepgram() -> startDeepgramOutput() / stopDeepgramOutput() para capturar saída
  */
 
 /* ================================
@@ -198,7 +198,7 @@ function stopDeepgramHeartbeat(source) {
 }
 
 /* ===============================
-   DEEPGRAM - FLUXO SEPARADO (STT)
+   DEEPGRAM - INICIA FLUXO (STT)
 =============================== */
 
 // 🔥 DEEPGRAM: Inicia captura (wrapper)
@@ -216,25 +216,6 @@ async function startAudioDeepgram(UIElements) {
 
 	debugLogRenderer('Fim da função: "startAudioDeepgram"');
 }
-
-// 🔥 DEEPGRAM: Para captura (wrapper)
-async function stopAudioDeepgram() {
-	debugLogRenderer('Início da função: "stopAudioDeepgram"');
-
-	try {
-		// 🌊 Deepgram: Para INPUT e OUTPUT
-		stopAllDeepgram(); // Fecha WebSocket
-		console.log('✅ Deepgram parado');
-	} catch (error) {
-		console.error('❌ Erro ao parar Deepgram:', error);
-	}
-
-	debugLogRenderer('Fim da função: "stopAudioDeepgram"');
-}
-
-/* ================================
-   CAPTURA DE ÁUDIO
-================================ */
 
 /**
  * Inicia captura de áudio do dispositivo de entrada com Deepgram
@@ -312,79 +293,6 @@ async function startDeepgramInput(UIElements) {
 		stopDeepgramInput();
 		throw error;
 	}
-}
-
-/**
- * Para captura de áudio do dispositivo de entrada
- */
-function stopDeepgramInput() {
-	isDeepgramInputActive = false;
-
-	// Envia "CloseStream" antes de fechar WebSocket
-	if (deepgramInputWebSocket && deepgramInputWebSocket.readyState === WebSocket.OPEN) {
-		try {
-			deepgramInputWebSocket.send(JSON.stringify({ type: 'CloseStream' }));
-			console.log('📤 CloseStream enviado para INPUT');
-		} catch (e) {
-			console.error('❌ Erro ao enviar CloseStream INPUT:', e);
-		}
-	}
-
-	// Para heartbeat
-	stopDeepgramHeartbeat('input');
-
-	// Fecha WebSocket
-	if (deepgramInputWebSocket) {
-		try {
-			deepgramInputWebSocket.close();
-		} catch (e) {
-			console.error('Erro ao fechar WebSocket INPUT:', e);
-		}
-		deepgramInputWebSocket = null;
-	}
-
-	// Limpa recursos
-	if (deepgramInputProcessor) {
-		deepgramInputProcessor.disconnect();
-		deepgramInputProcessor = null;
-	}
-
-	if (deepgramInputStream) {
-		deepgramInputStream.getTracks().forEach(t => t.stop());
-		deepgramInputStream = null;
-	}
-
-	if (deepgramInputAudioContext) {
-		deepgramInputAudioContext.close();
-		deepgramInputAudioContext = null;
-	}
-
-	console.log('🛑 Captura Deepgram INPUT parada');
-}
-
-/**
- * Analisa volume RMS/dB/percentual de um buffer de áudio
- * @param {Float32Array} inputData - Buffer de áudio
- * @param {number} minDb - dB mínimo para 0%
- * @returns {{rms: number, db: number, percent: number}}
- */
-function analyzeVolume(inputData, minDb = -60) {
-	// RMS direto do buffer
-	let sum = 0;
-	for (let i = 0; i < inputData.length; i++) {
-		sum += inputData[i] * inputData[i];
-	}
-	const rms = Math.sqrt(sum / inputData.length);
-
-	// dBFS
-	const db = 20 * Math.log10(rms || 1e-8); // evita -Infinity
-
-	// Percentual 0–100%
-	const percent = Math.max(0, Math.min(100, ((db - minDb) / -minDb) * 100));
-
-	//console.log(`🔊 OUTPUT Volume: RMS=${rms.toFixed(4)} | dB=${db.toFixed(1)} | Percent=${percent.toFixed(1)}%`);
-
-	return { rms, db, percent };
 }
 
 /**
@@ -472,65 +380,119 @@ async function startDeepgramOutput(UIElements) {
 }
 
 /**
- * Para captura de áudio da saída
+ * Analisa volume RMS/dB/percentual de um buffer de áudio
+ * @param {Float32Array} inputData - Buffer de áudio
+ * @param {number} minDb - dB mínimo para 0%
+ * @returns {{rms: number, db: number, percent: number}}
  */
-function stopDeepgramOutput() {
-	isDeepgramOutputActive = false;
+function analyzeVolume(inputData, minDb = -60) {
+	// RMS direto do buffer
+	let sum = 0;
+	for (let i = 0; i < inputData.length; i++) {
+		sum += inputData[i] * inputData[i];
+	}
+	const rms = Math.sqrt(sum / inputData.length);
 
-	// Envia "CloseStream" antes de fechar WebSocket
-	if (deepgramOutputWebSocket && deepgramOutputWebSocket.readyState === WebSocket.OPEN) {
+	// dBFS
+	const db = 20 * Math.log10(rms || 1e-8); // evita -Infinity
+
+	// Percentual 0–100%
+	const percent = Math.max(0, Math.min(100, ((db - minDb) / -minDb) * 100));
+
+	//console.log(`🔊 OUTPUT Volume: RMS=${rms.toFixed(4)} | dB=${db.toFixed(1)} | Percent=${percent.toFixed(1)}%`);
+
+	return { rms, db, percent };
+}
+
+/* ================================
+	DEEPGRAM - PARA FLUXO (STT)
+================================ */
+
+// 🔥 DEEPGRAM: Para captura (wrapper) - Agora síncrona, sem async desnecessário
+function stopAudioDeepgram() {
+	debugLogRenderer('Início da função: "stopAudioDeepgram"');
+
+	try {
+		// 🌊 Deepgram: Para INPUT e OUTPUT
+		stopAllDeepgram(); // Fecha WebSocket
+		console.log('✅ Deepgram parado');
+	} catch (error) {
+		console.error('❌ Erro ao parar Deepgram:', error);
+	}
+
+	debugLogRenderer('Fim da função: "stopAudioDeepgram"');
+}
+
+// Função genérica para parar input ou output (elimina duplicação)
+function stopDeepgram(source) {
+	const isInput = source === 'input';
+	const ws = isInput ? deepgramInputWebSocket : deepgramOutputWebSocket;
+	const isActive = isInput ? isDeepgramInputActive : isDeepgramOutputActive;
+
+	// Verificação de estado: se já parado, sai cedo
+	if (!isActive) {
+		console.log(`⚠️ Deepgram ${source} já parado, pulando.`);
+		return;
+	}
+
+	// Define flag como false
+	if (isInput) isDeepgramInputActive = false;
+	else isDeepgramOutputActive = false;
+
+	// Envia "CloseStream" se WebSocket estiver aberto
+	if (ws && ws.readyState === WebSocket.OPEN) {
 		try {
-			deepgramOutputWebSocket.send(JSON.stringify({ type: 'CloseStream' }));
-			console.log('📤 CloseStream enviado para OUTPUT');
+			ws.send(JSON.stringify({ type: 'CloseStream' }));
+			console.log(`📤 CloseStream enviado para ${source.toUpperCase()}`);
 		} catch (e) {
-			console.error('❌ Erro ao enviar CloseStream OUTPUT:', e);
+			console.error(`❌ Erro ao enviar CloseStream ${source}:`, e);
 		}
 	}
 
 	// Para heartbeat
-	stopDeepgramHeartbeat('output');
+	stopDeepgramHeartbeat(source);
 
 	// Fecha WebSocket
-	if (deepgramOutputWebSocket) {
+	if (ws) {
 		try {
-			deepgramOutputWebSocket.close();
+			ws.close();
 		} catch (e) {
-			console.error('Erro ao fechar WebSocket OUTPUT:', e);
+			console.error(`Erro ao fechar WebSocket ${source}:`, e);
 		}
-		deepgramOutputWebSocket = null;
+		if (isInput) deepgramInputWebSocket = null;
+		else deepgramOutputWebSocket = null;
 	}
 
-	// Limpa recursos
-	if (deepgramOutputProcessor) {
-		deepgramOutputProcessor.disconnect();
-		deepgramOutputProcessor = null;
+	// Limpa recursos (usando variáveis dinâmicas)
+	const processor = isInput ? deepgramInputProcessor : deepgramOutputProcessor;
+	const stream = isInput ? deepgramInputStream : deepgramOutputStream;
+	const audioContext = isInput ? deepgramInputAudioContext : deepgramOutputAudioContext;
+
+	if (processor) {
+		processor.disconnect();
+		if (isInput) deepgramInputProcessor = null;
+		else deepgramOutputProcessor = null;
 	}
 
-	if (deepgramOutputStream) {
-		deepgramOutputStream.getTracks().forEach(t => t.stop());
-		deepgramOutputStream = null;
+	if (stream) {
+		stream.getTracks().forEach(t => t.stop());
+		if (isInput) deepgramInputStream = null;
+		else deepgramOutputStream = null;
 	}
 
-	if (deepgramOutputAudioContext) {
-		deepgramOutputAudioContext.close();
-		deepgramOutputAudioContext = null;
+	if (audioContext) {
+		audioContext.close();
+		if (isInput) deepgramInputAudioContext = null;
+		else deepgramOutputAudioContext = null;
 	}
 
-	console.log('🛑 Captura Deepgram OUTPUT parada');
+	console.log(`🛑 Captura Deepgram ${source.toUpperCase()} parada`);
 }
 
-/* ================================
-   CLEANUP
-================================ */
-
-/**
- * Para tudo relacionado a Deepgram
- */
+// Atualiza stopAllDeepgram para usar a função genérica
 function stopAllDeepgram() {
-	stopDeepgramInput();
-	stopDeepgramOutput();
-
-	// Recursos já são limpos em stopDeepgramInput/Output
+	stopDeepgram('input');
+	stopDeepgram('output');
 	console.log('🌊 Deepgram completamente parado');
 }
 
