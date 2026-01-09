@@ -197,6 +197,41 @@ function stopDeepgramHeartbeat(source) {
 	}
 }
 
+/* ===============================
+   DEEPGRAM - FLUXO SEPARADO (STT)
+=============================== */
+
+// 🔥 DEEPGRAM: Inicia captura (wrapper)
+async function startAudioDeepgram(UIElements) {
+	debugLogRenderer('Início da função: "startAudioDeepgram"');
+
+	try {
+		// 🌊 Deepgram: Inicia INPUT/OUTPUT
+		if (UIElements.inputSelect?.value) await startDeepgramInput(UIElements);
+		if (UIElements.outputSelect?.value) await startDeepgramOutput(UIElements);
+	} catch (error) {
+		console.error('❌ Erro ao iniciar Deepgram:', error);
+		throw error;
+	}
+
+	debugLogRenderer('Fim da função: "startAudioDeepgram"');
+}
+
+// 🔥 DEEPGRAM: Para captura (wrapper)
+async function stopAudioDeepgram() {
+	debugLogRenderer('Início da função: "stopAudioDeepgram"');
+
+	try {
+		// 🌊 Deepgram: Para INPUT e OUTPUT
+		stopAllDeepgram(); // Fecha WebSocket
+		console.log('✅ Deepgram parado');
+	} catch (error) {
+		console.error('❌ Erro ao parar Deepgram:', error);
+	}
+
+	debugLogRenderer('Fim da função: "stopAudioDeepgram"');
+}
+
 /* ================================
    CAPTURA DE ÁUDIO
 ================================ */
@@ -204,7 +239,7 @@ function stopDeepgramHeartbeat(source) {
 /**
  * Inicia captura de áudio do dispositivo de entrada com Deepgram
  */
-async function startDeepgramInput() {
+async function startDeepgramInput(UIElements) {
 	// Passo 1: Iniciar captura de áudio da saída
 
 	if (isDeepgramInputActive) {
@@ -214,8 +249,7 @@ async function startDeepgramInput() {
 
 	try {
 		// Obtém o dispositivo INPUT selecionado no UI (busca diretamente no DOM)
-		const inputSelectElement = document.getElementById('audio-input-device');
-		const inputDeviceId = inputSelectElement?.value;
+		const inputDeviceId = UIElements.inputSelect?.value;
 
 		console.log(`🔊 Iniciando captura INPUT com dispositivo: ${inputDeviceId}`);
 
@@ -357,7 +391,7 @@ function analyzeVolume(inputData, minDb = -60) {
  * Inicia captura de áudio da saída (speaker/loopback via VoiceMeter ou Stereo Mix)
  * Usa o dispositivo selecionado no select #audio-output-device (mesma lógica do INPUT)
  */
-async function startDeepgramOutput() {
+async function startDeepgramOutput(UIElements) {
 	// Passo 1: Iniciar captura de áudio da saída
 
 	if (isDeepgramOutputActive) {
@@ -367,8 +401,7 @@ async function startDeepgramOutput() {
 
 	try {
 		// Obtém o dispositivo OUTPUT selecionado no UI (busca diretamente no DOM)
-		const outputSelectElement = document.getElementById('audio-output-device');
-		const outputDeviceId = outputSelectElement?.value;
+		const outputDeviceId = UIElements.outputSelect?.value;
 
 		if (!outputDeviceId) {
 			console.warn('⚠️ Nenhum dispositivo OUTPUT selecionado. Pulando captura OUTPUT.');
@@ -827,9 +860,6 @@ function updatePlaceholder(pid, authorLocal, transcriptLocal, isInputLocal, data
 // definidas aqui ficarão acessíveis no escopo global
 // Alternativa: module.exports para acesso via require()
 module.exports = {
-	startDeepgramInput,
-	stopDeepgramInput,
-	startDeepgramOutput,
-	stopDeepgramOutput,
-	stopAllDeepgram,
+	startAudioDeepgram,
+	stopAudioDeepgram,
 };

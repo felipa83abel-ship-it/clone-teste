@@ -6,13 +6,7 @@ const { marked } = require('marked');
 const hljs = require('highlight.js');
 
 // 🌊 Transcrição Deepgram
-const {
-	startDeepgramInput,
-	stopDeepgramInput,
-	startDeepgramOutput,
-	stopDeepgramOutput,
-	stopAllDeepgram,
-} = require('./transcribe-deepgram.js');
+const { startAudioDeepgram, stopAudioDeepgram } = require('./transcribe-deepgram.js');
 
 // 🔒 DESABILITADO TEMPORARIAMENTE
 const DESABILITADO_TEMPORARIAMENTE = false;
@@ -1078,7 +1072,7 @@ async function startAudio() {
 		// 🔥 ROTEAMENTO: Por modelo STT
 		if (sttModel === 'deepgram') {
 			console.log('🌊 Rotando para startAudioDeepgram');
-			await startAudioDeepgram();
+			await startAudioDeepgram(UIElements);
 		} else {
 			console.log('🎤 Rotando para startInputOutput (Vosk/OpenAI)');
 			await startInputOutput();
@@ -1126,6 +1120,9 @@ async function stopAudio() {
 		if (sttModel === 'deepgram') {
 			console.log('🌊 Rotando para stopAudioDeepgram');
 			await stopAudioDeepgram();
+
+			// Fecha pergunta atual se estava aberta
+			if (currentQuestion.text) closeCurrentQuestionForced();
 		} else {
 			console.log('🎤 Rotando para stopInputOutput (Vosk/OpenAI)');
 			await stopInputOutput();
@@ -1925,59 +1922,6 @@ function stopOutputMonitor() {
 
 	debugLogRenderer('Fim da função: "stopOutputMonitor"');
 	return Promise.resolve();
-}
-
-/* ===============================
-   DEEPGRAM - FLUXO SEPARADO (STT)
-=============================== */
-
-// 🔥 DEEPGRAM: Inicia captura (wrapper)
-// Chama o módulo isolado transcribe-deepgram.js
-async function startAudioDeepgram() {
-	debugLogRenderer('Início da função: "startAudioDeepgram"');
-
-	try {
-		// 🌊 Deepgram: Inicia INPUT (microfone) APENAS se foi selecionado
-		const inputSelectElement = document.getElementById('audio-input-device');
-		const inputDeviceId = inputSelectElement?.value;
-
-		if (inputDeviceId && inputDeviceId.trim().length > 0) {
-			await startDeepgramInput();
-			console.log('✅ Deepgram INPUT iniciado (microfone)');
-		} else {
-			console.log('⏭️ Deepgram INPUT desativado - dispositivo não selecionado (🔇 Nenhum)');
-		}
-
-		// 🌊 Deepgram: Inicia OUTPUT (VoiceMeter/Stereo Mix) - OBRIGATÓRIO
-		await startDeepgramOutput();
-		console.log('✅ Deepgram OUTPUT iniciado (saída de áudio)');
-	} catch (error) {
-		console.error('❌ Erro ao iniciar Deepgram:', error);
-		throw error;
-	}
-
-	debugLogRenderer('Fim da função: "startAudioDeepgram"');
-}
-
-// 🔥 DEEPGRAM: Para captura (wrapper)
-// Chama o módulo isolado transcribe-deepgram.js
-async function stopAudioDeepgram() {
-	debugLogRenderer('Início da função: "stopAudioDeepgram"');
-
-	try {
-		// 🌊 Deepgram: Para INPUT e OUTPUT
-		stopDeepgramInput();
-		stopDeepgramOutput();
-		stopAllDeepgram(); // Fecha WebSocket
-		console.log('✅ Deepgram parado');
-	} catch (error) {
-		console.error('❌ Erro ao parar Deepgram:', error);
-	}
-
-	// Fecha pergunta atual se estava aberta
-	if (currentQuestion.text) closeCurrentQuestionForced();
-
-	debugLogRenderer('Fim da função: "stopAudioDeepgram"');
 }
 
 /* ===============================
