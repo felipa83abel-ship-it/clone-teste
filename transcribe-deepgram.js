@@ -124,8 +124,16 @@ async function initDeepgramWS(source = 'input') {
 		};
 
 		ws.onmessage = event => {
+			console.log('💬 Mensagem Deepgram OUTPUT recebida (tamanho:', event.data.length, 'bytes)');
 			try {
 				const data = JSON.parse(event.data);
+
+				// 🔍 LOG COMPLETO DA RESPOSTA
+				console.log('📥 RESPOSTA COMPLETA DO DEEPGRAM OUTPUT:');
+				console.log(JSON.stringify(data, null, 2));
+				console.log('--------------------------------');
+
+				// 🌊 Deepgram: Processa apenas OUTPUT neste WebSocket
 				handleDeepgramMessage(data, source);
 			} catch (e) {
 				console.error(`❌ Erro ao processar mensagem Deepgram ${source}:`, e);
@@ -240,7 +248,7 @@ async function startDeepgramInput() {
 		// ScriptProcessor 4096 a 16kHz gera chunks de ~256ms (ideal para STT)
 		deepgramInputProcessor = deepgramInputAudioContext.createScriptProcessor(4096, 1, 1);
 
-		deepgramOutputProcessor.onaudioprocess = e => {
+		deepgramInputProcessor.onaudioprocess = e => {
 			if (deepgramInputWebSocket?.readyState !== WebSocket.OPEN) return;
 
 			const inputData = e.inputBuffer.getChannelData(0);
