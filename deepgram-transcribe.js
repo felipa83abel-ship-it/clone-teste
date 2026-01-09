@@ -255,32 +255,27 @@ async function startDeepgramInput(UIElements) {
 			sampleRate: 16000,
 		});
 
+		// Carrega o AudioWorklet
+		await deepgramInputAudioContext.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
+
 		const source = deepgramInputAudioContext.createMediaStreamSource(deepgramInputStream);
-		// ScriptProcessor 4096 a 16kHz gera chunks de ~256ms (ideal para STT)
-		deepgramInputProcessor = deepgramInputAudioContext.createScriptProcessor(4096, 1, 1);
 
-		deepgramInputProcessor.onaudioprocess = e => {
-			if (deepgramInputWebSocket?.readyState !== WebSocket.OPEN) return;
+		// Cria AudioWorkletNode em vez de ScriptProcessor
+		deepgramInputProcessor = new AudioWorkletNode(deepgramInputAudioContext, 'deepgram-audio-worklet-processor');
 
-			const inputData = e.inputBuffer.getChannelData(0);
-			const { rms, percent } = analyzeVolume(inputData);
-			const thresholdRms = 0.002; // ajuste conforme ambiente
+		// Define threshold mais alto para input (microfone) para filtrar ruído
+		deepgramInputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.01 });
 
-			if (rms > thresholdRms) {
-				// Envia PCM16
-				const pcm16 = new Int16Array(inputData.length);
-
-				for (let i = 0; i < inputData.length; i++) {
-					const s = Math.max(-1, Math.min(1, inputData[i]));
-					pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
-				}
-
-				// Envio imediato do buffer PCM processado
-				deepgramInputWebSocket.send(pcm16.buffer);
+		// Escuta mensagens do worklet
+		deepgramInputProcessor.port.onmessage = event => {
+			const { type, pcm16, percent } = event.data;
+			if (type === 'audioData' && deepgramInputWebSocket?.readyState === WebSocket.OPEN) {
+				// Envia PCM16 via WebSocket
+				deepgramInputWebSocket.send(pcm16);
+			} else if (type === 'volumeUpdate') {
+				// Atualiza UI com volume
+				emitUIChange('onInputVolumeUpdate', { percent });
 			}
-
-			// Atualiza UI com volume OUTPUT
-			emitUIChange('onOutputVolumeUpdate', { percent });
 		};
 
 		source.connect(deepgramInputProcessor);
@@ -339,32 +334,27 @@ async function startDeepgramOutput(UIElements) {
 			sampleRate: 16000,
 		});
 
+		// Carrega o AudioWorklet
+		await deepgramOutputAudioContext.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
+
 		const source = deepgramOutputAudioContext.createMediaStreamSource(deepgramOutputStream);
-		// ScriptProcessor 4096 a 16kHz gera chunks de ~256ms (ideal para STT)
-		deepgramOutputProcessor = deepgramOutputAudioContext.createScriptProcessor(4096, 1, 1);
 
-		deepgramOutputProcessor.onaudioprocess = e => {
-			if (deepgramOutputWebSocket?.readyState !== WebSocket.OPEN) return;
+		// Cria AudioWorkletNode em vez de ScriptProcessor
+		deepgramOutputProcessor = new AudioWorkletNode(deepgramOutputAudioContext, 'deepgram-audio-worklet-processor');
 
-			const inputData = e.inputBuffer.getChannelData(0);
-			const { rms, percent } = analyzeVolume(inputData);
-			const thresholdRms = 0.002; // ajuste conforme ambiente
+		// Define threshold para output (VoiceMeter) - mais baixo, pois é mais limpo
+		deepgramOutputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.005 });
 
-			if (rms > thresholdRms) {
-				// Envia PCM16
-				const pcm16 = new Int16Array(inputData.length);
-
-				for (let i = 0; i < inputData.length; i++) {
-					const s = Math.max(-1, Math.min(1, inputData[i]));
-					pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
-				}
-
-				// Envio imediato do buffer PCM processado
-				deepgramOutputWebSocket.send(pcm16.buffer);
+		// Escuta mensagens do worklet
+		deepgramOutputProcessor.port.onmessage = event => {
+			const { type, pcm16, percent } = event.data;
+			if (type === 'audioData' && deepgramOutputWebSocket?.readyState === WebSocket.OPEN) {
+				// Envia PCM16 via WebSocket
+				deepgramOutputWebSocket.send(pcm16);
+			} else if (type === 'volumeUpdate') {
+				// Atualiza UI com volume
+				emitUIChange('onOutputVolumeUpdate', { percent });
 			}
-
-			// Atualiza UI com volume OUTPUT
-			emitUIChange('onOutputVolumeUpdate', { percent });
 		};
 
 		source.connect(deepgramOutputProcessor);
