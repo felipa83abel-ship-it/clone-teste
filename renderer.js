@@ -3231,28 +3231,32 @@ function hasActiveModel() {
 async function listenToggleBtn() {
 	debugLogRenderer('Início da função: "listenToggleBtn"');
 
-	// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
-	const { active: hasModel, model: activeModel } = hasActiveModel();
-	console.log(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`);
+	if (!isRunning) {
+		console.log('🎤 listenToggleBtn: Tentando INICIAR escuta...');
 
-	if (!isRunning && !hasModel) {
-		const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
-		console.warn(`⚠️ ${errorMsg}`);
-		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
-		emitUIChange('onError', errorMsg);
-		return;
-	}
+		// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
+		const { active: hasModel, model: activeModel } = hasActiveModel();
+		console.log(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`);
 
-	// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
-	const hasOutputDevice = UIElements.outputSelect?.value;
-	console.log(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`);
+		if (!hasModel) {
+			const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
+			console.warn(`⚠️ ${errorMsg}`);
+			console.log('📡 DEBUG: Emitindo onError:', errorMsg);
+			emitUIChange('onError', errorMsg);
+			return;
+		}
 
-	if (!isRunning && !hasOutputDevice) {
-		const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
-		console.warn(`⚠️ ${errorMsg}`);
-		console.log('📡 DEBUG: Emitindo onError:', errorMsg);
-		emitUIChange('onError', errorMsg);
-		return;
+		// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
+		const hasOutputDevice = UIElements.outputSelect?.value;
+		console.log(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`);
+
+		if (!hasOutputDevice) {
+			const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
+			console.warn(`⚠️ ${errorMsg}`);
+			console.log('📡 DEBUG: Emitindo onError:', errorMsg);
+			emitUIChange('onError', errorMsg);
+			return;
+		}
 	}
 
 	// Inverte o estado de isRunning
@@ -3269,9 +3273,7 @@ async function listenToggleBtn() {
 	// Atualiza o status da escuta na tela
 	updateStatusMessage(statusMsg);
 
-	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'} (modelo: ${activeModel})`);
-
-	// 🔥 [REFATORADO] Roteamento centralizado em startAudio()/stopAudio()
+	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'}`);
 	await (isRunning ? startAudio() : stopAudio());
 
 	debugLogRenderer('Fim da função: "listenToggleBtn"');

@@ -123,13 +123,6 @@ async function initDeepgramWS(source = 'input') {
 			console.log('💬 Mensagem Deepgram OUTPUT recebida (tamanho:', event.data.length, 'bytes)');
 			try {
 				const data = JSON.parse(event.data);
-
-				// 🔍 LOG COMPLETO DA RESPOSTA
-				console.log('📥 RESPOSTA COMPLETA DO DEEPGRAM OUTPUT:');
-				console.log(JSON.stringify(data, null, 2));
-				console.log('--------------------------------');
-
-				// 🌊 Deepgram: Processa apenas OUTPUT neste WebSocket
 				handleDeepgramMessage(data, source);
 			} catch (e) {
 				console.error(`❌ Erro ao processar mensagem Deepgram ${source}:`, e);
@@ -349,6 +342,8 @@ async function startDeepgramOutput(UIElements) {
 		deepgramOutputProcessor.port.onmessage = event => {
 			const { type, pcm16, percent } = event.data;
 			if (type === 'audioData' && deepgramOutputWebSocket?.readyState === WebSocket.OPEN) {
+				//console.log(`🟡 Enviando áudio OUTPUT para o Deepgram - ${new Date().toLocaleTimeString("pt-BR")}`);
+
 				// Envia PCM16 via WebSocket
 				deepgramOutputWebSocket.send(pcm16);
 			} else if (type === 'volumeUpdate') {
@@ -367,31 +362,6 @@ async function startDeepgramOutput(UIElements) {
 		stopDeepgramOutput();
 		throw error;
 	}
-}
-
-/**
- * Analisa volume RMS/dB/percentual de um buffer de áudio
- * @param {Float32Array} inputData - Buffer de áudio
- * @param {number} minDb - dB mínimo para 0%
- * @returns {{rms: number, db: number, percent: number}}
- */
-function analyzeVolume(inputData, minDb = -60) {
-	// RMS direto do buffer
-	let sum = 0;
-	for (let i = 0; i < inputData.length; i++) {
-		sum += inputData[i] * inputData[i];
-	}
-	const rms = Math.sqrt(sum / inputData.length);
-
-	// dBFS
-	const db = 20 * Math.log10(rms || 1e-8); // evita -Infinity
-
-	// Percentual 0–100%
-	const percent = Math.max(0, Math.min(100, ((db - minDb) / -minDb) * 100));
-
-	//console.log(`🔊 OUTPUT Volume: RMS=${rms.toFixed(4)} | dB=${db.toFixed(1)} | Percent=${percent.toFixed(1)}%`);
-
-	return { rms, db, percent };
 }
 
 /* ================================
@@ -582,6 +552,14 @@ function handleDeepgramMessage(data, source = 'input') {
 
 	if (!transcript || !transcript.trim()) return; // Ignora transcrições vazias
 
+	// 🔍 LOG COMPLETO DA RESPOSTA
+	console.log(`📥 RESPOSTA DO DEEPGRAM - (${source}) - ${new Date().toLocaleTimeString('pt-BR')}`);
+	//console.log(JSON.stringify(data, null, 2));
+	console.log(`🟡 isFinal: ${isFinal}`);
+	console.log(`🟡 speechFinal: ${speechFinal}`);
+	console.log(`🟡 transcript: ${transcript}`);
+	console.log('--------------------------------');
+
 	if (isFinal) {
 		console.log(`Palavras finalizadas (${source}):`, transcript);
 		if (speechFinal) {
@@ -640,7 +618,7 @@ function handleDeepgramMessage(data, source = 'input') {
 			handleSpeech(author, transcript);
 		}
 
-		// 🔥 [NOVO] Emitir evento para sistema unificado STT (apenas para OUTPUT, pois é INPUT que espera resposta)
+		// Emite evento global onTranscriptionComplete para OUTPUT
 		if (source === 'output' && globalThis.emitSTTEvent) {
 			console.log('🌊 Deepgram OUTPUT: Emitindo evento onTranscriptionComplete');
 			globalThis.emitSTTEvent('transcriptionComplete', {

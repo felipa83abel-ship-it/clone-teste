@@ -18,8 +18,8 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 
 		// Calcula RMS (mesma lógica do analyzeVolume)
 		let sum = 0;
-		for (let i = 0; i < inputData.length; i++) {
-			sum += inputData[i] * inputData[i];
+		for (const sample of inputData) {
+			sum += sample * sample;
 		}
 		const rms = Math.sqrt(sum / inputData.length);
 
@@ -29,8 +29,6 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 
 		// Se volume acima do threshold, processa e envia PCM16
 		if (rms > this.thresholdRms) {
-			console.log(`🔊 Volume: RMS=${rms.toFixed(4)} | dB=${db.toFixed(1)} | Percent=${percent.toFixed(1)}%`);
-
 			const pcm16 = new Int16Array(inputData.length);
 			for (let i = 0; i < inputData.length; i++) {
 				const s = Math.max(-1, Math.min(1, inputData[i]));
@@ -53,6 +51,7 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 			percent: percent,
 		});
 
+		// Sempre retorna true para continuar processando (obrigatório para AudioWorklet).
 		return true; // Continua processando
 	}
 }
