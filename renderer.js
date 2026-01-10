@@ -154,6 +154,7 @@ let outputVolumeAnimationId = null;
 
 /* 🧠 PERGUNTAS */
 let currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
+let lastInterimText = ''; // 🔥 NOVO: Para armazenar o último interim para consolidação
 let questionsHistory = [];
 const answeredQuestions = new Set(); // 🔒 Armazena respostas já geradas (questionId -> true)
 let selectedQuestionId = null;
@@ -222,6 +223,15 @@ function onUIChange(eventName, callback) {
 
 // Função para emitir/enviar eventos para config-manager
 function emitUIChange(eventName, data) {
+	// 🔥 Intercepta onUpdateInterim para atualizar lastInterimText
+	if (eventName === 'onUpdateInterim') {
+		lastInterimText = data.text || '';
+	}
+	// 🔥 Intercepta onClearInterim para limpar lastInterimText
+	if (eventName === 'onClearInterim') {
+		lastInterimText = '';
+	}
+
 	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
 		UICallbacks[eventName](data);
 	} else {
@@ -648,8 +658,18 @@ function autoAskGptIfReady() {
 
 	const text = currentQuestion.text.trim();
 
-	// Verifica se é lixo
-	if (isGarbageSentence(text)) {
+	// 🔥 NOVO: Concatena último interim se existir
+	if (lastInterimText.trim()) {
+		currentQuestion.text += ' ' + lastInterimText.trim();
+		console.log(`🔗 autoAskGptIfReady: Concatenando interim ao CURRENT: "${lastInterimText.trim()}"`);
+		renderCurrentQuestion(); // Atualiza display
+		// Limpa interim após usar
+		lastInterimText = '';
+		emitUIChange('onClearInterim', { id: 'deepgram-interim-output' }); // Limpa DOM
+	}
+
+	// Verifica se é lixo (agora com interim concatenado)
+	if (isGarbageSentence(currentQuestion.text.trim())) {
 		console.log('❌ autoAskGptIfReady: pergunta é lixo, abortando');
 		return;
 	}

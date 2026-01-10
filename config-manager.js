@@ -5,7 +5,7 @@
 
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
 const _getIpcRenderer = () => {
-	if (typeof globalThis !== 'undefined' && globalThis.electron && globalThis.electron.ipcRenderer) {
+	if (globalThis?.electron?.ipcRenderer) {
 		return globalThis.electron.ipcRenderer;
 	}
 	if (typeof require === 'function') {
@@ -23,7 +23,6 @@ class ConfigManager {
 		debugLogConfig('Início da função: "constructor"');
 		this.config = this.loadConfig();
 		this.initEventListeners();
-		this.checkApiKeysStatus();
 
 		debugLogConfig('Fim da função: "constructor"');
 	}
@@ -311,13 +310,7 @@ class ConfigManager {
 							});
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
-							setTimeout(() => {
-								if (globalThis.RendererAPI?.startInputVolumeMonitoring) {
-									globalThis.RendererAPI.startInputVolumeMonitoring().catch(err => {
-										console.error('❌ Erro ao reiniciar monitoramento input:', err);
-									});
-								}
-							}, 150);
+							this.restartInputMonitoring();
 						}
 					} else if (input.id === 'audio-output-device') {
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
@@ -327,13 +320,7 @@ class ConfigManager {
 							});
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
-							setTimeout(() => {
-								if (globalThis.RendererAPI?.startOutputVolumeMonitoring) {
-									globalThis.RendererAPI.startOutputVolumeMonitoring().catch(err => {
-										console.error('❌ Erro ao reiniciar monitoramento output:', err);
-									});
-								}
-							}, 150);
+							this.restartOutputMonitoring();
 						}
 					}
 				});
@@ -349,6 +336,59 @@ class ConfigManager {
 		console.log('✅ Listeners de eventos inicializados');
 
 		debugLogConfig('Fim da função: "initEventListeners"');
+	}
+
+	// Helper to restart input monitoring
+	restartInputMonitoring() {
+		setTimeout(() => {
+			if (globalThis.RendererAPI?.startInputVolumeMonitoring) {
+				globalThis.RendererAPI.startInputVolumeMonitoring().catch(err => {
+					console.error('❌ Erro ao reiniciar monitoramento input:', err);
+				});
+			}
+		}, 150);
+	}
+
+	// Helper to restart output monitoring
+	restartOutputMonitoring() {
+		setTimeout(() => {
+			if (globalThis.RendererAPI?.startOutputVolumeMonitoring) {
+				globalThis.RendererAPI.startOutputVolumeMonitoring().catch(err => {
+					console.error('❌ Erro ao reiniciar monitoramento output:', err);
+				});
+			}
+		}, 150);
+	}
+
+	// Helper to find target placeholder
+	findTargetPlaceholder(data, transcriptionBox) {
+		const { placeholderId } = data;
+		let targetPlaceholder = null;
+
+		if (placeholderId) {
+			// Buscar placeholder pelo ID
+			targetPlaceholder = document.getElementById(placeholderId);
+			if (targetPlaceholder) {
+				console.log('✅ Placeholder encontrado por ID:', placeholderId);
+			} else {
+				console.warn('⚠️ Placeholder com ID não encontrado:', placeholderId);
+				// Fallback: busca pelo selector de data-is-placeholder
+				const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+				if (placeholders.length > 0) {
+					targetPlaceholder = placeholders[placeholders.length - 1];
+					console.log('📍 Usando FALLBACK: último placeholder');
+				}
+			}
+		} else {
+			// Sem ID (compatibilidade), usa o último
+			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+			if (placeholders.length > 0) {
+				targetPlaceholder = placeholders[placeholders.length - 1];
+				console.log('📍 ID não fornecido, usando último placeholder');
+			}
+		}
+
+		return targetPlaceholder;
 	}
 
 	// 🔥 NOVO: Verifica status das API keys de todos os providers
@@ -466,7 +506,7 @@ class ConfigManager {
 				this.updateApiKeyFieldStatus(provider, false);
 
 				// 🔥 NOVO: Se o modelo estava ativo, desativa automaticamente
-				if (this.config.api[provider] && this.config.api[provider].enabled === true) {
+				if (this.config.api[provider]?.enabled === true) {
 					console.log(`🔴 Desativando modelo ${provider} pois sua chave foi removida`);
 					this.config.api[provider].enabled = false;
 					this.config.api.activeProvider = null; // Limpa provider ativo
@@ -898,7 +938,7 @@ class ConfigManager {
 			// 🔥 NOVO: Processa API key primeiro (se houver)
 			const apiKeyInput = sectionElement.querySelector('.api-key-input');
 
-			if (apiKeyInput && apiKeyInput.id) {
+			if (apiKeyInput?.id) {
 				const provider = section; // 'openai', 'google', etc.
 				const apiKey = apiKeyInput.value; // 🔥 Pega valor completo
 
@@ -1098,22 +1138,26 @@ class ConfigManager {
 			const file = e.target.files[0];
 			if (!file) return;
 
-			const reader = new FileReader();
-			reader.onload = event => {
-				try {
-					const importedConfig = JSON.parse(event.target.result);
-					this.config = { ...this.config, ...importedConfig };
-					this.saveConfig();
-					this.showSaveFeedback();
+			file
+				.text()
+				.then(text => {
+					try {
+						const importedConfig = JSON.parse(text);
+						this.config = { ...this.config, ...importedConfig };
+						this.saveConfig();
+						this.showSaveFeedback();
 
-					// Recarrega a página para aplicar as configurações
-					setTimeout(() => location.reload(), 1500);
-				} catch (error) {
-					console.error('Erro ao fazer parse do arquivo de configurações:', error);
-					this.showError('Erro ao importar configurações: arquivo inválido');
-				}
-			};
-			reader.readAsText(file);
+						// Recarrega a página para aplicar as configurações
+						setTimeout(() => location.reload(), 1500);
+					} catch (error) {
+						console.error('Erro ao fazer parse do arquivo de configurações:', error);
+						this.showError('Erro ao importar configurações: arquivo inválido');
+					}
+				})
+				.catch(error => {
+					console.error('Erro ao ler arquivo:', error);
+					this.showError('Erro ao ler arquivo de configurações');
+				});
 		};
 
 		input.click();
@@ -1190,7 +1234,7 @@ class ConfigManager {
 
 	// Retorna configuração específica
 	get(keyPath) {
-		return keyPath.split('.').reduce((o, k) => o && o[k], this.config);
+		return keyPath.split('.').reduce((o, k) => o?.[k], this.config);
 	}
 
 	// Define configuração específica
@@ -1366,7 +1410,7 @@ class ConfigManager {
 			// Faz scroll no container pai que tem overflow-y: auto
 			requestAnimationFrame(() => {
 				const container = transcriptionBox.parentElement;
-				if (container && container.id === 'transcriptionContainer') {
+				if (container?.id === 'transcriptionContainer') {
 					container.scrollTop = container.scrollHeight;
 					console.log('📜 Auto-scroll para última transcrição', {
 						scrollTop: container.scrollTop,
@@ -1653,30 +1697,7 @@ class ConfigManager {
 			}
 
 			// 🔥 USAR ID DO PLACEHOLDER AO INVÉS DE SELECIONAR O ÚLTIMO
-			let targetPlaceholder = null;
-
-			if (placeholderId) {
-				// Buscar placeholder pelo ID
-				targetPlaceholder = document.getElementById(placeholderId);
-				if (targetPlaceholder) {
-					console.log('✅ Placeholder encontrado por ID:', placeholderId);
-				} else {
-					console.warn('⚠️ Placeholder com ID não encontrado:', placeholderId);
-					// Fallback: busca pelo selector de data-is-placeholder
-					const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
-					if (placeholders.length > 0) {
-						targetPlaceholder = placeholders[placeholders.length - 1];
-						console.log('📍 Usando FALLBACK: último placeholder');
-					}
-				}
-			} else {
-				// Sem ID (compatibilidade), usa o último
-				const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
-				if (placeholders.length > 0) {
-					targetPlaceholder = placeholders[placeholders.length - 1];
-					console.log('📍 ID não fornecido, usando último placeholder');
-				}
-			}
+			let targetPlaceholder = this.findTargetPlaceholder(data, transcriptionBox);
 
 			if (!targetPlaceholder) {
 				console.warn('⚠️ Nenhum placeholder encontrado para atualizar');
@@ -1949,7 +1970,7 @@ class ConfigManager {
 			// 🔥 NOVO: Sincronizar toggle com APP_CONFIG inicial (MODE_DEBUG)
 			// Faz DEPOIS de registrar o listener para disparar o evento se necessário
 			const currentConfig = globalThis.RendererAPI?.getAppConfig?.();
-			if (currentConfig && currentConfig.MODE_DEBUG) {
+			if (currentConfig?.MODE_DEBUG) {
 				mockToggle.checked = true;
 				// Dispara o evento change para REALMENTE ativar o modo debug
 				mockToggle.dispatchEvent(new Event('change', { bubbles: true }));
@@ -2083,7 +2104,7 @@ class ConfigManager {
 
 					// não sei se precisa disso
 					setTimeout(() => {
-						if (statusText && statusText.innerText.includes('API key configurada')) {
+						if (statusText?.innerText.includes('API key configurada')) {
 							const listenBtn = document.getElementById('listenBtn');
 							const isRunning = listenBtn?.innerText === 'Stop';
 							statusText.innerText = isRunning ? 'Status: ouvindo...' : 'Status: parado';
@@ -2168,7 +2189,7 @@ class ConfigManager {
 		debugLogConfig('Início da função: "registerErrorHandlers"');
 		globalThis.addEventListener('error', e => {
 			globalThis.RendererAPI.sendRendererError({
-				message: String(e.message || e),
+				message: e.message ? e.message : String(e),
 				stack: e.error?.stack || null,
 			});
 		});

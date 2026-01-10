@@ -27,6 +27,9 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 		const db = 20 * Math.log10(rms || 1e-8);
 		const percent = Math.max(0, Math.min(100, ((db - -60) / -(-60)) * 100));
 
+		// 🔥 LOG: Sempre loga RMS e threshold para debug
+		//console.log(`🔊 RMS: ${rms.toFixed(6)}, Threshold: ${this.thresholdRms}, Enviando: ${rms > this.thresholdRms}`);
+
 		// Se volume acima do threshold, processa e envia PCM16
 		if (rms > this.thresholdRms) {
 			const pcm16 = new Int16Array(inputData.length);
@@ -51,7 +54,8 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 			percent: percent,
 		});
 
-		// Sempre retorna true para continuar processando (obrigatório para AudioWorklet).
+		// Sempre retorna true para continuar processando (obrigatório para AudioWorkletProcessor).
+		// Nota: Esta função sempre retorna o mesmo valor por design, para manter o processamento contínuo.
 		return true; // Continua processando
 	}
 }
