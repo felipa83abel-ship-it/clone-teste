@@ -207,6 +207,8 @@ const UICallbacks = {
 	onAnswerStreamEnd: null,
 	onPlaceholderFulfill: null,
 	onPlaceholderUpdate: null,
+	onUpdateInterim: null,
+	onClearInterim: null,
 	onScreenshotBadgeUpdate: null,
 };
 

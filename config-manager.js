@@ -1785,6 +1785,37 @@ class ConfigManager {
 			// mantém data-is-placeholder até receber onPlaceholderFulfill
 		});
 
+		// Update Interim (atualização em tempo real para transcrições interims)
+		globalThis.RendererAPI.onUIChange('onUpdateInterim', data => {
+			const { id, speaker, text } = data;
+
+			let interimElement = document.getElementById(id);
+			if (!interimElement) {
+				// Cria o elemento se não existir
+				interimElement = document.createElement('div');
+				interimElement.id = id;
+				interimElement.className = 'transcript-item interim';
+				interimElement.style.color = '#888'; // Cor para indicar interim
+				const transcriptionBox = document.getElementById('conversation');
+				if (transcriptionBox) {
+					transcriptionBox.appendChild(interimElement);
+				}
+			}
+
+			// Atualiza o texto
+			const ts = new Date().toLocaleTimeString();
+			interimElement.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+		});
+
+		// Clear Interim (remove o elemento interim quando finalizado)
+		globalThis.RendererAPI.onUIChange('onClearInterim', data => {
+			const { id } = data;
+			const interimElement = document.getElementById(id);
+			if (interimElement) {
+				interimElement.remove();
+			}
+		});
+
 		// Clear Transcription
 		globalThis.RendererAPI.onUIChange('onTranscriptionCleared', () => {
 			const transcriptionBox = document.getElementById('conversation');
