@@ -237,9 +237,6 @@ function onUIChange(eventName, callback) {
 
 // Função para emitir/enviar eventos para config-manager
 function emitUIChange(eventName, data) {
-	// 🔥 REMOVIDO: Interceptação de onUpdateInterim/onClearInterim
-	// Os interims agora são processados diretamente pelo handleCurrentQuestion
-
 	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
 		UICallbacks[eventName](data);
 	} else {
@@ -1014,20 +1011,20 @@ async function startAudio() {
 	console.log(`🎤 startAudio: Modelo STT = ${sttModel}`);
 
 	try {
-		// 🔥 Inicia servidor Whisper se necessário
-		if (sttModel === 'whisper-cpp-local') {
-			const serverStarted = await ipcRenderer.invoke('start-whisper-server');
-			if (serverStarted) {
-				console.log('✅ Servidor Whisper.cpp iniciado');
-			}
-		}
-
 		// 🔥 ROTEAMENTO: Por modelo STT
 		if (sttModel === 'deepgram') {
-			console.log('🌊 Rotando para startAudioDeepgram');
+			console.log('🌊 Roteando para startAudioDeepgram');
 			await startAudioDeepgram(UIElements);
 		} else {
-			console.log('🎤 Rotando para startInputOutput (Vosk/OpenAI)');
+			// 🔥 Inicia servidor Whisper se necessário
+			if (sttModel === 'whisper-cpp-local') {
+				const serverStarted = await ipcRenderer.invoke('start-whisper-server');
+				if (serverStarted) {
+					console.log('✅ Servidor Whisper.cpp iniciado');
+				}
+			}
+
+			console.log('🎤 Roteando para startInputOutput (Vosk/OpenAI)');
 			await startInputOutput();
 		}
 	} catch (error) {
@@ -4208,46 +4205,5 @@ async function runMockAutoPlay() {
 	console.log('✅ Mock autoplay finalizado');
 	mockAutoPlayActive = false;
 }
-
-// 🔥 Listener para eventos de transcrição dos modelos (padrão desacoplado)
-window.transcriptionEvents.addEventListener('transcription', event => {
-	const { model, source, text, isFinal, confidence, timestamp } = event.detail;
-
-	console.log(`📥 Evento 'transcription' recebido de ${model}:`, { source, text, isFinal });
-
-	// 🔥 Lógica de processamento compartilhada
-	if (source === 'output') {
-		if (isFinal) {
-			// Para finais: consolidar no currentQuestion e adicionar à conversa
-			const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
-			if (cleaned.length >= 3) {
-				currentQuestion.finalText = cleaned;
-				currentQuestion.interimText = '';
-				currentQuestion.text = cleaned;
-				currentQuestion.lastUpdateTime = Date.now();
-				currentQuestion.lastUpdate = Date.now();
-				addTranscript(OTHER, cleaned, Date.now());
-				emitUIChange('onUpdateInterim', { id: 'deepgram-interim-output', speaker: OTHER, text: cleaned });
-			}
-		} else {
-			// Para interims: atualizar UI diretamente
-			emitUIChange('onUpdateInterim', { id: 'deepgram-interim-output', speaker: OTHER, text: text });
-			// Atualizar timestamp para resetar timer
-			currentQuestion.lastUpdateTime = Date.now();
-			currentQuestion.lastUpdate = Date.now();
-		}
-
-		// 🔥 Inicia timer de auto-close/auto-ask
-		if (autoCloseQuestionTimer) clearTimeout(autoCloseQuestionTimer);
-		autoCloseQuestionTimer = setTimeout(() => {
-			console.log('⏰ AUTO_CLOSE_QUESTION_TIMEOUT disparado (900ms)');
-			autoAskGptIfReady();
-		}, AUTO_CLOSE_QUESTION_TIMEOUT);
-	} else if (source === 'input') {
-		// Para input, manter handleSpeech (ou adaptar se necessário)
-		const author = YOU;
-		handleSpeech(author, text);
-	}
-});
 
 //console.log('🚀 Entrou no renderer.js');

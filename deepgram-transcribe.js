@@ -39,10 +39,6 @@ let deepgramOutputAudioContext = null;
 let deepgramOutputStream = null;
 let deepgramOutputProcessor = null;
 
-// Estado simplificado para interims atuais
-let deepgramCurrentInterimInput = null; // Texto atual do interim input
-let deepgramCurrentInterimOutput = null; // Texto atual do interim output
-
 // Timestamps para sincronizar com padrão de outros modelos
 let deepgramInputStartAt = null;
 let deepgramInputStopAt = null;
@@ -109,6 +105,7 @@ async function initDeepgramWS(source = 'input') {
 		ws.onmessage = event => {
 			console.log('💬 Mensagem Deepgram OUTPUT recebida (tamanho:', event.data.length, 'bytes)');
 			try {
+				// Recepção e Processamento de Transcrições
 				const data = JSON.parse(event.data);
 				handleDeepgramMessage(data, source);
 			} catch (e) {
@@ -216,11 +213,12 @@ async function startDeepgramInput(UIElements) {
 
 		// Inicializa WebSocket usando função genérica
 		const ws = await initDeepgramWS('input');
+
+		// Define flags globais
 		deepgramInputWebSocket = ws;
 		isDeepgramInputActive = true;
 		deepgramInputStartAt = Date.now();
 		deepgramInputStopAt = null;
-		deepgramCurrentInterimInput = null; // Inicializar interim
 
 		// Solicita acesso ao dispositivo INPUT selecionado
 		console.log('🎤 Solicitando acesso à entrada de áudio (Microfone)...');
@@ -287,20 +285,16 @@ async function startDeepgramOutput(UIElements) {
 		// Obtém o dispositivo OUTPUT selecionado no UI (busca diretamente no DOM)
 		const outputDeviceId = UIElements.outputSelect?.value;
 
-		if (!outputDeviceId) {
-			console.warn('⚠️ Nenhum dispositivo OUTPUT selecionado. Pulando captura OUTPUT.');
-			return;
-		}
-
 		console.log(`🔊 Iniciando captura OUTPUT com dispositivo: ${outputDeviceId}`);
 
 		// Inicializa WebSocket usando função genérica
 		const ws = await initDeepgramWS('output');
+
+		// Define flags globais
 		deepgramOutputWebSocket = ws;
 		isDeepgramOutputActive = true;
 		deepgramOutputStartAt = Date.now();
 		deepgramOutputStopAt = null;
-		deepgramCurrentInterimOutput = null; // Inicializar interim
 
 		// Solicita acesso ao dispositivo OUTPUT selecionado
 		console.log('🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)...');
@@ -315,10 +309,10 @@ async function startDeepgramOutput(UIElements) {
 		deepgramOutputAudioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
 			sampleRate: 16000,
 		});
-
 		// Carrega o AudioWorklet
 		await deepgramOutputAudioContext.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
 
+		// Cria MediaStreamSource a partir do stream capturado
 		const source = deepgramOutputAudioContext.createMediaStreamSource(deepgramOutputStream);
 
 		// Cria AudioWorkletNode em vez de ScriptProcessor
@@ -331,12 +325,6 @@ async function startDeepgramOutput(UIElements) {
 		deepgramOutputProcessor.port.onmessage = event => {
 			const { type, pcm16, percent } = event.data;
 			if (type === 'audioData' && deepgramOutputWebSocket?.readyState === WebSocket.OPEN) {
-				// console.log(
-				// 	`📤 Enviando áudio OUTPUT para Deepgram (${pcm16.byteLength} bytes) - ${new Date().toLocaleTimeString(
-				// 		'pt-BR',
-				// 	)}`,
-				// );
-
 				// Envia PCM16 via WebSocket
 				deepgramOutputWebSocket.send(pcm16);
 			} else if (type === 'volumeUpdate') {
@@ -383,8 +371,6 @@ const deepgramVars = {
 		setWs: val => (deepgramInputWebSocket = val),
 		isActive: () => isDeepgramInputActive,
 		setActive: val => (isDeepgramInputActive = val),
-		currentInterim: () => deepgramCurrentInterimInput,
-		setCurrentInterim: val => (deepgramCurrentInterimInput = val),
 		processor: () => deepgramInputProcessor,
 		setProcessor: val => (deepgramInputProcessor = val),
 		stream: () => deepgramInputStream,
@@ -397,8 +383,6 @@ const deepgramVars = {
 		setWs: val => (deepgramOutputWebSocket = val),
 		isActive: () => isDeepgramOutputActive,
 		setActive: val => (isDeepgramOutputActive = val),
-		currentInterim: () => deepgramCurrentInterimOutput,
-		setCurrentInterim: val => (deepgramCurrentInterimOutput = val),
 		processor: () => deepgramOutputProcessor,
 		setProcessor: val => (deepgramOutputProcessor = val),
 		stream: () => deepgramOutputStream,
@@ -445,9 +429,6 @@ function stopDeepgram(source) {
 		vars.setWs(null);
 	}
 
-	// Limpar interims
-	vars.setCurrentInterim(null);
-
 	// Limpar elemento interim no UI
 	const interimId = source === 'input' ? 'deepgram-interim-input' : 'deepgram-interim-output';
 	if (globalThis.RendererAPI?.emitUIChange) {
@@ -487,6 +468,7 @@ function stopAllDeepgram() {
    PROCESSAMENTO DE MENSAGENS
 ================================ */
 
+// Processa mensagens finais do Deepgram (transcrições completas)
 function handleFinalDeepgramMessage(transcript, confidence, source) {
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
@@ -538,34 +520,6 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 		});
 	}
 
-	// Atualizar estado
-	if (isInput) {
-		// 🔥 Para INPUT, emitir evento 'transcription'
-		window.transcriptionEvents.dispatchEvent(
-			new CustomEvent('transcription', {
-				detail: {
-					model: 'deepgram',
-					source: 'input',
-					text: transcript,
-					isFinal: true,
-					confidence: confidence,
-					timestamp: Date.now(),
-				},
-			}),
-		);
-
-		// Resetar interim atual
-		deepgramCurrentInterimInput = null;
-	} else {
-		// 🔥 Para OUTPUT, NÃO dispara evento 'transcription'
-		// porque onTranscriptAdd + onPlaceholderFulfill já adicionaram no UI.
-		// Se disparar aqui, vai duplicar a transcrição (renderer.js:4216 chama addTranscript novamente)
-		console.log('✅ OUTPUT final processado via onTranscriptAdd/onPlaceholderFulfill (sem evento duplicado)');
-
-		// Resetar interim atual
-		deepgramCurrentInterimOutput = null;
-	}
-
 	// Limpar elemento interim no UI
 	const interimId = isInput ? 'deepgram-interim-input' : 'deepgram-interim-output';
 	if (globalThis.RendererAPI?.emitUIChange) {
@@ -585,40 +539,23 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 	}
 }
 
+// Processa mensagens interim do Deepgram (transcrições parciais)
 function handleInterimDeepgramMessage(transcript, source) {
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
 
 	console.log(`🟡 INTERIM [${source}]: "${transcript}"`);
 
+	// Define ID do elemento interim
 	const interimId = isInput ? 'deepgram-interim-input' : 'deepgram-interim-output';
 
+	// Emitir atualização de interim via RendererAPI
 	if (globalThis.RendererAPI?.emitUIChange) {
 		globalThis.RendererAPI.emitUIChange('onUpdateInterim', {
 			id: interimId,
 			speaker: author,
 			text: transcript,
 		});
-	}
-
-	// Atualizar estado
-	if (isInput) {
-		deepgramCurrentInterimInput = transcript;
-	} else {
-		deepgramCurrentInterimOutput = transcript;
-
-		// 🔥 Para OUTPUT, emitir evento 'transcription' para interim
-		window.transcriptionEvents.dispatchEvent(
-			new CustomEvent('transcription', {
-				detail: {
-					model: 'deepgram',
-					source: 'output',
-					text: transcript,
-					isFinal: false,
-					timestamp: Date.now(),
-				},
-			}),
-		);
 	}
 }
 
