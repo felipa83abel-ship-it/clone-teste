@@ -541,31 +541,35 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 	// Atualizar estado
 	if (isInput) {
 		// 🔥 Para INPUT, emitir evento 'transcription'
-		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-			detail: {
-				model: 'deepgram',
-				source: 'input',
-				text: transcript,
-				isFinal: true,
-				confidence: confidence,
-				timestamp: Date.now()
-			}
-		}));
+		window.transcriptionEvents.dispatchEvent(
+			new CustomEvent('transcription', {
+				detail: {
+					model: 'deepgram',
+					source: 'input',
+					text: transcript,
+					isFinal: true,
+					confidence: confidence,
+					timestamp: Date.now(),
+				},
+			}),
+		);
 
 		// Resetar interim atual
 		deepgramCurrentInterimInput = null;
 	} else {
 		// 🔥 Para OUTPUT, emitir evento 'transcription'
-		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-			detail: {
-				model: 'deepgram',
-				source: 'output',
-				text: transcript,
-				isFinal: true,
-				confidence: confidence,
-				timestamp: Date.now()
-			}
-		}));
+		window.transcriptionEvents.dispatchEvent(
+			new CustomEvent('transcription', {
+				detail: {
+					model: 'deepgram',
+					source: 'output',
+					text: transcript,
+					isFinal: true,
+					confidence: confidence,
+					timestamp: Date.now(),
+				},
+			}),
+		);
 
 		// Resetar interim atual
 		deepgramCurrentInterimOutput = null;
@@ -613,15 +617,17 @@ function handleInterimDeepgramMessage(transcript, source) {
 		deepgramCurrentInterimOutput = transcript;
 
 		// 🔥 Para OUTPUT, emitir evento 'transcription' para interim
-		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-			detail: {
-				model: 'deepgram',
-				source: 'output',
-				text: transcript,
-				isFinal: false,
-				timestamp: Date.now()
-			}
-		}));
+		window.transcriptionEvents.dispatchEvent(
+			new CustomEvent('transcription', {
+				detail: {
+					model: 'deepgram',
+					source: 'output',
+					text: transcript,
+					isFinal: false,
+					timestamp: Date.now(),
+				},
+			}),
+		);
 	}
 }
 

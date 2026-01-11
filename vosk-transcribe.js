@@ -56,15 +56,17 @@ async function transcribeVoskComplete(buffer, source) {
 		console.log(`📝 Resultado (${transcribedText.length} chars): "${transcribedText.substring(0, 80)}..."`);
 
 		// 🔥 Emitir evento 'transcription'
-		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-			detail: {
-				model: 'vosk-local',
-				source: source,
-				text: transcribedText,
-				isFinal: true,
-				timestamp: Date.now()
-			}
-		}));
+		window.transcriptionEvents.dispatchEvent(
+			new CustomEvent('transcription', {
+				detail: {
+					model: 'vosk-local',
+					source: source,
+					text: transcribedText,
+					isFinal: true,
+					timestamp: Date.now(),
+				},
+			}),
+		);
 
 		return transcribedText;
 	} catch (error) {

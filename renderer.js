@@ -237,16 +237,10 @@ function onUIChange(eventName, callback) {
 
 // Função para emitir/enviar eventos para config-manager
 function emitUIChange(eventName, data) {
-	// 🔥 Intercepta onUpdateInterim para atualizar lastInterimText
-	if (eventName === 'onUpdateInterim') {
-		lastInterimText = data.text || '';
-	}
-	// 🔥 Intercepta onClearInterim para limpar lastInterimText
-	if (eventName === 'onClearInterim') {
-		lastInterimText = '';
-	}
+	// 🔥 REMOVIDO: Interceptação de onUpdateInterim/onClearInterim
+	// Os interims agora são processados diretamente pelo handleCurrentQuestion
 
-	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
+	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === ' function') {
 		UICallbacks[eventName](data);
 	} else {
 		console.warn(`⚠️ DEBUG: Nenhum callback registrado para '${eventName}'`);
@@ -688,17 +682,10 @@ function autoAskGptIfReady() {
 
 	const text = currentQuestion.text.trim();
 
-	// 🔥 NOVO: Concatena último interim se existir
-	if (lastInterimText.trim()) {
-		currentQuestion.text += ' ' + lastInterimText.trim();
-		console.log(`🔗 autoAskGptIfReady: Concatenando interim ao CURRENT: "${lastInterimText.trim()}"`);
-		renderCurrentQuestion(); // Atualiza display
-		// Limpa interim após usar
-		lastInterimText = '';
-		emitUIChange('onClearInterim', { id: 'deepgram-interim-output' }); // Limpa DOM
-	}
+	// 🔥 REMOVIDO: Lógica duplicada de concatenação de interim
+	// O currentQuestion.text já inclui interimText através de handleCurrentQuestion
 
-	// Verifica se é lixo (agora com interim concatenado)
+	// Verifica se é lixo
 	if (isGarbageSentence(currentQuestion.text.trim())) {
 		console.log('❌ autoAskGptIfReady: pergunta é lixo, abortando');
 		return;
@@ -2597,8 +2584,8 @@ function handleCurrentQuestion(author, text, options = {}) {
 			// Para interims: substituir o interim atual
 			currentQuestion.interimText = cleaned;
 		} else {
-			// Para finais: adicionar o final ao acumulado e limpar interim
-			currentQuestion.finalText += (currentQuestion.finalText ? ' ' : '') + cleaned;
+			// Para finais: substituir completamente o finalText e limpar interim
+			currentQuestion.finalText = cleaned;
 			currentQuestion.interimText = '';
 		}
 
@@ -4223,7 +4210,7 @@ async function runMockAutoPlay() {
 }
 
 // 🔥 Listener para eventos de transcrição dos modelos (padrão desacoplado)
-window.transcriptionEvents.addEventListener('transcription', (event) => {
+window.transcriptionEvents.addEventListener('transcription', event => {
 	const { model, source, text, isFinal, confidence, timestamp } = event.detail;
 
 	console.log(`📥 Evento 'transcription' recebido de ${model}:`, { source, text, isFinal });
@@ -4240,9 +4227,8 @@ window.transcriptionEvents.addEventListener('transcription', (event) => {
 	}
 
 	// 🔥 Emitir evento para UI se necessário (ex.: para interims visuais)
-	if (!isFinal) {
-		emitUIChange('onUpdateInterim', { id: `${model}-interim-${source}`, speaker: source === 'input' ? YOU : OTHER, text });
-	}
+	// 🔥 REMOVIDO: onUpdateInterim não é mais necessário
+	// Os interims são processados diretamente pelo handleCurrentQuestion
 });
 
 //console.log('🚀 Entrou no renderer.js');

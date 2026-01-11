@@ -43,15 +43,17 @@ async function transcribeWhisperComplete(buffer, source) {
 			console.log(`📝 Resultado (${result.length} chars): "${result.substring(0, 80)}..."`);
 
 			// 🔥 Emitir evento 'transcription'
-			window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-				detail: {
-					model: 'whisper-cpp-local',
-					source: source,
-					text: result,
-					isFinal: true,
-					timestamp: Date.now()
-				}
-			}));
+			window.transcriptionEvents.dispatchEvent(
+				new CustomEvent('transcription', {
+					detail: {
+						model: 'whisper-cpp-local',
+						source: source,
+						text: result,
+						isFinal: true,
+						timestamp: Date.now(),
+					},
+				}),
+			);
 
 			return result;
 		} catch (error) {
@@ -67,15 +69,17 @@ async function transcribeWhisperComplete(buffer, source) {
 			console.log(`✅ Whisper-1 concluído em ${endTime - startTime}ms`);
 
 			// 🔥 Emitir evento 'transcription'
-			window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-				detail: {
-					model: 'whisper-1',
-					source: source,
-					text: result,
-					isFinal: true,
-					timestamp: Date.now()
-				}
-			}));
+			window.transcriptionEvents.dispatchEvent(
+				new CustomEvent('transcription', {
+					detail: {
+						model: 'whisper-1',
+						source: source,
+						text: result,
+						isFinal: true,
+						timestamp: Date.now(),
+					},
+				}),
+			);
 
 			return result;
 		} catch (error) {
@@ -104,15 +108,17 @@ async function transcribeWhisperPartial(buffer, source) {
 			const result = await ipcRenderer.invoke('transcribe-audio-partial', buffer);
 
 			// 🔥 Emitir evento 'transcription' para parcial
-			window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
-				detail: {
-					model: 'whisper-1',
-					source: source,
-					text: result,
-					isFinal: false,
-					timestamp: Date.now()
-				}
-			}));
+			window.transcriptionEvents.dispatchEvent(
+				new CustomEvent('transcription', {
+					detail: {
+						model: 'whisper-1',
+						source: source,
+						text: result,
+						isFinal: false,
+						timestamp: Date.now(),
+					},
+				}),
+			);
 
 			return result;
 		} catch (error) {
