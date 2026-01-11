@@ -240,7 +240,7 @@ function emitUIChange(eventName, data) {
 	// 🔥 REMOVIDO: Interceptação de onUpdateInterim/onClearInterim
 	// Os interims agora são processados diretamente pelo handleCurrentQuestion
 
-	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === ' function') {
+	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
 		UICallbacks[eventName](data);
 	} else {
 		console.warn(`⚠️ DEBUG: Nenhum callback registrado para '${eventName}'`);
@@ -4217,18 +4217,37 @@ window.transcriptionEvents.addEventListener('transcription', event => {
 
 	// 🔥 Lógica de processamento compartilhada
 	if (source === 'output') {
-		// Para output, usar handleCurrentQuestion
-		const author = OTHER; // Constante global
-		handleCurrentQuestion(author, text, { isInterim: !isFinal, skipAddToUI: !isFinal });
+		if (isFinal) {
+			// Para finais: consolidar no currentQuestion e adicionar à conversa
+			const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
+			if (cleaned.length >= 3) {
+				currentQuestion.finalText = cleaned;
+				currentQuestion.interimText = '';
+				currentQuestion.text = cleaned;
+				currentQuestion.lastUpdateTime = Date.now();
+				currentQuestion.lastUpdate = Date.now();
+				addTranscript(OTHER, cleaned, Date.now());
+				emitUIChange('onUpdateInterim', { id: 'deepgram-interim-output', speaker: OTHER, text: cleaned });
+			}
+		} else {
+			// Para interims: atualizar UI diretamente
+			emitUIChange('onUpdateInterim', { id: 'deepgram-interim-output', speaker: OTHER, text: text });
+			// Atualizar timestamp para resetar timer
+			currentQuestion.lastUpdateTime = Date.now();
+			currentQuestion.lastUpdate = Date.now();
+		}
+
+		// 🔥 Inicia timer de auto-close/auto-ask
+		if (autoCloseQuestionTimer) clearTimeout(autoCloseQuestionTimer);
+		autoCloseQuestionTimer = setTimeout(() => {
+			console.log('⏰ AUTO_CLOSE_QUESTION_TIMEOUT disparado (900ms)');
+			autoAskGptIfReady();
+		}, AUTO_CLOSE_QUESTION_TIMEOUT);
 	} else if (source === 'input') {
 		// Para input, manter handleSpeech (ou adaptar se necessário)
 		const author = YOU;
 		handleSpeech(author, text);
 	}
-
-	// 🔥 Emitir evento para UI se necessário (ex.: para interims visuais)
-	// 🔥 REMOVIDO: onUpdateInterim não é mais necessário
-	// Os interims são processados diretamente pelo handleCurrentQuestion
 });
 
 //console.log('🚀 Entrou no renderer.js');

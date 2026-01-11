@@ -557,19 +557,10 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 		// Resetar interim atual
 		deepgramCurrentInterimInput = null;
 	} else {
-		// 🔥 Para OUTPUT, emitir evento 'transcription'
-		window.transcriptionEvents.dispatchEvent(
-			new CustomEvent('transcription', {
-				detail: {
-					model: 'deepgram',
-					source: 'output',
-					text: transcript,
-					isFinal: true,
-					confidence: confidence,
-					timestamp: Date.now(),
-				},
-			}),
-		);
+		// 🔥 Para OUTPUT, NÃO dispara evento 'transcription'
+		// porque onTranscriptAdd + onPlaceholderFulfill já adicionaram no UI.
+		// Se disparar aqui, vai duplicar a transcrição (renderer.js:4216 chama addTranscript novamente)
+		console.log('✅ OUTPUT final processado via onTranscriptAdd/onPlaceholderFulfill (sem evento duplicado)');
 
 		// Resetar interim atual
 		deepgramCurrentInterimOutput = null;
