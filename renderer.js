@@ -6,7 +6,7 @@ const { marked } = require('marked');
 const hljs = require('highlight.js');
 
 // 🌊 Transcrição Deepgram
-const { startAudioDeepgram, stopAudioDeepgram } = require('./deepgram-transcribe.js');
+const { startAudioDeepgram, stopAudioDeepgram, finalizePendingTranscription } = require('./deepgram-transcribe.js');
 
 // 🔥 Transcrição Whisper
 const { transcribeWhisperComplete, transcribeWhisperPartial } = require('./whisper-transcribe.js');
@@ -2600,6 +2600,10 @@ function handleCurrentQuestion(author, text, options = {}) {
 			if (currentQuestionSilenceTimer) clearTimeout(currentQuestionSilenceTimer);
 			currentQuestionSilenceTimer = setTimeout(() => {
 				console.log('⏰ CURRENT_QUESTION_SILENCE_TIMEOUT disparado: Finalizando pergunta por silêncio');
+
+				// 🔥 FINALIZA TRANSCRIÇÃO PENDENTE: Quando finalizamos por silêncio, força final da transcrição atual
+				finalizePendingTranscription(currentQuestion.interimText, OTHER);
+
 				finalizeCurrentQuestion();
 			}, CURRENT_QUESTION_SILENCE_TIMEOUT);
 		}

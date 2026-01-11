@@ -595,6 +595,40 @@ function handleDeepgramMessage(data, source = 'input') {
 	}
 }
 
+/**
+ * 🔥 finalizePendingTranscription - Força finalização de transcrição pendente quando pergunta é fechada por silêncio
+ * Simula um handleFinalDeepgramMessage para o texto atual
+ */
+function finalizePendingTranscription(transcript, author) {
+	console.log(`🔚 FINALIZANDO TRANSCRIÇÃO PENDENTE: "${transcript}" - "${author}"`);
+
+	const now = Date.now();
+	const startAt = now - 1000; // estimativa
+	const stopAt = now;
+
+	// Adiciona à transcrição como se fosse final
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
+			author: author,
+			text: transcript,
+			timestamp: now,
+			timeStr: new Date(now).toLocaleTimeString(),
+			startStr: new Date(startAt).toLocaleTimeString(),
+			stopStr: new Date(stopAt).toLocaleTimeString(),
+			elementId: 'conversation',
+			recordingDuration: 1,
+			latency: 0,
+			total: 1,
+		});
+	}
+
+	// Limpar interim
+	const interimId = 'deepgram-interim-output';
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
+	}
+}
+
 /* ================================
    EXPORTS (CommonJS)
 ================================ */
@@ -602,7 +636,9 @@ function handleDeepgramMessage(data, source = 'input') {
 // Nota: Em Electron com nodeIntegration: true, as funções
 // definidas aqui ficarão acessíveis no escopo global
 // Alternativa: module.exports para acesso via require()
+
 module.exports = {
 	startAudioDeepgram,
 	stopAudioDeepgram,
+	finalizePendingTranscription,
 };
