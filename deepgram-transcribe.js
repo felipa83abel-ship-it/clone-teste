@@ -469,7 +469,7 @@ function stopAllDeepgram() {
 ================================ */
 
 // Processa mensagens finais do Deepgram (transcrições completas)
-function handleFinalDeepgramMessage(transcript, confidence, source) {
+function handleFinalDeepgramMessage(transcript, confidence, source, speechFinal) {
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
 
@@ -526,9 +526,9 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
 	}
 
-	// Emite evento global onTranscriptionComplete para OUTPUT
-	if (source === 'output' && globalThis.emitSTTEvent) {
-		console.log('🌊 Deepgram OUTPUT: Emitindo evento onTranscriptionComplete');
+	// Emite evento global onTranscriptionComplete para OUTPUT apenas se speechFinal=true
+	if (!isInput && speechFinal && globalThis.emitSTTEvent) {
+		console.log('🌊 Deepgram OUTPUT: Emitindo evento onTranscriptionComplete (speechFinal=true)');
 		globalThis.emitSTTEvent('transcriptionComplete', {
 			text: transcript,
 			speaker: author,
@@ -536,6 +536,11 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 			model: 'deepgram',
 			confidence: confidence,
 		});
+	}
+
+	// 🔥 NOVO: Para OUTPUT, atualizar CURRENT com final
+	if (!isInput && globalThis.RendererAPI?.handleCurrentQuestion) {
+		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, { isInterim: false });
 	}
 }
 
@@ -556,6 +561,11 @@ function handleInterimDeepgramMessage(transcript, source) {
 			speaker: author,
 			text: transcript,
 		});
+	}
+
+	// 🔥 NOVO: Para OUTPUT, atualizar CURRENT com interim
+	if (!isInput && globalThis.RendererAPI?.handleCurrentQuestion) {
+		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, { isInterim: true });
 	}
 }
 
@@ -579,7 +589,7 @@ function handleDeepgramMessage(data, source = 'input') {
 	console.log(`🟡 isFinal: ${isFinal}, speechFinal: ${speechFinal}, transcript: "${transcript}"`);
 
 	if (isFinal) {
-		handleFinalDeepgramMessage(transcript, confidence, source);
+		handleFinalDeepgramMessage(transcript, confidence, source, speechFinal);
 	} else {
 		handleInterimDeepgramMessage(transcript, source);
 	}

@@ -73,6 +73,7 @@ const OTHER = 'Outros';
 
 const ENABLE_INTERVIEW_TIMING_DEBUG = true; // ← desligar depois = false
 const QUESTION_IDLE_TIMEOUT = 300; // Tempo de espera para a pergunta ser considerada inativa = 300
+const CURRENT_QUESTION_SILENCE_TIMEOUT = 1500; // 🔥 Tempo sem novos interims para considerar pergunta finalizada = 1500ms
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
 
 const INPUT_SPEECH_THRESHOLD = 20; // Valor limite (threshold) para detectar fala mais cedo = 20
@@ -178,6 +179,7 @@ let gptRequestedTurnId = null;
 let gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta foi realmente solicitada ao GPT
 let lastSentQuestionText = '';
 let autoCloseQuestionTimer = null;
+let currentQuestionSilenceTimer = null; // 🔥 Timer para detectar fim de fala no CURRENT
 let lastInputStartAt = null;
 let lastInputStopAt = null;
 let lastOutputStartAt = null;
@@ -575,15 +577,7 @@ function promoteCurrentToHistory(text) {
 	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
 	const prevSelected = selectedQuestionId;
 
-	currentQuestion = {
-		text: '',
-		lastUpdate: 0,
-		finalized: false,
-		lastUpdateTime: null,
-		createdAt: null,
-		finalText: '',
-		interimText: '',
-	};
+	resetCurrentQuestion();
 
 	if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
 		selectedQuestionId = CURRENT_QUESTION_ID;
@@ -2578,12 +2572,18 @@ function handleCurrentQuestion(author, text, options = {}) {
 
 		// Lógica de consolidação para evitar duplicações
 		if (options.isInterim) {
-			// Para interims: substituir o interim atual
+			// Para interims: substituir o interim atual (Deepgram envia versões progressivas)
 			currentQuestion.interimText = cleaned;
 		} else {
 			// Para finais: substituir completamente o finalText e limpar interim
 			currentQuestion.finalText = cleaned;
 			currentQuestion.interimText = '';
+
+			// 🔥 Limpar timer de silêncio pois já temos final
+			if (currentQuestionSilenceTimer) {
+				clearTimeout(currentQuestionSilenceTimer);
+				currentQuestionSilenceTimer = null;
+			}
 		}
 
 		// Atualizar o texto total
@@ -2595,6 +2595,15 @@ function handleCurrentQuestion(author, text, options = {}) {
 		currentQuestion.lastUpdateTime = now;
 		currentQuestion.lastUpdate = now;
 
+		// 🔥 TIMER DE SILÊNCIO PARA CURRENT: Reiniciar timer se for interim
+		if (options.isInterim) {
+			if (currentQuestionSilenceTimer) clearTimeout(currentQuestionSilenceTimer);
+			currentQuestionSilenceTimer = setTimeout(() => {
+				console.log('⏰ CURRENT_QUESTION_SILENCE_TIMEOUT disparado: Finalizando pergunta por silêncio');
+				finalizeCurrentQuestion();
+			}, CURRENT_QUESTION_SILENCE_TIMEOUT);
+		}
+
 		// 🟦 CURRENT vira seleção padrão ao receber fala
 		if (!selectedQuestionId) {
 			selectedQuestionId = CURRENT_QUESTION_ID;
@@ -2603,16 +2612,152 @@ function handleCurrentQuestion(author, text, options = {}) {
 
 		// 🔥 Adiciona à conversa visual em tempo real (sempre, para mostrar tudo)
 		console.log('💬 handleCurrentQuestion: Adicionando à conversa:', cleaned);
-		if (!options.skipAddToUI) {
-			addTranscript(OTHER, cleaned, now);
-		} else {
-			console.log('⚪ handleCurrentQuestion: addTranscript pulado por skipAddToUI');
-		}
 
 		renderCurrentQuestion();
 	}
 
 	debugLogRenderer('Fim da função: "handleCurrentQuestion"');
+}
+
+/* ===============================
+   RESET CURRENT QUESTION
+=============================== */
+
+function resetCurrentQuestion() {
+	debugLogRenderer('Início da função: "resetCurrentQuestion"');
+
+	currentQuestion = {
+		text: '',
+		lastUpdate: 0,
+		finalized: false,
+		lastUpdateTime: null,
+		createdAt: null,
+		finalText: '',
+		interimText: '',
+	};
+
+	// 🔥 Limpar timer de silêncio
+	if (currentQuestionSilenceTimer) {
+		clearTimeout(currentQuestionSilenceTimer);
+		currentQuestionSilenceTimer = null;
+	}
+
+	debugLogRenderer('Fim da função: "resetCurrentQuestion"');
+}
+
+/* ===============================
+   FINALIZAÇÃO DE PERGUNTAS POR SILÊNCIO (CURRENT TIMER)
+=============================== */
+
+/**
+ * 🔥 finalizeCurrentQuestion - Finaliza pergunta atual por timeout de silêncio
+ * Chamada quando não há novos interims por CURRENT_QUESTION_SILENCE_TIMEOUT
+ */
+function finalizeCurrentQuestion() {
+	debugLogRenderer('Início da função: "finalizeCurrentQuestion"');
+
+	// Limpar timer
+	if (currentQuestionSilenceTimer) {
+		clearTimeout(currentQuestionSilenceTimer);
+		currentQuestionSilenceTimer = null;
+	}
+
+	// Se não há texto, ignorar
+	if (!currentQuestion.text || !currentQuestion.text.trim()) {
+		console.log('⚠️ finalizeCurrentQuestion: Sem texto para finalizar');
+		return;
+	}
+
+	console.log('✅ finalizeCurrentQuestion: Finalizando pergunta por silêncio:', currentQuestion.text);
+
+	// 🔒 GUARDA ABSOLUTA: Se a pergunta já foi finalizada, NÃO faça nada.
+	if (currentQuestion.finalized) {
+		console.log('⛔ finalizeCurrentQuestion ignorado — pergunta já finalizada');
+		return;
+	}
+
+	// Trata perguntas incompletas
+	if (isIncompleteQuestion(currentQuestion.text)) {
+		// 🔥 No modo entrevista, ignorar incompleta e forçar finalização
+		if (ModeController.isInterviewMode()) {
+			console.log('⚠️ pergunta incompleta detectada, mas modo entrevista ativo — forçando finalização');
+		} else {
+			console.log('⚠️ pergunta incompleta detectada — promovendo ao histórico como incompleta:', currentQuestion.text);
+
+			const newId = String(questionsHistory.length + 1);
+			questionsHistory.push({
+				id: newId,
+				text: currentQuestion.text,
+				createdAt: currentQuestion.createdAt || Date.now(),
+				lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
+				incomplete: true,
+			});
+
+			selectedQuestionId = newId;
+			resetCurrentQuestion();
+			renderQuestionsHistory();
+			return;
+		}
+	}
+
+	// Verifica se parece uma pergunta
+	if (!looksLikeQuestion(currentQuestion.text)) {
+		// ⚠️ No modo entrevista, NÃO abortar o fechamento
+		if (ModeController.isInterviewMode()) {
+			console.log('⚠️ looksLikeQuestion=false, mas modo entrevista ativo — forçando fechamento');
+
+			currentQuestion.text = finalizeQuestion(currentQuestion.text);
+			currentQuestion.lastUpdateTime = Date.now();
+			currentQuestion.finalized = true;
+
+			// garante seleção lógica
+			selectedQuestionId = CURRENT_QUESTION_ID;
+
+			// chama GPT automaticamente se ainda não respondeu este turno
+			if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
+				console.log('➡️ finalizeCurrentQuestion (fallback) chamou askGpt', {
+					interviewTurnId,
+					gptRequestedTurnId,
+					gptAnsweredTurnId,
+				});
+				askGpt();
+			}
+			return;
+		}
+
+		// modo normal mantém comportamento atual
+		resetCurrentQuestion();
+		renderCurrentQuestion();
+		return;
+	}
+
+	// ✅ consolida a pergunta
+	currentQuestion.text = finalizeQuestion(currentQuestion.text);
+	currentQuestion.lastUpdateTime = Date.now();
+	currentQuestion.finalized = true;
+
+	// 🔥 COMPORTAMENTO POR MODO
+	if (ModeController.isInterviewMode()) {
+		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
+			selectedQuestionId = CURRENT_QUESTION_ID;
+
+			console.log('➡️ finalizeCurrentQuestion chamou askGpt (vou enviar para o GPT)', {
+				interviewTurnId,
+				gptRequestedTurnId,
+				gptAnsweredTurnId,
+			});
+
+			askGpt();
+		}
+	} else {
+		console.log('🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT');
+
+		promoteCurrentToHistory(currentQuestion.text);
+		resetCurrentQuestion();
+		renderCurrentQuestion();
+	}
+
+	debugLogRenderer('Fim da função: "finalizeCurrentQuestion"');
 }
 
 /* ===============================
@@ -3584,6 +3729,7 @@ const RendererAPI = {
 	getMode: () => CURRENT_MODE,
 
 	// Questions
+	handleCurrentQuestion,
 	handleQuestionClick,
 	closeCurrentQuestion,
 
@@ -3864,13 +4010,7 @@ document.addEventListener('DOMContentLoaded', () => {
 		console.log('   → Speaker:', data.speaker);
 		console.log('   → Modelo:', data.model);
 
-		// Inicia o timer de auto-close/auto-ask
-		if (autoCloseQuestionTimer) clearTimeout(autoCloseQuestionTimer);
-
-		autoCloseQuestionTimer = setTimeout(() => {
-			console.log('⏰ AUTO_CLOSE_QUESTION_TIMEOUT disparado (900ms)');
-			autoAskGptIfReady();
-		}, AUTO_CLOSE_QUESTION_TIMEOUT);
+		// 🔥 Removido: AUTO_CLOSE_QUESTION_TIMEOUT — agora usamos apenas o silêncio para Deepgram
 	});
 
 	const resetBtn = document.getElementById('resetHomeBtn');
