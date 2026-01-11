@@ -8,8 +8,17 @@ const hljs = require('highlight.js');
 // 🌊 Transcrição Deepgram
 const { startAudioDeepgram, stopAudioDeepgram } = require('./deepgram-transcribe.js');
 
+// 🔥 Transcrição Whisper
+const { transcribeWhisperComplete, transcribeWhisperPartial } = require('./whisper-transcribe.js');
+
+// 🔥 Transcrição Vosk
+const { transcribeVoskComplete, transcribeVoskPartial } = require('./vosk-transcribe.js');
+
 // 🔒 DESABILITADO TEMPORARIAMENTE
 const DESABILITADO_TEMPORARIAMENTE = false;
+
+// 🔥 Sistema de eventos para módulos de transcrição (desacoplamento)
+window.transcriptionEvents = new EventTarget();
 
 /* ===============================
    🔐 PROTEÇÃO CONTRA CAPTURA DE TELA EXTERNA
@@ -117,8 +126,6 @@ let audioContext;
 // 🔥 MODIFICADO: STT model vem da config agora (removido USE_LOCAL_WHISPER)
 let transcriptionMetrics = {
 	audioStartTime: null,
-	whisperStartTime: null,
-	whisperEndTime: null,
 	gptStartTime: null,
 	gptEndTime: null,
 	totalTime: null,
@@ -826,8 +833,6 @@ async function resetAppState() {
 		// 9️⃣ RESETAR MÉTRICAS
 		transcriptionMetrics = {
 			audioStartTime: null,
-			whisperStartTime: null,
-			whisperEndTime: null,
 			gptStartTime: null,
 			gptEndTime: null,
 			totalTime: null,
@@ -975,87 +980,9 @@ async function transcribeAudio(blob) {
 
 	// Roteia para o modelo configurado
 	if (sttModel === 'vosk-local') {
-		// Modelo: Vosk local
-		// Vantagem: Rápido (500-1000ms), offline, leve
-		// Desvantagem: Menor precisão (modelo pequeno ~50MB)
-		// Handlers: main.js → vosk-transcribe (envia), vosk-finalize (recupera resultado acumulado)
-		// Processo: WebM → Buffer → Vosk server Python → Texto
-		try {
-			console.log(`🚀 Enviando para Vosk (local)...`);
-			transcriptionMetrics.whisperStartTime = Date.now();
-
-			// Primeiro envia o áudio para processar
-			await ipcRenderer.invoke('vosk-transcribe', buffer);
-
-			// Depois finaliza para obter o resultado final acumulado
-			const finalResult = await ipcRenderer.invoke('vosk-finalize');
-
-			transcriptionMetrics.whisperEndTime = Date.now();
-			const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
-
-			console.log(`✅ Vosk concluído em ${whisperTime}ms`);
-
-			// Vosk retorna um objeto: { final: string, partial: string, isFinal: boolean }
-			// Extrai o texto final
-			let transcribedText = '';
-			if (typeof finalResult === 'string') {
-				transcribedText = finalResult;
-			} else if (typeof finalResult === 'object' && finalResult !== null) {
-				// Usa final (que agora contém o resultado acumulado)
-				transcribedText = finalResult.final || '';
-			}
-
-			console.log(`📝 Resultado (${transcribedText.length} chars): "${transcribedText.substring(0, 80)}..."`);
-
-			return transcribedText;
-		} catch (error) {
-			console.error('❌ Vosk falhou:', error.message);
-			// 🔥 [CRÍTICO] SEM FALLBACK AUTOMÁTICO!
-			// Se o usuário escolhe vosk-local, APENAS vosk-local será usado.
-			// Se falhar, o erro é propagado e o usuário deve mudar o modelo nas Configurações.
-			throw new Error(`Vosk local falhou: ${error.message}. Altere o modelo em "Configurações → API e Modelos"`);
-		}
-	} else if (sttModel === 'whisper-cpp-local') {
-		// Modelo: Whisper.cpp local
-		// Vantagem: Alta precisão (modelo maior), offline
-		// Desvantagem: Mais lento (2-4s), requer arquivos locais
-		// Handler: main.js → transcribe-local (buffer enviado via IPC)
-		// Processo: WebM → WAV → Whisper.cpp CLI → Texto
-		try {
-			console.log(`🚀 Enviando para Whisper.cpp (local, alta precisão)...`);
-
-			transcriptionMetrics.whisperStartTime = Date.now();
-
-			const result = await ipcRenderer.invoke('transcribe-local', buffer);
-
-			transcriptionMetrics.whisperEndTime = Date.now();
-			const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
-
-			console.log(`✅ Whisper.cpp concluído em ${whisperTime}ms`);
-			console.log(`📝 Resultado (${result.length} chars): "${result.substring(0, 80)}..."`);
-
-			return result;
-		} catch (error) {
-			console.error('❌ Whisper.cpp local falhou:', error.message);
-			// 🔥 [CRÍTICO] SEM FALLBACK AUTOMÁTICO!
-			// Se o usuário escolhe whisper-cpp-local, APENAS whisper-cpp-local será usado.
-			// Se falhar, o erro é propagado e o usuário deve mudar o modelo nas Configurações.
-			throw new Error(`Whisper.cpp local falhou: ${error.message}. Altere o modelo em "Configurações → API e Modelos"`);
-		}
-	} else if (sttModel === 'whisper-1') {
-		// Modelo: OpenAI Whisper-1 (online)
-		// Vantagem: Melhor precisão (modelo grande), multilíngue
-		// Desvantagem: Requer conexão, custo ($0.02/min), latência
-		// Handler: main.js → transcribe-audio (requer OpenAI API key configurada)
-		// Processo: WebM → Arquivo temp → OpenAI API → Texto
-		transcriptionMetrics.whisperStartTime = Date.now();
-		const result = await ipcRenderer.invoke('transcribe-audio', buffer);
-		transcriptionMetrics.whisperEndTime = Date.now();
-
-		const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
-		console.log(`✅ Whisper-1 concluído em ${whisperTime}ms`);
-
-		return result;
+		return await transcribeVoskComplete(buffer, source);
+	} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
+		return await transcribeWhisperComplete(buffer, source);
 	} else {
 		// 🔥 [CRÍTICO] Modelo desconhecido = ERRO, não fallback!
 		throw new Error(
@@ -1069,23 +996,9 @@ async function transcribeAudioPartial(blob) {
 	const sttModel = getConfiguredSTTModel();
 
 	if (sttModel === 'vosk-local') {
-		// ⚠️ Para Vosk, não fazemos transcrição parcial em tempo real
-		// Vosk acumula e retorna parciais, mas não queremos enviá-las para a UI
-		// A transcrição real será feita em transcribeAudio() quando a gravação terminar
-		return '';
-	} else if (sttModel === 'whisper-cpp-local') {
-		// 🔥 [DESABILITADO] Transcrições parciais para whisper-cpp-local foram desabilitadas
-		// Motivo: WebM chunks incompletos causam erro ffmpeg constantemente (código 3199971767)
-		// Solução: confiar apenas em transcrição completa (funciona perfeitamente)
-		// Resultado final é entregue completo após gravação terminar
-		return '';
-	} else if (sttModel === 'whisper-1') {
-		try {
-			return await ipcRenderer.invoke('transcribe-audio-partial', buffer);
-		} catch (error) {
-			console.warn('⚠️ Whisper-1 parcial falhou:', error.message);
-			return '';
-		}
+		return await transcribeVoskPartial(buffer, source);
+	} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
+		return await transcribeWhisperPartial(buffer, source);
 	} else {
 		// 🔥 [CRÍTICO] Modelo desconhecido = ERRO, não fallback!
 		console.warn(`⚠️ Modelo STT desconhecido em transcribeAudioPartial: ${sttModel}`);
@@ -3907,7 +3820,6 @@ function debugLogRenderer(msg) {
 function logTranscriptionMetrics() {
 	if (!transcriptionMetrics.audioStartTime) return;
 
-	const whisperTime = transcriptionMetrics.whisperEndTime - transcriptionMetrics.whisperStartTime;
 	const gptTime = transcriptionMetrics.gptEndTime - transcriptionMetrics.gptStartTime;
 	const totalTime = transcriptionMetrics.totalTime;
 
@@ -3915,18 +3827,14 @@ function logTranscriptionMetrics() {
 	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
 	console.log(`📊 ================================`);
 	console.log(`📊 TAMANHO ÁUDIO: ${transcriptionMetrics.audioSize} bytes`);
-	console.log(`📊 WHISPER: ${whisperTime}ms (${Math.round(transcriptionMetrics.audioSize / whisperTime)} bytes/ms)`);
 	console.log(`📊 GPT: ${gptTime}ms`);
 	console.log(`📊 TOTAL: ${totalTime}ms`);
-	console.log(`📊 WHISPER % DO TOTAL: ${Math.round((whisperTime / totalTime) * 100)}%`);
 	console.log(`📊 GPT % DO TOTAL: ${Math.round((gptTime / totalTime) * 100)}%`);
 	console.log(`📊 ================================`);
 
 	// Reset para próxima medição
 	transcriptionMetrics = {
 		audioStartTime: null,
-		whisperStartTime: null,
-		whisperEndTime: null,
 		gptStartTime: null,
 		gptEndTime: null,
 		totalTime: null,
@@ -4313,5 +4221,28 @@ async function runMockAutoPlay() {
 	console.log('✅ Mock autoplay finalizado');
 	mockAutoPlayActive = false;
 }
+
+// 🔥 Listener para eventos de transcrição dos modelos (padrão desacoplado)
+window.transcriptionEvents.addEventListener('transcription', (event) => {
+	const { model, source, text, isFinal, confidence, timestamp } = event.detail;
+
+	console.log(`📥 Evento 'transcription' recebido de ${model}:`, { source, text, isFinal });
+
+	// 🔥 Lógica de processamento compartilhada
+	if (source === 'output') {
+		// Para output, usar handleCurrentQuestion
+		const author = OTHER; // Constante global
+		handleCurrentQuestion(author, text, { isInterim: !isFinal, skipAddToUI: !isFinal });
+	} else if (source === 'input') {
+		// Para input, manter handleSpeech (ou adaptar se necessário)
+		const author = YOU;
+		handleSpeech(author, text);
+	}
+
+	// 🔥 Emitir evento para UI se necessário (ex.: para interims visuais)
+	if (!isFinal) {
+		emitUIChange('onUpdateInterim', { id: `${model}-interim-${source}`, speaker: source === 'input' ? YOU : OTHER, text });
+	}
+});
 
 //console.log('🚀 Entrou no renderer.js');

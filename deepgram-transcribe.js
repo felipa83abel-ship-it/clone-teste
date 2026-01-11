@@ -540,14 +540,32 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 
 	// Atualizar estado
 	if (isInput) {
-		// Para INPUT, usar handleSpeech para consolidar (sem adicionar à UI novamente)
-		handleSpeech(author, transcript, { skipAddToUI: true });
+		// 🔥 Para INPUT, emitir evento 'transcription'
+		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
+			detail: {
+				model: 'deepgram',
+				source: 'input',
+				text: transcript,
+				isFinal: true,
+				confidence: confidence,
+				timestamp: Date.now()
+			}
+		}));
 
 		// Resetar interim atual
 		deepgramCurrentInterimInput = null;
 	} else {
-		// Para OUTPUT, usar handleCurrentQuestion para consolidar no CURRENT
-		handleCurrentQuestion(author, transcript, { skipAddToUI: true });
+		// 🔥 Para OUTPUT, emitir evento 'transcription'
+		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
+			detail: {
+				model: 'deepgram',
+				source: 'output',
+				text: transcript,
+				isFinal: true,
+				confidence: confidence,
+				timestamp: Date.now()
+			}
+		}));
 
 		// Resetar interim atual
 		deepgramCurrentInterimOutput = null;
@@ -594,11 +612,16 @@ function handleInterimDeepgramMessage(transcript, source) {
 	} else {
 		deepgramCurrentInterimOutput = transcript;
 
-		// 🔥 Para OUTPUT, atualizar CURRENT em tempo real com handleCurrentQuestion
-		if (typeof globalThis.handleCurrentQuestion === 'function') {
-			console.log(`🔄 [INTERIM] Atualizando CURRENT em tempo real com: "${transcript}"`);
-			globalThis.handleCurrentQuestion(author, transcript, { isInterim: true, skipAddToUI: true });
-		}
+		// 🔥 Para OUTPUT, emitir evento 'transcription' para interim
+		window.transcriptionEvents.dispatchEvent(new CustomEvent('transcription', {
+			detail: {
+				model: 'deepgram',
+				source: 'output',
+				text: transcript,
+				isFinal: false,
+				timestamp: Date.now()
+			}
+		}));
 	}
 }
 
