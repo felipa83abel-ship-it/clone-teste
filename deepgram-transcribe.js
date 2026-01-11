@@ -493,13 +493,63 @@ function handleFinalDeepgramMessage(transcript, confidence, source) {
 
 	console.log(`📝 ✅ FINAL [${source.toUpperCase()}]: "${transcript}" (${(confidence * 100).toFixed(1)}%)`);
 
-	// Chamar handleSpeech para criar nova transcrição no histórico
-	handleSpeech(author, transcript);
-
-	// Resetar interim atual
+	// Setar stopAt quando a transcrição finaliza
+	const now = Date.now();
 	if (isInput) {
+		deepgramInputStopAt = now;
+	} else {
+		deepgramOutputStopAt = now;
+	}
+
+	// Calcular métricas de timing
+	const startAt = isInput ? deepgramInputStartAt : deepgramOutputStartAt;
+	const stopAt = isInput ? deepgramInputStopAt : deepgramOutputStopAt;
+	const recordingDuration = startAt && stopAt ? stopAt - startAt : 0;
+	const latency = startAt ? now - stopAt : 0;
+	const total = startAt ? now - startAt : 0;
+
+	// Criar placeholder ID único
+	const placeholderId = `dg-${source}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+	// Adicionar transcrição com placeholder via evento
+	const transcriptData = {
+		author,
+		text: transcript,
+		timeStr: startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
+		elementId: 'conversation',
+		placeholderId: placeholderId,
+	};
+
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', transcriptData);
+	}
+
+	// Preencher placeholder com métricas
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
+			speaker: author,
+			text: transcript,
+			placeholderId: placeholderId,
+			startStr: startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
+			stopStr: stopAt ? new Date(stopAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
+			recordingDuration: recordingDuration,
+			latency: latency,
+			total: total,
+		});
+	}
+
+	// Atualizar estado
+	if (isInput) {
+		// Para INPUT, usar handleSpeech para consolidar (sem adicionar à UI novamente)
+		handleSpeech(author, transcript, { skipAddToUI: true });
+
+		// Resetar interim atual
 		deepgramCurrentInterimInput = null;
 	} else {
+		// Para OUTPUT, usar handleCurrentQuestion para consolidar no CURRENT
+		handleCurrentQuestion(author, transcript, { skipAddToUI: true });
+
+		// Resetar interim atual
 		deepgramCurrentInterimOutput = null;
 	}
 
@@ -544,10 +594,10 @@ function handleInterimDeepgramMessage(transcript, source) {
 	} else {
 		deepgramCurrentInterimOutput = transcript;
 
-		// Para output, atualizar CURRENT em tempo real
-		if (typeof globalThis.handleSpeechInterim === 'function') {
+		// 🔥 Para OUTPUT, atualizar CURRENT em tempo real com handleCurrentQuestion
+		if (typeof globalThis.handleCurrentQuestion === 'function') {
 			console.log(`🔄 [INTERIM] Atualizando CURRENT em tempo real com: "${transcript}"`);
-			globalThis.handleSpeechInterim(author, transcript, { isInterim: true, skipAddToUI: true });
+			globalThis.handleCurrentQuestion(author, transcript, { isInterim: true, skipAddToUI: true });
 		}
 	}
 }

@@ -153,8 +153,15 @@ let inputVolumeAnimationId = null;
 let outputVolumeAnimationId = null;
 
 /* 🧠 PERGUNTAS */
-let currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
-let lastInterimText = ''; // 🔥 NOVO: Para armazenar o último interim para consolidação
+let currentQuestion = {
+	text: '',
+	lastUpdate: 0,
+	finalized: false,
+	lastUpdateTime: null,
+	createdAt: null,
+	finalText: '',
+	interimText: '',
+};
 let questionsHistory = [];
 const answeredQuestions = new Set(); // 🔒 Armazena respostas já geradas (questionId -> true)
 let selectedQuestionId = null;
@@ -516,7 +523,15 @@ function promoteCurrentToHistory(text) {
 
 		// limpa CURRENT mas preserva seleção conforme antes
 		const prevSelected = selectedQuestionId;
-		currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
+		currentQuestion = {
+			text: '',
+			lastUpdate: 0,
+			finalized: false,
+			lastUpdateTime: null,
+			createdAt: null,
+			finalText: '',
+			interimText: '',
+		};
 		if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
 			selectedQuestionId = CURRENT_QUESTION_ID;
 		} else {
@@ -562,7 +577,15 @@ function promoteCurrentToHistory(text) {
 	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
 	const prevSelected = selectedQuestionId;
 
-	currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
+	currentQuestion = {
+		text: '',
+		lastUpdate: 0,
+		finalized: false,
+		lastUpdateTime: null,
+		createdAt: null,
+		finalText: '',
+		interimText: '',
+	};
 
 	if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
 		selectedQuestionId = CURRENT_QUESTION_ID;
@@ -764,7 +787,15 @@ async function resetAppState() {
 		console.log('✅ Timers limpos');
 
 		// 6️⃣ LIMPAR PERGUNTAS E RESPOSTAS
-		currentQuestion = { text: '', lastUpdate: 0, finalized: false, lastUpdateTime: null, createdAt: null };
+		currentQuestion = {
+			text: '',
+			lastUpdate: 0,
+			finalized: false,
+			lastUpdateTime: null,
+			createdAt: null,
+			finalText: '',
+			interimText: '',
+		};
 		questionsHistory = [];
 		answeredQuestions.clear();
 		selectedQuestionId = null;
@@ -2620,6 +2651,71 @@ function handleSpeech(author, text, options = {}) {
 	}
 
 	debugLogRenderer('Fim da função: "handleSpeech"');
+}
+
+/**
+ * 🔥 handleCurrentQuestion - Fluxo específico para Deepgram OUTPUT
+ * Similar ao handleSpeech, mas focado em consolidar transcrições no CURRENT
+ * sem lógicas de fechamento ou detecção de perguntas. Apenas concatena e renderiza.
+ * Usado para interims e finais do Deepgram output.
+ */
+function handleCurrentQuestion(author, text, options = {}) {
+	debugLogRenderer('Início da função: "handleCurrentQuestion"');
+
+	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
+	console.log('🔊 handleCurrentQuestion', { author, raw: text, cleaned, isInterim: options.isInterim });
+
+	// ignora frases muito curtas
+	if (cleaned.length < 3) return;
+
+	// Usa o tempo exato que chegou no renderer (Date.now)
+	const now = Date.now();
+
+	if (author === OTHER) {
+		// Inicializa timestamps se for a primeira fala
+		if (!currentQuestion.text) {
+			currentQuestion.createdAt = Date.now();
+			currentQuestion.lastUpdateTime = Date.now();
+			interviewTurnId++; // 🔥 novo turno
+		}
+
+		// Lógica de consolidação para evitar duplicações
+		if (options.isInterim) {
+			// Para interims: substituir o interim atual
+			currentQuestion.interimText = cleaned;
+		} else {
+			// Para finais: adicionar o final ao acumulado e limpar interim
+			currentQuestion.finalText += (currentQuestion.finalText ? ' ' : '') + cleaned;
+			currentQuestion.interimText = '';
+		}
+
+		// Atualizar o texto total
+		currentQuestion.text =
+			currentQuestion.finalText +
+			(currentQuestion.finalText && currentQuestion.interimText ? ' ' : '') +
+			currentQuestion.interimText;
+
+		currentQuestion.lastUpdateTime = now;
+		currentQuestion.lastUpdate = now;
+
+		// 🟦 CURRENT vira seleção padrão ao receber fala
+		if (!selectedQuestionId) {
+			selectedQuestionId = CURRENT_QUESTION_ID;
+			clearAllSelections();
+		}
+
+		// 🔥 Adiciona à conversa visual em tempo real (sempre, para mostrar tudo)
+		console.log('💬 handleCurrentQuestion: Adicionando à conversa:', cleaned);
+		if (!options.skipAddToUI) {
+			addTranscript(OTHER, cleaned, now);
+		} else {
+			console.log('⚪ handleCurrentQuestion: addTranscript pulado por skipAddToUI');
+		}
+
+		renderCurrentQuestion();
+	}
+
+	debugLogRenderer('Fim da função: "handleCurrentQuestion"');
 }
 
 /* ===============================
