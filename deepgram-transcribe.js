@@ -83,11 +83,13 @@ async function initDeepgramWS(source = 'input') {
 		model: 'nova-2',
 		language: 'pt-BR',
 		smart_format: 'true',
+		punctuate: 'true', // Melhor pontuação
 		interim_results: 'true',
 		encoding: 'linear16',
 		sample_rate: '16000',
 		endpointing: '300', // Detecta pausas naturais
 		utterance_end_ms: '1000', // Finaliza a frase após 1s de silêncio
+		utterances: 'true', // Habilita timestamps de utterances para calcular duração real da fala
 	});
 
 	const wsUrl = `wss://api.deepgram.com/v1/listen?${params.toString()}`;
@@ -469,7 +471,7 @@ function stopAllDeepgram() {
 ================================ */
 
 // Processa mensagens finais do Deepgram (transcrições completas)
-function handleFinalDeepgramMessage(transcript, confidence, source, speechFinal) {
+function handleFinalDeepgramMessage(data, transcript, confidence, source, speechFinal) {
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
 
@@ -486,9 +488,57 @@ function handleFinalDeepgramMessage(transcript, confidence, source, speechFinal)
 	// Calcular métricas de timing
 	const startAt = isInput ? deepgramInputStartAt : deepgramOutputStartAt;
 	const stopAt = isInput ? deepgramInputStopAt : deepgramOutputStopAt;
-	const recordingDuration = startAt && stopAt ? stopAt - startAt : 0;
-	const latency = startAt ? now - stopAt : 0;
-	const total = startAt ? now - startAt : 0;
+
+	let recordingDuration, latency, total, startStr, stopStr;
+
+	if (data.utterances && data.utterances.length > 0) {
+		// Usar utterances para métricas precisas
+		const firstUtterance = data.utterances[0];
+		const lastUtterance = data.utterances[data.utterances.length - 1];
+		const utteranceStart = firstUtterance.start; // em segundos
+		const utteranceEnd = lastUtterance.end; // em segundos
+
+		// grav: duração da fala real (período apenas da fala)
+		recordingDuration = (utteranceEnd - utteranceStart) * 1000; // ms
+
+		// lat: tempo de processamento (desde envio até recebimento)
+		latency = startAt ? now - stopAt : 0;
+
+		// total: grav + lat
+		total = recordingDuration + latency;
+
+		// Timestamps: início da primeira fala e fim da transcrição
+		startStr = startAt
+			? new Date(startAt + utteranceStart * 1000).toLocaleTimeString()
+			: new Date(now).toLocaleTimeString();
+		stopStr = startAt
+			? new Date(startAt + utteranceEnd * 1000).toLocaleTimeString()
+			: new Date(now).toLocaleTimeString();
+	} else if (data.channel && typeof data.channel.start === 'number' && typeof data.channel.duration === 'number') {
+		// Usar channel.start e duration como fallback
+		const channelStart = data.channel.start; // em segundos
+		const channelDuration = data.channel.duration; // em segundos
+
+		// grav: duração da fala real, ajustada para mínimo 6s
+		recordingDuration = Math.max(channelDuration * 1000, 6000); // ms
+
+		// lat: tempo de processamento
+		latency = startAt ? now - stopAt : 0;
+
+		// total: grav + lat
+		total = recordingDuration + latency;
+
+		// Timestamps: start baseado em stop - grav
+		startStr = new Date(stopAt - recordingDuration).toLocaleTimeString();
+		stopStr = new Date(stopAt).toLocaleTimeString();
+	} else {
+		// Fallback: usar timestamps antigos
+		recordingDuration = startAt && stopAt ? stopAt - startAt : 0;
+		latency = startAt ? now - stopAt : 0;
+		total = startAt ? now - startAt : 0;
+		startStr = startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString();
+		stopStr = stopAt ? new Date(stopAt).toLocaleTimeString() : new Date(now).toLocaleTimeString();
+	}
 
 	// Criar placeholder ID único
 	const placeholderId = `dg-${source}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -496,7 +546,7 @@ function handleFinalDeepgramMessage(transcript, confidence, source, speechFinal)
 	// Adicionar transcrição com placeholder via evento
 	const transcriptData = {
 		author,
-		text: transcript,
+		text: '...', // Placeholder, será preenchido com onPlaceholderFulfill
 		timeStr: startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
 		elementId: 'conversation',
 		placeholderId: placeholderId,
@@ -512,11 +562,12 @@ function handleFinalDeepgramMessage(transcript, confidence, source, speechFinal)
 			speaker: author,
 			text: transcript,
 			placeholderId: placeholderId,
-			startStr: startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
-			stopStr: stopAt ? new Date(stopAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
+			startStr: startStr,
+			stopStr: stopStr,
 			recordingDuration: recordingDuration,
 			latency: latency,
 			total: total,
+			showMeta: false, // Não exibir métricas para Deepgram por enquanto
 		});
 	}
 
@@ -589,7 +640,7 @@ function handleDeepgramMessage(data, source = 'input') {
 	console.log(`🟡 isFinal: ${isFinal}, speechFinal: ${speechFinal}, transcript: "${transcript}"`);
 
 	if (isFinal) {
-		handleFinalDeepgramMessage(transcript, confidence, source, speechFinal);
+		handleFinalDeepgramMessage(data, transcript, confidence, source, speechFinal);
 	} else {
 		handleInterimDeepgramMessage(transcript, source);
 	}
@@ -606,19 +657,30 @@ function finalizePendingTranscription(transcript, author) {
 	const startAt = now - 1000; // estimativa
 	const stopAt = now;
 
-	// Adiciona à transcrição como se fosse final
+	// Adiciona placeholder primeiro
 	if (globalThis.RendererAPI?.emitUIChange) {
 		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
 			author: author,
-			text: transcript,
+			text: '...', // placeholder
 			timestamp: now,
 			timeStr: new Date(now).toLocaleTimeString(),
+			elementId: 'conversation',
+			placeholderId: `forced-final-${now}`,
+		});
+	}
+
+	// Preenche placeholder com texto real e métricas
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
+			speaker: author,
+			text: transcript,
+			placeholderId: `forced-final-${now}`,
 			startStr: new Date(startAt).toLocaleTimeString(),
 			stopStr: new Date(stopAt).toLocaleTimeString(),
-			elementId: 'conversation',
-			recordingDuration: 1,
+			recordingDuration: 1000, // estimativa
 			latency: 0,
-			total: 1,
+			total: 1000,
+			showMeta: false, // Não exibir métricas para Deepgram por enquanto
 		});
 	}
 

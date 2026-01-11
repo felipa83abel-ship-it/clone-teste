@@ -1688,7 +1688,7 @@ class ConfigManager {
 			console.log('🔔 onPlaceholderFulfill recebido:', data);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
-			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, placeholderId } = data;
+			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, placeholderId, showMeta } = data;
 			const transcriptionBox = document.getElementById('conversation');
 
 			if (!transcriptionBox) {
@@ -1710,9 +1710,9 @@ class ConfigManager {
 
 			console.log('✅ Placeholder atualizado:', text.substring(0, 50) + '...');
 
-			// Só cria/atualiza metadados se houver texto visível no placeholder
+			// Só cria/atualiza metadados se houver texto visível no placeholder e showMeta não for false
 			const hasVisibleText = text && String(text).trim().length > 0;
-			if (hasVisibleText) {
+			if (hasVisibleText && showMeta !== false) {
 				// Insere metadados DENTRO do placeholder para evitar órfãos caso o elemento pai seja removido
 				let meta = targetPlaceholder.querySelector('.transcript-meta');
 				if (!meta) {
