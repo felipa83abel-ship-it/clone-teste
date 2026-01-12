@@ -4,14 +4,8 @@
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
-
-// 🌊 Transcrição Deepgram
-const { startAudioDeepgram, stopAudioDeepgram, finalizePendingTranscription } = require('./deepgram-transcribe.js');
-
-// 🔥 Transcrição Whisper
+const { startAudioDeepgram, stopAudioDeepgram } = require('./deepgram-transcribe.js');
 const { transcribeWhisperComplete, transcribeWhisperPartial } = require('./whisper-transcribe.js');
-
-// 🔥 Transcrição Vosk
 const { transcribeVoskComplete, transcribeVoskPartial } = require('./vosk-transcribe.js');
 
 // 🔒 DESABILITADO TEMPORARIAMENTE
@@ -71,7 +65,7 @@ window.transcriptionEvents = new EventTarget();
 const YOU = 'Você';
 const OTHER = 'Outros';
 
-const ENABLE_INTERVIEW_TIMING_DEBUG = true; // ← desligar depois = false
+const ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 const QUESTION_IDLE_TIMEOUT = 300; // Tempo de espera para a pergunta ser considerada inativa = 300
 const CURRENT_QUESTION_SILENCE_TIMEOUT = 1500; // 🔥 Tempo sem novos interims para considerar pergunta finalizada = 1500ms
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
@@ -243,38 +237,6 @@ function emitUIChange(eventName, data) {
 		UICallbacks[eventName](data);
 	} else {
 		console.warn(`⚠️ DEBUG: Nenhum callback registrado para '${eventName}'`);
-	}
-}
-
-/* ===============================
-   STT EVENTS - Sistema Unificado de Eventos
-   Disparado quando qualquer modelo STT termina uma transcrição
-=============================== */
-
-const STTEvents = {
-	onTranscriptionComplete: null, // Disparado quando STT termina
-};
-
-/**
- * 🔥 Registra listener para eventos STT
- * @param {string} eventName - Nome do evento ('transcriptionComplete')
- * @param {function} callback - Callback a ser executado
- */
-function onSTTEvent(eventName, callback) {
-	if (eventName === 'transcriptionComplete') {
-		STTEvents.onTranscriptionComplete = callback;
-		console.log('📡 STT Event listener registrado: transcriptionComplete');
-	}
-}
-
-/**
- * 🔥 Emite evento STT para todas as camadas superiores
- * @param {string} eventName - Nome do evento ('transcriptionComplete')
- * @param {object} data - Dados do evento
- */
-function emitSTTEvent(eventName, data) {
-	if (eventName === 'transcriptionComplete') {
-		STTEvents.onTranscriptionComplete?.(data);
 	}
 }
 
@@ -653,7 +615,6 @@ function isQuestionReady(text) {
 
 /**
  * 🔥 AUTO-ASK: Tenta chamar GPT automaticamente em modo entrevista
- * Disparada por: STTEvents.onTranscriptionComplete (após 900ms sem áudio)
  *
  * Precondições:
  * - Modo entrevista ativo
@@ -2429,15 +2390,7 @@ async function transcribeOutput() {
 		// 🔥 [NOVO] MODO ENTREVISTA: Emitir evento de transcrição completa
 		// O listener em DOMContentLoaded cuidará do timer de auto-close
 		if (ModeController.isInterviewMode() && currentQuestion.text) {
-			console.log('🎤 transcribeOutput: Emitindo evento STT onTranscriptionComplete');
-
-			// Emite evento para todas as camadas superiores (agnóstico ao modelo)
-			emitSTTEvent('transcriptionComplete', {
-				text: currentQuestion.text,
-				speaker: OTHER,
-				isFinal: true,
-				model: 'vosk-or-openai', // Vosk/OpenAI compartilham este fluxo
-			});
+			console.log('🎤 transcribeOutput: Emitindo evento STT');
 		}
 	} catch (err) {
 		console.warn('⚠️ erro na transcrição (OUTPUT)', err);
@@ -2559,7 +2512,7 @@ function handleSpeech(author, text, options = {}) {
 }
 
 /**
- * 🔥 handleCurrentQuestion - Fluxo específico para Deepgram OUTPUT
+ * Fluxo específico para Deepgram
  * Similar ao handleSpeech, mas focado em consolidar transcrições no CURRENT
  * sem lógicas de fechamento ou detecção de perguntas. Apenas concatena e renderiza.
  * Usado para interims e finais do Deepgram output.
@@ -2568,7 +2521,6 @@ function handleCurrentQuestion(author, text, options = {}) {
 	debugLogRenderer('Início da função: "handleCurrentQuestion"');
 
 	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
-	console.log('🔊 handleCurrentQuestion', { author, raw: text, cleaned, isInterim: options.isInterim });
 
 	// ignora frases muito curtas
 	if (cleaned.length < 3) return;
@@ -2576,51 +2528,36 @@ function handleCurrentQuestion(author, text, options = {}) {
 	// Usa o tempo exato que chegou no renderer (Date.now)
 	const now = Date.now();
 
+	// Apenas consolida falas no CURRENT do OTHER
 	if (author === OTHER) {
-		// Inicializa timestamps se for a primeira fala
+		// Se não existe texto ainda, marca tempo de criação e incrementa turno
 		if (!currentQuestion.text) {
-			currentQuestion.createdAt = Date.now();
-			currentQuestion.lastUpdateTime = Date.now();
+			currentQuestion.createdAt = now;
 			interviewTurnId++; // 🔥 novo turno
 		}
+
+		currentQuestion.lastUpdateTime = now;
+		currentQuestion.lastUpdate = now;
+
+		console.log('currentQuestion antes: ', { ...currentQuestion });
 
 		// Lógica de consolidação para evitar duplicações
 		if (options.isInterim) {
 			// Para interims: substituir o interim atual (Deepgram envia versões progressivas)
 			currentQuestion.interimText = cleaned;
 		} else {
-			// Para finais: substituir completamente o finalText e limpar interim
-			currentQuestion.finalText = cleaned;
+			// Para finais: limpar interim e ACUMULAR no finalText
 			currentQuestion.interimText = '';
-
-			// 🔥 Limpar timer de silêncio pois já temos final
-			if (currentQuestionSilenceTimer) {
-				clearTimeout(currentQuestionSilenceTimer);
-				currentQuestionSilenceTimer = null;
-			}
+			currentQuestion.finalText = (currentQuestion.finalText ? currentQuestion.finalText + ' ' : '') + cleaned;
 		}
+
+		console.log('currentQuestion durante: ', { ...currentQuestion });
 
 		// Atualizar o texto total
 		currentQuestion.text =
-			currentQuestion.finalText +
-			(currentQuestion.finalText && currentQuestion.interimText ? ' ' : '') +
-			currentQuestion.interimText;
+			currentQuestion.finalText + (currentQuestion.interimText ? ' ' + currentQuestion.interimText : '');
 
-		currentQuestion.lastUpdateTime = now;
-		currentQuestion.lastUpdate = now;
-
-		// 🔥 TIMER DE SILÊNCIO PARA CURRENT: Reiniciar timer se for interim
-		if (options.isInterim) {
-			if (currentQuestionSilenceTimer) clearTimeout(currentQuestionSilenceTimer);
-			currentQuestionSilenceTimer = setTimeout(() => {
-				console.log('⏰ CURRENT_QUESTION_SILENCE_TIMEOUT disparado: Finalizando pergunta por silêncio');
-
-				// 🔥 FINALIZA TRANSCRIÇÃO PENDENTE: Quando finalizamos por silêncio, força final da transcrição atual
-				finalizePendingTranscription(currentQuestion.interimText, OTHER);
-
-				finalizeCurrentQuestion();
-			}, CURRENT_QUESTION_SILENCE_TIMEOUT);
-		}
+		console.log('currentQuestion depois: ', { ...currentQuestion });
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
 		if (!selectedQuestionId) {
@@ -2628,9 +2565,7 @@ function handleCurrentQuestion(author, text, options = {}) {
 			clearAllSelections();
 		}
 
-		// 🔥 Adiciona à conversa visual em tempo real (sempre, para mostrar tudo)
-		console.log('💬 handleCurrentQuestion: Adicionando à conversa:', cleaned);
-
+		// Adiciona TUDO à conversa visual em tempo real ao elemento "currentQuestionText"
 		renderCurrentQuestion();
 	}
 
@@ -3028,7 +2963,7 @@ async function askGpt() {
 
 	// � MODO ENTREVISTA — STREAMING
 	if (ModeController.isInterviewMode()) {
-		const gptStartAt = ENABLE_INTERVIEW_TIMING_DEBUG ? Date.now() : null;
+		const gptStartAt = ENABLE_INTERVIEW_TIMING_DEBUG_METRICS ? Date.now() : null;
 		let streamedText = '';
 
 		console.log('⏳ enviando para o GPT via stream...');
@@ -3095,7 +3030,7 @@ async function askGpt() {
 			logTranscriptionMetrics();
 
 			let finalText = streamedText;
-			if (ENABLE_INTERVIEW_TIMING_DEBUG && gptStartAt) {
+			if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && gptStartAt) {
 				const endAt = Date.now();
 				const elapsed = endAt - gptStartAt;
 
@@ -3277,12 +3212,7 @@ function addTranscript(author, text, time, elementId = null) {
 function renderCurrentQuestion() {
 	debugLogRenderer('Início da função: "renderCurrentQuestion"');
 
-	// Desabilitado temporariamente (teste)
-	if (DESABILITADO_TEMPORARIAMENTE) {
-		debugLogRenderer('Fim da função: "renderCurrentQuestion" 🔒 DESABILITADO TEMPORARIAMENTE');
-		return;
-	}
-
+	// Se não há texto, emite vazio
 	if (!currentQuestion.text) {
 		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
 		return;
@@ -3290,12 +3220,13 @@ function renderCurrentQuestion() {
 
 	let label = currentQuestion.text;
 
-	if (ENABLE_INTERVIEW_TIMING_DEBUG && currentQuestion.lastUpdateTime) {
+	// Adiciona timestamp se modo debug métricas ativo
+	if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && currentQuestion.lastUpdateTime) {
 		const time = new Date(currentQuestion.lastUpdateTime).toLocaleTimeString();
 		label = `⏱️ ${time} — ${label}`;
 	}
 
-	// 🔥 Apenas EMITE dados - config-manager aplica ao DOM
+	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const questionData = {
 		text: label,
 		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
@@ -3304,10 +3235,7 @@ function renderCurrentQuestion() {
 		lastUpdateTime: currentQuestion.lastUpdateTime,
 	};
 
-	console.log(`📤 renderCurrentQuestion: emitindo onCurrentQuestionUpdate`, {
-		label,
-		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
-	});
+	// Emite evento para o config-manager renderizar no DOM
 	emitUIChange('onCurrentQuestionUpdate', questionData);
 
 	debugLogRenderer('Fim da função: "renderCurrentQuestion"');
@@ -3325,7 +3253,7 @@ function renderQuestionsHistory() {
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const historyData = [...questionsHistory].reverse().map(q => {
 		let label = q.text;
-		if (ENABLE_INTERVIEW_TIMING_DEBUG && q.lastUpdateTime) {
+		if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && q.lastUpdateTime) {
 			const time = new Date(q.lastUpdateTime).toLocaleTimeString();
 			label = `⏱️ ${time} — ${label}`;
 		}
@@ -4018,21 +3946,6 @@ function resetHomeSection() {
 
 // 🔥 LISTENER DO BOTÃO RESET
 document.addEventListener('DOMContentLoaded', () => {
-	// 🔥 Registrar listener para eventos de transcrição completa (STT)
-	onSTTEvent('transcriptionComplete', data => {
-		if (!ModeController.isInterviewMode()) {
-			console.log('⏭️ STT Event: modo normal (não entrevista), ignorando auto-ask');
-			return;
-		}
-
-		console.log('🔊 STT Event: transcriptionComplete recebido');
-		console.log('   → Texto:', data.text?.substring(0, 50) + '...');
-		console.log('   → Speaker:', data.speaker);
-		console.log('   → Modelo:', data.model);
-
-		// 🔥 Removido: AUTO_CLOSE_QUESTION_TIMEOUT — agora usamos apenas o silêncio para Deepgram
-	});
-
 	const resetBtn = document.getElementById('resetHomeBtn');
 	if (resetBtn) {
 		resetBtn.addEventListener('click', () => {

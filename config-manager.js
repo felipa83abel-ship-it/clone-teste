@@ -1503,10 +1503,12 @@ class ConfigManager {
 			}
 		});
 
-		// Pergunta Atual
+		// Pergunta Atual - Elemento: currentQuestion
 		globalThis.RendererAPI.onUIChange('onCurrentQuestionUpdate', data => {
-			console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
+			// NOSONAR console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
+
 			const { text, isSelected } = data;
+
 			const currentQuestionBox = document.getElementById('currentQuestion');
 			if (!currentQuestionBox) {
 				console.warn(`⚠️ config-manager: elemento #currentQuestion não encontrado`);
@@ -1518,7 +1520,7 @@ class ConfigManager {
 			if (textEl) {
 				console.log(`✅ config-manager: atualizando texto em elemento:`, {
 					seletor: textEl.id || textEl.className,
-					texto: text?.substring(0, 50),
+					texto: text,
 				});
 				textEl.innerText = text;
 			} else {

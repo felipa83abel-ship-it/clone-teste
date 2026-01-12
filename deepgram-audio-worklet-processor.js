@@ -54,9 +54,8 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 			percent: percent,
 		});
 
-		// Sempre retorna true para continuar processando (obrigatório para AudioWorkletProcessor).
-		// Nota: Esta função sempre retorna o mesmo valor por design, para manter o processamento contínuo.
-		return true; // Continua processando
+		// Nota: Esta função sempre retorna o mesmo valor por design, para manter o processamento contínuo, (obrigatório para AudioWorkletProcessor).
+		return true; // NOSONAR
 	}
 }
 
