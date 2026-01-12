@@ -532,6 +532,13 @@ function promoteCurrentToHistory(text) {
 			finalText: '',
 			interimText: '',
 		};
+
+		// 🔥 Limpar timer de silêncio
+		if (currentQuestionSilenceTimer) {
+			clearTimeout(currentQuestionSilenceTimer);
+			currentQuestionSilenceTimer = null;
+		}
+
 		if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
 			selectedQuestionId = CURRENT_QUESTION_ID;
 		} else {
@@ -576,6 +583,13 @@ function promoteCurrentToHistory(text) {
 	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
 	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
 	const prevSelected = selectedQuestionId;
+
+	// 🔥 RESET COMPLETO: Limpar timer de silêncio antes de resetar
+	if (currentQuestionSilenceTimer) {
+		console.log('🔥 Limpando timer de silêncio durante promoção');
+		clearTimeout(currentQuestionSilenceTimer);
+		currentQuestionSilenceTimer = null;
+	}
 
 	resetCurrentQuestion();
 
@@ -2724,7 +2738,9 @@ function finalizeCurrentQuestion() {
 					gptRequestedTurnId,
 					gptAnsweredTurnId,
 				});
+
 				askGpt();
+				resetCurrentQuestion();
 			}
 			return;
 		}

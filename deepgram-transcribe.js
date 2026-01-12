@@ -80,7 +80,7 @@ async function initDeepgramWS(source = 'input') {
 
 	// Monta URL com parâmetros (token é passado na URL para evitar erros 401)
 	const params = new URLSearchParams({
-		model: 'nova-2',
+		model: 'nova-3',
 		language: 'pt-BR',
 		smart_format: 'true',
 		punctuate: 'true', // Melhor pontuação
@@ -332,6 +332,7 @@ async function startDeepgramOutput(UIElements) {
 			} else if (type === 'volumeUpdate') {
 				// Atualiza UI com volume
 				emitUIChange('onOutputVolumeUpdate', { percent });
+				console.log(`🔊 Output volume: ${percent.toFixed(2)}%`);
 			}
 		};
 
@@ -647,7 +648,7 @@ function handleDeepgramMessage(data, source = 'input') {
 }
 
 /**
- * 🔥 finalizePendingTranscription - Força finalização de transcrição pendente quando pergunta é fechada por silêncio
+ * Força finalização de transcrição pendente quando pergunta é fechada por silêncio
  * Simula um handleFinalDeepgramMessage para o texto atual
  */
 function finalizePendingTranscription(transcript, author) {
