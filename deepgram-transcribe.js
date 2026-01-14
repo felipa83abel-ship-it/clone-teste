@@ -247,7 +247,7 @@ async function startDeepgramOutput(UIElements) {
 				}
 
 				// Trata detecção de silêncio
-				handleSilenceDetection('output', percent, 500); // 500ms para output
+				handleSilenceDetection('output', percent, 300); // 300ms para output
 			}
 		};
 
@@ -522,7 +522,8 @@ function handleSilenceDetection(source, percent, silenceTimeout = 1000) {
 	if (percent > 0) {
 		vars.lastActive = Date.now();
 		if (inSilence) {
-			// NOSONAR console.log('🔊 Som voltou: ', percent.toFixed(2), '%');
+			// NOSONAR
+			console.log('🔊 Som voltou: ', percent.toFixed(2), '%');
 			vars.inSilence = false;
 		}
 	} else {

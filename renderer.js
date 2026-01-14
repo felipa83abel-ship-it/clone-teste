@@ -126,6 +126,7 @@ let audioContext;
 let transcriptionMetrics = {
 	audioStartTime: null,
 	gptStartTime: null,
+	gptFirstTokenTime: null,
 	gptEndTime: null,
 	totalTime: null,
 	audioSize: 0,
@@ -984,6 +985,7 @@ async function askGpt() {
 	const isCurrent = questionId === CURRENT_QUESTION_ID;
 	const text = getSelectedQuestionText();
 	const normalizedText = normalizeForCompare(text);
+	transcriptionMetrics.gptStartTime = Date.now(); // Marca início GPT
 
 	// Evita reenvio da mesma pergunta atual ao GPT (dedupe)
 	if (isCurrent && normalizedText && lastAskedQuestionNormalized === normalizedText) {
@@ -1021,9 +1023,6 @@ async function askGpt() {
 		lastAskedQuestionNormalized = normalizedText;
 		lastSentQuestionText = text.trim();
 	}
-
-	// Inicia medição do GPT
-	transcriptionMetrics.gptStartTime = Date.now();
 
 	// � MODO ENTREVISTA — STREAMING
 	if (ModeController.isInterviewMode()) {
@@ -1066,6 +1065,8 @@ async function askGpt() {
 				accum: streamedText,
 			});
 
+			transcriptionMetrics.gptFirstTokenTime = transcriptionMetrics.gptFirstTokenTime || Date.now();
+
 			console.log(`🎬 🟢 GPT_STREAM_CHUNK recebido (token parcial): "${token}"`);
 		};
 
@@ -1093,7 +1094,9 @@ async function askGpt() {
 				finalText +=
 					`\n\n⏱️ GPT iniciou: ${startTime}` + `\n⏱️ GPT finalizou: ${endTime}` + `\n⏱️ Resposta em ${elapsed}ms`;
 
-				console.log(finalText);
+				console.log(
+					finalText + `\n⏱️ Primeiro Token: ${new Date(transcriptionMetrics.gptFirstTokenTime).toLocaleTimeString()}`,
+				);
 			}
 
 			// garante que o turno foi realmente fechado
