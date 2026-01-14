@@ -1,6 +1,19 @@
 /* ================================
    IMPORTS E CONFIGURAÇÕES INICIAIS
 =============================== */
+
+// 🔥 DEEPGRAM: Carrega variáveis de ambiente do .env
+require('dotenv').config();
+
+const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
+const OpenAI = require('openai');
+const fs = require('node:fs');
+const path = require('node:path');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const execFileAsync = promisify(execFile);
+
+// Habilita reload automático em desenvolvimento
 if (process.env.NODE_ENV === 'development') {
 	try {
 		require('electron-reload')(__dirname, {
@@ -11,15 +24,7 @@ if (process.env.NODE_ENV === 'development') {
 	}
 }
 
-const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
-const OpenAI = require('openai');
-const fs = require('fs');
-const path = require('path');
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
-
-// Importações condicionais
+// Importa electron-store para armazenamento seguro
 let ElectronStore;
 try {
 	ElectronStore = require('electron-store');
@@ -35,19 +40,18 @@ try {
 /* ================================
    CONSTANTES
 =============================== */
-const APP_CONFIG = {
-	MODE_DEBUG: false,
-};
 
-// Configuração de modelo Vosk
+const USE_FAKE_STREAM_GPT = false; // mude para false quando quiser usar o real
+
+// Configuração de modelo Vosk (local)
 const VOSK_CONFIG = {
 	// MODEL: 'vosk-models/vosk-model-small-pt-0.3' ( Modelo pequeno, rápido, menos preciso)
 	MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3',
 };
 
-// Configuração do Whisper.cpp local
+// Configuração do modelo Whisper.cpp (local)
 const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
-// Modelo Tiny (Modelo menor, rápido, menos preciso)
+// Modelo ggml-tiny (Modelo menor, rápido, menos preciso)
 const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
 
 /* ================================
@@ -57,6 +61,11 @@ let mainWindow = null;
 let openaiClient = null;
 let secureStore = null;
 let clickThroughEnabled = false;
+
+// 🔥 NOVO: Gerenciamento do Whisper.cpp como servidor persistente
+let whisperServerProcess = null;
+let whisperServerReady = false;
+const { spawn } = require('node:child_process');
 
 /* ================================
    INICIALIZAÇÃO DO SECURE STORE
@@ -128,6 +137,74 @@ function checkWhisperFiles() {
 }
 
 /**
+ * 🔥 NOVO: Inicia Whisper.cpp como servidor persistente
+ * Mantém o processo rodando enquanto o usuário está em modo de escuta
+ * Isso evita overhead de inicialização e problemas com WebM corrompido
+ */
+async function startWhisperServer() {
+	if (whisperServerProcess) {
+		console.log('⚠️ Servidor Whisper já rodando');
+		return true;
+	}
+
+	if (!checkWhisperFiles()) {
+		console.error('❌ Arquivos do Whisper não encontrados!');
+		return false;
+	}
+
+	console.log('🚀 Iniciando Whisper.cpp como servidor persistente...');
+
+	try {
+		// Inicia Whisper.cpp em modo de espera por stdin
+		whisperServerProcess = spawn(WHISPER_CLI_EXE, ['-m', WHISPER_MODEL, '-l', 'pt', '--print-progress'], {
+			stdio: ['pipe', 'pipe', 'pipe'],
+			detached: false,
+		});
+
+		whisperServerProcess.on('close', code => {
+			console.log(`📌 Processo Whisper encerrado com código: ${code}`);
+			whisperServerProcess = null;
+			whisperServerReady = false;
+		});
+
+		whisperServerProcess.on('error', err => {
+			console.error(`❌ Erro no processo Whisper: ${err.message}`);
+			whisperServerProcess = null;
+			whisperServerReady = false;
+		});
+
+		whisperServerReady = true;
+		console.log('✅ Servidor Whisper iniciado com sucesso');
+		return true;
+	} catch (error) {
+		console.error(`❌ Erro ao iniciar servidor Whisper: ${error.message}`);
+		whisperServerProcess = null;
+		whisperServerReady = false;
+		return false;
+	}
+}
+
+/**
+ * Encerra o servidor Whisper.cpp persistente
+ */
+function stopWhisperServer() {
+	if (!whisperServerProcess) {
+		console.log('⚠️ Servidor Whisper não está rodando');
+		return;
+	}
+
+	console.log('🛑 Encerrando servidor Whisper...');
+	try {
+		whisperServerProcess.kill();
+		whisperServerProcess = null;
+		whisperServerReady = false;
+		console.log('✅ Servidor Whisper encerrado');
+	} catch (error) {
+		console.error(`❌ Erro ao encerrar servidor: ${error.message}`);
+	}
+}
+
+/**
  * Converte WebM para WAV usando ffmpeg (para Whisper.cpp)
  * Trabalha com caminhos de arquivo (não buffers)
  * Origem: commit 9545a76
@@ -170,7 +247,7 @@ async function convertWebMToWAV(webmBuffer) {
 			fs.writeFileSync(inputFile, webmBuffer);
 
 			// Converte com ffmpeg: WebM → WAV 16-bit 16kHz mono (MESMA FORMA DE ANTES)
-			const { stdout, stderr } = await execFileAsync(
+			await execFileAsync(
 				ffmpegPath,
 				[
 					'-i',
@@ -216,11 +293,8 @@ async function convertWebMToWAV(webmBuffer) {
 // Erros do renderer
 ipcMain.on('RENDERER_ERROR', (_, info) => {
 	console.error('Renderer reported error:', info && (info.message || info));
-	if (info && info.stack) console.error(info.stack);
+	if (info?.stack) console.error(info.stack);
 });
-
-// Configuração do app
-ipcMain.handle('GET_APP_CONFIG', () => APP_CONFIG);
 
 // Status do cliente OpenAI
 ipcMain.handle('GET_OPENAI_API_STATUS', () => ({
@@ -269,7 +343,7 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 		// Se for OpenAI, inicializa cliente
 		if (provider === 'openai') {
 			const success = initializeOpenAIClient(trimmedKey);
-			if (mainWindow && mainWindow.webContents) {
+			if (mainWindow?.webContents) {
 				mainWindow.webContents.send('API_KEY_UPDATED', !!success);
 			}
 			return { success, provider };
@@ -315,9 +389,9 @@ ipcMain.handle('initialize-api-client', async (_, apiKey) => {
  * Referência: handlers IPC 'transcribe-audio' e 'transcribe-audio-partial'
  */
 async function transcribeAudioCommon(audioBuffer, isPartial = false) {
-	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('\n--------------------------------------------------------');
 	console.log('📋 STT HANDLER ATIVO: WHISPER-1 OPENAI (Cloud, Versátil)');
-	console.log('════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('--------------------------------------------------------');
 	// Verifica se o cliente está inicializado
 	if (!openaiClient) {
 		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
@@ -379,10 +453,82 @@ async function transcribeAudioCommon(audioBuffer, isPartial = false) {
  * Referência: handlers IPC 'transcribe-local' e 'transcribe-local-partial'
  * Processo: WebM → WAV → Whisper.cpp → Texto
  */
+// Helper function para processar arquivo WAV no Whisper
+async function processWhisperFile(whisperModelPath, tempWavPath, isPartial = false) {
+	const whisperStart = Date.now();
+
+	const args = ['-m', whisperModelPath, '-f', tempWavPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'];
+
+	if (isPartial) {
+		args.push('-d', '3000', '-ml', '50');
+	}
+
+	console.log(`🚀 4. Executando Whisper: ${WHISPER_CLI_EXE} ${args.join(' ')}`);
+
+	const { stdout } = await execFileAsync(WHISPER_CLI_EXE, args, {
+		timeout: isPartial ? 1500 : 10000, // 🔥 OTIMIZADO: Parcial 1.5s (era 3s), Final 10s
+		maxBuffer: 1024 * 1024 * 5,
+	});
+
+	const whisperTime = Date.now() - whisperStart;
+	console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
+
+	if (stdout && stdout.trim()) {
+		console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
+	} else {
+		console.log(`📝 STDOUT: vazio ou nulo`);
+	}
+
+	return (stdout || '').trim();
+}
+
+// Helper para log de erro durante execução do Whisper
+function logWhisperError(execError, tempWavPath) {
+	console.error(`❌ ERRO NA EXECUÇÃO DO WHISPER:`);
+	console.error(`   Código: ${execError.code}`);
+	console.error(`   Sinal: ${execError.signal}`);
+	console.error(`   Mensagem: ${execError.message}`);
+	if (execError.stderr) {
+		console.error(`   STDERR do processo: ${execError.stderr}`);
+	}
+	if (execError.stdout) {
+		console.error(`   STDOUT do processo: ${execError.stdout}`);
+	}
+
+	if (fs.existsSync(tempWavPath)) {
+		const stats = fs.statSync(tempWavPath);
+		console.error(`   📝 WAV file existe: ${stats.size} bytes`);
+	} else {
+		console.error(`   ❌ WAV file NÃO EXISTE!`);
+	}
+}
+
+// Helper para validar e preparar arquivo WAV
+async function prepareWavFile(audioBuffer, tempWebmPath, tempWavPath, isPartial) {
+	fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
+	console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
+
+	const convertStart = Date.now();
+	await convertWebMToWAVFile(tempWebmPath, tempWavPath);
+	const convertTime = Date.now() - convertStart;
+	console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
+
+	if (!fs.existsSync(tempWavPath)) {
+		throw new Error('Arquivo WAV não foi criado');
+	}
+
+	const wavStats = fs.statSync(tempWavPath);
+	console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
+
+	if (wavStats.size < 1000) {
+		console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
+	}
+}
+
 async function transcribeLocalCommon(audioBuffer, isPartial = false) {
-	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('\n--------------------------------------------------------');
 	console.log('📋 STT HANDLER ATIVO: WHISPER.CPP LOCAL (Offline, Alta Precisão)');
-	console.log('════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('--------------------------------------------------------');
 	const startTime = Date.now();
 	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
 	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes`);
@@ -393,117 +539,35 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 	}
 
 	const tempDir = app.getPath('temp');
-
-	// Salva como WebM primeiro
 	const tempWebmPath = path.join(tempDir, `whisper-${isPartial ? 'partial' : 'temp'}-${Date.now()}.webm`);
 	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
 
 	try {
-		// 1. Salva o buffer WebM
-		const saveStart = Date.now();
-		fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
-		const saveTime = Date.now() - saveStart;
-		console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
-
-		// 2. Converte WebM para WAV
-		const convertStart = Date.now();
-		await convertWebMToWAVFile(tempWebmPath, tempWavPath);
-		const convertTime = Date.now() - convertStart;
-		console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
-
-		// 3. Verifica se o arquivo WAV existe
-		if (!fs.existsSync(tempWavPath)) {
-			throw new Error('Arquivo WAV não foi criado');
-		}
-
-		const wavStats = fs.statSync(tempWavPath);
-		console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
-
-		if (wavStats.size < 1000) {
-			console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
-		}
-
-		// 4. Executar Whisper.cpp COM ARGUMENTOS BÁSICOS ESTÁVEIS
-		const whisperStart = Date.now();
-
-		// 🔥 ARGUMENTOS OTIMIZADOS (conforme commit 9545a76 que funcionava)
-		const args = [
-			'-m',
-			WHISPER_MODEL,
-			'-f',
-			tempWavPath,
-			'-l',
-			'pt', // idioma português
-			'-otxt', // saída em texto
-			'-t',
-			'4', // 4 threads
-			'-np', // não imprimir logs (no-prints)
-			'-nt', // não imprimir timestamps
-		];
-
-		// Se for parcial, ajusta parâmetros para ser mais rápido
-		if (isPartial) {
-			args.push('-d', '3000'); // máximo 3 segundos
-			args.push('-ml', '50'); // máximo 50 caracteres por segmento
-		}
-
-		console.log(`🚀 4. Executando Whisper: ${WHISPER_CLI_EXE} ${args.join(' ')}`);
+		await prepareWavFile(audioBuffer, tempWebmPath, tempWavPath, isPartial);
 
 		let result = '';
 		try {
-			const { stdout, stderr } = await execFileAsync(WHISPER_CLI_EXE, args, {
-				timeout: isPartial ? 2000 : 4000, // Timeout maior para garantir
-				maxBuffer: 1024 * 1024 * 5, // 5MB buffer
-			});
-
-			const whisperTime = Date.now() - whisperStart;
-			console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
-
-			// Debug detalhado
-			if (stdout && stdout.trim()) {
-				console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
-			} else {
-				console.log(`📝 STDOUT: vazio ou nulo`);
-			}
-
-			if (stderr) {
-				console.log(`⚠️ STDERR (primeiros 200 chars):`, stderr.substring(0, 200));
-			}
-
-			// Extrai texto da saída
-			result = (stdout || '').trim();
-			const elapsedTotal = Date.now() - startTime;
-			console.log(`📊 Tempo total: ${elapsedTotal}ms`);
-			console.log(
-				`✨ Resultado (${result.length} chars): "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
-			);
-
-			return result;
+			result = await processWhisperFile(WHISPER_MODEL, tempWavPath, isPartial);
 		} catch (execError) {
-			// 🔥 Log detalhado quando execFile falha
-			console.error(`❌ ERRO NA EXECUÇÃO DO WHISPER:`);
-			console.error(`   Código: ${execError.code}`);
-			console.error(`   Sinal: ${execError.signal}`);
-			console.error(`   Mensagem: ${execError.message}`);
-			if (execError.stderr) {
-				console.error(`   STDERR do processo: ${execError.stderr}`);
-			}
-			if (execError.stdout) {
-				console.error(`   STDOUT do processo: ${execError.stdout}`);
-			}
-
-			// Verifica se o arquivo WAV existe e seu tamanho
-			if (fs.existsSync(tempWavPath)) {
-				const stats = fs.statSync(tempWavPath);
-				console.error(`   📝 WAV file existe: ${stats.size} bytes`);
-			} else {
-				console.error(`   ❌ WAV file NÃO EXISTE!`);
-			}
-
-			throw execError;
+			logWhisperError(execError, tempWavPath);
+			// 🔥 [NOVO] Ao invés de relançar silenciosamente, log claro
+			const timeoutMs = isPartial ? 3000 : 10000;
+			const errorMsg =
+				execError.signal === 'SIGTERM'
+					? `⏱️ Whisper timeout (${timeoutMs}ms) - arquivo grande demais ou modelo carregando`
+					: `❌ Whisper erro: ${execError.message}`;
+			console.error(`🚨 TRANSCRIBE-LOCAL FALHOU: ${errorMsg}`);
+			throw new Error(errorMsg); // Propaga para renderer saber que falhou
 		}
+
+		const elapsedTotal = Date.now() - startTime;
+		console.log(`📊 Tempo total: ${elapsedTotal}ms`);
+		console.log(
+			`✨ Resultado (${result.length} chars): "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
+		);
+
+		return result;
 	} finally {
-		// Limpa arquivos temporários
 		try {
 			if (fs.existsSync(tempWebmPath)) {
 				fs.unlinkSync(tempWebmPath);
@@ -533,7 +597,65 @@ ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCo
 
 // Handlers para Whisper.cpp (local, alta precisão)
 ipcMain.handle('transcribe-local', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, false));
-ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, true));
+// 🔥 [DESABILITADO] transcribe-local-partial foi desabilitado
+// Motivo: WebM chunks incompletos causam erro ffmpeg constantemente (código 3199971767)
+// Transcrição completa funciona perfeitamente - confiar apenas nela
+ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => {
+	return ''; // Retorna vazio silenciosamente - transcrição parcial desabilitada
+});
+
+// 🔥 NOVO: Handlers para gerenciar servidor Whisper persistente
+ipcMain.handle('start-whisper-server', async () => {
+	console.log('📡 Solicitação para iniciar servidor Whisper');
+	return await startWhisperServer();
+});
+
+ipcMain.handle('stop-whisper-server', () => {
+	console.log('📡 Solicitação para parar servidor Whisper');
+	stopWhisperServer();
+	return true;
+});
+
+/* ================================
+   HANDLERS IPC - DEEPGRAM (STT)
+=============================== */
+
+// 🔥 DEEPGRAM: Transcrição via SDK com suporte a chunks
+ipcMain.handle('transcribe-audio-deepgram', async (_, audioDataBase64) => {
+	try {
+		const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
+		if (!deepgramApiKey) {
+			throw new Error('DEEPGRAM_API_KEY não configurada no .env');
+		}
+
+		// Converte base64 (string) de volta para Buffer
+		const buffer = Buffer.from(audioDataBase64, 'base64');
+		console.log('🎤 Enviando chunk para Deepgram | size:', buffer.length);
+
+		// Usa Deepgram SDK com prerecorded (para chunks isolados)
+		const { createClient } = require('@deepgram/sdk');
+		const deepgram = createClient(deepgramApiKey);
+
+		const { result, error } = await deepgram.listen.prerecorded.transcribeFile(buffer, {
+			model: 'nova-2',
+			language: 'pt-BR',
+			smart_format: true,
+			container: 'webm',
+		});
+
+		if (error) {
+			console.error('❌ Erro Deepgram SDK:', error);
+			throw new Error(`Deepgram error: ${error.message}`);
+		}
+
+		const transcript = result?.results?.channels[0]?.alternatives[0]?.transcript || '';
+		console.log('✅ Transcrição Deepgram:', transcript || '(vazio)');
+		return transcript;
+	} catch (err) {
+		console.error('❌ Erro ao transcrever com Deepgram:', err.message);
+		throw err;
+	}
+});
 
 /* ================================
    HANDLERS IPC - GPT
@@ -553,13 +675,21 @@ ipcMain.handle('ask-gpt', async (_, messages) => {
 	await ensureOpenAIClient();
 
 	try {
-		const completion = await openaiClient.chat.completions.create({
-			model: 'gpt-4o-mini',
-			messages,
-			temperature: 0.3,
-		});
+		let response;
 
-		return completion.choices[0].message.content;
+		if (USE_FAKE_STREAM_GPT) {
+			// usa o mock
+			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
+		} else {
+			// usa o OpenAI real
+			response = await openaiClient.chat.completions.create({
+				model: 'gpt-4o-mini',
+				messages,
+				temperature: 0.3,
+			});
+		}
+
+		return response.choices[0].message.content;
 	} catch (error) {
 		console.error('❌ Erro no GPT:', error.message);
 		if (error.status === 401 || error.message.includes('authentication')) {
@@ -581,12 +711,20 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 	}
 
 	try {
-		const stream = await openaiClient.chat.completions.create({
-			model: 'gpt-4o-mini',
-			messages,
-			temperature: 0.3,
-			stream: true,
-		});
+		let stream;
+
+		if (USE_FAKE_STREAM_GPT) {
+			// usa o mock
+			stream = fakeStreamGPT();
+		} else {
+			// usa o OpenAI real
+			stream = await openaiClient.chat.completions.create({
+				model: 'gpt-4o-mini',
+				messages,
+				temperature: 0.3,
+				stream: true,
+			});
+		}
 
 		for await (const chunk of stream) {
 			const token = chunk.choices?.[0]?.delta?.content;
@@ -606,6 +744,22 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 		}
 	}
 });
+
+// ✅ Mock simples para simular stream
+async function* fakeStreamGPT() {
+	const response = 'Olá Thiago! Isso é um mock de resposta simulando o GPT 🚀';
+
+	// Quebra em pedaços variáveis (como se fossem tokens/chunks)
+	const chunks = response.match(/.{1,8}/g); // pedaços de até 8 caracteres
+
+	for (const chunk of chunks) {
+		// Delay aleatório entre 50ms e 200ms
+		const delay = 50 + Math.random() * 150;
+		await new Promise(r => setTimeout(r, delay));
+
+		yield { choices: [{ delta: { content: chunk } }] };
+	}
+}
 
 /* ================================
    HANDLERS IPC - CONTROLE DA JANELA
@@ -643,6 +797,7 @@ ipcMain.handle('GET_CURSOR_SCREEN_POINT', () => {
 		const { screen } = require('electron');
 		return screen.getCursorScreenPoint();
 	} catch (err) {
+		console.error('Erro ao obter posição do cursor:', err);
 		return { x: 0, y: 0 };
 	}
 });
@@ -666,7 +821,6 @@ ipcMain.on('MOVE_WINDOW_TO', (_, { x, y }) => {
    HANDLERS IPC - VOSK (VIA PYTHON SUBPROCESS)
 =============================== */
 
-const { spawn } = require('child_process');
 let voskProcess = null;
 let voskReady = false;
 
@@ -737,9 +891,9 @@ function startVoskServer() {
  * Envia comando JSON para servidor Python
  */
 ipcMain.handle('vosk-transcribe', async (_, audioBuffer) => {
-	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('\n--------------------------------------------------------');
 	console.log('📋 STT HANDLER ATIVO: VOSK LOCAL (Python Server)');
-	console.log('════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('--------------------------------------------------------');
 	try {
 		// Inicia servidor se não estiver rodando
 		if (!voskReady || !voskProcess) {
@@ -816,8 +970,9 @@ ipcMain.handle('vosk-transcribe', async (_, audioBuffer) => {
 						resolve(response);
 						return;
 					} catch (e) {
-						// Não é JSON válido, continua procurando
-						continue;
+						// Ignorar: Não é JSON válido, aguardar próxima linha
+						// O loop continuará por 'data' e 'end' listeners
+						console.warn(`⚠️ Linha Vosk não é JSON válido, aguardando próxima linha... ${e}`);
 					}
 				}
 			};
@@ -867,6 +1022,7 @@ ipcMain.handle('vosk-finalize', async () => {
 					console.log('✅ Vosk finalized:', response);
 					resolve(response);
 				} catch (error) {
+					console.error('Erro ao fazer parse da resposta final do Vosk:', error);
 					resolve({ final: '' });
 				}
 			};
@@ -1026,26 +1182,29 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 				content: [
 					{
 						type: 'text',
-						text: 'Analise estas capturas de tela e ajude a resolver o problema apresentado. Se houver código ou questão técnica e não seja identificada a linguagem use Java como padrão, forneça a solução completa, estruturada e com comentários em português para que eu saiba explicar cada trecho do código.',
+						text: 'Analise a captura de tela. Se houver código, forneça APENAS o código com comentários em português explicando cada linha. NÃO inclua explicações textuais adicionais, resumos ou introduções. Use Java como padrão se a linguagem não for identificável. Formato: apenas código + comentários. Mantenha espaço de uma linha se a proxima linha for um novo bloco de comentário + código para facilitar o entendimento. ',
 					},
 					...images,
 				],
 			},
 		];
 
-		// 🚀 Envia para OpenAI Vision (gpt-4o)
-		console.log('🚀 Enviando para OpenAI Vision API...');
-		const response = await openaiClient.chat.completions.create({
-			model: 'gpt-4o-mini', // Modelo com suporte a visão (gpt-4o)
-			messages,
-			max_tokens: 2000,
-			temperature: 0.3,
-		});
+		let response;
+
+		if (USE_FAKE_STREAM_GPT) {
+			// usa o mock
+			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
+		} else {
+			// usa o OpenAI real
+			response = await openaiClient.chat.completions.create({
+				model: 'gpt-4o-mini', // Modelo com suporte a visão (gpt-4o)
+				messages,
+				max_tokens: 2000,
+				temperature: 0.3,
+			});
+		}
 
 		const analysis = response.choices[0].message.content;
-
-		console.log('✅ Análise concluída');
-		console.log(`📝 Resposta: ${analysis.substring(0, 100)}...`);
 
 		// 🔄 Limpeza de imagens antigas maior que 5 minutos
 		cleanupScreenshots();
@@ -1072,7 +1231,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 });
 
 /**
- * Limpa screenshots antigos (> 5 minutos)
+ * Limpa screenshots antigos do diretório temp
  */
 async function cleanupScreenshots() {
 	try {
@@ -1117,7 +1276,7 @@ async function cleanupScreenshots() {
 	}
 }
 
-// Handler para chamadas vindas do renderer
+// Handler IPC para limpeza manual de screenshots
 ipcMain.handle('CLEANUP_SCREENSHOTS', cleanupScreenshots);
 
 /* ================================
@@ -1146,7 +1305,7 @@ function createWindow() {
 		hasShadow: false, // Sem sombras
 
 		skipTaskbar: true, // Não aparece na barra de tarefas
-		focusable: false, // Não recebe foco (reduz detectabilidade)
+		// focusable: false, // Não recebe foco (reduz detectabilidade)
 		alwaysOnTop: true, // Janela sempre acima das outras
 		alwaysOnTopLevel: 'screen-saver', // Nível mais alto
 
@@ -1243,4 +1402,6 @@ app.whenReady().then(() => {
 =============================== */
 app.on('will-quit', () => {
 	globalShortcut.unregisterAll();
+	// 🔥 NOVO: Encerra servidor Whisper ao fechar app
+	stopWhisperServer();
 });
