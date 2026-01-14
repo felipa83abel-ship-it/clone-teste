@@ -414,7 +414,7 @@ function handleDeepgramMessage(data, source = 'input') {
 	if (!transcript?.trim()) return; // Ignora transcrições vazias
 
 	if (isFinal) {
-		handleFinalDeepgramMessage(source, transcript, data);
+		handleFinalDeepgramMessage(source, transcript);
 	} else {
 		handleInterimDeepgramMessage(source, transcript);
 	}

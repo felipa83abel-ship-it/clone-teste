@@ -613,56 +613,6 @@ function isQuestionReady(text) {
 	return hasIndicator || hasQuestionMark;
 }
 
-/**
- * 🔥 AUTO-ASK: Tenta chamar GPT automaticamente em modo entrevista
- *
- * Precondições:
- * - Modo entrevista ativo
- * - CURRENT tem texto
- * - Pergunta ainda não foi respondida neste turno
- * - Texto não é "lixo"
- */
-function autoAskGptIfReady() {
-	debugLogRenderer('Início da função: "autoAskGptIfReady"');
-
-	// Validações básicas
-	if (!ModeController.isInterviewMode()) {
-		console.log('⏭️ autoAskGptIfReady: modo normal (não entrevista), abortando');
-		return;
-	}
-
-	if (!currentQuestion.text) {
-		console.log('⏭️ autoAskGptIfReady: CURRENT está vazio, abortando');
-		return;
-	}
-
-	if (gptRequestedTurnId === interviewTurnId) {
-		console.log('⏭️ autoAskGptIfReady: GPT já foi solicitado neste turno, abortando');
-		return;
-	}
-
-	if (gptAnsweredTurnId === interviewTurnId) {
-		console.log('⏭️ autoAskGptIfReady: GPT já respondeu neste turno, abortando');
-		return;
-	}
-
-	const text = currentQuestion.text.trim();
-
-	// 🔥 REMOVIDO: Lógica duplicada de concatenação de interim
-	// O currentQuestion.text já inclui interimText através de handleCurrentQuestion
-
-	// Verifica se é lixo
-	if (isGarbageSentence(currentQuestion.text.trim())) {
-		console.log('❌ autoAskGptIfReady: pergunta é lixo, abortando');
-		return;
-	}
-
-	console.log('✅ autoAskGptIfReady: chamando askGpt automaticamente');
-	askGpt();
-
-	debugLogRenderer('Fim da função: "autoAskGptIfReady"');
-}
-
 function isEndingPhrase(text) {
 	debugLogRenderer('Início da função: "isEndingPhrase"');
 	const normalized = text.toLowerCase().trim();
@@ -2868,6 +2818,52 @@ function closeCurrentQuestionForced() {
 /* ===============================
    GPT
 =============================== */
+
+/**
+ * 🔥 AUTO-ASK: Tenta chamar GPT automaticamente em modo entrevista
+ *
+ * Precondições:
+ * - Modo entrevista ativo
+ * - CURRENT tem texto
+ * - Pergunta ainda não foi respondida neste turno
+ * - Texto não é "lixo"
+ */
+function autoAskGptIfReady() {
+	debugLogRenderer('Início da função: "autoAskGptIfReady"');
+
+	// Validações básicas
+	if (!ModeController.isInterviewMode()) {
+		console.log('⏭️ autoAskGptIfReady: modo normal (não entrevista), abortando');
+		return;
+	}
+
+	if (!currentQuestion.text) {
+		console.log('⏭️ autoAskGptIfReady: CURRENT está vazio, abortando');
+		return;
+	}
+
+	if (gptRequestedTurnId === interviewTurnId) {
+		console.log('⏭️ autoAskGptIfReady: GPT já foi solicitado neste turno, abortando');
+		return;
+	}
+
+	if (gptAnsweredTurnId === interviewTurnId) {
+		console.log('⏭️ autoAskGptIfReady: GPT já respondeu neste turno, abortando');
+		return;
+	}
+
+	// Verifica se é lixo (Nota: removido para teste)
+	// if (isGarbageSentence(currentQuestion.text.trim())) {
+	// 	console.log('❌ autoAskGptIfReady: pergunta é lixo, abortando');
+	// 	return;
+	// }
+
+	console.log('✅ autoAskGptIfReady: chamando askGpt automaticamente');
+	askGpt();
+
+	debugLogRenderer('Fim da função: "autoAskGptIfReady"');
+}
+
 async function askGpt() {
 	debugLogRenderer('Início da função: "askGpt"');
 
@@ -3792,6 +3788,8 @@ const RendererAPI = {
 	onUIChange: (eventName, callback) => {
 		onUIChange(eventName, callback);
 	},
+	// Emit UI changes (para config-manager enviar eventos para renderer)
+	emitUIChange,
 
 	// API Key
 	setAppConfig: config => {
@@ -3871,9 +3869,6 @@ const RendererAPI = {
 			callback(direction);
 		});
 	},
-
-	// Emit UI changes (para config-manager enviar eventos para renderer)
-	emitUIChange,
 };
 
 if (typeof module !== 'undefined' && module.exports) {
