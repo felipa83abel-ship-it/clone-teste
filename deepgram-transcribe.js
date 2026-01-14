@@ -49,9 +49,7 @@ let deepgramOutputHeartbeatInterval = null;
 
 // Timestamps para sincronizar com padrão de outros modelos
 let deepgramInputStartAt = null;
-let deepgramInputStopAt = null;
 let deepgramOutputStartAt = null;
-let deepgramOutputStopAt = null;
 
 // Objeto para mapear variáveis de input/output
 const deepgramVars = {
@@ -130,7 +128,6 @@ async function startDeepgramInput(UIElements) {
 		deepgramInputWebSocket = ws;
 		isDeepgramInputActive = true;
 		deepgramInputStartAt = Date.now();
-		deepgramInputStopAt = null;
 
 		// Solicita acesso ao dispositivo INPUT selecionado
 		console.log('🎤 Solicitando acesso à entrada de áudio (Microfone)...');
@@ -211,7 +208,6 @@ async function startDeepgramOutput(UIElements) {
 		deepgramOutputWebSocket = ws;
 		isDeepgramOutputActive = true;
 		deepgramOutputStartAt = Date.now();
-		deepgramOutputStopAt = null;
 
 		// Solicita acesso ao dispositivo OUTPUT selecionado
 		console.log('🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)...');
@@ -251,7 +247,7 @@ async function startDeepgramOutput(UIElements) {
 				}
 
 				// Trata detecção de silêncio
-				handleSilenceDetection('output', percent);
+				handleSilenceDetection('output', percent, 500); // 500ms para output
 			}
 		};
 
@@ -443,7 +439,10 @@ function handleInterimDeepgramMessage(source, transcript) {
 
 	// Para OUTPUT, atualizar CURRENT com interim
 	if (!isInput && globalThis.RendererAPI?.handleCurrentQuestion) {
-		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, { isInterim: true });
+		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, {
+			isInterim: true,
+			inSilence: deepgramVars[source].inSilence,
+		});
 	}
 }
 
@@ -458,8 +457,8 @@ function handleFinalDeepgramMessage(source, transcript) {
 	const author = isInput ? YOU : OTHER;
 	const now = Date.now();
 	const metrics = isInput
-		? { startAt: deepgramInputStartAt, stopAt: (deepgramInputStopAt = now) }
-		: { startAt: deepgramOutputStartAt, stopAt: (deepgramOutputStopAt = now) };
+		? { startAt: deepgramInputStartAt, stopAt: now }
+		: { startAt: deepgramOutputStartAt, stopAt: now };
 	const { startAt, stopAt } = metrics;
 	const startStr = startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString();
 	const stopStr = stopAt ? new Date(stopAt).toLocaleTimeString() : new Date(now).toLocaleTimeString();
@@ -506,7 +505,10 @@ function handleFinalDeepgramMessage(source, transcript) {
 
 	// Para OUTPUT, atualizar CURRENT com final
 	if (!isInput && globalThis.RendererAPI?.handleCurrentQuestion) {
-		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, { isInterim: false });
+		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, {
+			isInterim: false,
+			inSilence: deepgramVars[source].inSilence,
+		});
 	}
 }
 

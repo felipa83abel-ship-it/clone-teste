@@ -316,7 +316,7 @@ body {
 
 #home.active .config-form .form-group {
 	margin: 0;
-	padding: 8px;
+	padding: 7px;
 }
 
 .config-home {
@@ -333,7 +333,7 @@ body {
 	gap: 16px;
 	background: rgba(var(--bg-panel-rgb), 0.5);
 	border-bottom: 1px solid var(--border-default);
-	padding-bottom: 5px;
+	padding: 3px 4px 4px 4px;
 }
 
 .vu-meter-home {
@@ -359,6 +359,7 @@ body {
 .home-vu-meters.listening {
 	animation: pulse-glow 2s infinite;
 	border: 2px solid rgba(var(--color-active-rgb), 0.5);
+	padding: 2px;
 }
 
 /* SPAN STATUS */

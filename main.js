@@ -41,6 +41,8 @@ try {
    CONSTANTES
 =============================== */
 
+const USE_FAKE_STREAM_GPT = false; // mude para false quando quiser usar o real
+
 // Configuração de modelo Vosk (local)
 const VOSK_CONFIG = {
 	// MODEL: 'vosk-models/vosk-model-small-pt-0.3' ( Modelo pequeno, rápido, menos preciso)
@@ -291,7 +293,7 @@ async function convertWebMToWAV(webmBuffer) {
 // Erros do renderer
 ipcMain.on('RENDERER_ERROR', (_, info) => {
 	console.error('Renderer reported error:', info && (info.message || info));
-	if (info && info.stack) console.error(info.stack);
+	if (info?.stack) console.error(info.stack);
 });
 
 // Status do cliente OpenAI
@@ -341,7 +343,7 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 		// Se for OpenAI, inicializa cliente
 		if (provider === 'openai') {
 			const success = initializeOpenAIClient(trimmedKey);
-			if (mainWindow && mainWindow.webContents) {
+			if (mainWindow?.webContents) {
 				mainWindow.webContents.send('API_KEY_UPDATED', !!success);
 			}
 			return { success, provider };
@@ -673,17 +675,21 @@ ipcMain.handle('ask-gpt', async (_, messages) => {
 	await ensureOpenAIClient();
 
 	try {
-		// const completion = await openaiClient.chat.completions.create({
-		// 	model: 'gpt-4o-mini',
-		// 	messages,
-		// 	temperature: 0.3,
-		// });
+		let response;
 
-		// ✅ Mock simples
-		const completion = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
-		// ✅ FIM - Mock simples
+		if (USE_FAKE_STREAM_GPT) {
+			// usa o mock
+			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
+		} else {
+			// usa o OpenAI real
+			response = await openaiClient.chat.completions.create({
+				model: 'gpt-4o-mini',
+				messages,
+				temperature: 0.3,
+			});
+		}
 
-		return completion.choices[0].message.content;
+		return response.choices[0].message.content;
 	} catch (error) {
 		console.error('❌ Erro no GPT:', error.message);
 		if (error.status === 401 || error.message.includes('authentication')) {
@@ -705,24 +711,20 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 	}
 
 	try {
-		// const stream = await openaiClient.chat.completions.create({
-		// 	model: 'gpt-4o-mini',
-		// 	messages,
-		// 	temperature: 0.3,
-		// 	stream: true,
-		// });
+		let stream;
 
-		// ✅ Mock simples de stream
-		async function* fakeStream() {
-			const tokens = ['Olá', ' ', 'Thiago', '! ', 'Isso ', 'é ', 'um ', 'mock ', '🚀'];
-			for (const t of tokens) {
-				// simula atraso entre tokens
-				await new Promise(r => setTimeout(r, 100));
-				yield { choices: [{ delta: { content: t } }] };
-			}
+		if (USE_FAKE_STREAM_GPT) {
+			// usa o mock
+			stream = fakeStreamGPT();
+		} else {
+			// usa o OpenAI real
+			stream = await openaiClient.chat.completions.create({
+				model: 'gpt-4o-mini',
+				messages,
+				temperature: 0.3,
+				stream: true,
+			});
 		}
-		const stream = fakeStream();
-		// ✅ FIM - Mock simples de stream
 
 		for await (const chunk of stream) {
 			const token = chunk.choices?.[0]?.delta?.content;
@@ -742,6 +744,22 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 		}
 	}
 });
+
+// ✅ Mock simples para simular stream
+async function* fakeStreamGPT() {
+	const response = 'Olá Thiago! Isso é um mock de resposta simulando o GPT 🚀';
+
+	// Quebra em pedaços variáveis (como se fossem tokens/chunks)
+	const chunks = response.match(/.{1,8}/g); // pedaços de até 8 caracteres
+
+	for (const chunk of chunks) {
+		// Delay aleatório entre 50ms e 200ms
+		const delay = 50 + Math.random() * 150;
+		await new Promise(r => setTimeout(r, delay));
+
+		yield { choices: [{ delta: { content: chunk } }] };
+	}
+}
 
 /* ================================
    HANDLERS IPC - CONTROLE DA JANELA
@@ -1171,23 +1189,22 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 			},
 		];
 
-		// 🚀 Envia para OpenAI Vision (gpt-4o)
-		console.log('🚀 Enviando para OpenAI Vision API...');
-		// const response = await openaiClient.chat.completions.create({
-		// 	model: 'gpt-4o-mini', // Modelo com suporte a visão (gpt-4o)
-		// 	messages,
-		// 	max_tokens: 2000,
-		// 	temperature: 0.3,
-		// });
+		let response;
 
-		// ✅ Mock simples
-		const response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
-		// ✅ FIM - Mock simples
+		if (USE_FAKE_STREAM_GPT) {
+			// usa o mock
+			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
+		} else {
+			// usa o OpenAI real
+			response = await openaiClient.chat.completions.create({
+				model: 'gpt-4o-mini', // Modelo com suporte a visão (gpt-4o)
+				messages,
+				max_tokens: 2000,
+				temperature: 0.3,
+			});
+		}
 
 		const analysis = response.choices[0].message.content;
-
-		console.log('✅ Análise concluída');
-		console.log(`📝 Resposta: ${analysis.substring(0, 100)}...`);
 
 		// 🔄 Limpeza de imagens antigas maior que 5 minutos
 		cleanupScreenshots();

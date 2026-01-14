@@ -2358,7 +2358,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 	debugLogConfig('Fim da função: "DOMContentLoaded"');
 });
 
-// Função de log debug estilizado
-function debugLogConfig(msg) {
-	console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
+/* ===============================
+   FUNÇÃO PARA LOGAR 
+=============================== */
+
+/**
+ * Log de debug padronizado para config-manager.js
+ * @param {*} msg
+ * @param {boolean} showLog
+ */
+function debugLogConfig(msg, showLog = false) {
+	if (showLog) {
+		console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
+	}
 }
