@@ -933,8 +933,6 @@ function finalizeCurrentQuestion() {
 
 	// ⚠️ No modo entrevista, NÃO abortar o fechamento
 	if (ModeController.isInterviewMode()) {
-		console.log('⚠️ looksLikeQuestion=false, mas modo entrevista ativo — forçando fechamento');
-
 		currentQuestion.text = finalizeQuestion(currentQuestion.text);
 		currentQuestion.lastUpdateTime = Date.now();
 		currentQuestion.finalized = true;

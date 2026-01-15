@@ -3,11 +3,10 @@
  *
  * Implementação isolada de transcrição com Deepgram Live Streaming.
  * - Captura áudio diretamente via WebSocket (sem IPC para dados binários)
- * - Consolida interim results em transcrições finais
- * - Converge para handleSpeech() como outros providers (Whisper, Vosk)
+ * - Consolida interim results e transcrições finais
  *
  * Uso:
- * - startAudioDeepgram() -> startDeepgramInput() / stopDeepgramInput() para capturar microfone
+ * - startAudioDeepgram() -> startDeepgramInput() / stopDeepgramInput() para capturar entrada
  * - startAudioDeepgram() -> startDeepgramOutput() / stopDeepgramOutput() para capturar saída
  */
 
@@ -19,6 +18,8 @@ const { ipcRenderer } = require('electron');
 /* ================================
    CONSTANTES
 ================================ */
+const USE_DEEPGRAM_MOCK = false; // Ativa mock para testes sem Deepgram real
+
 const YOU = 'Você'; // Autor das transcrições de entrada
 const OTHER = 'Outros'; // Autor das transcrições de saída
 
@@ -66,6 +67,8 @@ const deepgramVars = {
 		setAudioContext: val => (deepgramInputAudioContext = val),
 		lastActive: Date.now(),
 		inSilence: false,
+		noiseStartTime: null, // 🔥 NOVO: Rastreia quando o ruído começou
+		finalizeTriggered: false, // 🔥 NOVO: Garante que o próximo final dispare o GPT
 	},
 	output: {
 		ws: () => deepgramOutputWebSocket,
@@ -80,6 +83,8 @@ const deepgramVars = {
 		setAudioContext: val => (deepgramOutputAudioContext = val),
 		lastActive: Date.now(),
 		inSilence: false,
+		noiseStartTime: null, // 🔥 NOVO: Rastreia quando o ruído começou
+		finalizeTriggered: false, // 🔥 NOVO: Garante que o próximo final dispare o GPT
 	},
 };
 
@@ -122,7 +127,7 @@ async function startDeepgramInput(UIElements) {
 		console.log(`🔊 Iniciando captura INPUT com dispositivo: ${inputDeviceId}`);
 
 		// Inicializa WebSocket usando função genérica
-		const ws = await initDeepgramWS('input');
+		const ws = USE_DEEPGRAM_MOCK ? initDeepgramWSMock() : await initDeepgramWS('input');
 
 		// Define flags globais
 		deepgramInputWebSocket = ws;
@@ -133,7 +138,12 @@ async function startDeepgramInput(UIElements) {
 		console.log('🎤 Solicitando acesso à entrada de áudio (Microfone)...');
 
 		deepgramInputStream = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: inputDeviceId } },
+			audio: {
+				deviceId: { exact: inputDeviceId },
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false,
+			},
 		});
 
 		console.log('✅ Entrada de áudio autorizada');
@@ -148,11 +158,18 @@ async function startDeepgramInput(UIElements) {
 
 		const source = deepgramInputAudioContext.createMediaStreamSource(deepgramInputStream);
 
+		// 🔥 NOVO: Filtro Passa-Alta para supressão de ruído (ventilador, respiração)
+		// Corta frequências abaixo de 200Hz que não são essenciais para a fala mas contêm muito ruído.
+		const hpf = deepgramInputAudioContext.createBiquadFilter();
+		hpf.type = 'highpass';
+		hpf.frequency.value = 200; // Ajuste fino para cortar ar do ventilador
+		hpf.Q.value = 1;
+
 		// Cria AudioWorkletNode em vez de ScriptProcessor
 		deepgramInputProcessor = new AudioWorkletNode(deepgramInputAudioContext, 'deepgram-audio-worklet-processor');
 
-		// Define threshold para input (microfone) - ajustado para capturar mais
-		deepgramInputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.01 });
+		// Define threshold para input - Ajustado para ignorar silêncio ruidoso
+		deepgramInputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.02 });
 
 		// Escuta mensagens do worklet
 		deepgramInputProcessor.port.onmessage = event => {
@@ -171,7 +188,9 @@ async function startDeepgramInput(UIElements) {
 			}
 		};
 
-		source.connect(deepgramInputProcessor);
+		// Conecta fluxo: Source -> HighPassFilter -> Worklet
+		source.connect(hpf);
+		hpf.connect(deepgramInputProcessor);
 		deepgramInputProcessor.connect(deepgramInputAudioContext.destination);
 
 		console.log('▶️ Captura Deepgram INPUT iniciada');
@@ -202,7 +221,7 @@ async function startDeepgramOutput(UIElements) {
 		console.log(`🔊 Iniciando captura OUTPUT com dispositivo: ${outputDeviceId}`);
 
 		// Inicializa WebSocket usando função genérica
-		const ws = await initDeepgramWS('output');
+		const ws = USE_DEEPGRAM_MOCK ? initDeepgramWSMock() : await initDeepgramWS('output');
 
 		// Define flags globais
 		deepgramOutputWebSocket = ws;
@@ -213,7 +232,12 @@ async function startDeepgramOutput(UIElements) {
 		console.log('🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)...');
 
 		deepgramOutputStream = await navigator.mediaDevices.getUserMedia({
-			audio: { deviceId: { exact: outputDeviceId } },
+			audio: {
+				deviceId: { exact: outputDeviceId },
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false, // Evita que o volume suba no silêncio, expondo ruído residual
+			},
 		});
 
 		console.log('✅ Saída de áudio autorizada');
@@ -228,11 +252,18 @@ async function startDeepgramOutput(UIElements) {
 		// Cria MediaStreamSource a partir do stream capturado
 		const source = deepgramOutputAudioContext.createMediaStreamSource(deepgramOutputStream);
 
+		// 🔥 NOVO: Filtro Passa-Alta para supressão de ruído (ventilador, respiração)
+		// Corta frequências abaixo de 200Hz que não são essenciais para a fala mas contêm muito ruído.
+		const hpf = deepgramOutputAudioContext.createBiquadFilter();
+		hpf.type = 'highpass';
+		hpf.frequency.value = 200; // Ajuste fino para cortar ar do ventilador
+		hpf.Q.value = 1;
+
 		// Cria AudioWorkletNode em vez de ScriptProcessor
 		deepgramOutputProcessor = new AudioWorkletNode(deepgramOutputAudioContext, 'deepgram-audio-worklet-processor');
 
-		// Define threshold para output (VoiceMeter) - ainda mais baixo para capturar finais de fala
-		deepgramOutputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.005 });
+		// Define threshold para output - Ajustado para ignorar silêncio ruidoso
+		deepgramOutputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.002 });
 
 		// Escuta mensagens do worklet
 		deepgramOutputProcessor.port.onmessage = event => {
@@ -247,11 +278,13 @@ async function startDeepgramOutput(UIElements) {
 				}
 
 				// Trata detecção de silêncio
-				handleSilenceDetection('output', percent, 300); // 300ms para output
+				handleSilenceDetection('output', percent, 250);
 			}
 		};
 
-		source.connect(deepgramOutputProcessor);
+		// Conecta fluxo: Source -> HighPassFilter -> Worklet
+		source.connect(hpf);
+		hpf.connect(deepgramOutputProcessor);
 		deepgramOutputProcessor.connect(deepgramOutputAudioContext.destination);
 
 		console.log('▶️ Captura Deepgram OUTPUT iniciada');
@@ -263,9 +296,64 @@ async function startDeepgramOutput(UIElements) {
 	}
 }
 
+// Trata detecção de silêncio com base no volume percentual
+function handleSilenceDetection(source, percent, silenceTimeout = 500) {
+	// NOSONAR console.log(`🔊 ${source} volume: ${percent.toFixed(2)}%`);
+
+	const vars = deepgramVars[source];
+
+	// Constantes de debouncing
+	const NOISE_IGNORE_THRESHOLD = 250; //ms - ignora picos de ruído se já estiver em silêncio
+
+	if (percent > 0) {
+		if (vars.inSilence) {
+			// Se está em silêncio mas detectou som, inicia timer de ruído
+			if (!vars.noiseStartTime) vars.noiseStartTime = Date.now();
+
+			const noiseDuration = Date.now() - vars.noiseStartTime;
+			if (noiseDuration > NOISE_IGNORE_THRESHOLD) {
+				// Só quebra o silêncio se o som for persistente (fala real)
+				vars.inSilence = false;
+				vars.noiseStartTime = null;
+
+				// NOSONAR
+				console.log('🔊 Fala real detectada (som persistente): ', percent.toFixed(2), '%');
+			}
+		} else {
+			// Se não está em silêncio, apenas atualiza o tempo de atividade
+			vars.lastActive = Date.now();
+			vars.noiseStartTime = null;
+		}
+	} else {
+		// Se está em silêncio absoluto (percent 0), reseta timer de ruído
+		vars.noiseStartTime = null;
+
+		const elapsed = Date.now() - vars.lastActive;
+		if (elapsed >= silenceTimeout && !vars.inSilence) {
+			vars.inSilence = true;
+			vars.finalizeTriggered = true; // 🔥 Trava a intenção de finalizar
+
+			// NOSONAR
+			console.log('***** 🔇 Silêncio detectado (estável)! *****');
+
+			// enviar comando Finalize para Deepgram
+			sendDeepgramFinalize(source);
+		}
+	}
+}
+
 /* ================================
    INICIALIZAÇÃO DO WEBSOCKET
 ================================ */
+
+// Mock simples para não abrir conexão real
+function initDeepgramWSMock() {
+	return {
+		readyState: WebSocket.CLOSED, // nunca abre
+		send: data => console.log('Simulação: dados de áudio capturados', data),
+		close: () => console.log('Simulação: conexão fechada'),
+	};
+}
 
 /**
  * Inicializa conexão WebSocket com Deepgram (genérica para input/output)
@@ -293,13 +381,14 @@ async function initDeepgramWS(source = 'input') {
 	const params = new URLSearchParams({
 		model: 'nova-3',
 		language: 'pt-BR',
-		smart_format: 'true',
-		punctuate: 'true', // Melhor pontuação
-		interim_results: 'true',
-		encoding: 'linear16',
-		sample_rate: '16000',
-		endpointing: '300', // Detecta pausas naturais
+		encoding: 'linear16', // PCM16
+		sample_rate: '16000', // 16kHz
+		smart_format: 'true', // Formatação inteligente
+		interim_results: 'true', // Habilita interim results
 		utterance_end_ms: '1000', // Finaliza a frase após 1s de silêncio
+		endpointing: '10', // Detecta pausas naturais
+		keyterm: ['JDK', 'JRE', 'JVM', 'P.O.O', 'TDD', 'BDD', 'DDD', 'DLT', 'SOLID', 'MVC'], // Termos técnicos comuns
+		punctuate: 'true', // Melhor pontuação
 		utterances: 'true', // Habilita timestamps de utterances para calcular duração real da fala
 	});
 
@@ -387,6 +476,21 @@ function stopDeepgramHeartbeat(source) {
 	}
 }
 
+/**
+ * Envia comando "Finalize" para Deepgram para forçar processamento imediato do buffer de áudio pendente
+ */
+function sendDeepgramFinalize(source) {
+	const ws = source === 'input' ? deepgramInputWebSocket : deepgramOutputWebSocket;
+
+	if (ws && ws.readyState === WebSocket.OPEN) {
+		try {
+			ws.send(JSON.stringify({ type: 'Finalize' }));
+		} catch (e) {
+			console.error(`❌ Erro ao enviar Finalize ${source}:`, e);
+		}
+	}
+}
+
 /* ================================
    PROCESSAMENTO DE MENSAGENS
 ================================ */
@@ -452,6 +556,10 @@ function handleInterimDeepgramMessage(source, transcript) {
 function handleFinalDeepgramMessage(source, transcript) {
 	console.log(`📝 ✅ Handle FINAL [${source.toUpperCase()}]: "${transcript}"`);
 
+	const vars = deepgramVars[source];
+	// 🔥 NOVO: Consideramos silêncio se a flag está ativa OU se acabamos de disparar um Finalize
+	const shouldFinalize = vars.inSilence || vars.finalizeTriggered;
+
 	// Calcular métricas de timing
 	const isInput = source === 'input';
 	const author = isInput ? YOU : OTHER;
@@ -507,51 +615,12 @@ function handleFinalDeepgramMessage(source, transcript) {
 	if (!isInput && globalThis.RendererAPI?.handleCurrentQuestion) {
 		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, {
 			isInterim: false,
-			inSilence: deepgramVars[source].inSilence,
+			inSilence: shouldFinalize,
 		});
 	}
-}
 
-// Trata detecção de silêncio com base no volume percentual
-function handleSilenceDetection(source, percent, silenceTimeout = 1000) {
-	// NOSONAR console.log(`🔊 ${source} volume: ${percent.toFixed(2)}%`);
-
-	const vars = deepgramVars[source];
-	let { lastActive, inSilence } = vars;
-
-	if (percent > 0) {
-		vars.lastActive = Date.now();
-		if (inSilence) {
-			// NOSONAR
-			console.log('🔊 Som voltou: ', percent.toFixed(2), '%');
-			vars.inSilence = false;
-		}
-	} else {
-		const elapsed = Date.now() - lastActive;
-		if (elapsed >= silenceTimeout && !inSilence) {
-			// NOSONAR
-			console.log('***** 🔇 Silêncio detectado! *****');
-			vars.inSilence = true;
-
-			// enviar comando Finalize para Deepgram
-			sendDeepgramFinalize(source);
-		}
-	}
-}
-
-/**
- * Envia comando "Finalize" para Deepgram para forçar processamento imediato do buffer de áudio pendente
- */
-function sendDeepgramFinalize(source) {
-	const ws = source === 'input' ? deepgramInputWebSocket : deepgramOutputWebSocket;
-
-	if (ws && ws.readyState === WebSocket.OPEN) {
-		try {
-			ws.send(JSON.stringify({ type: 'Finalize' }));
-		} catch (e) {
-			console.error(`❌ Erro ao enviar Finalize ${source}:`, e);
-		}
-	}
+	// Reset da flag de trigger após processar a mensagem final
+	vars.finalizeTriggered = false;
 }
 
 /* ================================
