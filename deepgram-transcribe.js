@@ -37,10 +37,17 @@ let isDeepgramOutputActive = false;
 let deepgramInputAudioContext = null;
 let deepgramInputStream = null;
 let deepgramInputProcessor = null;
+let deepgramInputSource = null; // MediaStreamSource para input
+let deepgramInputHPF = null; // High-pass filter para input
 
 let deepgramOutputAudioContext = null;
 let deepgramOutputStream = null;
 let deepgramOutputProcessor = null;
+let deepgramOutputSource = null; // MediaStreamSource para output
+let deepgramOutputHPF = null; // High-pass filter para output
+
+let isSwitchingInput = false;
+let isSwitchingOutput = false;
 
 // 🔥 Keepalive para evitar timeout 1011 do Deepgram
 // Envia mensagem JSON {"type": "KeepAlive"} a cada 5 segundos
@@ -156,14 +163,15 @@ async function startDeepgramInput(UIElements) {
 		// Carrega o AudioWorklet
 		await deepgramInputAudioContext.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
 
-		const source = deepgramInputAudioContext.createMediaStreamSource(deepgramInputStream);
+		// Cria MediaStreamSource e guarda em variável global para permitir troca dinâmica
+		deepgramInputSource = deepgramInputAudioContext.createMediaStreamSource(deepgramInputStream);
 
 		// 🔥 NOVO: Filtro Passa-Alta para supressão de ruído (ventilador, respiração)
 		// Corta frequências abaixo de 200Hz que não são essenciais para a fala mas contêm muito ruído.
-		const hpf = deepgramInputAudioContext.createBiquadFilter();
-		hpf.type = 'highpass';
-		hpf.frequency.value = 200; // Ajuste fino para cortar ar do ventilador
-		hpf.Q.value = 1;
+		deepgramInputHPF = deepgramInputAudioContext.createBiquadFilter();
+		deepgramInputHPF.type = 'highpass';
+		deepgramInputHPF.frequency.value = 200; // Ajuste fino para cortar ar do ventilador
+		deepgramInputHPF.Q.value = 1;
 
 		// Cria AudioWorkletNode em vez de ScriptProcessor
 		deepgramInputProcessor = new AudioWorkletNode(deepgramInputAudioContext, 'deepgram-audio-worklet-processor');
@@ -189,8 +197,8 @@ async function startDeepgramInput(UIElements) {
 		};
 
 		// Conecta fluxo: Source -> HighPassFilter -> Worklet
-		source.connect(hpf);
-		hpf.connect(deepgramInputProcessor);
+		deepgramInputSource.connect(deepgramInputHPF);
+		deepgramInputHPF.connect(deepgramInputProcessor);
 		deepgramInputProcessor.connect(deepgramInputAudioContext.destination);
 
 		console.log('▶️ Captura Deepgram INPUT iniciada');
@@ -249,21 +257,21 @@ async function startDeepgramOutput(UIElements) {
 		// Carrega o AudioWorklet
 		await deepgramOutputAudioContext.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
 
-		// Cria MediaStreamSource a partir do stream capturado
-		const source = deepgramOutputAudioContext.createMediaStreamSource(deepgramOutputStream);
+		// Cria MediaStreamSource a partir do stream capturado e guarda para troca dinâmica
+		deepgramOutputSource = deepgramOutputAudioContext.createMediaStreamSource(deepgramOutputStream);
 
 		// 🔥 NOVO: Filtro Passa-Alta para supressão de ruído (ventilador, respiração)
 		// Corta frequências abaixo de 200Hz que não são essenciais para a fala mas contêm muito ruído.
-		const hpf = deepgramOutputAudioContext.createBiquadFilter();
-		hpf.type = 'highpass';
-		hpf.frequency.value = 200; // Ajuste fino para cortar ar do ventilador
-		hpf.Q.value = 1;
+		deepgramOutputHPF = deepgramOutputAudioContext.createBiquadFilter();
+		deepgramOutputHPF.type = 'highpass';
+		deepgramOutputHPF.frequency.value = 200; // Ajuste fino para cortar ar do ventilador
+		deepgramOutputHPF.Q.value = 1;
 
 		// Cria AudioWorkletNode em vez de ScriptProcessor
 		deepgramOutputProcessor = new AudioWorkletNode(deepgramOutputAudioContext, 'deepgram-audio-worklet-processor');
 
 		// Define threshold para output - Ajustado para ignorar silêncio ruidoso
-		deepgramOutputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.002 });
+		deepgramOutputProcessor.port.postMessage({ type: 'setThreshold', threshold: 0.005 });
 
 		// Escuta mensagens do worklet
 		deepgramOutputProcessor.port.onmessage = event => {
@@ -278,13 +286,13 @@ async function startDeepgramOutput(UIElements) {
 				}
 
 				// Trata detecção de silêncio
-				handleSilenceDetection('output', percent, 250);
+				handleSilenceDetection('output', percent, 700);
 			}
 		};
 
 		// Conecta fluxo: Source -> HighPassFilter -> Worklet
-		source.connect(hpf);
-		hpf.connect(deepgramOutputProcessor);
+		deepgramOutputSource.connect(deepgramOutputHPF);
+		deepgramOutputHPF.connect(deepgramOutputProcessor);
 		deepgramOutputProcessor.connect(deepgramOutputAudioContext.destination);
 
 		console.log('▶️ Captura Deepgram OUTPUT iniciada');
@@ -303,7 +311,7 @@ function handleSilenceDetection(source, percent, silenceTimeout = 500) {
 	const vars = deepgramVars[source];
 
 	// Constantes de debouncing
-	const NOISE_IGNORE_THRESHOLD = 250; //ms - ignora picos de ruído se já estiver em silêncio
+	const NOISE_IGNORE_THRESHOLD = 200; //ms - ignora picos de ruído se já estiver em silêncio
 
 	if (percent > 0) {
 		if (vars.inSilence) {
@@ -311,7 +319,22 @@ function handleSilenceDetection(source, percent, silenceTimeout = 500) {
 			if (!vars.noiseStartTime) vars.noiseStartTime = Date.now();
 
 			const noiseDuration = Date.now() - vars.noiseStartTime;
-			if (noiseDuration > NOISE_IGNORE_THRESHOLD) {
+
+			//----------- Logs detalhados para debug
+			const now = new Date();
+			const timeStr =
+				`${now.getHours().toString().padStart(2, '0')}:` +
+				`${now.getMinutes().toString().padStart(2, '0')}:` +
+				`${now.getSeconds().toString().padStart(2, '0')}.` +
+				`${now.getMilliseconds().toString().padStart(3, '0')}`;
+			console.log(
+				`🔊 ${source} | noiseDuration: ${noiseDuration} > NOISE_IGNORE_THRESHOLD: ${NOISE_IGNORE_THRESHOLD} - volume: ${percent.toFixed(
+					2,
+				)}% | ${timeStr}`,
+			);
+			//----------- Fim dos logs detalhados
+
+			if (noiseDuration >= NOISE_IGNORE_THRESHOLD) {
 				// Só quebra o silêncio se o som for persistente (fala real)
 				vars.inSilence = false;
 				vars.noiseStartTime = null;
@@ -323,13 +346,38 @@ function handleSilenceDetection(source, percent, silenceTimeout = 500) {
 			// Se não está em silêncio, apenas atualiza o tempo de atividade
 			vars.lastActive = Date.now();
 			vars.noiseStartTime = null;
+
+			//----------- Logs detalhados para debug
+			const now = new Date();
+			const timeStr =
+				`${now.getHours().toString().padStart(2, '0')}:` +
+				`${now.getMinutes().toString().padStart(2, '0')}:` +
+				`${now.getSeconds().toString().padStart(2, '0')}.` +
+				`${now.getMilliseconds().toString().padStart(3, '0')}`;
+			console.log(`🔊 ${source} | vars.inSilence: ${vars.inSilence} - volume: ${percent.toFixed(2)}% | ${timeStr}`);
+			//----------- Fim dos logs detalhados
 		}
 	} else {
 		// Se está em silêncio absoluto (percent 0), reseta timer de ruído
 		vars.noiseStartTime = null;
 
 		const elapsed = Date.now() - vars.lastActive;
+
 		if (elapsed >= silenceTimeout && !vars.inSilence) {
+			//----------- Logs detalhados para debug
+			const now = new Date();
+			const timeStr =
+				`${now.getHours().toString().padStart(2, '0')}:` +
+				`${now.getMinutes().toString().padStart(2, '0')}:` +
+				`${now.getSeconds().toString().padStart(2, '0')}.` +
+				`${now.getMilliseconds().toString().padStart(3, '0')}`;
+			console.log(
+				`🔊 ${source} | elapsed: ${elapsed} >= silenceTimeout: ${silenceTimeout} !vars.inSilence: ${!vars.inSilence} - volume: ${percent.toFixed(
+					2,
+				)}% | ${timeStr}`,
+			);
+			//----------- Fim dos logs detalhados
+
 			vars.inSilence = true;
 			vars.finalizeTriggered = true; // 🔥 Trava a intenção de finalizar
 
@@ -380,13 +428,13 @@ async function initDeepgramWS(source = 'input') {
 	// Monta URL com parâmetros (token é passado na URL para evitar erros 401)
 	const params = new URLSearchParams({
 		model: 'nova-3',
-		language: 'pt-BR',
+		language: 'multi',
 		encoding: 'linear16', // PCM16
 		sample_rate: '16000', // 16kHz
 		smart_format: 'true', // Formatação inteligente
 		interim_results: 'true', // Habilita interim results
 		utterance_end_ms: '1000', // Finaliza a frase após 1s de silêncio
-		endpointing: '10', // Detecta pausas naturais
+		endpointing: '100', // Detecta pausas naturais
 		keyterm: ['JDK', 'JRE', 'JVM', 'P.O.O', 'TDD', 'BDD', 'DDD', 'DLT', 'SOLID', 'MVC'], // Termos técnicos comuns
 		punctuate: 'true', // Melhor pontuação
 		utterances: 'true', // Habilita timestamps de utterances para calcular duração real da fala
@@ -488,6 +536,135 @@ function sendDeepgramFinalize(source) {
 		} catch (e) {
 			console.error(`❌ Erro ao enviar Finalize ${source}:`, e);
 		}
+	}
+}
+
+/**
+ * Troca dinâmica do dispositivo de INPUT enquanto Deepgram está ativo
+ * @param {string} newDeviceId
+ */
+async function switchDeepgramInputDevice(newDeviceId) {
+	if (isSwitchingInput) {
+		console.warn('Já em processo de troca de dispositivo INPUT');
+		return;
+	}
+	if (!deepgramVars.input.isActive()) {
+		console.warn('Deepgram INPUT não está ativo; nada a trocar');
+		return;
+	}
+
+	isSwitchingInput = true;
+	try {
+		// Opcional: pede ao Deepgram para finalizar buffer atual
+		sendDeepgramFinalize('input');
+
+		// Adquire novo MediaStream para o device solicitado
+		const newStream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				deviceId: { exact: newDeviceId },
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false,
+			},
+		});
+
+		// Cria nova source e conecta ao HPF existente (ou cria HPF se necessário)
+		const newSource = deepgramInputAudioContext.createMediaStreamSource(newStream);
+		if (!deepgramInputHPF) {
+			deepgramInputHPF = deepgramInputAudioContext.createBiquadFilter();
+			deepgramInputHPF.type = 'highpass';
+			deepgramInputHPF.frequency.value = 150;
+			deepgramInputHPF.Q.value = 1;
+		}
+
+		// Desconecta antiga source
+		try {
+			if (deepgramInputSource) deepgramInputSource.disconnect();
+		} catch (e) {}
+
+		// Conecta nova source -> HPF -> processor
+		newSource.connect(deepgramInputHPF);
+		deepgramInputHPF.connect(deepgramInputProcessor);
+
+		// Para evitar leaks, para tracks do stream anterior
+		if (deepgramInputStream) {
+			try {
+				deepgramInputStream.getTracks().forEach(t => t.stop());
+			} catch (e) {}
+		}
+
+		// Atualiza referências
+		deepgramInputStream = newStream;
+		deepgramInputSource = newSource;
+		deepgramVars.input.setStream(newStream);
+
+		console.log('✅ Troca de dispositivo INPUT concluída');
+	} catch (e) {
+		console.error('❌ Falha ao trocar dispositivo INPUT:', e);
+		throw e;
+	} finally {
+		isSwitchingInput = false;
+	}
+}
+
+/**
+ * Troca dinâmica do dispositivo de OUTPUT enquanto Deepgram está ativo
+ * @param {string} newDeviceId
+ */
+async function switchDeepgramOutputDevice(newDeviceId) {
+	if (isSwitchingOutput) {
+		console.warn('Já em processo de troca de dispositivo OUTPUT');
+		return;
+	}
+	if (!deepgramVars.output.isActive()) {
+		console.warn('Deepgram OUTPUT não está ativo; nada a trocar');
+		return;
+	}
+
+	isSwitchingOutput = true;
+	try {
+		sendDeepgramFinalize('output');
+
+		const newStream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				deviceId: { exact: newDeviceId },
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false,
+			},
+		});
+
+		const newSource = deepgramOutputAudioContext.createMediaStreamSource(newStream);
+		if (!deepgramOutputHPF) {
+			deepgramOutputHPF = deepgramOutputAudioContext.createBiquadFilter();
+			deepgramOutputHPF.type = 'highpass';
+			deepgramOutputHPF.frequency.value = 150;
+			deepgramOutputHPF.Q.value = 1;
+		}
+
+		try {
+			if (deepgramOutputSource) deepgramOutputSource.disconnect();
+		} catch (e) {}
+
+		newSource.connect(deepgramOutputHPF);
+		deepgramOutputHPF.connect(deepgramOutputProcessor);
+
+		if (deepgramOutputStream) {
+			try {
+				deepgramOutputStream.getTracks().forEach(t => t.stop());
+			} catch (e) {}
+		}
+
+		deepgramOutputStream = newStream;
+		deepgramOutputSource = newSource;
+		deepgramVars.output.setStream(newStream);
+
+		console.log('✅ Troca de dispositivo OUTPUT concluída');
+	} catch (e) {
+		console.error('❌ Falha ao trocar dispositivo OUTPUT:', e);
+		throw e;
+	} finally {
+		isSwitchingOutput = false;
 	}
 }
 
@@ -709,6 +886,35 @@ function stopDeepgram(source) {
 		vars.setStream(null);
 	}
 
+	// Desconecta e limpa MediaStreamSource/HPF se existirem
+	if (source === 'input') {
+		if (deepgramInputSource) {
+			try {
+				deepgramInputSource.disconnect();
+			} catch (e) {}
+			deepgramInputSource = null;
+		}
+		if (deepgramInputHPF) {
+			try {
+				deepgramInputHPF.disconnect();
+			} catch (e) {}
+			deepgramInputHPF = null;
+		}
+	} else if (source === 'output') {
+		if (deepgramOutputSource) {
+			try {
+				deepgramOutputSource.disconnect();
+			} catch (e) {}
+			deepgramOutputSource = null;
+		}
+		if (deepgramOutputHPF) {
+			try {
+				deepgramOutputHPF.disconnect();
+			} catch (e) {}
+			deepgramOutputHPF = null;
+		}
+	}
+
 	const audioContext = vars.audioContext();
 	if (audioContext) {
 		audioContext.close();
@@ -726,4 +932,6 @@ function stopDeepgram(source) {
 module.exports = {
 	startAudioDeepgram,
 	stopAudioDeepgram,
+	switchDeepgramInputDevice,
+	switchDeepgramOutputDevice,
 };

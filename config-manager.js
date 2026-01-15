@@ -303,6 +303,8 @@ class ConfigManager {
 
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
 					if (input.id === 'audio-input-device') {
+						console.log('📝 Input device mudou');
+
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
 						if (globalThis.RendererAPI?.stopInput) {
 							globalThis.RendererAPI.stopInput().catch(err => {
@@ -311,8 +313,15 @@ class ConfigManager {
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
 							this.restartInputMonitoring();
+
+							// Emite evento para notificar mudança de dispositivo (renderer fica cego ao DOM)
+							if (globalThis.RendererAPI?.emitUIChange) {
+								globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'input', deviceId: input.value });
+							}
 						}
 					} else if (input.id === 'audio-output-device') {
+						console.log('📝 Output device mudou');
+
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
 						if (globalThis.RendererAPI?.stopOutput) {
 							globalThis.RendererAPI.stopOutput().catch(err => {
@@ -321,6 +330,11 @@ class ConfigManager {
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
 							this.restartOutputMonitoring();
+
+							// Emite evento para notificar mudança de dispositivo (renderer fica cego ao DOM)
+							if (globalThis.RendererAPI?.emitUIChange) {
+								globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
+							}
 						}
 					}
 				});
@@ -1887,38 +1901,6 @@ class ConfigManager {
 		if (!globalThis.RendererAPI) {
 			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI não disponível em registerDOMEventListeners!');
 			return;
-		}
-
-		// Input select
-		const inputSelect = document.getElementById('audio-input-device');
-		if (inputSelect) {
-			inputSelect.addEventListener('change', async () => {
-				console.log('📝 Input device mudou');
-				this.saveDevices();
-				if (globalThis.RendererAPI?.stopInput) {
-					globalThis.RendererAPI.stopInput();
-				}
-				if (!inputSelect.value) return;
-				if (globalThis.RendererAPI?.startInput) {
-					await globalThis.RendererAPI.startInput();
-				}
-			});
-		}
-
-		// Output select
-		const outputSelect = document.getElementById('audio-output-device');
-		if (outputSelect) {
-			outputSelect.addEventListener('change', async () => {
-				console.log('📝 Output device mudou');
-				this.saveDevices();
-				if (globalThis.RendererAPI?.stopOutput) {
-					globalThis.RendererAPI.stopOutput();
-				}
-				if (!outputSelect.value) return;
-				if (globalThis.RendererAPI?.startOutput) {
-					await globalThis.RendererAPI.startOutput();
-				}
-			});
 		}
 
 		// Mock toggle

@@ -4,7 +4,12 @@
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
-const { startAudioDeepgram, stopAudioDeepgram } = require('./deepgram-transcribe.js');
+const {
+	startAudioDeepgram,
+	stopAudioDeepgram,
+	switchDeepgramInputDevice,
+	switchDeepgramOutputDevice,
+} = require('./deepgram-transcribe.js');
 const { transcribeWhisperComplete, transcribeWhisperPartial } = require('./whisper-transcribe.js');
 const { transcribeVoskComplete, transcribeVoskPartial } = require('./vosk-transcribe.js');
 
@@ -226,6 +231,7 @@ const UICallbacks = {
 	onUpdateInterim: null,
 	onClearInterim: null,
 	onScreenshotBadgeUpdate: null,
+	onAudioDeviceChanged: null,
 };
 
 // Função para config-manager se inscrever em eventos
@@ -317,6 +323,32 @@ const ModeController = {
 		return this.isInterviewMode() ? Math.min(400, defaultSize) : defaultSize;
 	},
 };
+
+/* ===============================
+   EVENTOS DE CONFIGURAÇÃO / UI
+=============================== */
+
+// Escuta evento de mudança de dispositivo emitido pelo config-manager
+onUIChange('onAudioDeviceChanged', async data => {
+	try {
+		if (!isRunning) return; // só trocar se app estiver em execução
+
+		const sttModel = getConfiguredSTTModel();
+		if (sttModel !== 'deepgram') {
+			console.log('onAudioDeviceChanged: modelo STT atual não é Deepgram:', sttModel);
+			return;
+		}
+
+		if (!data || !data.type) return;
+		if (data.type === 'input') {
+			if (typeof switchDeepgramInputDevice === 'function') await switchDeepgramInputDevice(data.deviceId);
+		} else if (data.type === 'output') {
+			if (typeof switchDeepgramOutputDevice === 'function') await switchDeepgramOutputDevice(data.deviceId);
+		}
+	} catch (err) {
+		console.warn('Erro ao processar onAudioDeviceChanged:', err);
+	}
+});
 
 /* ===============================
    HELPERS PUROS
