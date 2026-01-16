@@ -2,10 +2,15 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 	constructor() {
 		super();
 		this.thresholdRms = 0.002; // Default, será sobrescrito por mensagem
+		this.frameBuffer = [];
+		this.postInterval = 0; // contador para controle de envio (se necessário)
+
 		this.port.onmessage = event => {
 			if (event.data.type === 'setThreshold') {
 				this.thresholdRms = event.data.threshold;
-				console.log(`🔧 Threshold RMS atualizado para: ${this.thresholdRms}`);
+			}
+			if (event.data.type === 'setPostIntervalMs') {
+				this.postIntervalMs = event.data.ms;
 			}
 		};
 	}
@@ -36,23 +41,22 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 		// 🔥 OTIMIZAÇÃO: Se abaixo do threshold, forçamos o percentual para 0 evitando ruído residual (ventilador, etc).
 		if (!isAboveThreshold) percent = 0;
 
-		// Se volume acima do threshold, processa e envia PCM16
-		if (isAboveThreshold) {
-			const pcm16 = new Int16Array(inputData.length);
-			for (let i = 0; i < inputData.length; i++) {
-				const s = Math.max(-1, Math.min(1, inputData[i]));
-				pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
-			}
-
-			// Envia dados para o thread principal
-			this.port.postMessage(
-				{
-					type: 'audioData',
-					pcm16: pcm16.buffer,
-				},
-				[pcm16.buffer],
-			);
+		// Converte sempre para PCM16 e envia --- envia continuamente para permitir VAD no lado do main thread
+		const pcm16 = new Int16Array(inputData.length);
+		for (let i = 0; i < inputData.length; i++) {
+			const s = Math.max(-1, Math.min(1, inputData[i]));
+			pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
 		}
+
+		// Envia dados para o thread principal
+		this.port.postMessage(
+			{
+				type: 'audioData',
+				pcm16: pcm16.buffer,
+				sampleRate: sampleRate || sampleRate, // placeholder (AudioWorkletProcessor global)
+			},
+			[pcm16.buffer],
+		);
 
 		// Sempre envia atualização de volume (pode ser 0 se estiver em silêncio ruidoso)
 		this.port.postMessage({

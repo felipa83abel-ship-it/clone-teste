@@ -1426,10 +1426,12 @@ class ConfigManager {
 				const container = transcriptionBox.parentElement;
 				if (container?.id === 'transcriptionContainer') {
 					container.scrollTop = container.scrollHeight;
-					console.log('📜 Auto-scroll para última transcrição', {
-						scrollTop: container.scrollTop,
-						scrollHeight: container.scrollHeight,
-					});
+
+					debugLogConfig(
+						'📜 Auto-scroll para última transcrição',
+						{ scrollTop: container.scrollTop, scrollHeight: container.scrollHeight },
+						false,
+					);
 				}
 			});
 		});
@@ -1652,7 +1654,7 @@ class ConfigManager {
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
 
-				console.log('📊 Total blocos agora:', answersHistoryBox.querySelectorAll('.answer-block').length);
+				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, true);
 			}
 
 			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
@@ -2101,6 +2103,7 @@ class ConfigManager {
 		// Toggle audio (global shortcut)
 		if (globalThis.RendererAPI?.onToggleAudio) {
 			globalThis.RendererAPI.onToggleAudio(() => {
+				// Começar a ouvir / Parar de ouvir (Ctrl+D)
 				if (globalThis.RendererAPI?.listenToggleBtn) {
 					globalThis.RendererAPI.listenToggleBtn();
 				}
@@ -2346,11 +2349,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /**
  * Log de debug padronizado para config-manager.js
+ * Por padrão nunca loga, se quiser mostrar é só passar true.
  * @param {*} msg
- * @param {boolean} showLog
+ * @param {boolean} showLog - true para mostrar, false para ignorar
  */
-function debugLogConfig(msg, showLog = false) {
+function debugLogConfig(...args) {
+	const maybeFlag = args.at(-1);
+	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+
+	const nowLog = new Date();
+	const timeStr =
+		`${nowLog.getHours().toString().padStart(2, '0')}:` +
+		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
+		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
+		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+
 	if (showLog) {
-		console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
+		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+		// prettier-ignore
+		console.log(
+			`%c🪲 [${timeStr}] ❯❯❯❯ Debug em config-manager.js: `, 
+			'color: orange; font-weight: bold;', 
+			...cleanArgs
+		);
 	}
 }

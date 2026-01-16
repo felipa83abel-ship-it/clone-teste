@@ -41,7 +41,7 @@ try {
    CONSTANTES
 =============================== */
 
-const USE_FAKE_STREAM_GPT = false; // 🤖 mude para false quando quiser usar o real 🤖
+const USE_FAKE_STREAM_GPT = false; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
 
 // Configuração de modelo Vosk (local)
 const VOSK_CONFIG = {

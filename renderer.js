@@ -4,12 +4,7 @@
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
-const {
-	startAudioDeepgram,
-	stopAudioDeepgram,
-	switchDeepgramInputDevice,
-	switchDeepgramOutputDevice,
-} = require('./deepgram-transcribe.js');
+const { startAudioDeepgram, stopAudioDeepgram, switchDeepgramDevice } = require('./deepgram-transcribe.js');
 const { transcribeWhisperComplete, transcribeWhisperPartial } = require('./whisper-transcribe.js');
 const { transcribeVoskComplete, transcribeVoskPartial } = require('./vosk-transcribe.js');
 
@@ -184,6 +179,8 @@ let gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta f
 let lastSentQuestionText = '';
 let autoCloseQuestionTimer = null;
 let currentQuestionSilenceTimer = null; // 🔥 Timer para detectar fim de fala no CURRENT
+// Timestamp para debounce de finalização (ms)
+let lastFinalizeRequestAt = 0;
 let lastInputStartAt = null;
 let lastInputStopAt = null;
 let lastOutputStartAt = null;
@@ -332,18 +329,12 @@ const ModeController = {
 onUIChange('onAudioDeviceChanged', async data => {
 	try {
 		if (!isRunning) return; // só trocar se app estiver em execução
+		if (!data || !data.type || !data.deviceId) return; // dados inválidos
 
+		// 🔥 ORQUESTRADOR: Roteia por modelo STT
 		const sttModel = getConfiguredSTTModel();
-		if (sttModel !== 'deepgram') {
-			console.log('onAudioDeviceChanged: modelo STT atual não é Deepgram:', sttModel);
-			return;
-		}
-
-		if (!data || !data.type) return;
-		if (data.type === 'input') {
-			if (typeof switchDeepgramInputDevice === 'function') await switchDeepgramInputDevice(data.deviceId);
-		} else if (data.type === 'output') {
-			if (typeof switchDeepgramOutputDevice === 'function') await switchDeepgramOutputDevice(data.deviceId);
+		if (sttModel === 'deepgram') {
+			if (typeof switchDeepgramDevice === 'function') await switchDeepgramDevice(data.type, data.deviceId);
 		}
 	} catch (err) {
 		console.warn('Erro ao processar onAudioDeviceChanged:', err);
@@ -683,7 +674,13 @@ async function startAudio() {
 				}
 			}
 
-			console.log('🎤 Roteando para startInputOutput (Vosk/OpenAI)');
+			// Modelo não suportado
+			if (sttModel === 'error') {
+				console.error('❌ Erro ao obter modelo STT configurado');
+				return;
+			}
+
+			console.log('🎤 Roteando para startInputOutput (Vosk/Whisper/OpenAI)');
 			await startInputOutput();
 		}
 	} catch (error) {
@@ -899,7 +896,7 @@ function handleCurrentQuestion(author, text, options = {}) {
 		currentQuestion.lastUpdateTime = now;
 		currentQuestion.lastUpdate = now;
 
-		console.log('currentQuestion antes: ', { ...currentQuestion });
+		debugLogRenderer('currentQuestion antes: ', { ...currentQuestion }, true);
 
 		// Lógica de consolidação para evitar duplicações
 		if (options.isInterim) {
@@ -911,13 +908,13 @@ function handleCurrentQuestion(author, text, options = {}) {
 			currentQuestion.finalText = (currentQuestion.finalText ? currentQuestion.finalText + ' ' : '') + cleaned;
 		}
 
-		console.log('currentQuestion durante: ', { ...currentQuestion });
+		debugLogRenderer('currentQuestion durante: ', { ...currentQuestion }, true);
 
 		// Atualizar o texto total
 		currentQuestion.text =
-			currentQuestion.finalText + (currentQuestion.interimText ? ' ' + currentQuestion.interimText : '');
+			currentQuestion.finalText.trim() + (currentQuestion.interimText ? ' ' + currentQuestion.interimText : '');
 
-		console.log('currentQuestion depois: ', { ...currentQuestion });
+		debugLogRenderer('currentQuestion depois: ', { ...currentQuestion }, true);
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
 		if (!selectedQuestionId) {
@@ -928,8 +925,9 @@ function handleCurrentQuestion(author, text, options = {}) {
 		// Adiciona TUDO à conversa visual em tempo real ao elemento "currentQuestionText"
 		renderCurrentQuestion();
 
-		if (options.inSilence) {
-			console.log('********  Está em silêncio, feche a pergunta e chame o GPT  ********');
+		// Só finaliza se estivermos em silêncio e NÃO for um interim
+		if (options.inSilence && !options.isInterim) {
+			debugLogRenderer('🟢 ********  Está em silêncio, feche a pergunta e chame o GPT 🤖 ******** 🟢', true);
 
 			// fecha/finaliza a pergunta atual
 			finalizeCurrentQuestion();
@@ -1058,7 +1056,7 @@ async function askGpt() {
 	if (ModeController.isInterviewMode()) {
 		let streamedText = '';
 
-		console.log('⏳ enviando para o GPT via stream...');
+		debugLogRenderer('⏳ enviando para o GPT via stream...', true);
 
 		ipcRenderer
 			.invoke('ask-gpt-stream', [
@@ -2124,6 +2122,7 @@ const RendererAPI = {
 		ipcRenderer.on('API_KEY_UPDATED', callback);
 	},
 	onToggleAudio: callback => {
+		// Começar a ouvir / Parar de ouvir (Ctrl+D)
 		ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
 	},
 	onAskGpt: callback => {
@@ -2186,12 +2185,29 @@ if (typeof globalThis !== 'undefined') {
 
 /**
  * Log de debug padronizado para renderer.js
+ * Por padrão nunca loga, se quiser mostrar é só passar true.
  * @param {*} msg
- * @param {boolean} showLog
+ * @param {boolean} showLog - true para mostrar, false para ignorar
  */
-function debugLogRenderer(msg, showLog = false) {
+function debugLogRenderer(...args) {
+	const maybeFlag = args.at(-1);
+	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+
+	const nowLog = new Date();
+	const timeStr =
+		`${nowLog.getHours().toString().padStart(2, '0')}:` +
+		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
+		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
+		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+
 	if (showLog) {
-		console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em renderer.js', 'color: brown; font-weight: bold;');
+		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+		// prettier-ignore
+		console.log(
+			`%c🪲 [${timeStr}] ❯❯❯❯ Debug em renderer.js:`,
+			'color: brown; font-weight: bold;', 
+			...cleanArgs
+		);
 	}
 }
 
@@ -2618,7 +2634,7 @@ function getConfiguredSTTModel() {
 		return sttModel;
 	} catch (err) {
 		console.error('❌ Erro ao obter modelo STT da config:', err);
-		return 'whisper-1'; // fallback
+		return 'error'; // fallback
 	}
 }
 
