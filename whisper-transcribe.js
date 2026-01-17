@@ -156,7 +156,18 @@ function getConfiguredSTTModel() {
 /* ================================
    EXPORTS (CommonJS)
 ================================ */
+function startAudioWhisperLocal() {
+	console.log('chamou startAudioWhisperLocal');
+}
+function stopAudioWhisperLocal() {
+	console.log('🛑 Whisper completamente parado');
+}
+function switchDeviceWhisperLocal() {
+	console.log('chamou switchDeviceWhisperLocal');
+}
+
 module.exports = {
-	transcribeWhisperComplete,
-	transcribeWhisperPartial,
+	startAudioWhisperLocal,
+	stopAudioWhisperLocal,
+	switchDeviceWhisperLocal,
 };

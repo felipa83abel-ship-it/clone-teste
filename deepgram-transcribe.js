@@ -340,7 +340,7 @@ async function initDeepgramWS(source = 'input') {
 }
 
 // Troca dinâmica do dispositivo Deepgram (input/output)
-async function changeDeepgramDevice(source, newDeviceId) {
+async function changeDeviceDeepgram(source, newDeviceId) {
 	const vars = deepgramVars[source];
 
 	// Verifica se já está trocando
@@ -797,10 +797,11 @@ function handleSilenceDetection(source, percent, silenceTimeout = 700) {
 			const noiseDuration = vars.noiseStartTime - vars.noiseStopTime;
 			vars.noiseStopTime = null;
 
-			console.log(`🟡 🟡 [${new Date().toISOString()}] 🔊 Fala real detectada após (${noiseDuration}ms)`);
+			console.log(`🟡 🟢 🟢 [${new Date().toISOString()}] 🔊 Fala real detectada após (${noiseDuration}ms)`);
 		}
 
 		vars.inSilence = false;
+		vars.shouldFinalizeAskCurrent = false;
 		vars.lastActive = now;
 		vars.noiseStartTime = null;
 	} else {
@@ -813,7 +814,7 @@ function handleSilenceDetection(source, percent, silenceTimeout = 700) {
 			vars.shouldFinalizeAskCurrent = true;
 			vars.noiseStopTime = Date.now();
 
-			console.log(`🟡 🟡 [${new Date().toISOString()}] ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`);
+			console.log(`🟡 🔴 🔴 [${new Date().toISOString()}] ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`);
 
 			// Dispara finalize apenas uma vez
 			sendDeepgramFinalize(source);
@@ -987,7 +988,7 @@ function handleFinalDeepgramMessage(source, transcript) {
 		}
 	}
 
-	// Para OUTPUT, atualizar CURRENT com final somente se detectamos silêncio.
+	// Para OUTPUT, atualizar CURRENT com a transcrição final
 	if (!isInput && globalThis.RendererAPI?.handleCurrentQuestion) {
 		// Atualiza CURRENT com a transcrição final
 		globalThis.RendererAPI.handleCurrentQuestion(author, transcript, {
@@ -1129,7 +1130,7 @@ function stopAudioDeepgram() {
 		// 🌊 Deepgram: Para INPUT e OUTPUT
 		stopDeepgram('input');
 		stopDeepgram('output');
-		console.log('🌊 Deepgram completamente parado');
+		console.log('🛑 Deepgram completamente parado');
 	} catch (error) {
 		console.error('❌ Erro ao parar Deepgram:', error);
 	}
@@ -1143,14 +1144,14 @@ function stopAudioDeepgram() {
  * @param {*} newDeviceId
  * @returns
  */
-async function switchDeepgramDevice(source, newDeviceId) {
-	debugLogRenderer('Início da função: "switchDeepgramDevice"');
-	debugLogRenderer('Fim da função: "switchDeepgramDevice"');
-	return await changeDeepgramDevice(source, newDeviceId);
+async function switchDeviceDeepgram(source, newDeviceId) {
+	debugLogRenderer('Início da função: "switchDeviceDeepgram"');
+	debugLogRenderer('Fim da função: "switchDeviceDeepgram"');
+	return await changeDeviceDeepgram(source, newDeviceId);
 }
 
 module.exports = {
 	startAudioDeepgram,
 	stopAudioDeepgram,
-	switchDeepgramDevice,
+	switchDeviceDeepgram,
 };

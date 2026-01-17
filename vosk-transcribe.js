@@ -113,7 +113,18 @@ function getConfiguredSTTModel() {
 /* ================================
    EXPORTS (CommonJS)
 ================================ */
+function startAudioVoskLocal() {
+	console.log('chamou startAudioVoskLocal');
+}
+function stopAudioVoskLocal() {
+	console.log('🛑 Vosk completamente parado');
+}
+function switchDeviceVoskLocal() {
+	console.log('chamou switchDeviceVoskLocal');
+}
+
 module.exports = {
-	transcribeVoskComplete,
-	transcribeVoskPartial,
+	startAudioVoskLocal,
+	stopAudioVoskLocal,
+	switchDeviceVoskLocal,
 };
