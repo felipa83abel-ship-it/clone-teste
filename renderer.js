@@ -869,18 +869,14 @@ function stopOutputVolumeMonitoring() {
 =============================== */
 
 /**
- * Fluxo específico para Deepgram
- * Similar ao handleSpeech, mas focado em consolidar transcrições no CURRENT
- * sem lógicas de fechamento ou detecção de perguntas. Apenas concatena e renderiza.
- * Usado para interims e finais do Deepgram output.
+ * Fluxo para consolidar transcrições no CURRENT.
+ * Apenas concatena e renderiza.
+ * Usado para transcrição interims e finais.
  */
 function handleCurrentQuestion(author, text, options = {}) {
 	debugLogRenderer('Início da função: "handleCurrentQuestion"');
 
 	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
-
-	// ignora frases muito curtas
-	if (cleaned.length < 3) return;
 
 	// Usa o tempo exato que chegou no renderer (Date.now)
 	const now = Date.now();
@@ -890,7 +886,7 @@ function handleCurrentQuestion(author, text, options = {}) {
 		// Se não existe texto ainda, marca tempo de criação e incrementa turno
 		if (!currentQuestion.text) {
 			currentQuestion.createdAt = now;
-			interviewTurnId++; // 🔥 novo turno
+			interviewTurnId++;
 		}
 
 		currentQuestion.lastUpdateTime = now;
@@ -926,7 +922,7 @@ function handleCurrentQuestion(author, text, options = {}) {
 		renderCurrentQuestion();
 
 		// Só finaliza se estivermos em silêncio e NÃO for um interim
-		if (options.inSilence && !options.isInterim) {
+		if (options.shouldFinalizeAskCurrent && !options.isInterim) {
 			debugLogRenderer('🟢 ********  Está em silêncio, feche a pergunta e chame o GPT 🤖 ******** 🟢', true);
 
 			// fecha/finaliza a pergunta atual
@@ -3706,8 +3702,8 @@ async function transcribeInput() {
 			lastInputPlaceholderEl.dataset.startAt !== undefined
 				? Number(lastInputPlaceholderEl.dataset.startAt)
 				: lastInputStartAt !== null && lastInputStartAt !== undefined
-				? lastInputStartAt
-				: stop;
+					? lastInputStartAt
+					: stop;
 
 		const now = Date.now();
 		const recordingDuration = stop - start;
