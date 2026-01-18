@@ -500,12 +500,13 @@ function findAnswerByQuestionId(questionId) {
 
 function promoteCurrentToHistory(text) {
 	debugLogRenderer('Início da função: "promoteCurrentToHistory"');
-	console.log('📚 promovendo pergunta para histórico:', text);
+
+	debugLogRenderer('📚 promovendo pergunta para histórico:', text, false);
 
 	// evita duplicação no histórico: se a última entrada é igual (normalizada), não adiciona
 	const last = questionsHistory.length ? questionsHistory[questionsHistory.length - 1] : null;
 	if (last && normalizeForCompare(last.text) === normalizeForCompare(text)) {
-		console.log('🔕 pergunta igual já presente no histórico — pulando promoção');
+		debugLogRenderer('🔕 pergunta igual já presente no histórico — pulando promoção', false);
 
 		// limpa CURRENT mas preserva seleção conforme antes
 		const prevSelected = selectedQuestionId;
@@ -549,11 +550,15 @@ function promoteCurrentToHistory(text) {
 	if (answeredQuestions.has(CURRENT_QUESTION_ID)) {
 		answeredQuestions.delete(CURRENT_QUESTION_ID);
 		answeredQuestions.add(newId);
-		console.log('🔄 [IMPORTANTE] Migrada resposta de CURRENT para newId:', newId);
+		debugLogRenderer('🔄 [IMPORTANTE] Migrada resposta de CURRENT para newId:', newId, false);
 	}
 
 	// 🔥 [CRÍTICO] Atualizar o ID do bloco de resposta no DOM se ele foi criado com CURRENT
-	console.log('🔄 [IMPORTANTE] Emitindo onAnswerIdUpdate para atualizar bloco de resposta: CURRENT → ', newId);
+	debugLogRenderer(
+		'🔄 [IMPORTANTE] Emitindo onAnswerIdUpdate para atualizar bloco de resposta: CURRENT → ',
+		newId,
+		false,
+	);
 	emitUIChange('onAnswerIdUpdate', {
 		oldId: CURRENT_QUESTION_ID,
 		newId: newId,
@@ -563,7 +568,7 @@ function promoteCurrentToHistory(text) {
 	// atualizar o rastreamento para apontar para o novo ID promovido
 	if (gptRequestedQuestionId === CURRENT_QUESTION_ID) {
 		gptRequestedQuestionId = newId;
-		console.log('🔄 [IMPORTANTE] gptRequestedQuestionId atualizado de CURRENT para newId:', newId);
+		debugLogRenderer('🔄 [IMPORTANTE] gptRequestedQuestionId atualizado de CURRENT para newId:', newId, false);
 	}
 
 	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
@@ -572,7 +577,7 @@ function promoteCurrentToHistory(text) {
 
 	// 🔥 RESET COMPLETO: Limpar timer de silêncio antes de resetar
 	if (currentQuestionSilenceTimer) {
-		console.log('🔥 Limpando timer de silêncio durante promoção');
+		debugLogRenderer('🔥 Limpando timer de silêncio durante promoção', false);
 		clearTimeout(currentQuestionSilenceTimer);
 		currentQuestionSilenceTimer = null;
 	}
@@ -1016,17 +1021,21 @@ async function askGpt() {
 	}
 
 	// Nota log temporario para testar a aplicação remover depois
-	console.log('🤖 🧾 askGpt diagnóstico', {
-		currentQuestion,
-		gptAnsweredTurnId,
-		interviewTurnId,
-		isCurrent,
-		isInterviewMode: ModeController.isInterviewMode(),
-		questionId_variable: questionId, // 🔥 DEBUG: mostrar a variável questionId
-		selectedQuestionId,
-		textGPT: normalizedText,
-		textLength: text.length,
-	});
+	debugLogRenderer(
+		'🤖 🧾 askGpt diagnóstico',
+		{
+			currentQuestion,
+			gptAnsweredTurnId,
+			interviewTurnId,
+			isCurrent,
+			isInterviewMode: ModeController.isInterviewMode(),
+			questionId_variable: questionId, // 🔥 DEBUG: mostrar a variável questionId
+			selectedQuestionId,
+			textGPT: normalizedText,
+			textLength: text.length,
+		},
+		true,
+	);
 
 	// marca que este turno teve uma requisição ao GPT (apenas para CURRENT)
 	if (isCurrent) {
@@ -1079,11 +1088,11 @@ async function askGpt() {
 
 			transcriptionMetrics.gptFirstTokenTime = transcriptionMetrics.gptFirstTokenTime || Date.now();
 
-			console.log(`🎬 🟢 GPT_STREAM_CHUNK recebido (token parcial): "${token}"`);
+			debugLogRenderer(`🎬 🟢 GPT_STREAM_CHUNK recebido (token parcial): "${token}"`, true);
 		};
 
 		const onEnd = () => {
-			console.log('✅ GPT_STREAM_END recebido - Stream finalizado!');
+			debugLogRenderer('✅ GPT_STREAM_END recebido - Stream finalizado!', true);
 
 			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
 			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
@@ -1106,8 +1115,9 @@ async function askGpt() {
 				finalText +=
 					`\n\n⏱️ GPT iniciou: ${startTime}` + `\n⏱️ GPT finalizou: ${endTime}` + `\n⏱️ Resposta em ${elapsed}ms`;
 
-				console.log(
+				debugLogRenderer(
 					finalText + `\n⏱️ Primeiro Token: ${new Date(transcriptionMetrics.gptFirstTokenTime).toLocaleTimeString()}`,
+					true,
 				);
 			}
 
@@ -1123,14 +1133,18 @@ async function askGpt() {
 			if (requestedQuestionId) {
 				// const finalHtml = marked.parse(finalText); // Resposta já renderizada via streaming
 
-				console.log('✅ GPT_STREAM_END: Renderizando resposta para pergunta solicitada:', {
-					requestedQuestionId,
-					wasRequestedForThisTurn,
-				});
+				debugLogRenderer(
+					'✅ GPT_STREAM_END: Renderizando resposta para pergunta solicitada:',
+					{
+						requestedQuestionId,
+						wasRequestedForThisTurn,
+					},
+					true,
+				);
 
 				// Se a pergunta solicitada foi CURRENT, promover para history ANTES de renderizar
 				if (requestedQuestionId === CURRENT_QUESTION_ID && currentQuestion.text) {
-					console.log('🔄 GPT_STREAM_END: Promovendo CURRENT para history antes de renderizar resposta');
+					debugLogRenderer('🔄 GPT_STREAM_END: Promovendo CURRENT para history antes de renderizar resposta', true);
 					promoteCurrentToHistory(currentQuestion.text);
 
 					// Pega a pergunta recém-promovida
@@ -1140,7 +1154,7 @@ async function askGpt() {
 						promotedQuestion.answered = true;
 						answeredQuestions.add(promotedQuestion.id);
 						renderQuestionsHistory();
-						console.log('✅ Resposta renderizada para pergunta promovida:', promotedQuestion.id);
+						debugLogRenderer('✅ Resposta renderizada para pergunta promovida:', promotedQuestion.id, true);
 					} else {
 						console.warn('⚠️ Pergunta promovida não encontrada');
 					}
@@ -2173,7 +2187,7 @@ function debugLogRenderer(...args) {
 		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
 		// prettier-ignore
 		console.log(
-			`%c🪲 [${timeStr}] ❯❯❯❯ Debug em renderer.js:`,
+			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em renderer.js:`,
 			'color: brown; font-weight: bold;', 
 			...cleanArgs
 		);
@@ -2949,30 +2963,30 @@ function stopInputMonitor() {
 //	AUDIO - OUTPUT (OUTROS) - VIA VOICEMEETER
 /* =============================== */
 
-// async function createOutputStream() {
-// 	debugLogRenderer('Início da função: "createOutputStream"');
+async function createOutputStream() {
+	debugLogRenderer('Início da função: "createOutputStream"');
 
-// 	// Cria a stream de áudio (outputStream)
-// 	outputStream = await navigator.mediaDevices.getUserMedia({
-// 		audio: { deviceId: { exact: UIElements.outputSelect.value } },
-// 	});
+	// Cria a stream de áudio (outputStream)
+	outputStream = await navigator.mediaDevices.getUserMedia({
+		audio: { deviceId: { exact: UIElements.outputSelect.value } },
+	});
 
-// 	// Cria o source de áudio (source)
-// 	const source = audioContext.createMediaStreamSource(outputStream);
+	// Cria o source de áudio (source)
+	const source = audioContext.createMediaStreamSource(outputStream);
 
-// 	// Cria o analisador de frequência (outputAnalyser)
-// 	outputAnalyser = audioContext.createAnalyser();
-// 	// Define o tamanho do FFT (fftSize) como 256
-// 	outputAnalyser.fftSize = 256;
-// 	// Cria os dados (outputData)
-// 	outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
-// 	// Conecta o source ao analisador de frequência
-// 	source.connect(outputAnalyser);
+	// Cria o analisador de frequência (outputAnalyser)
+	outputAnalyser = audioContext.createAnalyser();
+	// Define o tamanho do FFT (fftSize) como 256
+	outputAnalyser.fftSize = 256;
+	// Cria os dados (outputData)
+	outputData = new Uint8Array(outputAnalyser.frequencyBinCount);
+	// Conecta o source ao analisador de frequência
+	source.connect(outputAnalyser);
 
-// 	debugLogRenderer('Fim da função: "createOutputStream"');
+	debugLogRenderer('Fim da função: "createOutputStream"');
 
-// 	return source;
-// }
+	return source;
+}
 
 // async function startOutput() {
 // 	debugLogRenderer('Início da função: "startOutput"');

@@ -1534,10 +1534,14 @@ class ConfigManager {
 			// Procura por span dentro do elemento (pode ser currentQuestionText)
 			const textEl = currentQuestionBox.querySelector('span') || currentQuestionBox;
 			if (textEl) {
-				console.log(`✅ config-manager: atualizando texto em elemento:`, {
-					seletor: textEl.id || textEl.className,
-					texto: text,
-				});
+				debugLogConfig(
+					`✅ config-manager: atualizando texto em elemento:`,
+					{
+						seletor: textEl.id || textEl.className,
+						texto: text,
+					},
+					false,
+				);
 				textEl.innerText = text;
 			} else {
 				console.warn(`⚠️ config-manager: elemento de texto não encontrado dentro de #currentQuestion`);
@@ -1570,7 +1574,7 @@ class ConfigManager {
 
 		// Answer Selected — exibe resposta existente e faz scroll
 		globalThis.RendererAPI.onUIChange('onAnswerSelected', payload => {
-			console.log('📌 onAnswerSelected recebido:', payload);
+			debugLogConfig('📌 onAnswerSelected recebido:', payload, false);
 
 			if (!payload) return;
 
@@ -1580,10 +1584,10 @@ class ConfigManager {
 			const answersBox = document.getElementById('answersHistory');
 			if (!answersBox) return;
 
-			console.log('🎨 [onAnswerSelected] Removendo destaque anterior');
+			debugLogConfig('🎨 [onAnswerSelected] Removendo destaque anterior', false);
 			// remove seleção anterior
 			answersBox.querySelectorAll('.selected-answer').forEach(el => {
-				console.log('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId);
+				debugLogConfig('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId, false);
 				el.classList.remove('selected-answer');
 			});
 
@@ -1596,12 +1600,12 @@ class ConfigManager {
 			}
 
 			// marca como selecionada
-			console.log('🎨 [onAnswerSelected] Adicionando destaque em:', questionId);
+			debugLogConfig('🎨 [onAnswerSelected] Adicionando destaque em:', questionId, false);
 			answerEl.classList.add('selected-answer');
 
 			// garante visibilidade com scroll suave
 			if (shouldScroll) {
-				console.log('📜 [onAnswerSelected] Scrollando para resposta:', questionId);
+				debugLogConfig('📜 [onAnswerSelected] Scrollando para resposta:', questionId, false);
 				answerEl.scrollIntoView({
 					behavior: 'smooth',
 					block: 'center',
@@ -1631,7 +1635,7 @@ class ConfigManager {
 
 			// ✅ PRIMEIRA CHUNK - não existe wrapper ainda
 			if (!wrapper) {
-				console.log('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId);
+				debugLogConfig('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId, true);
 
 				// Criar novo div de resposta
 				wrapper = document.createElement('div');
@@ -1676,12 +1680,12 @@ class ConfigManager {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
 
-			console.log('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId);
+			debugLogConfig('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId, false);
 
 			const wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${oldId}"]`);
 			if (wrapper) {
 				wrapper.dataset.questionId = newId;
-				console.log('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId);
+				debugLogConfig('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId, false);
 
 				// Atualizar rastreamento de streaming também
 				if (currentStreamingQuestionId === oldId) {
@@ -1697,7 +1701,7 @@ class ConfigManager {
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		globalThis.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
-			console.log('✅ [STREAM_END] Limpando streamingQuestionId');
+			debugLogConfig('✅ [STREAM_END] Limpando streamingQuestionId', false);
 			currentStreamingQuestionId = null;
 		});
 
@@ -1706,7 +1710,7 @@ class ConfigManager {
 			console.log('🔔 onPlaceholderFulfill recebido:', data);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
-			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, placeholderId, showMeta } = data;
+			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, showMeta } = data;
 			const transcriptionBox = document.getElementById('conversation');
 
 			if (!transcriptionBox) {
@@ -2368,7 +2372,7 @@ function debugLogConfig(...args) {
 		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
 		// prettier-ignore
 		console.log(
-			`%c🪲 [${timeStr}] ❯❯❯❯ Debug em config-manager.js: `, 
+			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em config-manager.js:`, 
 			'color: orange; font-weight: bold;', 
 			...cleanArgs
 		);
