@@ -1034,7 +1034,7 @@ async function askGpt() {
 			textGPT: normalizedText,
 			textLength: text.length,
 		},
-		true,
+		false,
 	);
 
 	// marca que este turno teve uma requisição ao GPT (apenas para CURRENT)
@@ -1088,7 +1088,7 @@ async function askGpt() {
 
 			transcriptionMetrics.gptFirstTokenTime = transcriptionMetrics.gptFirstTokenTime || Date.now();
 
-			debugLogRenderer(`🎬 🟢 GPT_STREAM_CHUNK recebido (token parcial): "${token}"`, true);
+			debugLogRenderer(`🎬 🟢 GPT_STREAM_CHUNK recebido (token parcial): "${token}"`, false);
 		};
 
 		const onEnd = () => {
@@ -1116,8 +1116,10 @@ async function askGpt() {
 					`\n\n⏱️ GPT iniciou: ${startTime}` + `\n⏱️ GPT finalizou: ${endTime}` + `\n⏱️ Resposta em ${elapsed}ms`;
 
 				debugLogRenderer(
-					finalText + `\n⏱️ Primeiro Token: ${new Date(transcriptionMetrics.gptFirstTokenTime).toLocaleTimeString()}`,
-					true,
+					'🤖 Resposta GPT ❓' +
+						finalText +
+						`\n⏱️ Primeiro Token: ${new Date(transcriptionMetrics.gptFirstTokenTime).toLocaleTimeString()}`,
+					false,
 				);
 			}
 
@@ -1139,7 +1141,7 @@ async function askGpt() {
 						requestedQuestionId,
 						wasRequestedForThisTurn,
 					},
-					true,
+					false,
 				);
 
 				// Se a pergunta solicitada foi CURRENT, promover para history ANTES de renderizar
@@ -1154,7 +1156,7 @@ async function askGpt() {
 						promotedQuestion.answered = true;
 						answeredQuestions.add(promotedQuestion.id);
 						renderQuestionsHistory();
-						debugLogRenderer('✅ Resposta renderizada para pergunta promovida:', promotedQuestion.id, true);
+						debugLogRenderer('✅ Resposta renderizada para pergunta promovida:', promotedQuestion.id, false);
 					} else {
 						console.warn('⚠️ Pergunta promovida não encontrada');
 					}

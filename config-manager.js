@@ -1635,7 +1635,7 @@ class ConfigManager {
 
 			// ✅ PRIMEIRA CHUNK - não existe wrapper ainda
 			if (!wrapper) {
-				debugLogConfig('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId, true);
+				debugLogConfig('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId, false);
 
 				// Criar novo div de resposta
 				wrapper = document.createElement('div');
@@ -1658,7 +1658,7 @@ class ConfigManager {
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
 
-				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, true);
+				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, false);
 			}
 
 			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
