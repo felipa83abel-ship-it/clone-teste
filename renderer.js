@@ -664,17 +664,15 @@ async function startAudio() {
 	try {
 		// 🔥 ROTEAMENTO: Por modelo STT
 		if (sttModel === 'deepgram') {
-			console.log('🌊 Roteando para startAudioDeepgram');
 			await startAudioDeepgram(UIElements);
+		} else if (sttModel === 'vosk-local') {
+			await startAudioVoskLocal(UIElements);
 		} else if (sttModel === 'whisper-cpp-local') {
 			const serverStarted = await ipcRenderer.invoke('start-whisper-server');
 			if (serverStarted) {
 				console.log('🎤 Roteando para startAudioWhisperLocal');
 				await startAudioWhisperLocal(UIElements);
 			}
-		} else if (sttModel === 'vosk-local') {
-			console.log('🎤 Roteando para startAudioVoskLocal');
-			await startAudioVoskLocal(UIElements);
 		} else if (sttModel === 'whisper-1') {
 			console.log('🌐 Roteando para startAudioWhisperLocal (Whisper-1 via API)');
 			await startAudioWhisperLocal(UIElements); // verificar se precisa criar um novo
@@ -1443,19 +1441,18 @@ async function listenToggleBtn() {
 
 		// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
 		const { active: hasModel, model: activeModel } = hasActiveModel();
-		console.log(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`);
+		debugLogRenderer(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`, false);
 
 		if (!hasModel) {
 			const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
 			console.warn(`⚠️ ${errorMsg}`);
-			console.log('📡 DEBUG: Emitindo onError:', errorMsg);
 			emitUIChange('onError', errorMsg);
 			return;
 		}
 
 		// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
 		const hasOutputDevice = UIElements.outputSelect?.value;
-		console.log(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`);
+		debugLogRenderer(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
 
 		if (!hasOutputDevice) {
 			const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
@@ -1480,7 +1477,6 @@ async function listenToggleBtn() {
 	// Atualiza o status da escuta na tela
 	updateStatusMessage(statusMsg);
 
-	console.log(`🎤 Listen toggle: ${isRunning ? 'INICIANDO' : 'PARANDO'}`);
 	await (isRunning ? startAudio() : stopAudio());
 
 	debugLogRenderer('Fim da função: "listenToggleBtn"');
@@ -2574,26 +2570,19 @@ async function runMockAutoPlay() {
 function getConfiguredSTTModel() {
 	try {
 		if (!window.configManager || !window.configManager.config) {
-			console.warn('⚠️ configManager não disponível, usando padrão: whisper-1');
-			return 'whisper-1';
+			console.warn('⚠️ configManager não disponível no escopo global');
+			return 'error'; // fallback
 		}
 
 		const config = window.configManager.config;
-		const activeProvider = config.api?.activeProvider || 'openai';
+		const activeProvider = config.api?.activeProvider;
 		const sttModel = config.api?.[activeProvider]?.selectedSTTModel;
 
 		if (!sttModel) {
-			console.warn(`⚠️ Modelo STT não configurado para ${activeProvider}, usando padrão: whisper-1`);
-			return 'whisper-1';
+			console.warn(`⚠️ Modelo STT não configurado para ${activeProvider}`);
+			return 'error'; // fallback
 		}
 
-		console.log(`🎤 STT Model selecionado: ${sttModel} (provider: ${activeProvider})`);
-		console.log(`   [DEBUG] config.api.${activeProvider}.selectedSTTModel = "${sttModel}"`);
-		console.log(
-			`   [DEBUG] select#${activeProvider}-stt-model.value = "${
-				document.getElementById(activeProvider + '-stt-model')?.value
-			}"`,
-		);
 		return sttModel;
 	} catch (err) {
 		console.error('❌ Erro ao obter modelo STT da config:', err);

@@ -41,7 +41,7 @@ try {
    CONSTANTES
 =============================== */
 
-const USE_FAKE_STREAM_GPT = false; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
+const USE_FAKE_STREAM_GPT = true; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
 
 // Configuração de modelo Vosk (local)
 const VOSK_CONFIG = {
@@ -884,6 +884,170 @@ function startVoskServer() {
 			reject(error);
 		}
 	});
+}
+
+/**
+ * Handler IPC para inicializar servidor Vosk
+ * Chamado uma vez ao iniciar a captura de áudio
+ */
+ipcMain.handle('vosk-init-server', async () => {
+	console.log('🔥 Handler vosk-init-server chamado');
+	try {
+		if (!voskReady || !voskProcess) {
+			console.log('🔄 Inicializando Vosk...');
+			await startVoskServer();
+		} else {
+			console.log('✅ Vosk já está rodando');
+		}
+		return { success: true, message: 'Vosk server iniciado' };
+	} catch (error) {
+		console.error('❌ Erro ao inicializar Vosk:', error.message);
+		return { success: false, error: error.message };
+	}
+});
+
+/**
+ * Handler IPC para converter PCM 16-bit para WAV e enviar para Vosk
+ * 🔥 NOVO: Evita problemas de fragmentação WebM
+ * PCM é simples: samples em little-endian, sem container
+ */
+ipcMain.handle('vosk-transcribe-pcm', async (_, pcmBuffer) => {
+	console.log('\n--------------------------------------------------------');
+	console.log('📋 STT HANDLER ATIVO: VOSK LOCAL (PCM 16-bit → WAV)');
+	console.log('--------------------------------------------------------');
+	try {
+		// Inicia servidor se não estiver rodando
+		if (!voskReady || !voskProcess) {
+			console.log('🔄 Inicializando Vosk...');
+			await startVoskServer();
+		}
+
+		console.log(`🎤 Recebido PCM 16-bit: ${pcmBuffer.length} bytes`);
+
+		// 🔥 Converte PCM 16-bit para WAV sem usar FFmpeg (muito mais rápido)
+		// WAV = header + PCM samples
+		let wavBuffer;
+		try {
+			wavBuffer = convertPCM16ToWAV(pcmBuffer);
+		} catch (error) {
+			console.error('❌ Erro ao converter PCM→WAV:', error.message);
+			throw error;
+		}
+
+		console.log(`✅ Convertido PCM (${pcmBuffer.length}b) → WAV (${wavBuffer.length}b)`);
+
+		// Resto é idêntico ao handler vosk-transcribe original
+		// Codifica WAV em base64
+		const audioBase64 = wavBuffer.toString('base64');
+
+		const command = {
+			type: 'transcribe',
+			audio: audioBase64,
+		};
+
+		const commandJson = JSON.stringify(command) + '\n';
+
+		return new Promise((resolve, reject) => {
+			const timeout = setTimeout(() => {
+				voskProcess.stdout.removeListener('data', responseHandler);
+				reject(new Error('Timeout ao aguardar resposta do Vosk'));
+			}, 5000);
+
+			const responseHandler = data => {
+				const lines = data.toString().split('\n');
+
+				for (const line of lines) {
+					const trimmed = line.trim();
+
+					if (!trimmed || trimmed.startsWith('[VOSK]') || trimmed === 'VOSK_READY') {
+						continue;
+					}
+
+					try {
+						const response = JSON.parse(trimmed);
+						clearTimeout(timeout);
+						voskProcess.stdout.removeListener('data', responseHandler);
+						console.log('📝 Resposta Vosk:', response);
+						resolve(response);
+						return;
+					} catch (e) {
+						console.warn(`⚠️ Linha não é JSON válido: ${e}`);
+					}
+				}
+			};
+
+			voskProcess.stdout.on('data', responseHandler);
+			voskProcess.stdin.write(commandJson);
+		});
+	} catch (error) {
+		console.error('❌ Erro em vosk-transcribe-pcm:', error.message);
+		return {
+			final: '',
+			partial: '',
+			isFinal: false,
+			error: error.message,
+		};
+	}
+});
+
+/**
+ * Converte PCM 16-bit bruto para WAV (sem FFmpeg!)
+ * WAV = RIFF header + fmt chunk + data chunk + PCM samples
+ * Muito mais rápido que usar FFmpeg
+ */
+function convertPCM16ToWAV(pcmBuffer) {
+	const sampleRate = 16000;
+	const numChannels = 1;
+	const bitsPerSample = 16;
+	const bytesPerSample = bitsPerSample / 8;
+
+	// 🔥 FIX: Converter para Buffer se não for (pode vir como Uint8Array via IPC)
+	const pcmBuf = Buffer.isBuffer(pcmBuffer) ? pcmBuffer : Buffer.from(pcmBuffer);
+
+	// Tamanho dos dados
+	const dataSize = pcmBuf.length;
+	const fileSize = 36 + dataSize; // 36 = header size
+
+	// Cria buffer WAV
+	const wavBuffer = Buffer.alloc(44 + dataSize);
+	let offset = 0;
+
+	// RIFF header
+	wavBuffer.write('RIFF', offset);
+	offset += 4;
+	wavBuffer.writeUInt32LE(fileSize, offset); // File size - 8
+	offset += 4;
+	wavBuffer.write('WAVE', offset);
+	offset += 4;
+
+	// fmt subchunk
+	wavBuffer.write('fmt ', offset);
+	offset += 4;
+	wavBuffer.writeUInt32LE(16, offset); // Subchunk1Size (16 for PCM)
+	offset += 4;
+	wavBuffer.writeUInt16LE(1, offset); // AudioFormat (1 = PCM)
+	offset += 2;
+	wavBuffer.writeUInt16LE(numChannels, offset); // NumChannels
+	offset += 2;
+	wavBuffer.writeUInt32LE(sampleRate, offset); // SampleRate
+	offset += 4;
+	wavBuffer.writeUInt32LE(sampleRate * numChannels * bytesPerSample, offset); // ByteRate
+	offset += 4;
+	wavBuffer.writeUInt16LE(numChannels * bytesPerSample, offset); // BlockAlign
+	offset += 2;
+	wavBuffer.writeUInt16LE(bitsPerSample, offset); // BitsPerSample
+	offset += 2;
+
+	// data subchunk
+	wavBuffer.write('data', offset);
+	offset += 4;
+	wavBuffer.writeUInt32LE(dataSize, offset); // Subchunk2Size
+	offset += 4;
+
+	// PCM data
+	pcmBuf.copy(wavBuffer, offset);
+
+	return wavBuffer;
 }
 
 /**

@@ -48,11 +48,12 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 			pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
 		}
 
-		// Envia dados para o thread principal
+		// Envia dados para o thread principal COM o volume/percent
 		this.port.postMessage(
 			{
 				type: 'audioData',
 				pcm16: pcm16.buffer,
+				percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
 				sampleRate: sampleRate || sampleRate, // placeholder (AudioWorkletProcessor global)
 			},
 			[pcm16.buffer],
