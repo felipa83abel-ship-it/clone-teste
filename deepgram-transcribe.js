@@ -8,8 +8,8 @@
  * - Consolida interim results e transcrições finais
  *
  * Uso:
- * - startAudioDeepgram() -> startDeepgramInput() / stopDeepgramInput() para capturar entrada
- * - startAudioDeepgram() -> startDeepgramOutput() / stopDeepgramOutput() para capturar saída
+ * - startAudioDeepgram() -> startDeepgram('input'|'output', UIElements) para capturar entrada/saída
+ * - stopDeepgram('input'|'output') para parar captura
  */
 
 /* ================================ */
@@ -20,12 +20,31 @@ const { ipcRenderer } = require('electron');
 /* ================================ */
 //	CONSTANTES
 /* ================================ */
-const USE_DEEPGRAM_MOCK = false; // Mude para true para ativar os testes sem Deepgram real
 
+// Configuração Geral
+const USE_DEEPGRAM_MOCK = false; // Mude para true para ativar os testes sem Deepgram real
 const YOU = 'Você'; // Autor das transcrições de entrada
 const OTHER = 'Outros'; // Autor das transcrições de saída
-
 const DEEPGRAM_HEARTBEAT_INTERVAL = 5000; // 5 segundos (entre 3-5 segundos conforme documentação)
+
+// Configuração de Áudio
+const AUDIO_SAMPLE_RATE = 16000; // 16kHz
+const AUDIO_CONTEXT_WORKLET_PATH = './deepgram-audio-worklet-processor.js'; // Path do AudioWorklet
+
+// Configuração do Filtro Passa-Alta (HPF)
+const HPF_TYPE = 'highpass';
+const HPF_FREQUENCY = 200; // Frequência de corte em Hz
+const HPF_Q_FACTOR = 1; // Fator de qualidade
+
+// Configuração de VAD (Voice Activity Detection)
+const VAD_MODE = 2; // Modo agressivo do webrtcvad
+const VAD_FRAME_DURATION_MS = 0.03; // 30ms por frame
+const VAD_WINDOW_SIZE = 6; // Últimos ~6 frames (~50-100ms)
+const FALLBACK_VOLUME_THRESHOLD = 20; // Limiar de volume para fallback (%)
+
+// Timeouts de Silêncio
+const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
+const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 /* ================================ */
 //	ESTADO DO DEEPGRAM
@@ -227,28 +246,28 @@ function initDeepgramWSMock() {
 
 // Helper: run native VAD or energy-based fallback for a single frame
 // Returns: true (speech), false (no speech), null (error / undecided)
-function runNativeVAD(frame, sampleRate = 16000) {
+function runNativeVAD(frame, sampleRate = AUDIO_SAMPLE_RATE) {
 	try {
-		if (typeof vadInstance !== 'undefined' && vadInstance) {
+		if (vadInstance !== undefined && vadInstance) {
 			try {
 				if (typeof vadInstance.process === 'function') {
 					// Some implementations expect (sampleRate, frame), others (frame)
 					if (vadInstance.process.length === 2) {
 						const r = vadInstance.process(sampleRate, frame);
 						if (typeof r === 'boolean') return r;
-						if (Array.isArray(r)) return r.some(d => d === 1);
+						if (Array.isArray(r)) return r.includes(1);
 					} else {
 						const r = vadInstance.process(frame);
 						if (typeof r === 'boolean') return r;
-						if (Array.isArray(r)) return r.some(d => d === 1);
+						if (Array.isArray(r)) return r.includes(1);
 					}
 				} else if (typeof vadInstance.isSpeech === 'function') {
 					return !!vadInstance.isSpeech(frame, sampleRate);
 				} else if (typeof vadInstance === 'function') {
 					return !!vadInstance(frame, sampleRate);
 				}
-			} catch (innerErr) {
-				console.warn('runNativeVAD: erro ao chamar vadInstance:', innerErr && (innerErr.message || innerErr));
+			} catch (error_) {
+				console.warn('runNativeVAD: erro ao chamar vadInstance:', error_ && (error_.message || error_));
 				return null;
 			}
 		}
@@ -348,6 +367,8 @@ async function changeDeviceDeepgram(source, newDeviceId) {
 		console.warn(`Já em processo de troca de dispositivo ${source.toUpperCase()}`);
 		return;
 	}
+
+	// Verifica se está ativo
 	if (!vars.isActive()) {
 		console.warn(`Deepgram ${source.toUpperCase()} não está ativo; nada a trocar`);
 		return;
@@ -372,9 +393,9 @@ async function changeDeviceDeepgram(source, newDeviceId) {
 		const newSource = audioCtx.createMediaStreamSource(newStream);
 		if (!vars.hpf()) {
 			const hpf = audioCtx.createBiquadFilter();
-			hpf.type = 'highpass';
-			hpf.frequency.value = 150;
-			hpf.Q.value = 1;
+			hpf.type = HPF_TYPE;
+			hpf.frequency.value = HPF_FREQUENCY;
+			hpf.Q.value = HPF_Q_FACTOR;
 			vars.setHPF(hpf);
 		}
 
@@ -426,7 +447,9 @@ function startDeepgramHeartbeat(ws, source) {
 
 	try {
 		deepgramVars[source]?.setHeartbeatInterval(interval);
-	} catch (e) {}
+	} catch (error_) {
+		console.warn(`Aviso: falha ao configurar heartbeat interval para ${source}:`, error_);
+	}
 }
 
 // Para heartbeat do Deepgram
@@ -437,10 +460,12 @@ function stopDeepgramHeartbeat(source) {
 			clearInterval(iv);
 			deepgramVars[source].setHeartbeatInterval(null);
 		}
-	} catch (e) {}
+	} catch (error_) {
+		console.warn(`Aviso: falha ao parar heartbeat interval para ${source}:`, error_);
+	}
 }
 
-// Envia comando "Finalize" para Deepgram forçando processamento imediato do buffer de áudio pendente
+// Envia mensagem "Finalize" para Deepgram (input/output)
 function sendDeepgramFinalize(source) {
 	const ws = deepgramVars[source]?.ws?.();
 
@@ -467,167 +492,105 @@ function sendDeepgramFinalize(source) {
 //	DEEPGRAM - INICIA FLUXO (STT)
 /* ================================ */
 
-// Inicia captura de áudio do dispositivo de entrada com Deepgram
-async function startDeepgramInput(UIElements) {
-	// Passo 1: Iniciar captura de áudio da saída
+// Inicia captura de áudio do dispositivo de entrada ou saída com Deepgram
+async function startDeepgram(source, UIElements) {
+	// Configurações específicas por source
+	const config = {
+		input: {
+			deviceKey: 'inputSelect',
+			accessMessage: '🎤 Solicitando acesso à entrada de áudio (Microfone)...',
+			threshold: 0.02,
+			startLog: '▶️ Captura Deepgram INPUT iniciada',
+		},
+		output: {
+			deviceKey: 'outputSelect',
+			accessMessage: '🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)...',
+			threshold: 0.005,
+			startLog: '▶️ Captura Deepgram OUTPUT iniciada',
+		},
+	};
 
-	if (deepgramVars.input.isActive?.()) {
-		console.warn('⚠️ Deepgram INPUT já ativo');
+	const cfg = config[source];
+	if (!cfg) {
+		throw new Error(`❌ Source inválido: ${source}. Use 'input' ou 'output'`);
+	}
+
+	const vars = deepgramVars[source];
+
+	if (vars.isActive?.()) {
+		console.warn(`⚠️ Deepgram ${source.toUpperCase()} já ativo`);
 		return;
 	}
 
 	try {
-		// Obtém o dispositivo INPUT selecionado no UI (busca diretamente no DOM)
-		const inputDeviceId = UIElements.inputSelect?.value;
+		// Obtém o dispositivo selecionado no UI
+		const deviceId = UIElements[cfg.deviceKey]?.value;
 
-		console.log(`🔊 Iniciando captura INPUT com dispositivo: ${inputDeviceId}`);
+		console.log(`🔊 Iniciando captura ${source.toUpperCase()} com dispositivo: ${deviceId}`);
 
 		// Inicializa WebSocket usando função genérica
-		const ws = USE_DEEPGRAM_MOCK ? initDeepgramWSMock() : await initDeepgramWS('input');
+		const ws = USE_DEEPGRAM_MOCK ? initDeepgramWSMock() : await initDeepgramWS(source);
 
 		// Define flags via deepgramVars
-		deepgramVars.input.setWs(ws);
-		deepgramVars.input.setActive(true);
-		deepgramVars.input.setStartAt(Date.now());
+		vars.setWs(ws);
+		vars.setActive(true);
+		vars.setStartAt(Date.now());
 
-		// Solicita acesso ao dispositivo INPUT selecionado
-		console.log('🎤 Solicitando acesso à entrada de áudio (Microfone)...');
+		// Solicita acesso ao dispositivo selecionado
+		console.log(cfg.accessMessage);
 
 		const stream = await navigator.mediaDevices.getUserMedia({
 			audio: {
-				deviceId: { exact: inputDeviceId },
+				deviceId: { exact: deviceId },
 				echoCancellation: true,
 				noiseSuppression: true,
 				autoGainControl: false,
 			},
 		});
 
-		console.log('✅ Entrada de áudio autorizada');
+		console.log(`✅ Acesso ao áudio ${source.toUpperCase()} autorizado`);
 
 		// Cria AudioContext com 16kHz
-		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({ sampleRate: 16000 });
-		await audioCtx.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
+		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+		await audioCtx.audioWorklet.addModule(AUDIO_CONTEXT_WORKLET_PATH);
 
 		// Cria MediaStreamSource e guarda via deepgramVars
-		const source = audioCtx.createMediaStreamSource(stream);
+		const mediaSource = audioCtx.createMediaStreamSource(stream);
 
 		// Filtro Passa-Alta
 		const hpf = audioCtx.createBiquadFilter();
-		hpf.type = 'highpass';
-		hpf.frequency.value = 200;
-		hpf.Q.value = 1;
+		hpf.type = HPF_TYPE;
+		hpf.frequency.value = HPF_FREQUENCY;
+		hpf.Q.value = HPF_Q_FACTOR;
 
 		// Worklet
 		const processor = new AudioWorkletNode(audioCtx, 'deepgram-audio-worklet-processor');
-		processor.port.postMessage({ type: 'setThreshold', threshold: 0.02 });
+		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
-			processIncomingAudioMessage('input', event.data).catch(e =>
-				console.error('❌ Erro ao processar mensagem do worklet (input):', e),
+			processIncomingAudioMessage(source, event.data).catch(error_ =>
+				console.error(`❌ Erro ao processar mensagem do worklet (${source}):`, error_),
 			);
 		};
 
 		// Conecta fluxo: Source -> HPF -> processor -> destination
-		source.connect(hpf);
-		hpf.connect(processor);
-		processor.connect(audioCtx.destination);
-
-		// Atualiza referências via deepgramVars (setters atualizam as variáveis globais existentes)
-		deepgramVars.input.setStream(stream);
-		deepgramVars.input.setAudioContext(audioCtx);
-		deepgramVars.input.setSource(source);
-		deepgramVars.input.setHPF(hpf);
-		deepgramVars.input.setProcessor(processor);
-
-		console.log('▶️ Captura Deepgram INPUT iniciada');
-	} catch (error) {
-		console.error('❌ Erro ao iniciar Deepgram INPUT:', error);
-		try {
-			deepgramVars.input.setActive(false);
-		} catch (e) {}
-		stopDeepgram('input');
-		throw error;
-	}
-}
-
-// Inicia captura de áudio do dispositivo de saída com Deepgram
-async function startDeepgramOutput(UIElements) {
-	// Passo 1: Iniciar captura de áudio da saída
-
-	if (deepgramVars.output.isActive?.()) {
-		console.warn('⚠️ Deepgram OUTPUT já ativo');
-		return;
-	}
-
-	try {
-		// Obtém o dispositivo OUTPUT selecionado no UI (busca diretamente no DOM)
-		const outputDeviceId = UIElements.outputSelect?.value;
-
-		console.log(`🔊 Iniciando captura OUTPUT com dispositivo: ${outputDeviceId}`);
-
-		// Inicializa WebSocket usando função genérica
-		const ws = USE_DEEPGRAM_MOCK ? initDeepgramWSMock() : await initDeepgramWS('output');
-
-		// Define flags via deepgramVars
-		deepgramVars.output.setWs(ws);
-		deepgramVars.output.setActive(true);
-		deepgramVars.output.setStartAt(Date.now());
-
-		// Solicita acesso ao dispositivo OUTPUT selecionado
-		console.log('🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)...');
-
-		const stream = await navigator.mediaDevices.getUserMedia({
-			audio: {
-				deviceId: { exact: outputDeviceId },
-				echoCancellation: true,
-				noiseSuppression: true,
-				autoGainControl: false, // Evita que o volume suba no silêncio, expondo ruído residual
-			},
-		});
-
-		console.log('✅ Saída de áudio autorizada');
-
-		// Cria AudioContext com 16kHz
-		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({ sampleRate: 16000 });
-		await audioCtx.audioWorklet.addModule('./deepgram-audio-worklet-processor.js');
-
-		// Cria MediaStreamSource e guarda via deepgramVars
-		const source = audioCtx.createMediaStreamSource(stream);
-
-		// Filtro passa-alta
-		const hpf = audioCtx.createBiquadFilter();
-		hpf.type = 'highpass';
-		hpf.frequency.value = 200;
-		hpf.Q.value = 1;
-
-		// Worklet
-		const processor = new AudioWorkletNode(audioCtx, 'deepgram-audio-worklet-processor');
-		processor.port.postMessage({ type: 'setThreshold', threshold: 0.005 });
-		processor.port.onmessage = event => {
-			// processIncomingAudioMessage é async; garantir captura de rejeições
-			processIncomingAudioMessage('output', event.data).catch(e =>
-				console.error('❌ Erro ao processar mensagem do worklet (output):', e),
-			);
-		};
-
-		// Conecta fluxo: Source -> HPF -> processor -> destination
-		source.connect(hpf);
+		mediaSource.connect(hpf);
 		hpf.connect(processor);
 		processor.connect(audioCtx.destination);
 
 		// Atualiza referências via deepgramVars
-		deepgramVars.output.setStream(stream);
-		deepgramVars.output.setAudioContext(audioCtx);
-		deepgramVars.output.setSource(source);
-		deepgramVars.output.setHPF(hpf);
-		deepgramVars.output.setProcessor(processor);
+		vars.setStream(stream);
+		vars.setAudioContext(audioCtx);
+		vars.setSource(mediaSource);
+		vars.setHPF(hpf);
+		vars.setProcessor(processor);
 
-		console.log('▶️ Captura Deepgram OUTPUT iniciada');
+		console.log(cfg.startLog);
 	} catch (error) {
-		console.error('❌ Erro ao iniciar Deepgram OUTPUT:', error);
+		console.error(`❌ Erro ao iniciar Deepgram ${source.toUpperCase()}:`, error);
 		try {
-			deepgramVars.output.setActive(false);
+			vars.setActive(false);
 		} catch (e) {}
-		stopDeepgram('output');
+		stopDeepgram(source);
 		throw error;
 	}
 }
@@ -660,11 +623,11 @@ async function processIncomingAudioMessage(source, data) {
 
 		if (isVADEnabled()) {
 			try {
-				const sampleRate = data.sampleRate || 16000;
+				const sampleRate = data.sampleRate || AUDIO_SAMPLE_RATE;
 				const pcm = new Int16Array(data.pcm16);
 
 				// 30ms por frame
-				const frameSize = Math.floor(sampleRate * 0.03);
+				const frameSize = Math.floor(sampleRate * VAD_FRAME_DURATION_MS);
 
 				for (let i = 0; i + frameSize <= pcm.length; i += frameSize) {
 					const frame = pcm.subarray(i, i + frameSize);
@@ -761,7 +724,7 @@ async function processIncomingAudioMessage(source, data) {
 		}
 
 		// Mantém sua lógica de silêncio, com timeouts ajustados
-		handleSilenceDetection(source, percent, source === 'output' ? 700 : 500);
+		handleSilenceDetection(source, percent, source === 'output' ? SILENCE_TIMEOUT_OUTPUT : SILENCE_TIMEOUT_INPUT);
 	}
 }
 
@@ -771,7 +734,7 @@ function handleSilenceDetection(source, percent, silenceTimeout = 700) {
 	const now = Date.now();
 
 	// Decisão principal: VAD se disponível, senão fallback por volume
-	const useVADDecision = isVADEnabled() && typeof vars._lastIsSpeech !== 'undefined';
+	const useVADDecision = isVADEnabled() && vars._lastIsSpeech !== undefined;
 	const effectiveSpeech = useVADDecision ? !!vars._lastIsSpeech : percent > 0;
 
 	// NOSONAR
@@ -839,13 +802,13 @@ function initVAD() {
 
 	if (typeof VAD?.default === 'function') {
 		// webrtcvad (ESM default)
-		return new VAD.default(16000, 2);
+		return new VAD.default(AUDIO_SAMPLE_RATE, VAD_MODE);
 	} else if (typeof VAD === 'function') {
 		// node-webrtcvad (CommonJS)
-		return new VAD(2);
+		return new VAD(VAD_MODE);
 	} else if (VAD?.VAD) {
 		// classe interna
-		return new VAD.VAD(2);
+		return new VAD.VAD(VAD_MODE);
 	}
 
 	return null;
@@ -862,11 +825,11 @@ function fallbackIsSpeech(source, percent) {
 	if (!vars.vadWindow) vars.vadWindow = [];
 	const window = vars.vadWindow;
 	window.push(percent);
-	if (window.length > 6) window.shift(); // últimos ~6 frames (~50ms-100ms dependendo do worklet)
+	if (window.length > VAD_WINDOW_SIZE) window.shift(); // últimos ~6 frames (~50ms-100ms dependendo do worklet)
 	const avg = window.reduce((a, b) => a + b, 0) / window.length;
 	// heurística ajustada: muitos loopbacks/VoiceMeeter apresentam baseline alto
 	// aumentar limiar para reduzir segmentação falsa (experiência inicial: 20%)
-	return avg > 20;
+	return avg > FALLBACK_VOLUME_THRESHOLD;
 }
 
 /* ================================ */
@@ -1065,14 +1028,18 @@ function stopDeepgram(source) {
 
 	// Desconecta e limpa MediaStreamSource/HPF se existirem (usando deepgramVars)
 	try {
-		const src = vars.source && vars.source();
+		const src = vars.source?.();
 		if (src) {
 			try {
 				src.disconnect();
-			} catch (e) {}
+			} catch (error_) {
+				console.warn(`Aviso: falha ao desconectar source durante stop (${source}):`, error_);
+			}
 			vars.setSource(null);
 		}
-	} catch (e) {}
+	} catch (error_) {
+		console.warn(`Aviso: falha ao limpar source em stop (${source}):`, error_);
+	}
 	try {
 		const hpf = vars.hpf?.();
 		if (hpf) {
@@ -1104,8 +1071,8 @@ async function startAudioDeepgram(UIElements) {
 
 	try {
 		// 🌊 Deepgram: Inicia INPUT/OUTPUT
-		if (UIElements.inputSelect?.value) await startDeepgramInput(UIElements);
-		if (UIElements.outputSelect?.value) await startDeepgramOutput(UIElements);
+		if (UIElements.inputSelect?.value) await startDeepgram('input', UIElements);
+		if (UIElements.outputSelect?.value) await startDeepgram('output', UIElements);
 
 		// Inicializa uma vez (no bootstrap da app ou antes de começar a capturar áudio)
 		if (useNativeVAD) {
