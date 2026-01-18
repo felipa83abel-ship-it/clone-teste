@@ -41,7 +41,7 @@ try {
    CONSTANTES
 =============================== */
 
-const USE_FAKE_STREAM_GPT = false; // mude para false quando quiser usar o real
+const USE_FAKE_STREAM_GPT = false; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
 
 // Configuração de modelo Vosk (local)
 const VOSK_CONFIG = {
@@ -375,7 +375,7 @@ ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
 // Inicializa cliente OpenAI com chave fornecida
 ipcMain.handle('initialize-api-client', async (_, apiKey) => {
 	const initialized = initializeOpenAIClient(apiKey);
-	if (mainWindow && mainWindow.webContents) mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
+	if (mainWindow?.webContents) mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
 	return { initialized };
 });
 
@@ -473,7 +473,7 @@ async function processWhisperFile(whisperModelPath, tempWavPath, isPartial = fal
 	const whisperTime = Date.now() - whisperStart;
 	console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
 
-	if (stdout && stdout.trim()) {
+	if (stdout?.trim()) {
 		console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
 	} else {
 		console.log(`📝 STDOUT: vazio ou nulo`);

@@ -28,51 +28,35 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 - **Arquivo**: `deepgram-transcribe.js`
 - **Função/Evento**: `startAudioDeepgram(UIElements)` (linha ~185)
 - **Descrição**: Inicializa captura para input e output separadamente.
-  - Se `UIElements.inputSelect?.value`: chama `startDeepgramInput(UIElements)`.
-  - Se `UIElements.outputSelect?.value`: chama `startDeepgramOutput(UIElements)`.  
+  - Se `UIElements.inputSelect?.value`: chama `startDeepgram('input', UIElements)`.
+  - Se `UIElements.outputSelect?.value`: chama `startDeepgram('output', UIElements)`.
 
-#### 2.1.1. Captura de Entrada (Microfone)
+#### 2.1.1. Captura de Entrada (Microfone) e Saída (Sistema)
 
 - **Arquivo**: `deepgram-transcribe.js`
-- **Função/Evento**: `startDeepgramInput(UIElements)` (linha ~195)
-- **Descrição**:
-  - Verifica se já ativo (`isDeepgramInputActive`), se sim retorna.
-  - Obtém `inputDeviceId = UIElements.inputSelect?.value`.
-  - Chama `initDeepgramWS('input')` para WebSocket.
-  - Define flags globais.
-    - `deepgramInputWebSocket = ws;`
-    - `isDeepgramInputActive = true;`
-    - `deepgramInputStartAt = Date.now();`
-    - `deepgramInputStopAt = null;`
-  - Solicita microfone: `navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: inputDeviceId } } })`.
-  - Cria `deepgramInputAudioContext = new AudioContext({ sampleRate: 16000 })`.
+- **Função/Evento**: `startDeepgram(source, UIElements)` (linha ~475)
+- **Descrição**: Função genérica que inicializa captura tanto para entrada quanto saída, parametrizando por source.
+  - `source` pode ser `'input'` (microfone) ou `'output'` (sistema).
+  - **Para INPUT**:
+    - Obtém `deviceId = UIElements.inputSelect?.value`.
+    - Threshold: `0.02` (menos sensível).
+    - Mensagem de acesso: `"🎤 Solicitando acesso à entrada de áudio (Microfone)..."`.
+  - **Para OUTPUT**:
+    - Obtém `deviceId = UIElements.outputSelect?.value`.
+    - Threshold: `0.005` (mais sensível, para capturar finais de fala).
+    - Mensagem de acesso: `"🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)..."`.
+  - Verifica se já ativo via `deepgramVars[source].isActive()`, se sim retorna.
+  - Chama `initDeepgramWS(source)` para WebSocket.
+  - Define flags via deepgramVars:
+    - `setWs(ws)`
+    - `setActive(true)`
+    - `setStartAt(Date.now())`
+  - Solicita acesso ao dispositivo: `navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } })`.
+  - Cria `AudioContext` com 16kHz.
   - Carrega AudioWorklet: `audioContext.audioWorklet.addModule('./deepgram-audio-worklet-processor.js')`.
-  - Cria `deepgramInputProcessor = new AudioWorkletNode(audioContext, 'deepgram-audio-worklet-processor')`.
-  - Define threshold: `processor.port.postMessage({ type: 'setThreshold', threshold: 0.01 })`.
-  - Conecta: 
-    - `source.connect(processor);`
-    - `processor.connect(audioContext.destination)`.
-  - Escuta mensagens do worklet: `processor.port.onmessage = event => { ... }`.
-
-#### 2.1.2. Captura de Saída (Sistema)
-
-- **Arquivo**: `deepgram-transcribe.js`
-- **Função/Evento**: `startDeepgramOutput(UIElements)` (linha ~275)
-- **Descrição**:
-  - Verifica se já ativo (`isDeepgramOutputActive`), se sim retorna.
-  - Obtém `outputDeviceId = UIElements.outputSelect?.value`.
-  - Chama `initDeepgramWS('output')` para WebSocket.
-  - Define flags globais.
-    - `deepgramOutputWebSocket = ws;`
-    - `isDeepgramOutputActive = true;`
-    - `deepgramOutputStartAt = Date.now();`
-    - `deepgramOutputStopAt = null;`
-  - Solicita display media: `navigator.mediaDevices.getDisplayMedia({ audio: true, selfBrowserSurface: 'include' })`.
-  - Cria `deepgramOutputAudioContext` e `deepgramOutputProcessor`.
-  - Threshold mais baixo: 0.005 (para capturar finais de fala).
-  - Conecta: 
-    - `source.connect(processor)`; 
-    - `processor.connect(audioContext.destination)`.
+  - Cria `AudioWorkletNode` com threshold apropriado para o source.
+  - Conecta fluxo: `source → HPF (passa-alta) → processor → destination`.
+  - Atualiza referências via deepgramVars (stream, audioContext, source, hpf, processor).
 
 ### 2.2. Inicialização do WebSocket (initDeepgramWS)
 
@@ -134,7 +118,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
   - Define autor da transcrição (Input ou Output): `author = isInput ? YOU : OTHER;`.
   - Define ID do elemento interim: `interimId = isInput ? 'deepgram-interim-input' : 'deepgram-interim-output'`.
   - **Emite** `emitUIChange('onUpdateInterim', { id: interimId, speaker: author, text: transcript })`
-    para atualizar a interface com o texto sendo transcrito em tempo real (mostra o texto aparecendo gradualmente na tela, como um "typing effect" - efeito de digitação).  
+    para atualizar a interface com o texto sendo transcrito em tempo real (mostra o texto aparecendo gradualmente na tela, como um "typing effect" - efeito de digitação).
 
 ### 4.3. Processamento de Finals (transcrições completas)
 

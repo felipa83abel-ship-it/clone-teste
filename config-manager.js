@@ -303,6 +303,8 @@ class ConfigManager {
 
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
 					if (input.id === 'audio-input-device') {
+						console.log('📝 Input device mudou');
+
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
 						if (globalThis.RendererAPI?.stopInput) {
 							globalThis.RendererAPI.stopInput().catch(err => {
@@ -311,8 +313,15 @@ class ConfigManager {
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
 							this.restartInputMonitoring();
+
+							// Emite evento para notificar mudança de dispositivo (renderer fica cego ao DOM)
+							if (globalThis.RendererAPI?.emitUIChange) {
+								globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'input', deviceId: input.value });
+							}
 						}
 					} else if (input.id === 'audio-output-device') {
+						console.log('📝 Output device mudou');
+
 						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
 						if (globalThis.RendererAPI?.stopOutput) {
 							globalThis.RendererAPI.stopOutput().catch(err => {
@@ -321,6 +330,11 @@ class ConfigManager {
 
 							// 🔥 Reinicia monitoramento com novo dispositivo
 							this.restartOutputMonitoring();
+
+							// Emite evento para notificar mudança de dispositivo (renderer fica cego ao DOM)
+							if (globalThis.RendererAPI?.emitUIChange) {
+								globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
+							}
 						}
 					}
 				});
@@ -1412,10 +1426,12 @@ class ConfigManager {
 				const container = transcriptionBox.parentElement;
 				if (container?.id === 'transcriptionContainer') {
 					container.scrollTop = container.scrollHeight;
-					console.log('📜 Auto-scroll para última transcrição', {
-						scrollTop: container.scrollTop,
-						scrollHeight: container.scrollHeight,
-					});
+
+					debugLogConfig(
+						'📜 Auto-scroll para última transcrição',
+						{ scrollTop: container.scrollTop, scrollHeight: container.scrollHeight },
+						false,
+					);
 				}
 			});
 		});
@@ -1518,10 +1534,14 @@ class ConfigManager {
 			// Procura por span dentro do elemento (pode ser currentQuestionText)
 			const textEl = currentQuestionBox.querySelector('span') || currentQuestionBox;
 			if (textEl) {
-				console.log(`✅ config-manager: atualizando texto em elemento:`, {
-					seletor: textEl.id || textEl.className,
-					texto: text,
-				});
+				debugLogConfig(
+					`✅ config-manager: atualizando texto em elemento:`,
+					{
+						seletor: textEl.id || textEl.className,
+						texto: text,
+					},
+					false,
+				);
 				textEl.innerText = text;
 			} else {
 				console.warn(`⚠️ config-manager: elemento de texto não encontrado dentro de #currentQuestion`);
@@ -1554,7 +1574,7 @@ class ConfigManager {
 
 		// Answer Selected — exibe resposta existente e faz scroll
 		globalThis.RendererAPI.onUIChange('onAnswerSelected', payload => {
-			console.log('📌 onAnswerSelected recebido:', payload);
+			debugLogConfig('📌 onAnswerSelected recebido:', payload, false);
 
 			if (!payload) return;
 
@@ -1564,10 +1584,10 @@ class ConfigManager {
 			const answersBox = document.getElementById('answersHistory');
 			if (!answersBox) return;
 
-			console.log('🎨 [onAnswerSelected] Removendo destaque anterior');
+			debugLogConfig('🎨 [onAnswerSelected] Removendo destaque anterior', false);
 			// remove seleção anterior
 			answersBox.querySelectorAll('.selected-answer').forEach(el => {
-				console.log('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId);
+				debugLogConfig('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId, false);
 				el.classList.remove('selected-answer');
 			});
 
@@ -1580,12 +1600,12 @@ class ConfigManager {
 			}
 
 			// marca como selecionada
-			console.log('🎨 [onAnswerSelected] Adicionando destaque em:', questionId);
+			debugLogConfig('🎨 [onAnswerSelected] Adicionando destaque em:', questionId, false);
 			answerEl.classList.add('selected-answer');
 
 			// garante visibilidade com scroll suave
 			if (shouldScroll) {
-				console.log('📜 [onAnswerSelected] Scrollando para resposta:', questionId);
+				debugLogConfig('📜 [onAnswerSelected] Scrollando para resposta:', questionId, false);
 				answerEl.scrollIntoView({
 					behavior: 'smooth',
 					block: 'center',
@@ -1615,7 +1635,7 @@ class ConfigManager {
 
 			// ✅ PRIMEIRA CHUNK - não existe wrapper ainda
 			if (!wrapper) {
-				console.log('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId);
+				debugLogConfig('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId, true);
 
 				// Criar novo div de resposta
 				wrapper = document.createElement('div');
@@ -1638,7 +1658,7 @@ class ConfigManager {
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
 
-				console.log('📊 Total blocos agora:', answersHistoryBox.querySelectorAll('.answer-block').length);
+				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, true);
 			}
 
 			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
@@ -1660,12 +1680,12 @@ class ConfigManager {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
 
-			console.log('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId);
+			debugLogConfig('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId, false);
 
 			const wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${oldId}"]`);
 			if (wrapper) {
 				wrapper.dataset.questionId = newId;
-				console.log('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId);
+				debugLogConfig('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId, false);
 
 				// Atualizar rastreamento de streaming também
 				if (currentStreamingQuestionId === oldId) {
@@ -1681,7 +1701,7 @@ class ConfigManager {
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		globalThis.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
-			console.log('✅ [STREAM_END] Limpando streamingQuestionId');
+			debugLogConfig('✅ [STREAM_END] Limpando streamingQuestionId', false);
 			currentStreamingQuestionId = null;
 		});
 
@@ -1690,7 +1710,7 @@ class ConfigManager {
 			console.log('🔔 onPlaceholderFulfill recebido:', data);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
-			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, placeholderId, showMeta } = data;
+			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, showMeta } = data;
 			const transcriptionBox = document.getElementById('conversation');
 
 			if (!transcriptionBox) {
@@ -1887,38 +1907,6 @@ class ConfigManager {
 		if (!globalThis.RendererAPI) {
 			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI não disponível em registerDOMEventListeners!');
 			return;
-		}
-
-		// Input select
-		const inputSelect = document.getElementById('audio-input-device');
-		if (inputSelect) {
-			inputSelect.addEventListener('change', async () => {
-				console.log('📝 Input device mudou');
-				this.saveDevices();
-				if (globalThis.RendererAPI?.stopInput) {
-					globalThis.RendererAPI.stopInput();
-				}
-				if (!inputSelect.value) return;
-				if (globalThis.RendererAPI?.startInput) {
-					await globalThis.RendererAPI.startInput();
-				}
-			});
-		}
-
-		// Output select
-		const outputSelect = document.getElementById('audio-output-device');
-		if (outputSelect) {
-			outputSelect.addEventListener('change', async () => {
-				console.log('📝 Output device mudou');
-				this.saveDevices();
-				if (globalThis.RendererAPI?.stopOutput) {
-					globalThis.RendererAPI.stopOutput();
-				}
-				if (!outputSelect.value) return;
-				if (globalThis.RendererAPI?.startOutput) {
-					await globalThis.RendererAPI.startOutput();
-				}
-			});
 		}
 
 		// Mock toggle
@@ -2119,6 +2107,7 @@ class ConfigManager {
 		// Toggle audio (global shortcut)
 		if (globalThis.RendererAPI?.onToggleAudio) {
 			globalThis.RendererAPI.onToggleAudio(() => {
+				// Começar a ouvir / Parar de ouvir (Ctrl+D)
 				if (globalThis.RendererAPI?.listenToggleBtn) {
 					globalThis.RendererAPI.listenToggleBtn();
 				}
@@ -2364,11 +2353,28 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 /**
  * Log de debug padronizado para config-manager.js
+ * Por padrão nunca loga, se quiser mostrar é só passar true.
  * @param {*} msg
- * @param {boolean} showLog
+ * @param {boolean} showLog - true para mostrar, false para ignorar
  */
-function debugLogConfig(msg, showLog = false) {
+function debugLogConfig(...args) {
+	const maybeFlag = args.at(-1);
+	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+
+	const nowLog = new Date();
+	const timeStr =
+		`${nowLog.getHours().toString().padStart(2, '0')}:` +
+		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
+		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
+		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+
 	if (showLog) {
-		console.log('%c🪲 ❯❯❯❯ Debug: ' + msg + ' em config-manager.js', 'color: orange; font-weight: bold;');
+		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+		// prettier-ignore
+		console.log(
+			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em config-manager.js:`, 
+			'color: orange; font-weight: bold;', 
+			...cleanArgs
+		);
 	}
 }
