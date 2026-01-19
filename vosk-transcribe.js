@@ -1,19 +1,22 @@
 /**
- * 🔥 VOSK TRANSCRIBE - STREAMING CONTÍNUO (COMO DEEPGRAM)
+ * 🔥 VOSK TRANSCRIBE - MÓDULO INDEPENDENTE
  *
- * NOVA ABORDAGEM:
- * - Mantém MediaRecorder SEMPRE ativo (nunca fecha)
- * - Envia chunks de áudio continuamente via IPC (não espera por silêncio)
- * - Transcrição incremental: recebe resultados parciais e finais do Vosk
- * - Mantém Vosk "vivo" entre frases (sem reiniciar contexto)
+ * Implementação isolada de transcrição local com Vosk,
+ * - Spawn vosk-server.py AQUI no renderer (não via IPC)
+ * - Comunicação stdin/stdout direta (JSON)
+ * - AudioWorklet para captura e processamento de áudio bruto PCM16
+ * - Usa VAD para detecção de fala (webrtcvad ou fallback de energia)
+ * - Consolida interim results e transcrições finais
  *
- * Padrão idêntico ao Deepgram: capture -> send chunks -> detect silence -> finalize -> continue
+ * Uso:
+ * - startAudioVoskLocal(UIElements) - inicia captura input + output
+ * - stopAudioVoskLocal() - para captura input + output
  */
 
 /* ================================ */
 //	IMPORTS
 /* ================================ */
-const { ipcRenderer } = require('electron');
+const { spawn } = require('node:child_process');
 
 /* ================================ */
 //	CONSTANTES
@@ -22,258 +25,247 @@ const { ipcRenderer } = require('electron');
 const INPUT = 'input';
 const OUTPUT = 'output';
 
-// Chunk size para envio contínuo de áudio (500ms de áudio a 16kHz = ~16KB)
-const CHUNK_SEND_INTERVAL_MS = 500;
-
-// 🔥 AUDIO WORKLET - Usar o mesmo que Deepgram usa
-const AUDIO_CONTEXT_WORKLET_PATH = './deepgram-audio-worklet-processor.js';
-
-// Timeouts de silêncio para finalizar transcrição
-const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada
-const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída
-
-// 🔥 VAD (Voice Activity Detection) - COPIADO EXATAMENTE DO DEEPGRAM
+// Configuração de Áudio 16kHz
 const AUDIO_SAMPLE_RATE = 16000; // Hz
-const VAD_FRAME_DURATION_MS = 0.03; // 30ms por frame (idêntico ao Deepgram)
-const VAD_WINDOW_SIZE = 6; // Últimos ~6 frames (~50-100ms, idêntico ao Deepgram)
-const FALLBACK_VOLUME_THRESHOLD = 20; // Limiar de volume para fallback (idêntico ao Deepgram)
 
-// Configuração VAD nativa
-let useNativeVADVosk = true;
-let vadAvailableVosk = false;
-let vadInstanceVosk = null;
+// AudioWorklet path
+const AUDIO_CONTEXT_WORKLET_PATH = './stt-audio-worklet-processor.js';
+
+// Configuração de VAD (Voice Activity Detection)
+const VAD_MODE = 2; // Modo agressivo do webrtcvad
+const VAD_FRAME_DURATION_MS = 0.03; // 30ms por frame
+const VAD_WINDOW_SIZE = 6; // Últimos ~6 frames (~50-100ms)
+const FALLBACK_VOLUME_THRESHOLD = 20; // Limiar de volume para fallback (%)
+const ENERGY_THRESHOLD = 500; // Limiar de energia RMS para fallback
+
+// Detecção de silêncio
+const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
+const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 /* ================================ */
-//	ESTADO DO VOSK
+//	ESTADO DO Vosk
 /* ================================ */
 
-const voskVars = {
+// Configuração Vosk
+const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3' };
+
+// Configuração de VAD nativo (compatível com deepgram)
+let useNativeVAD = true;
+let vadAvailable = false;
+let vadInstance = null;
+
+/* ================================ */
+//	ESTADO GLOBAL DO VOSK
+/* ================================ */
+
+const voskState = {
 	input: {
 		_isActive: false,
 		_stream: null,
 		_audioContext: null,
-		_processor: null, // AudioWorkletNode (substitui ScriptProcessorNode)
-		_source: null, // MediaStreamSource
+		_processor: null,
+		_source: null,
 		_startAt: null,
-		_chunkBuffer: [], // Buffer de chunks para envio contínuo
-		_chunkSendTimer: null,
-		_vadLastSpeechTime: null, // Último momento que detectou fala (para VAD)
-		_lastPercent: 0, // Último valor de volume medido (%)
-		_lastIsSpeech: false, // Último resultado de VAD
-		_lastVADTimestamp: null, // Último timestamp de VAD
-		vadWindow: [], // Janela deslizante de volume (para fallback suavizado)
+		_lastChunkTime: null,
+		_silenceCheckTimer: null,
+		_recordingActive: false,
+		_canSend: false,
+		_voskProcess: null,
 
-		isActive() {
-			return this._isActive;
-		},
-		setActive(val) {
-			this._isActive = val;
-		},
-		stream() {
-			return this._stream;
-		},
-		setStream(val) {
-			this._stream = val;
-		},
-		processor() {
-			return this._processor;
-		},
-		setProcessor(val) {
-			this._processor = val;
-		},
-		source() {
-			return this._source;
-		},
-		setSource(val) {
-			this._source = val;
-		},
-		audioContext() {
-			return this._audioContext;
-		},
-		setAudioContext(val) {
-			this._audioContext = val;
-		},
-		recorder() {
-			return this._recorder;
-		},
-		setRecorder(val) {
-			this._recorder = val;
-		},
 		startAt() {
 			return this._startAt;
 		},
 		setStartAt(val) {
 			this._startAt = val;
 		},
-		chunkBuffer() {
-			return this._chunkBuffer;
-		},
-		clearChunkBuffer() {
-			this._chunkBuffer = [];
-		},
-		chunkSendTimer() {
-			return this._chunkSendTimer;
-		},
-		setChunkSendTimer(val) {
-			this._chunkSendTimer = val;
-		},
 
 		author: 'Você',
-		lastActive: null,
 		lastTranscript: '',
 		inSilence: false,
 		lastPercent: 0,
+		shouldFinalizeAskCurrent: false,
+		_lastIsSpeech: false,
+		_lastVADTimestamp: null,
+		lastActive: null,
+		vadWindow: [],
 		noiseStartTime: null,
 		noiseStopTime: null,
-		shouldFinalizeAskCurrent: false,
 	},
 	output: {
 		_isActive: false,
 		_stream: null,
 		_audioContext: null,
-		_processor: null, // AudioWorkletNode
-		_source: null, // MediaStreamSource
+		_processor: null,
+		_source: null,
 		_startAt: null,
-		_chunkBuffer: [],
-		_chunkSendTimer: null,
-		_vadLastSpeechTime: null, // Último momento que detectou fala (para VAD)
-		_lastPercent: 0, // Último valor de volume medido (%)
-		_lastIsSpeech: false, // Último resultado de VAD
-		_lastVADTimestamp: null, // Último timestamp de VAD
-		vadWindow: [], // Janela deslizante de volume (para fallback suavizado)
+		_silenceCheckTimer: null,
+		_recordingActive: false,
+		_canSend: false,
+		_voskProcess: null,
 
-		isActive() {
-			return this._isActive;
-		},
-		setActive(val) {
-			this._isActive = val;
-		},
-		stream() {
-			return this._stream;
-		},
-		setStream(val) {
-			this._stream = val;
-		},
-		processor() {
-			return this._processor;
-		},
-		setProcessor(val) {
-			this._processor = val;
-		},
-		source() {
-			return this._source;
-		},
-		setSource(val) {
-			this._source = val;
-		},
-		audioContext() {
-			return this._audioContext;
-		},
-		setAudioContext(val) {
-			this._audioContext = val;
-		},
-		recorder() {
-			return this._recorder;
-		},
-		setRecorder(val) {
-			this._recorder = val;
-		},
 		startAt() {
 			return this._startAt;
 		},
 		setStartAt(val) {
 			this._startAt = val;
 		},
-		chunkBuffer() {
-			return this._chunkBuffer;
-		},
-		clearChunkBuffer() {
-			this._chunkBuffer = [];
-		},
-		chunkSendTimer() {
-			return this._chunkSendTimer;
-		},
-		setChunkSendTimer(val) {
-			this._chunkSendTimer = val;
-		},
 
 		author: 'Outros',
-		lastActive: null,
 		lastTranscript: '',
 		inSilence: false,
 		lastPercent: 0,
+		shouldFinalizeAskCurrent: false,
+		_lastIsSpeech: false,
+		_lastVADTimestamp: null,
+		lastActive: null,
+		vadWindow: [],
 		noiseStartTime: null,
 		noiseStopTime: null,
-		shouldFinalizeAskCurrent: false,
 	},
 };
 
 /* ================================ */
-//	INICIALIZAÇÃO
+//	SERVER VOSK PROCESS
 /* ================================ */
 
-/**
- * Inicia captura contínua de áudio (nunca para até stopVosk ser chamado)
- */
+// Inicia processo Vosk (input/output) no servidor
+function initVoskProcess(source) {
+	const vars = voskState[source];
+
+	if (vars._voskProcess) {
+		console.log(`⚠️ Vosk ${source} já está rodando`);
+		return vars._voskProcess;
+	}
+
+	console.log(`🚀 Iniciando Vosk (${source}) com modelo: ${VOSK_CONFIG.MODEL}...`);
+
+	vars._voskProcess = spawn('python', ['vosk-server.py', VOSK_CONFIG.MODEL], {
+		cwd: __dirname,
+		stdio: ['pipe', 'pipe', 'pipe'],
+	});
+
+	// Recebe mensagens do Vosk (igual teste-vosk.js)
+	vars._voskProcess.stdout.on('data', data => {
+		const lines = data.toString().split('\n');
+		lines.forEach(rawLine => {
+			const line = rawLine.trim(); // remove espaços e \r
+			if (!line) return; // ignora linhas vazias sem log
+
+			// Ignora mensagens de controle e logs
+			if (line === 'VOSK_READY' || line.startsWith('[VOSK]')) {
+				console.log(`[Vosk Controle] ${line}`);
+				return;
+			}
+
+			// Só tenta parsear se parecer JSON
+			if (!(line.startsWith('{') || line.startsWith('['))) {
+				console.log(`[Ignorado] ${line}`);
+				return;
+			}
+
+			try {
+				const msg = JSON.parse(line);
+
+				if (msg.error) {
+					console.error(`❌ Erro Vosk (${source}):`, msg.error);
+					return;
+				}
+
+				handleVoskMessage(source, msg);
+			} catch (error) {
+				console.error(`❌ Erro ao processar mensagem Vosk (${source}):`, error);
+				console.log(`[RAW] ${line}`);
+			}
+		});
+	});
+
+	vars._voskProcess.stderr.on('data', data => {
+		const line = data.toString().trim();
+		if (line && !line.includes('[VOSK]')) {
+			console.log(`[Vosk stderr] ${line}`);
+		}
+	});
+
+	vars._voskProcess.on('error', error => {
+		console.error(`❌ Erro ao spawn Vosk (${source}):`, error.message);
+		vars._voskProcess = null;
+	});
+
+	vars._voskProcess.on('close', code => {
+		console.log(`⏹️ Vosk (${source}) encerrado (código ${code})`);
+		vars._voskProcess = null;
+	});
+
+	console.log(`✅ Vosk (${source}) iniciado`);
+	return vars._voskProcess;
+}
+
+// Para processo Vosk (input/output) no servidor
+function stopVoskProcess(source) {
+	const vars = voskState[source];
+
+	if (!vars._voskProcess) return;
+
+	try {
+		vars._voskProcess.kill('SIGTERM');
+		vars._voskProcess = null;
+		console.log(`🛑 Vosk (${source}) parado`);
+	} catch (error) {
+		console.error(`❌ Erro ao parar Vosk (${source}):`, error);
+	}
+}
+
+// Envia mensagem "Finalize" para Vosk (input/output) no servidor
+function sendVoskFinalize(source) {
+	const vars = voskState[source];
+	if (vars._voskProcess) {
+		console.log(`🔔 Enviando Finalize para Vosk (${source})`);
+		vars._voskProcess.stdin.write(JSON.stringify({ type: 'finalize' }) + '\n');
+	}
+}
+
+/* ================================ */
+//	VOSK - INICIAR FLUXO (STT)
+/* ================================ */
+
+// Inicia captura de áudio do dispositivo de entrada ou saída com Vosk
 async function startVosk(source, UIElements) {
 	const config = {
 		input: {
 			deviceKey: 'inputSelect',
 			accessMessage: '🎤 Solicitando acesso à entrada de áudio (Microfone)...',
-			startLog: '▶️ Captura Vosk INPUT iniciada (STREAMING CONTÍNUO)',
+			threshold: 0.02,
+			startLog: '▶️ Captura Vosk INPUT iniciada',
 		},
 		output: {
 			deviceKey: 'outputSelect',
 			accessMessage: '🔊 Solicitando acesso à saída de áudio (VoiceMeter/Stereo Mix)...',
-			startLog: '▶️ Captura Vosk OUTPUT iniciada (STREAMING CONTÍNUO)',
+			threshold: 0.005,
+			startLog: '▶️ Captura Vosk OUTPUT iniciada',
 		},
 	};
 
 	const cfg = config[source];
 	if (!cfg) throw new Error(`❌ Source inválido: ${source}`);
 
-	const vars = voskVars[source];
+	const vars = voskState[source];
 
-	if (vars.isActive?.()) {
+	if (vars._isActive) {
 		console.warn(`⚠️ Vosk ${source.toUpperCase()} já ativo`);
 		return;
 	}
 
 	try {
-		console.log(cfg.accessMessage);
-
-		// 🔥 INICIALIZA VAD NATIVO (idêntico ao Deepgram)
-		console.log('🔥 Inicializando VAD nativo...');
-		if (!vadInstanceVosk && !vadAvailableVosk) {
-			try {
-				vadInstanceVosk = initVADVosk();
-				vadAvailableVosk = !!vadInstanceVosk;
-				if (vadAvailableVosk) {
-					console.log('✅ VAD nativo disponível (webrtcvad)');
-				} else {
-					console.log('⚠️ VAD nativo não disponível, usando fallback por volume');
-				}
-			} catch (e) {
-				console.warn('⚠️ Erro ao inicializar VAD:', e.message || e);
-				vadAvailableVosk = false;
-			}
-		}
-
-		// 🔥 SEGUNDO: Inicializa servidor Vosk antes de começar a capturar áudio
-		console.log('🔥 Inicializando servidor Vosk Python...');
-		try {
-			await ipcRenderer.invoke('vosk-init-server');
-			console.log('✅ Servidor Vosk inicializado e pronto');
-		} catch (error) {
-			console.error('❌ Erro ao inicializar servidor Vosk:', error);
-			throw error;
-		}
-
+		// Obtém o dispositivo selecionado no UI
 		const deviceId = UIElements[cfg.deviceKey]?.value;
-		if (!deviceId) {
-			console.warn(`⚠️ Nenhum dispositivo ${source} selecionado`);
-			return;
-		}
+
+		console.log(`🔊 Iniciando captura ${source.toUpperCase()} com dispositivo: ${deviceId}`);
+
+		// Inicia Vosk (spawn direto)
+		initVoskProcess(source);
+
+		// Solicita acesso ao dispositivo selecionado
+		console.log(cfg.accessMessage);
 
 		// Obtém stream de áudio
 		const stream = await navigator.mediaDevices.getUserMedia({
@@ -287,493 +279,162 @@ async function startVosk(source, UIElements) {
 
 		console.log(`✅ Acesso ao áudio ${source.toUpperCase()} autorizado`);
 
-		// 🔥 NOVO: Usa AudioWorkletNode (idêntico ao Deepgram)
-		// Isso fornece frames de tamanho adequado para o webrtcvad (320, 640 ou 960 samples)
-		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
+		// Cria AudioContext com 16kHz
+		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
+			sampleRate: AUDIO_SAMPLE_RATE,
+		});
 		await audioCtx.audioWorklet.addModule(AUDIO_CONTEXT_WORKLET_PATH);
 
-		// MediaStreamSource
+		// Cria MediaStreamSource e guarda via voskState
 		const mediaSource = audioCtx.createMediaStreamSource(stream);
 
-		// AudioWorkletNode: Processa áudio em pequenos buffers
-		const processor = new AudioWorkletNode(audioCtx, 'deepgram-audio-worklet-processor');
-		processor.port.postMessage({ type: 'setThreshold', threshold: source === INPUT ? 0.02 : 0.005 });
-
-		let audioDataCount = 0;
-		let volumeUpdateCount = 0;
-
+		// Inicia AudioWorklet para captura e processamento de áudio
+		const processor = new AudioWorkletNode(audioCtx, 'stt-audio-worklet-processor');
+		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
-			try {
-				if (event.data.type === 'audioData') {
-					audioDataCount++;
-					if (audioDataCount === 1) console.log(`🎧 Recebido primeiro audioData do worklet (${source})`);
-				} else if (event.data.type === 'volumeUpdate') {
-					volumeUpdateCount++;
-				}
-
-				processVoskAudioMessage(source, event.data).catch(error =>
-					console.error(`❌ Erro ao processar mensagem do worklet (${source}):`, error),
-				);
-			} catch (error) {
-				console.error(`❌ Erro crítico no handler de mensagem (${source}):`, error);
-			}
+			processIncomingAudioMessage(source, event.data).catch(error_ =>
+				console.error(`❌ Erro ao processar mensagem do worklet (${source}):`, error_),
+			);
 		};
 
-		// Conecta: Source → Processor → Destination
+		// Conecta fluxo: Source -> processor -> destination
 		mediaSource.connect(processor);
 		processor.connect(audioCtx.destination);
 
-		// Atualiza estado
-		vars.setStream(stream);
-		vars.setAudioContext(audioCtx);
-		vars.setSource(mediaSource);
-		vars.setProcessor(processor);
-		vars.setActive(true);
-		vars.setStartAt(Date.now());
-		vars.lastActive = Date.now();
+		vars._processor = processor;
 
-		// Inicia envio contínuo de chunks
-		startChunkSender(source, vars);
+		// Atualiza referências de estado
+		vars._stream = stream;
+		vars._audioContext = audioCtx;
+		vars._source = mediaSource;
+		vars._isActive = true;
+		vars._startAt = Date.now();
+		vars.lastActive = Date.now();
+		vars._recordingActive = true;
+		vars._canSend = true;
 
 		console.log(cfg.startLog);
 	} catch (error) {
 		console.error(`❌ Erro ao iniciar Vosk ${source.toUpperCase()}:`, error);
-		vars.setActive(false);
 		stopVosk(source);
 		throw error;
 	}
 }
 
-/**
- * Processa mensagens de áudio do AudioWorklet (idêntico ao Deepgram)
- */
-async function processVoskAudioMessage(source, data) {
-	const vars = voskVars[source];
-
+// Processa mensagens de áudio recebida do AudioWorklet
+async function processIncomingAudioMessage(source, data) {
+	const vars = voskState[source];
 	if (data.type === 'audioData') {
-		// 🔥 CORRIGIDO: O worklet envia pcm16.buffer (ArrayBuffer), precisa converter para Int16Array
-		const pcm16Array = data.pcm16 instanceof ArrayBuffer ? new Int16Array(data.pcm16) : data.pcm16;
-
-		// Detecta fala usando VAD
-		const isSpeech = detectSpeechVosk(source, vars, pcm16Array, data.percent || 0);
-		updateVADStateVosk(vars, isSpeech);
-
-		// Só acumula se detectou fala
-		if (isSpeech) {
-			vars.chunkBuffer().push(new Int16Array(pcm16Array));
-			// Debug: Log a cada N buffers
-			if (vars.chunkBuffer().length % 10 === 0) {
-				console.log(
-					`📥 Acumulados ${vars.chunkBuffer().length} buffers VAD-speech (${vars.chunkBuffer().reduce((s, c) => s + c.byteLength, 0)} bytes)`,
-				);
-			}
-		}
+		onAudioChunk(source, vars, data);
 	} else if (data.type === 'volumeUpdate') {
-		// Atualiza volume
-		vars._lastPercent = data.percent;
 		vars.lastPercent = data.percent;
-
 		if (globalThis.RendererAPI?.emitUIChange) {
 			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
 			globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
 		}
-
-		// Detecta silêncio
-		handleSilenceDetectionVosk(source, data.percent, vars);
+		handleSilenceDetection(source, data.percent);
 	}
 }
 
-/**
- * Para captura de áudio
- */
-async function stopVosk(source) {
-	const vars = voskVars[source];
+// Processa chunk de áudio PCM16 vindo do AudioWorklet
+async function onAudioChunk(source, vars, data) {
+	const pcm16Array = data.pcm16 instanceof ArrayBuffer ? new Int16Array(data.pcm16) : data.pcm16;
 
-	if (!vars.isActive?.()) return;
+	if (!pcm16Array || pcm16Array.length === 0 || !vars._canSend) {
+		return;
+	}
+
+	// VAD: Detecta fala usando padrão Vosk
+	const isSpeech = detectSpeech(source, vars, data);
+	updateVADState(vars, isSpeech);
+
+	// Se detectou fala, atualiza lastActive
+	if (isSpeech) {
+		vars.lastActive = Date.now();
+	}
 
 	try {
-		// Para envio de chunks
-		if (vars.chunkSendTimer?.()) {
-			clearInterval(vars.chunkSendTimer?.());
-			vars.setChunkSendTimer(null);
-		}
+		// 🔥 EXATAMENTE como teste-vosk.js
+		const buffer = Buffer.from(pcm16Array.buffer, pcm16Array.byteOffset, pcm16Array.byteLength);
+		const audioBase64 = buffer.toString('base64');
 
-		// Envia chunks pendentes
-		await sendPendingChunks(source, vars);
+		const msg = {
+			type: 'transcribe',
+			format: 'pcm',
+			rate: AUDIO_SAMPLE_RATE,
+			audio: audioBase64,
+		};
 
-		// Desconecta processador
-		const processor = vars.processor?.();
-		if (processor) {
-			try {
-				processor.disconnect();
-			} catch (e) {
-				console.warn(`⚠️ Erro ao desconectar processor (${source}):`, e);
-			}
-		}
-
-		// Desconecta source
-		const source_node = vars.source?.();
-		if (source_node) {
-			try {
-				source_node.disconnect();
-			} catch (e) {
-				console.warn(`⚠️ Erro ao desconectar source (${source}):`, e);
-			}
-		}
-
-		// Fecha stream
-		vars
-			.stream()
-			?.getTracks()
-			.forEach(track => track.stop());
-
-		vars.setActive(false);
-		vars.setStream(null);
-		vars.setProcessor(null);
-		vars.setSource(null);
-		vars.setAudioContext(null);
-		vars.setStartAt(null);
-
-		console.log(`🛑 Vosk ${source.toUpperCase()} parado`);
+		// Envia direto ao Vosk via stdin (não IPC!)
+		vars._voskProcess.stdin.write(JSON.stringify(msg) + '\n');
 	} catch (error) {
-		console.error(`❌ Erro ao parar Vosk ${source.toUpperCase()}:`, error);
+		console.error(`❌ Erro ao enviar chunk ao Vosk:`, error);
 	}
 }
 
-/* ================================ */
-//	ENVIO CONTÍNUO DE CHUNKS
-/* ================================ */
-
-/**
- * Inicia timer para enviar chunks periodicamente
- */
-function startChunkSender(source, vars) {
-	if (vars.chunkSendTimer?.()) {
-		clearInterval(vars.chunkSendTimer?.());
-	}
-
-	const timer = setInterval(async () => {
-		const chunks = vars.chunkBuffer();
-		if (chunks.length > 0) {
-			const totalSize = chunks.reduce((sum, c) => sum + c.byteLength, 0);
-			// 🔥 Ignora se vazios ou muito pequenos (< ~1KB = ~64ms @ 16kHz)
-			if (totalSize > 1000) {
-				console.log(`📤 Enviando ${chunks.length} chunks ao Vosk (${totalSize} bytes PCM 16-bit)...`);
-				await sendChunksToVosk(source, vars, chunks);
-				vars.clearChunkBuffer();
-			} else {
-				console.warn(`⚠️ PCM muito pequeno (${totalSize}b), acumulando...`);
-			}
-		}
-	}, CHUNK_SEND_INTERVAL_MS);
-
-	vars.setChunkSendTimer(timer);
-}
-
-/**
- * Envia chunks de PCM 16-bit acumulados ao Vosk via IPC
- * Agora usa VAD EXATAMENTE IGUAL AO DEEPGRAM
- * Só envia se houver áudio real detectado
- */
-async function sendChunksToVosk(source, vars, chunks) {
-	try {
-		if (chunks.length === 0) return;
-
-		// 🔥 Monta buffer único a partir dos chunks PCM 16-bit
-		const totalSize = chunks.reduce((sum, c) => sum + c.byteLength, 0);
-		const pcmBuffer = new Int16Array(totalSize / 2); // Divide por 2 porque cada sample = 2 bytes
-		let offset = 0;
-
-		for (const chunk of chunks) {
-			const view = new Int16Array(chunk.buffer, chunk.byteOffset, chunk.byteLength / 2);
-			pcmBuffer.set(view, offset);
-			offset += view.length;
-		}
-
-		// 🔥 NÃO VALIDAR VAD NOVAMENTE: Já foi validado ao acumular chunks
-		// Se chegou aqui com chunks, é porque passou por VAD
-
-		console.log(`📦 PCM 16-bit combinado: ${pcmBuffer.byteLength} bytes (${chunks.length} chunks) - ENVIANDO`);
-
-		// 🔥 VALIDAÇÃO: Rejeita se muito pequeno
-		if (pcmBuffer.byteLength < 1000) {
-			console.warn(`⚠️ PCM muito pequeno (${pcmBuffer.byteLength}b), ignorando...`);
-			return;
-		}
-
-		// Envia para Vosk via IPC (main.js converterá PCM → WAV se necessário)
-		const buffer = Buffer.from(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.byteLength);
-		const startTime = Date.now();
-
-		// 🔥 NOVO: Chama handler específico para PCM (não WebM)
-		const finalResult = await ipcRenderer.invoke('vosk-transcribe-pcm', buffer);
-
-		const duration = Date.now() - startTime;
-		console.log(`✅ Vosk processou em ${duration}ms - Resultado:`, finalResult);
-
-		// 🔥 CORRIGIDO: Usar partial se final vazio (Vosk retorna incremental)
-		const transcribedText = (finalResult?.final?.trim?.() || finalResult?.partial?.trim?.() || '').trim();
-
-		if (!transcribedText) {
-			console.log(`📝 Vosk ainda processando... (partial vazio)`);
-			return;
-		}
-
-		console.log(`📝 Resultado: "${transcribedText}"`);
-
-		// Atualiza UI
-		if (globalThis.RendererAPI?.emitUIChange) {
-			globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
-				author: vars.author,
-				text: transcribedText,
-				timeStr: new Date().toLocaleTimeString(),
-				elementId: 'conversation',
-				placeholderId: `vosk-${source}-${Date.now()}`,
-			});
-
-			globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
-				speaker: vars.author,
-				text: transcribedText,
-				placeholderId: `vosk-${source}-${Date.now()}`,
-			});
-		}
-
-		vars.lastTranscript = transcribedText;
-
-		// Para OUTPUT: chama handleCurrentQuestion (Deepgram pattern)
-		if (source === OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
-			globalThis.RendererAPI.handleCurrentQuestion(vars.author, transcribedText, {
-				isInterim: false,
-				shouldFinalizeAskCurrent: vars.shouldFinalizeAskCurrent,
-			});
-		}
-	} catch (error) {
-		console.error(`❌ Erro ao enviar chunks ao Vosk:`, error);
-	}
-}
-
-/**
- * Envia chunks pendentes quando MediaRecorder para
- */
-async function sendPendingChunks(source, vars) {
-	const chunks = vars.chunkBuffer();
-	if (chunks.length > 0) {
-		console.log(`📤 Enviando ${chunks.length} chunks FINAIS ao Vosk...`);
-		await sendChunksToVosk(source, vars, chunks);
-		vars.clearChunkBuffer();
-	}
-}
-
-/* ================================ */
-//	MONITORAMENTO DE VOLUME E SILÊNCIO
-/* ================================ */
-
-/**
- * Monitora volume e detecta silêncio
- */
-function monitorVolumeVosk(source, analyser, vars) {
-	const dataArray = new Uint8Array(analyser.frequencyBinCount);
-	let logCounter = 0;
-
-	const updateVolume = () => {
-		if (!vars.isActive?.()) return;
-
-		analyser.getByteFrequencyData(dataArray);
-
-		const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
-		const percent = (average / 255) * 100;
-
-		vars._lastPercent = percent;
-		vars.lastPercent = percent;
-
-		// Log periodicamente
-		if (logCounter++ % 30 === 0) {
-			console.log(`📊 Volume ${source}: ${percent.toFixed(2)}%`);
-		}
-
-		// Atualiza UI
-		if (globalThis.RendererAPI?.emitUIChange) {
-			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-			globalThis.RendererAPI.emitUIChange(ev, { percent });
-		}
-
-		// Detecta silêncio
-		handleSilenceDetectionVosk(source, percent, vars);
-
-		requestAnimationFrame(updateVolume);
-	};
-
-	updateVolume();
-}
-
-/**
- * Detecta silêncio e finaliza transcrição
- */
-function handleSilenceDetectionVosk(source, percent, vars) {
+// Trata detecção de silêncio com VAD ou fallback
+function handleSilenceDetection(source, percent) {
+	const vars = voskState[source];
 	const silenceTimeout = source === INPUT ? SILENCE_TIMEOUT_INPUT : SILENCE_TIMEOUT_OUTPUT;
 	const now = Date.now();
-	const MIN_RECORDING_TIME = 800;
-	const VOLUME_THRESHOLD = 3;
 
-	const isSpeech = percent > VOLUME_THRESHOLD;
+	// Decisão principal: VAD se disponível, senão fallback por volume
+	const useVADDecision = isVADEnabled() && vars._lastIsSpeech !== undefined;
+	const effectiveSpeech = useVADDecision ? !!vars._lastIsSpeech : percent > 0;
 
-	if (isSpeech) {
+	debugLogVosk(
+		`🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
+		false,
+	);
+
+	if (effectiveSpeech) {
+		// Se detectou fala, resetamos estado de silêncio
 		if (vars.inSilence) {
 			if (!vars.noiseStartTime) vars.noiseStartTime = Date.now();
+
 			const noiseDuration = vars.noiseStartTime - vars.noiseStopTime;
-			console.log(`🟢 🟢 🟢 ***** 🔊 Fala detectada após ${noiseDuration}ms - Volume: ${percent.toFixed(2)}% *****`);
+			vars.noiseStopTime = null;
+
+			debugLogVosk(`🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`, true);
 		}
 
 		vars.inSilence = false;
 		vars.shouldFinalizeAskCurrent = false;
 		vars.lastActive = now;
 		vars.noiseStartTime = null;
-
-		// 🔥 VAD: Atualiza último momento de fala detectada
-		vars._vadLastSpeechTime = now;
 	} else {
+		// Silêncio detectado → verifica se já passou o timeout
 		const elapsed = now - vars.lastActive;
-		const recordingTime = now - (vars.startAt?.() || now);
 
-		// Detectou silêncio estável
-		if (elapsed >= silenceTimeout && !vars.inSilence && recordingTime >= MIN_RECORDING_TIME) {
+		// Entrando em silêncio estável
+		if (elapsed >= silenceTimeout && !vars.inSilence) {
 			vars.inSilence = true;
 			vars.shouldFinalizeAskCurrent = true;
 			vars.noiseStopTime = Date.now();
 
-			console.log(
-				`🔴 🔴 🔴 ***** 🔇 Silêncio estável (${elapsed}ms, recording: ${recordingTime}ms) - Volume: ${percent.toFixed(2)}% *****`,
-			);
+			debugLogVosk(`🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`, true);
 
-			// 🔥 ENVIA chunks acumulados ao detectar silêncio
-			const chunks = vars.chunkBuffer();
-			if (chunks.length > 0) {
-				console.log(`📤 Detectado silêncio - ENVIANDO ${chunks.length} chunks ao Vosk...`);
-				sendChunksToVosk(source, vars, chunks).catch(error =>
-					console.error(`❌ Erro ao enviar chunks no silêncio:`, error),
-				);
-				vars.clearChunkBuffer();
-			}
-
-			// IMPORTANTE: Não para a gravação aqui!
-			// Apenas marca como "silêncio" - a gravação continua
-			// Isso permite capturar áudio novamente quando a pessoa fala de novo
+			// Dispara finalize apenas uma vez
+			sendVoskFinalize(source);
 		}
 	}
 }
 
 /* ================================ */
-//	FUNÇÕES VAD (Voice Activity Detection)
-//	COPIADAS EXATAMENTE DO DEEPGRAM
+//	VAD (VOICE ACTIVITY DETECTION)
 /* ================================ */
 
-/**
- * Inicializa VAD nativo (webrtcvad) - idêntico ao Deepgram
- */
-function initVADVosk() {
-	let VAD = null;
-	try {
-		VAD = require('webrtcvad');
-	} catch {
-		try {
-			VAD = require('node-webrtcvad');
-		} catch {
-			return null;
-		}
-	}
-
-	if (!VAD) return null;
-
-	try {
-		if (typeof VAD?.default === 'function') {
-			// webrtcvad (ESM default)
-			const mode = 2; // Modo agressivo (idêntico ao Deepgram)
-			return new VAD.default(AUDIO_SAMPLE_RATE, mode);
-		} else if (typeof VAD === 'function') {
-			// node-webrtcvad (CommonJS)
-			const mode = 2;
-			return new VAD(mode);
-		} else if (VAD?.VAD) {
-			// classe interna
-			const mode = 2;
-			return new VAD.VAD(mode);
-		}
-	} catch (e) {
-		console.warn('⚠️ Erro ao inicializar VAD nativo:', e.message || e);
-	}
-
-	return null;
-}
-
-/**
- * Tenta chamar VAD com diferentes assinaturas - idêntico ao Deepgram
- */
-function tryCallVADInstanceVosk(frame, sampleRate) {
-	if (typeof vadInstanceVosk.process === 'function') {
-		if (vadInstanceVosk.process.length === 2) {
-			return processVADResultVosk(vadInstanceVosk.process(sampleRate, frame));
-		} else {
-			return processVADResultVosk(vadInstanceVosk.process(frame));
-		}
-	} else if (typeof vadInstanceVosk.isSpeech === 'function') {
-		return !!vadInstanceVosk.isSpeech(frame, sampleRate);
-	} else if (typeof vadInstanceVosk === 'function') {
-		return !!vadInstanceVosk(frame, sampleRate);
-	}
-	return null;
-}
-
-/**
- * Processa resultado do VAD - idêntico ao Deepgram
- */
-function processVADResultVosk(result) {
-	if (typeof result === 'boolean') return result;
-	if (typeof result === 'number') return result > 0;
-	return null;
-}
-
-/**
- * Verifica se VAD nativo está habilitado - idêntico ao Deepgram
- */
-function isVADEnabledVosk() {
-	return useNativeVADVosk && !!vadAvailableVosk;
-}
-
-/**
- * Executa VAD nativo - idêntico ao Deepgram
- */
-function runNativeVADVosk(frame, sampleRate = AUDIO_SAMPLE_RATE) {
-	try {
-		if (vadInstanceVosk !== undefined && vadInstanceVosk) {
-			try {
-				return tryCallVADInstanceVosk(frame, sampleRate);
-			} catch (error_) {
-				console.warn('runNativeVADVosk: erro ao chamar vadInstance:', error_ && (error_.message || error_));
-				return null;
-			}
-		}
-	} catch (err) {
-		console.warn('runNativeVADVosk erro:', err && (err.message || err));
-	}
-	return null;
-}
-
-/**
- * Detecta fala usando VAD nativo ou fallback - IDÊNTICO AO DEEPGRAM
- */
-function detectSpeechVosk(source, vars, pcm16Data, percent) {
+// Detecta fala baseado em VAD nativo ou fallback de energia
+function detectSpeech(source, vars, data) {
 	let isSpeech = null;
-
-	// Tenta VAD nativo se disponível
-	if (isVADEnabledVosk()) {
+	if (isVADEnabled()) {
 		try {
-			const sampleRate = AUDIO_SAMPLE_RATE;
-			const pcm = new Int16Array(pcm16Data);
-			const frameSize = Math.floor(sampleRate * VAD_FRAME_DURATION_MS); // ~480 samples
-
+			const sampleRate = data.sampleRate || AUDIO_SAMPLE_RATE;
+			const pcm = new Int16Array(data.pcm16);
+			const frameSize = Math.floor(sampleRate * VAD_FRAME_DURATION_MS);
 			for (let i = 0; i + frameSize <= pcm.length; i += frameSize) {
 				const frame = pcm.subarray(i, i + frameSize);
-				const vadDecision = runNativeVADVosk(frame, sampleRate);
+				const vadDecision = runNativeVAD(frame, sampleRate);
 				if (vadDecision === true) {
 					isSpeech = true;
 					break;
@@ -787,39 +448,336 @@ function detectSpeechVosk(source, vars, pcm16Data, percent) {
 			isSpeech = null;
 		}
 	}
-
-	// Fallback: VAD por energia com janela deslizante (idêntico ao Deepgram)
-	return isSpeech === null ? fallbackIsSpeechVosk(vars, percent) : isSpeech;
+	return isSpeech === null ? fallbackIsSpeech(source, vars.lastPercent) : isSpeech;
 }
 
-/**
- * Fallback de VAD baseado em energia com suavização (multi-frame) - IDÊNTICO AO DEEPGRAM
- */
-function fallbackIsSpeechVosk(vars, percent) {
-	if (!vars.vadWindow) vars.vadWindow = [];
-	const window = vars.vadWindow;
-	window.push(percent);
-	if (window.length > VAD_WINDOW_SIZE) window.shift(); // últimos ~6 frames
-	const avg = window.reduce((a, b) => a + b, 0) / window.length;
+// Verifica se VAD nativo está habilitado e disponível
+function isVADEnabled() {
+	return useNativeVAD && !!vadAvailable;
+}
 
-	// heurística ajustada: use 20% (idêntico ao Deepgram)
-	const result = avg > FALLBACK_VOLUME_THRESHOLD;
-
-	if (result !== vars._lastIsSpeech) {
-		const status = result ? '🔊 FALA' : '🔇 SILÊNCIO';
-		console.log(`   VAD Fallback: ${status} (avg: ${avg.toFixed(1)}%, threshold: ${FALLBACK_VOLUME_THRESHOLD}%)`);
+// Computa energia do frame PCM16 e executa VAD nativo
+function runNativeVAD(frame, sampleRate = AUDIO_SAMPLE_RATE) {
+	try {
+		if (vadInstance !== undefined && vadInstance) {
+			try {
+				return tryCallVADInstance(frame, sampleRate);
+			} catch (error_) {
+				console.warn('runNativeVAD: erro ao chamar vadInstance:', error_ && (error_.message || error_));
+				return null;
+			}
+		}
+		const energy = computeEnergy(frame);
+		return energy > ENERGY_THRESHOLD;
+	} catch (err) {
+		console.warn('runNativeVAD erro:', err && (err.message || err));
+		return null;
 	}
-
-	return result;
 }
 
-/**
- * Atualiza estado VAD - idêntico ao Deepgram
- */
-function updateVADStateVosk(vars, isSpeech) {
+// Tenta chamar instância VAD nativa (webrtcvad ou node-webrtcvad)
+function tryCallVADInstance(frame, sampleRate) {
+	if (typeof vadInstance.process === 'function') {
+		if (vadInstance.process.length === 2) {
+			return processVADResult(vadInstance.process(sampleRate, frame));
+		} else {
+			return processVADResult(vadInstance.process(frame));
+		}
+	} else if (typeof vadInstance.isSpeech === 'function') {
+		return !!vadInstance.isSpeech(frame, sampleRate);
+	} else if (typeof vadInstance === 'function') {
+		return !!vadInstance(frame, sampleRate);
+	}
+	return null;
+}
+
+// Processa resultado do VAD: true (speech), false (no speech), null (error / undecided)
+function processVADResult(result) {
+	if (typeof result === 'boolean') return result;
+	if (Array.isArray(result)) return result.includes(1);
+	return null;
+}
+
+// Atualiza estado VAD
+function updateVADState(vars, isSpeech) {
 	vars._lastIsSpeech = !!isSpeech;
 	vars._lastVADTimestamp = Date.now();
 	if (isSpeech) vars.lastActive = Date.now();
+}
+
+// Inicializa instância de VAD nativo (webrtcvad ou node-webrtcvad)
+function initVAD() {
+	let VAD = null;
+	try {
+		VAD = require('webrtcvad');
+	} catch {
+		try {
+			VAD = require('node-webrtcvad');
+		} catch {
+			return null;
+		}
+	}
+
+	if (!VAD) return null;
+
+	if (typeof VAD?.default === 'function') {
+		// webrtcvad (ESM default)
+		return new VAD.default(AUDIO_SAMPLE_RATE, VAD_MODE);
+	} else if (typeof VAD === 'function') {
+		// node-webrtcvad (CommonJS)
+		return new VAD(VAD_MODE);
+	} else if (VAD?.VAD) {
+		// classe interna
+		return new VAD.VAD(VAD_MODE);
+	}
+
+	return null;
+}
+
+// Fallback de VAD baseado em energia com suavização (multi-frame)
+function fallbackIsSpeech(source, percent) {
+	const vars = voskState[source];
+	if (!vars.vadWindow) vars.vadWindow = [];
+	const window = vars.vadWindow;
+	window.push(percent);
+	if (window.length > VAD_WINDOW_SIZE) window.shift(); // últimos ~6 frames (~50ms-100ms dependendo do worklet)
+	const avg = window.reduce((a, b) => a + b, 0) / window.length;
+	// heurística ajustada: muitos loopbacks/VoiceMeeter apresentam baseline alto
+	// aumentar limiar para reduzir segmentação falsa (experiência inicial: 20%)
+	return avg > FALLBACK_VOLUME_THRESHOLD;
+}
+
+// Computa energia RMS do frame PCM16 no fallback de VAD
+function computeEnergy(pcm16Array) {
+	if (!pcm16Array || pcm16Array.length === 0) return 0;
+
+	let sum = 0;
+	for (const element of pcm16Array) {
+		const sample = element;
+		sum += sample * sample;
+	}
+
+	const rms = Math.sqrt(sum / pcm16Array.length);
+	return rms;
+}
+
+/* ================================ */
+//	PROCESSAMENTO DE MENSAGENS
+/* ================================ */
+
+// Processa resultado do Vosk (final ou parcial)
+function handleVoskMessage(source, result) {
+	if (result?.isFinal && result?.final?.trim()) {
+		handleFinalVoskMessage(source, result.final);
+	} else if (result?.partial?.trim()) {
+		handleInterimVoskMessage(source, result.partial);
+	}
+}
+
+// Processa resultado interim (parcial) do Vosk
+function handleInterimVoskMessage(source, transcript) {
+	console.log(`⏳ 🟠 Handle INTERIM [${source}]: "${transcript}"`);
+
+	if (!transcript?.trim()) {
+		console.warn(`⚠️ Transcript interim vazio recebido do Vosk (${source}); ignorando.`);
+		return;
+	}
+
+	const vars = voskState[source];
+	vars.lastTranscript = transcript;
+
+	// Atualiza interim transcript no UI
+	updateInterim(source, transcript, vars.author);
+
+	// Atualiza CURRENT question (apenas para output)
+	updateCurrentQuestion(source, transcript, true);
+}
+
+// Processa resultado final do Vosk
+function handleFinalVoskMessage(source, transcript) {
+	console.log(`📝 🟢 Handle FINAL [${source.toUpperCase()}]: "${transcript}"`);
+
+	const vars = voskState[source];
+	vars.lastTranscript = transcript.trim() ? transcript : vars.lastTranscript;
+
+	if (transcript.trim()) {
+		// Adiciona placeholder com transcrição
+		const placeholderId = `vosk-${source}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+		const metrics = calculateTimingMetrics(vars);
+
+		// Adiciona transcrição com placeholder na UI
+		addTranscriptPlaceholder(vars.author, placeholderId, metrics.startStr);
+		// Preenche placeholder com resultado final
+		fillTranscriptPlaceholder(vars.author, transcript, placeholderId, metrics);
+		// Limpa interim do UI
+		clearInterim(source);
+	}
+
+	// Atualiza CURRENT question (apenas para output)
+	updateCurrentQuestion(source, transcript, false);
+}
+
+/**
+ * Adiciona transcrição com placeholder ao UI
+ */
+function addTranscriptPlaceholder(author, placeholderId, timeStr) {
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
+			author,
+			text: '...',
+			timeStr,
+			elementId: 'conversation',
+			placeholderId,
+		});
+	}
+}
+
+// Preenche placeholder com transcrição final
+function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
+			speaker: author,
+			text: transcript,
+			placeholderId,
+			...metrics,
+			showMeta: false,
+		});
+	}
+}
+
+// Limpa interim transcript do UI
+function clearInterim(source) {
+	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
+	}
+}
+
+// Atualiza interim transcript no UI
+function updateInterim(source, transcript, author) {
+	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
+	if (globalThis.RendererAPI?.emitUIChange) {
+		globalThis.RendererAPI.emitUIChange('onUpdateInterim', {
+			id: interimId,
+			speaker: author,
+			text: transcript,
+		});
+	}
+}
+
+/**
+ * Atualiza CURRENT question (apenas para output)
+ */
+function updateCurrentQuestion(source, transcript, isInterim = false) {
+	const vars = voskState[source];
+	if (source === OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
+		globalThis.RendererAPI.handleCurrentQuestion(vars.author, transcript, {
+			isInterim,
+			shouldFinalizeAskCurrent: vars.shouldFinalizeAskCurrent,
+		});
+		// 🔥 Só reseta quando for mensagem FINAL (não interim)
+		if (!isInterim && vars.shouldFinalizeAskCurrent) vars.shouldFinalizeAskCurrent = false;
+	}
+}
+
+// Calcula métricas de timing para transcrição
+function calculateTimingMetrics(vars) {
+	const startAt = vars.startAt?.();
+	const now = Date.now();
+	const elapsedMs = startAt ? now - startAt : 0;
+	return {
+		startStr: startAt ? new Date(startAt).toLocaleTimeString() : new Date(now).toLocaleTimeString(),
+		stopStr: new Date(now).toLocaleTimeString(),
+		recordingDuration: (elapsedMs / 1000).toFixed(2),
+		latency: (elapsedMs / 1000).toFixed(2),
+		total: (elapsedMs / 1000).toFixed(2),
+	};
+}
+
+/* ================================ */
+//	VOSK - PARAR FLUXO (STT)
+/* ================================ */
+
+// Para captura de áudio
+async function stopVosk(source) {
+	const vars = voskState[source];
+
+	if (!vars._isActive) return;
+
+	try {
+		// Para timer de silêncio
+		if (vars._silenceCheckTimer) {
+			clearInterval(vars._silenceCheckTimer);
+			vars._silenceCheckTimer = null;
+		}
+
+		// Para Vosk
+		stopVoskProcess(source);
+
+		// Desconecta processor
+		if (vars._processor) {
+			try {
+				vars._processor.disconnect?.();
+			} catch (e) {
+				console.warn(`⚠️ Erro ao desconectar processor (${source}):`, e);
+			}
+		}
+
+		// Desconecta source
+		if (vars._source) {
+			try {
+				vars._source.disconnect();
+			} catch (e) {
+				console.warn(`⚠️ Erro ao desconectar source (${source}):`, e);
+			}
+		}
+
+		// Fecha stream
+		vars._stream?.getTracks?.().forEach(track => track.stop());
+
+		vars._isActive = false;
+		vars._stream = null;
+		vars._processor = null;
+		vars._source = null;
+		vars._audioContext = null;
+		vars._startAt = null;
+
+		console.log(`🛑 Vosk ${source.toUpperCase()} parado`);
+	} catch (error) {
+		console.error(`❌ Erro ao parar Vosk ${source.toUpperCase()}:`, error);
+	}
+}
+
+/* ================================ */
+// FUNÇÃO PARA LOGAR
+/* ================================ */
+
+/**
+ * Log de debug padronizado para config-manager.js
+ * Por padrão nunca loga, se quiser mostrar é só passar true.
+ * @param {*} msg
+ * @param {boolean} showLog - true para mostrar, false para ignorar
+ */
+function debugLogVosk(...args) {
+	const maybeFlag = args.at(-1);
+	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+
+	const nowLog = new Date();
+	const timeStr =
+		`${nowLog.getHours().toString().padStart(2, '0')}:` +
+		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
+		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
+		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+
+	if (showLog) {
+		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+		// prettier-ignore
+		console.log(
+			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em vosk-transcribe.js:`, 
+			'color: blue; font-weight: bold;', 
+			...cleanArgs
+		);
+	}
 }
 
 /* ================================ */
@@ -831,6 +789,15 @@ function updateVADStateVosk(vars, isSpeech) {
  */
 async function startAudioVoskLocal(UIElements) {
 	try {
+		// Inicia VAD nativo se disponível
+		vadInstance = initVAD();
+		if (vadInstance) {
+			vadAvailable = true;
+			console.log(`✅ VAD nativo inicializado`);
+		} else {
+			console.log(`⚠️ VAD nativo não disponível, usando fallback de energia`);
+		}
+
 		// Inicia INPUT (você) + OUTPUT (outros)
 		if (UIElements.inputSelect?.value) await startVosk(INPUT, UIElements);
 		if (UIElements.outputSelect?.value) await startVosk(OUTPUT, UIElements);
@@ -852,8 +819,8 @@ function stopAudioVoskLocal() {
  * Muda dispositivo para um source
  */
 function switchDeviceVoskLocal(source, newDeviceId) {
-	const vars = voskVars[source];
-	if (vars.isActive?.()) {
+	const vars = voskState[source];
+	if (vars._isActive) {
 		stopVosk(source);
 		// TODO: Implementar reinício com novo dispositivo após mudança
 		vars.currentDeviceId = newDeviceId;
@@ -861,7 +828,7 @@ function switchDeviceVoskLocal(source, newDeviceId) {
 }
 
 /* ================================ */
-//	EXPORTS
+//	EXPORTS (CommonJS)
 /* ================================ */
 
 module.exports = {

@@ -105,7 +105,8 @@ class VoskTranscriber:
                 # Resultado final (silence detectado)
                 import json as json_module
                 result = json_module.loads(self.recognizer.Result())
-                final_text = " ".join(result.get("result", [])) if result.get("result") else ""
+                # Usa o campo 'text' do resultado do Vosk
+                final_text = result.get("text", "").strip()
                 
                 # Acumula o texto final
                 if final_text:
@@ -143,19 +144,18 @@ class VoskTranscriber:
         try:
             import json as json_module
             
-            # Obtém o último resultado parcial atual
-            partial_result = json_module.loads(self.recognizer.PartialResult())
-            partial_text = partial_result.get("partial", "")
+            # Usa o FinalResult do reconhecedor para fechar a frase
+            final_result = json_module.loads(self.recognizer.FinalResult())
+            final_text = final_result.get("text", "").strip()
             
-            # Combina resultado acumulado com parcial atual
-            final_text = self.accumulated_text
-            if partial_text:
-                final_text = (final_text + " " + partial_text) if final_text else partial_text
+            # Combina com acumulado (se houver)
+            if self.accumulated_text:
+                final_text = (self.accumulated_text + (" " + final_text if final_text else "")).strip()
             
             return {
-                "final": final_text.strip(),
+                "final": final_text,
                 "partial": "",
-                "isFinal": bool(final_text.strip())
+                "isFinal": bool(final_text)
             }
         except Exception as e:
             return {

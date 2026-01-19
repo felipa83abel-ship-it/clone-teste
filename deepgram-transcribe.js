@@ -5,6 +5,8 @@
  *
  * Implementação isolada de transcrição com Deepgram Live Streaming.
  * - Captura áudio diretamente via WebSocket (sem IPC para dados binários)
+ * - AudioWorklet para captura e processamento de áudio bruto PCM16
+ * - Usa VAD para detecção de fala (webrtcvad ou fallback de energia)
  * - Consolida interim results e transcrições finais
  *
  * Uso:
@@ -27,24 +29,27 @@ const INPUT = 'input';
 const OUTPUT = 'output';
 const DEEPGRAM_HEARTBEAT_INTERVAL = 5000; // 5 segundos (entre 3-5 segundos conforme documentação)
 
-// Configuração de Áudio
+// Configuração de Áudio 16kHz
 const AUDIO_SAMPLE_RATE = 16000; // 16kHz
-const AUDIO_CONTEXT_WORKLET_PATH = './deepgram-audio-worklet-processor.js'; // Path do AudioWorklet
 
-// Configuração do Filtro Passa-Alta (HPF)
-const HPF_TYPE = 'highpass';
-const HPF_FREQUENCY = 200; // Frequência de corte em Hz
-const HPF_Q_FACTOR = 1; // Fator de qualidade
+// AudioWorklet path
+const AUDIO_CONTEXT_WORKLET_PATH = './stt-audio-worklet-processor.js';
 
 // Configuração de VAD (Voice Activity Detection)
 const VAD_MODE = 2; // Modo agressivo do webrtcvad
 const VAD_FRAME_DURATION_MS = 0.03; // 30ms por frame
 const VAD_WINDOW_SIZE = 6; // Últimos ~6 frames (~50-100ms)
 const FALLBACK_VOLUME_THRESHOLD = 20; // Limiar de volume para fallback (%)
+const ENERGY_THRESHOLD = 500; // Limiar de energia RMS para fallback
 
-// Timeouts de Silêncio
+// Detecção de silêncio
 const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
 const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
+
+// Configuração do Filtro Passa-Alta (HPF)
+const HPF_TYPE = 'highpass';
+const HPF_FREQUENCY = 200; // Frequência de corte em Hz
+const HPF_Q_FACTOR = 1; // Fator de qualidade
 
 /* ================================ */
 //	ESTADO DO DEEPGRAM
@@ -399,47 +404,6 @@ async function changeDeviceDeepgram(source, newDeviceId) {
 	}
 }
 
-// Processa resultado do VAD: true (speech), false (no speech), null (error / undecided)
-function processVADResult(result) {
-	if (typeof result === 'boolean') return result;
-	if (Array.isArray(result)) return result.includes(1);
-	return null;
-}
-
-// Tenta chamar VAD com diferentes assinaturas
-function tryCallVADInstance(frame, sampleRate) {
-	if (typeof vadInstance.process === 'function') {
-		if (vadInstance.process.length === 2) {
-			return processVADResult(vadInstance.process(sampleRate, frame));
-		} else {
-			return processVADResult(vadInstance.process(frame));
-		}
-	} else if (typeof vadInstance.isSpeech === 'function') {
-		return !!vadInstance.isSpeech(frame, sampleRate);
-	} else if (typeof vadInstance === 'function') {
-		return !!vadInstance(frame, sampleRate);
-	}
-	return null;
-}
-
-function runNativeVAD(frame, sampleRate = AUDIO_SAMPLE_RATE) {
-	try {
-		if (vadInstance !== undefined && vadInstance) {
-			try {
-				return tryCallVADInstance(frame, sampleRate);
-			} catch (error_) {
-				console.warn('runNativeVAD: erro ao chamar vadInstance:', error_ && (error_.message || error_));
-				return null;
-			}
-		}
-		const energy = computeEnergy(frame);
-		return energy > ENERGY_THRESHOLD;
-	} catch (err) {
-		console.warn('runNativeVAD erro:', err && (err.message || err));
-		return null;
-	}
-}
-
 // Envia mensagem "KeepAlive" a cada 5 segundos para manter WebSocket Deepgram vivo
 function startDeepgramHeartbeat(ws, source) {
 	const interval = setInterval(() => {
@@ -487,7 +451,7 @@ function sendDeepgramFinalize(source) {
 }
 
 /* ================================ */
-//	DEEPGRAM - INICIA FLUXO (STT)
+//	DEEPGRAM - INICIAR FLUXO (STT)
 /* ================================ */
 
 // Inicia captura de áudio do dispositivo de entrada ou saída com Deepgram
@@ -561,8 +525,8 @@ async function startDeepgram(source, UIElements) {
 		hpf.frequency.value = HPF_FREQUENCY;
 		hpf.Q.value = HPF_Q_FACTOR;
 
-		// Worklet
-		const processor = new AudioWorkletNode(audioCtx, 'deepgram-audio-worklet-processor');
+		// Inicia AudioWorklet para captura e processamento de áudio
+		const processor = new AudioWorkletNode(audioCtx, 'stt-audio-worklet-processor');
 		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
 			processIncomingAudioMessage(source, event.data).catch(error_ =>
@@ -575,7 +539,7 @@ async function startDeepgram(source, UIElements) {
 		hpf.connect(processor);
 		processor.connect(audioCtx.destination);
 
-		// Atualiza referências via deepgramVars
+		// Atualiza referências de estado
 		vars.setStream(stream);
 		vars.setAudioContext(audioCtx);
 		vars.setSource(mediaSource);
@@ -595,7 +559,7 @@ async function startDeepgram(source, UIElements) {
 	}
 }
 
-// Processa mensagens de áudio do worklet
+// Processa mensagens de áudio recebida do AudioWorklet
 async function processIncomingAudioMessage(source, data) {
 	const vars = deepgramVars[source];
 	if (data.type === 'audioData') {
@@ -673,7 +637,11 @@ function handleSilenceDetection(source, percent) {
 	}
 }
 
-// Detecta fala usando VAD ou fallback
+/* ================================ */
+//	VAD (VOICE ACTIVITY DETECTION)
+/* ================================ */
+
+// Detecta fala baseado em VAD nativo ou fallback de energia
 function detectSpeech(source, vars, data) {
 	let isSpeech = null;
 	if (isVADEnabled()) {
@@ -700,16 +668,58 @@ function detectSpeech(source, vars, data) {
 	return isSpeech === null ? fallbackIsSpeech(source, vars.lastPercent) : isSpeech;
 }
 
+// Verifica se VAD nativo está habilitado e disponível
+function isVADEnabled() {
+	return useNativeVAD && !!vadAvailable;
+}
+
+// Computa energia do frame PCM16 e executa VAD nativo
+function runNativeVAD(frame, sampleRate = AUDIO_SAMPLE_RATE) {
+	try {
+		if (vadInstance !== undefined && vadInstance) {
+			try {
+				return tryCallVADInstance(frame, sampleRate);
+			} catch (error_) {
+				console.warn('runNativeVAD: erro ao chamar vadInstance:', error_ && (error_.message || error_));
+				return null;
+			}
+		}
+		const energy = computeEnergy(frame);
+		return energy > ENERGY_THRESHOLD;
+	} catch (err) {
+		console.warn('runNativeVAD erro:', err && (err.message || err));
+		return null;
+	}
+}
+
+// Tenta chamar instância VAD nativa (webrtcvad ou node-webrtcvad)
+function tryCallVADInstance(frame, sampleRate) {
+	if (typeof vadInstance.process === 'function') {
+		if (vadInstance.process.length === 2) {
+			return processVADResult(vadInstance.process(sampleRate, frame));
+		} else {
+			return processVADResult(vadInstance.process(frame));
+		}
+	} else if (typeof vadInstance.isSpeech === 'function') {
+		return !!vadInstance.isSpeech(frame, sampleRate);
+	} else if (typeof vadInstance === 'function') {
+		return !!vadInstance(frame, sampleRate);
+	}
+	return null;
+}
+
+// Processa resultado do VAD: true (speech), false (no speech), null (error / undecided)
+function processVADResult(result) {
+	if (typeof result === 'boolean') return result;
+	if (Array.isArray(result)) return result.includes(1);
+	return null;
+}
+
 // Atualiza estado VAD
 function updateVADState(vars, isSpeech) {
 	vars._lastIsSpeech = !!isSpeech;
 	vars._lastVADTimestamp = Date.now();
 	if (isSpeech) vars.lastActive = Date.now();
-}
-
-// Verifica se VAD nativo está habilitado e disponível
-function isVADEnabled() {
-	return useNativeVAD && !!vadAvailable;
 }
 
 // Inicializa instância de VAD nativo (webrtcvad ou node-webrtcvad)
@@ -753,6 +763,24 @@ function fallbackIsSpeech(source, percent) {
 	// aumentar limiar para reduzir segmentação falsa (experiência inicial: 20%)
 	return avg > FALLBACK_VOLUME_THRESHOLD;
 }
+
+// Computa energia RMS do frame PCM16 no fallback de VAD
+function computeEnergy(pcm16Array) {
+	if (!pcm16Array || pcm16Array.length === 0) return 0;
+
+	let sum = 0;
+	for (const element of pcm16Array) {
+		const sample = element;
+		sum += sample * sample;
+	}
+
+	const rms = Math.sqrt(sum / pcm16Array.length);
+	return rms;
+}
+
+/* ================================ */
+//	BUFFER DE PRÉ e POST-ROLL DE ÁUDIO
+/* ================================ */
 
 // Armazena buffer de áudio para pré-roll
 function storePreRollBuffer(vars, pcm16) {
@@ -835,7 +863,7 @@ function handleDeepgramMessage(data, source = INPUT) {
 
 // Processa mensagens interim do Deepgram (transcrições parciais)
 function handleInterimDeepgramMessage(source, transcript) {
-	debugLogDeepgram(`📝 🟠 Handle INTERIM [${source}]: "${transcript}"`, true);
+	debugLogDeepgram(`⏳ 🟠 Handle INTERIM [${source}]: "${transcript}"`, true);
 
 	if (!transcript?.trim()) {
 		console.warn(`⚠️ Transcript interim vazio recebido do Deepgram (${source}); ignorando.`);
@@ -926,7 +954,8 @@ function updateCurrentQuestion(source, transcript, isInterim = false) {
 			isInterim,
 			shouldFinalizeAskCurrent: vars.shouldFinalizeAskCurrent,
 		});
-		if (vars.shouldFinalizeAskCurrent) vars.shouldFinalizeAskCurrent = false;
+		// 🔥 Só reseta quando for mensagem FINAL (não interim)
+		if (!isInterim && vars.shouldFinalizeAskCurrent) vars.shouldFinalizeAskCurrent = false;
 	}
 }
 
@@ -945,7 +974,7 @@ function calculateTimingMetrics(vars) {
 }
 
 /* ================================ */
-//	DEEPGRAM - PARA FLUXO (STT)
+//	DEEPGRAM - PARAR FLUXO (STT)
 /* ================================ */
 
 // Envia CloseStream ao Deepgram se WebSocket estiver aberto
@@ -1053,9 +1082,9 @@ function stopDeepgram(source) {
 	debugLogDeepgram(`🛑 Captura Deepgram ${source.toUpperCase()} parada`, true);
 }
 
-/* ===============================
-   FUNÇÃO PARA LOGAR 
-=============================== */
+/* ================================ */
+// FUNÇÃO PARA LOGAR
+/* ================================ */
 
 /**
  * Log de debug padronizado para config-manager.js
@@ -1086,7 +1115,7 @@ function debugLogDeepgram(...args) {
 }
 
 /* ================================ */
-//	EXPORTS (CommonJS)
+//	INTERFACE PÚBLICA
 /* ================================ */
 
 /**
@@ -1142,6 +1171,10 @@ async function switchDeviceDeepgram(source, newDeviceId) {
 	debugLogRenderer('Fim da função: "switchDeviceDeepgram"');
 	return await changeDeviceDeepgram(source, newDeviceId);
 }
+
+/* ================================ */
+//	EXPORTS (CommonJS)
+/* ================================ */
 
 module.exports = {
 	startAudioDeepgram,

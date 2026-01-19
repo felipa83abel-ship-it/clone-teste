@@ -1,4 +1,4 @@
-class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
+class STTAudioWorkletProcessor extends AudioWorkletProcessor {
 	constructor() {
 		super();
 		this.thresholdRms = 0.002; // Default, será sobrescrito por mensagem
@@ -54,7 +54,7 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 				type: 'audioData',
 				pcm16: pcm16.buffer,
 				percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
-				sampleRate: sampleRate || sampleRate, // placeholder (AudioWorkletProcessor global)
+				sampleRate: sampleRate, // placeholder (AudioWorkletProcessor global)
 			},
 			[pcm16.buffer],
 		);
@@ -72,4 +72,4 @@ class DeepgramAudioWorkletProcessor extends AudioWorkletProcessor {
 	}
 }
 
-registerProcessor('deepgram-audio-worklet-processor', DeepgramAudioWorkletProcessor);
+registerProcessor('stt-audio-worklet-processor', STTAudioWorkletProcessor);

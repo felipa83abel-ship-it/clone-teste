@@ -886,7 +886,7 @@ function handleCurrentQuestion(author, text, options = {}) {
 		currentQuestion.lastUpdateTime = now;
 		currentQuestion.lastUpdate = now;
 
-		debugLogRenderer('currentQuestion antes: ', { ...currentQuestion }, true);
+		debugLogRenderer('currentQuestion antes: ', { ...currentQuestion }, false);
 
 		// Lógica de consolidação para evitar duplicações
 		if (options.isInterim) {
@@ -898,13 +898,13 @@ function handleCurrentQuestion(author, text, options = {}) {
 			currentQuestion.finalText = (currentQuestion.finalText ? currentQuestion.finalText + ' ' : '') + cleaned;
 		}
 
-		debugLogRenderer('currentQuestion durante: ', { ...currentQuestion }, true);
+		debugLogRenderer('currentQuestion durante: ', { ...currentQuestion }, false);
 
 		// Atualizar o texto total
 		currentQuestion.text =
 			currentQuestion.finalText.trim() + (currentQuestion.interimText ? ' ' + currentQuestion.interimText : '');
 
-		debugLogRenderer('currentQuestion depois: ', { ...currentQuestion }, true);
+		debugLogRenderer('currentQuestion depois: ', { ...currentQuestion }, false);
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
 		if (!selectedQuestionId) {
@@ -965,19 +965,16 @@ function finalizeCurrentQuestion() {
 	}
 
 	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
-	if (isIncompleteQuestion(currentQuestion.text)) {
-		console.log(
-			'⚠️ pergunta incompleta detectada — promovendo ao histórico como incompleta sem chamar GPT:',
-			currentQuestion.text,
-		);
+	if (!ModeController.isInterviewMode()) {
+		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', currentQuestion.text);
 
+		// promoteCurrentToHistory(currentQuestion.text);
 		const newId = String(questionsHistory.length + 1);
 		questionsHistory.push({
 			id: newId,
 			text: currentQuestion.text,
 			createdAt: currentQuestion.createdAt || Date.now(),
 			lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
-			incomplete: true,
 		});
 
 		selectedQuestionId = newId;
