@@ -383,7 +383,7 @@ class ConfigManager {
 			// Buscar placeholder pelo ID
 			targetPlaceholder = document.getElementById(placeholderId);
 			if (targetPlaceholder) {
-				console.log('✅ Placeholder encontrado por ID:', placeholderId);
+				debugLogConfig('✅ Placeholder encontrado por ID:', placeholderId, false);
 			} else {
 				console.warn('⚠️ Placeholder com ID não encontrado:', placeholderId);
 				// Fallback: busca pelo selector de data-is-placeholder
@@ -1400,7 +1400,7 @@ class ConfigManager {
 				if (placeholderId) {
 					const existing = document.getElementById(placeholderId);
 					if (existing) {
-						console.log('⚪ Placeholder já existe, ignorando criação duplicada:', placeholderId);
+						debugLogConfig('⚪ Placeholder já existe, ignorando criação duplicada:', placeholderId, false);
 						return;
 					}
 				}
@@ -1408,14 +1408,14 @@ class ConfigManager {
 				// 🔥 ATRIBUIR ID AO ELEMENTO REAL DO DOM
 				if (placeholderId) {
 					div.id = placeholderId;
-					console.log('🔥 ID atribuído ao placeholder real:', placeholderId);
+					debugLogConfig('🔥 ID atribuído ao placeholder real:', placeholderId, false);
 				}
 				// 🔥 Não adicionar "..." visível - deixar para atualizar depois com texto real
 				div.innerHTML = ''; // Elemento vazio, será preenchido com onPlaceholderFulfill
-				console.log('✅ Placeholder reservado no DOM (vazio, aguardando transcrição):', placeholderId);
+				debugLogConfig('✅ Placeholder reservado no DOM (vazio, aguardando transcrição):', placeholderId, false);
 			} else {
 				div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
-				console.log(`✅ Transcrição adicionada: ${author} - ${text}`);
+				debugLogConfig(`✅ Transcrição adicionada: ${author} - ${text}`, false);
 			}
 
 			transcriptionBox.appendChild(div);
@@ -1707,7 +1707,7 @@ class ConfigManager {
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
 		globalThis.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
-			console.log('🔔 onPlaceholderFulfill recebido:', data);
+			debugLogConfig('🔔 onPlaceholderFulfill recebido:', data, false);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
 			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, showMeta } = data;
@@ -1730,7 +1730,7 @@ class ConfigManager {
 			targetPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
 			delete targetPlaceholder.dataset.isPlaceholder;
 
-			console.log('✅ Placeholder atualizado:', text.substring(0, 50) + '...');
+			debugLogConfig('✅ Placeholder atualizado:', text.substring(0, 50) + '...', false);
 
 			// Só cria/atualiza metadados se houver texto visível no placeholder e showMeta não for false
 			const hasVisibleText = text && String(text).trim().length > 0;
