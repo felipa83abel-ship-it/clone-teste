@@ -19,6 +19,16 @@
 /* ================================ */
 const { ipcRenderer } = require('electron');
 const { getVADEngine } = require('./vad-engine');
+const fs = require('node:fs');
+const path = require('node:path');
+const os = require('node:os');
+const { promisify } = require('node:util');
+const { execFile } = require('node:child_process');
+const ffmpeg = require('fluent-ffmpeg');
+const ffmpegStatic = require('ffmpeg-static');
+const OpenAI = require('openai');
+
+const execFileAsync = promisify(execFile);
 
 /* ================================ */
 //	CONSTANTES
@@ -40,8 +50,20 @@ const AUDIO_WORKLET_PROCESSOR_PATH = './stt-audio-worklet-processor.js';
 const SILENCE_TIMEOUT_INPUT = 500;
 const SILENCE_TIMEOUT_OUTPUT = 700;
 
+const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
+const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
+const WHISPER_LOCAL_TIMEOUT_MS = 10000;
+const WHISPER_LOCAL_PARTIAL_TIMEOUT_MS = 1500;
+const WHISPER_WARMUP_FILENAME = 'whisper-warmup.wav';
+const WARMUP_DURATION_SECONDS = 1;
+const WARMUP_SAMPLE_RATE = 16000;
+
 // VAD Engine
 let vad = null;
+
+if (ffmpegStatic) {
+	ffmpeg.setFfmpegPath(ffmpegStatic);
+}
 
 /* ================================ */
 //	ESTADO GLOBAL DO WHISPER
@@ -208,6 +230,11 @@ const whisperState = {
 		vadWindow: [],
 	},
 };
+
+let openaiClient = null;
+let lastOpenAIKey = '';
+let whisperLocalReady = false;
+let whisperLocalWarmupPromise = null;
 
 /* ================================ */
 //	WHISPER - HANDLERS DE ÁUDIO
@@ -407,6 +434,16 @@ async function startWhisper(source, UIElements) {
 
 			// Limpa chunks para próxima gravação
 			audioChunks.length = 0;
+
+			// Reinicia MediaRecorder para continuar capturando após a transcrição
+			if (vars.isActive() && mediaRecorder.state === 'inactive') {
+				try {
+					mediaRecorder.start();
+					debugLogWhisper(`▶️ MediaRecorder reiniciado para ${source.toUpperCase()}`, false);
+				} catch (restartError) {
+					console.error(`❌ Erro ao reiniciar MediaRecorder (${source}):`, restartError);
+				}
+			}
 		};
 
 		// Carrega AudioWorklet para detecção em tempo real
@@ -451,43 +488,25 @@ async function startWhisper(source, UIElements) {
 }
 
 /* ================================ */
-//	TRANSCRIÇÃO WHISPER (IPC)
+//	TRANSCRIÇÃO WHISPER
 /* ================================ */
 
 /**
- * Transcreve áudio com Whisper (delegado ao main.js via IPC)
- * @param {Blob} audioBlob - Blob de áudio em formato WebM
- * @param {string} source - 'input' ou 'output'
- * @returns {Promise<string>} Texto transcrito
+ * Transcreve áudio com Whisper (local ou OpenAI)
  */
 async function transcribeWhisper(audioBlob, source) {
 	const sttModel = getConfiguredSTTModel();
-
 	debugLogWhisper(`🎤 Transcrição (${sttModel}): ${audioBlob.size} bytes`, true);
 
-	try {
-		const buffer = Buffer.from(await audioBlob.arrayBuffer());
+	const buffer = Buffer.from(await audioBlob.arrayBuffer());
 
-		let result = '';
+	try {
+		let result;
 
 		if (sttModel === 'whisper-cpp-local') {
-			// 🚀 Whisper.cpp local (alta precisão, offline)
-			debugLogWhisper(`🚀 Enviando para Whisper.cpp (local, alta precisão)...`, true);
-
-			const startTime = Date.now();
-			result = await ipcRenderer.invoke('transcribe-local', buffer);
-			const elapsed = Date.now() - startTime;
-
-			debugLogWhisper(`✅ Whisper.cpp concluído em ${elapsed}ms`, true);
+			result = await transcribeWithWhisperLocal(buffer, source);
 		} else if (sttModel === 'whisper-1') {
-			// 🌐 Whisper-1 OpenAI (online, melhor precisão, custa $)
-			debugLogWhisper(`🚀 Enviando para Whisper-1 OpenAI (online)...`, true);
-
-			const startTime = Date.now();
-			result = await ipcRenderer.invoke('transcribe-audio', buffer);
-			const elapsed = Date.now() - startTime;
-
-			debugLogWhisper(`✅ Whisper-1 concluído em ${elapsed}ms`, true);
+			result = await transcribeWithWhisperOpenAI(buffer, source);
 		} else {
 			throw new Error(`Modelo Whisper desconhecido: ${sttModel}`);
 		}
@@ -496,7 +515,6 @@ async function transcribeWhisper(audioBlob, source) {
 			`📝 Resultado (${result.length} chars): "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
 			true,
 		);
-
 		return result;
 	} catch (error) {
 		console.error(`❌ Transcrição Whisper falhou (${sttModel}):`, error.message);
@@ -524,6 +542,227 @@ function getConfiguredSTTModel() {
 	} catch (error) {
 		console.warn('⚠️ configManager não disponível, usando padrão: whisper-1', error);
 		return 'whisper-1';
+	}
+}
+
+/* ================================ */
+//	WHISPER - TRANSCRIPTION HELPERS
+/* ================================ */
+
+async function transcribeWithWhisperLocal(buffer, source) {
+	debugLogWhisper(`🚀 Enviando para Whisper.cpp (local, alta precisão)...`, true);
+
+	if (!checkWhisperFiles()) {
+		throw new Error('Arquivos do Whisper.cpp não encontrados!');
+	}
+
+	await warmupWhisperLocal();
+
+	const tempDir = os.tmpdir();
+	const tempWebmPath = path.join(
+		tempDir,
+		`whisper-${source}-${Date.now()}-${Math.random().toString(36).slice(2)}.webm`,
+	);
+	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
+
+	try {
+		await prepareWavFile(buffer, tempWebmPath, tempWavPath);
+		const startTime = Date.now();
+		const result = await processWhisperFile(WHISPER_MODEL, tempWavPath);
+		debugLogWhisper(`✅ Whisper.cpp concluído em ${Date.now() - startTime}ms`, true);
+		return result;
+	} catch (error) {
+		logWhisperError(error, tempWavPath);
+		throw error;
+	} finally {
+		removeFileIfExists(tempWebmPath);
+		removeFileIfExists(tempWavPath);
+	}
+}
+
+async function transcribeWithWhisperOpenAI(buffer) {
+	const startTime = Date.now();
+	await ensureOpenAIClient();
+
+	const tempDir = os.tmpdir();
+	const tempFilePath = path.join(tempDir, `whisper-openai-${Date.now()}-${Math.random().toString(36).slice(2)}.webm`);
+	fs.writeFileSync(tempFilePath, buffer);
+
+	try {
+		debugLogWhisper(`🚀 Enviando para Whisper-1 OpenAI (online)...`, true);
+		const transcription = await openaiClient.audio.transcriptions.create({
+			file: fs.createReadStream(tempFilePath),
+			model: 'whisper-1',
+			language: 'pt',
+		});
+		debugLogWhisper(`✅ Whisper-1 concluído em ${Date.now() - startTime}ms`, true);
+		return transcription.text;
+	} catch (error) {
+		console.error(`❌ Erro OpenAI Whisper:`, error.message);
+		if (error.status === 401 || error.message?.includes('authentication')) {
+			resetOpenAIClient();
+			throw new Error('Chave da API inválida ou expirada. Configure em "API e Modelos"');
+		}
+		throw error;
+	} finally {
+		removeFileIfExists(tempFilePath);
+	}
+}
+
+async function ensureOpenAIClient() {
+	if (openaiClient) return true;
+	return initializeOpenAIClient();
+}
+
+async function initializeOpenAIClient(apiKey = null) {
+	const key = apiKey || (await ipcRenderer.invoke('GET_API_KEY', 'openai'));
+	if (!key || key.trim().length < 10) {
+		throw new Error('Chave OpenAI não encontrada ou inválida');
+	}
+
+	openaiClient = new OpenAI({ apiKey: key.trim() });
+	lastOpenAIKey = key.trim();
+	console.log('✅ Cliente OpenAI inicializado dentro do Whisper');
+	return true;
+}
+
+function resetOpenAIClient() {
+	openaiClient = null;
+	lastOpenAIKey = '';
+}
+
+function checkWhisperFiles() {
+	const exeExists = fs.existsSync(WHISPER_CLI_EXE);
+	const modelExists = fs.existsSync(WHISPER_MODEL);
+	return exeExists && modelExists;
+}
+
+async function warmupWhisperLocal() {
+	if (whisperLocalReady) {
+		return true;
+	}
+
+	if (whisperLocalWarmupPromise) {
+		return whisperLocalWarmupPromise;
+	}
+
+	if (!checkWhisperFiles()) {
+		throw new Error('Arquivos do Whisper.cpp não foram encontrados para o warm-up');
+	}
+
+	const warmupPath = path.join(os.tmpdir(), WHISPER_WARMUP_FILENAME);
+	whisperLocalWarmupPromise = (async () => {
+		try {
+			createWarmupWav(warmupPath);
+			await execFileAsync(
+				WHISPER_CLI_EXE,
+				['-m', WHISPER_MODEL, '-f', warmupPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'],
+				{
+					timeout: 30000,
+					maxBuffer: 1024 * 1024 * 5,
+				},
+			);
+			whisperLocalReady = true;
+			return true;
+		} catch (error) {
+			console.error('❌ Warm-up Whisper falhou:', error.message);
+			whisperLocalReady = false;
+			throw error;
+		} finally {
+			removeFileIfExists(warmupPath);
+			whisperLocalWarmupPromise = null;
+		}
+	})();
+
+	return whisperLocalWarmupPromise;
+}
+
+function createWarmupWav(filePath) {
+	const samples = WARMUP_DURATION_SECONDS * WARMUP_SAMPLE_RATE;
+	const byteRate = WARMUP_SAMPLE_RATE * 2;
+	const blockAlign = 2;
+	const buffer = Buffer.alloc(44 + samples * 2);
+	buffer.write('RIFF', 0);
+	buffer.writeUInt32LE(36 + samples * 2, 4);
+	buffer.write('WAVE', 8);
+	buffer.write('fmt ', 12);
+	buffer.writeUInt32LE(16, 16);
+	buffer.writeUInt16LE(1, 20);
+	buffer.writeUInt16LE(1, 22);
+	buffer.writeUInt32LE(WARMUP_SAMPLE_RATE, 24);
+	buffer.writeUInt32LE(byteRate, 28);
+	buffer.writeUInt16LE(blockAlign, 32);
+	buffer.writeUInt16LE(16, 34);
+	buffer.write('data', 36);
+	buffer.writeUInt32LE(samples * 2, 40);
+	fs.writeFileSync(filePath, buffer);
+}
+
+function removeFileIfExists(filepath) {
+	if (!filepath) return;
+	try {
+		if (fs.existsSync(filepath)) {
+			fs.unlinkSync(filepath);
+		}
+	} catch (error) {
+		console.warn(`⚠️ Não foi possível remover ${filepath}:`, error.message);
+	}
+}
+
+async function prepareWavFile(audioBuffer, tempWebmPath, tempWavPath) {
+	fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
+	await convertWebMToWAVFile(tempWebmPath, tempWavPath);
+}
+
+function convertWebMToWAVFile(inputPath, outputPath) {
+	return new Promise((resolve, reject) => {
+		ffmpeg(inputPath)
+			.audioCodec('pcm_s16le')
+			.audioFrequency(AUDIO_SAMPLE_RATE)
+			.audioChannels(1)
+			.format('wav')
+			.on('end', resolve)
+			.on('error', err => {
+				console.error('❌ Erro na conversão WebM → WAV:', err.message);
+				reject(err);
+			})
+			.save(outputPath);
+	});
+}
+
+async function processWhisperFile(whisperModelPath, tempWavPath, isPartial = false) {
+	const whisperStart = Date.now();
+	const args = ['-m', whisperModelPath, '-f', tempWavPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'];
+	if (isPartial) {
+		args.push('-d', '3000', '-ml', '50');
+	}
+
+	console.log(`🚀 Executando Whisper: ${WHISPER_CLI_EXE} ${args.join(' ')}`);
+	const timeout = isPartial ? WHISPER_LOCAL_PARTIAL_TIMEOUT_MS : WHISPER_LOCAL_TIMEOUT_MS;
+	const { stdout } = await execFileAsync(WHISPER_CLI_EXE, args, {
+		timeout,
+		maxBuffer: 1024 * 1024 * 5,
+	});
+	console.log(`✅ Whisper executado em ${Date.now() - whisperStart}ms`);
+	return (stdout || '').trim();
+}
+
+function logWhisperError(execError, tempWavPath) {
+	console.error(`❌ ERRO NA EXECUÇÃO DO WHISPER:`);
+	console.error(`   Código: ${execError.code}`);
+	console.error(`   Sinal: ${execError.signal}`);
+	console.error(`   Mensagem: ${execError.message}`);
+	if (execError.stderr) {
+		console.error(`   STDERR do processo: ${execError.stderr}`);
+	}
+	if (execError.stdout) {
+		console.error(`   STDOUT do processo: ${execError.stdout}`);
+	}
+	if (tempWavPath && fs.existsSync(tempWavPath)) {
+		const stats = fs.statSync(tempWavPath);
+		console.error(`   📝 WAV file existe: ${stats.size} bytes`);
+	} else {
+		console.error(`   ❌ WAV file NÃO EXISTE!`);
 	}
 }
 

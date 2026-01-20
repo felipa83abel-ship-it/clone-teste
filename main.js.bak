@@ -1,6 +1,6 @@
-/* ================================ */
-//	IMPORTS E CONFIGURAÇÕES INICIAIS
-/* ================================ */
+/* ================================
+   IMPORTS E CONFIGURAÇÕES INICIAIS
+=============================== */
 
 // Carrega variáveis de ambiente do .env
 require('dotenv').config();
@@ -9,6 +9,9 @@ const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const OpenAI = require('openai');
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
+const execFileAsync = promisify(execFile);
 
 // Habilita reload automático em desenvolvimento
 if (process.env.NODE_ENV === 'development') {
@@ -34,25 +37,33 @@ try {
 	ElectronStore = null;
 }
 
-/* ================================ */
-//	CONSTANTES
-/* ================================ */
+/* ================================
+   CONSTANTES
+=============================== */
 
 const USE_FAKE_STREAM_GPT = true; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
 
-/* ================================ */
-//	ESTADO GLOBAL
-/* ================================ */
+// Configuração do modelo Whisper.cpp (local)
+const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
+// Modelo ggml-tiny (Modelo menor, rápido, menos preciso)
+const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
 
+/* ================================
+   ESTADO GLOBAL
+=============================== */
 let mainWindow = null;
 let openaiClient = null;
 let secureStore = null;
 let clickThroughEnabled = false;
 
-/* ================================ */
-//	INICIALIZAÇÃO DO SECURE STORE
-/* ================================ */
+// 🔥 NOVO: Gerenciamento do Whisper.cpp como servidor persistente
+let whisperServerProcess = null;
+let whisperServerReady = false;
+const { spawn } = require('node:child_process');
 
+/* ================================
+   INICIALIZAÇÃO DO SECURE STORE
+=============================== */
 if (ElectronStore) {
 	try {
 		secureStore = new ElectronStore({
@@ -72,11 +83,13 @@ if (ElectronStore) {
 	}
 }
 
-/* ================================ */
-//	FUNÇÕES AUXILIARES
-/* ================================ */
+/* ================================
+   FUNÇÕES AUXILIARES
+=============================== */
 
-// Inicializa o cliente OpenAI
+/**
+ * Inicializa o cliente OpenAI
+ */
 function initializeOpenAIClient(apiKey = null) {
 	try {
 		const key = apiKey || (secureStore ? secureStore.get('apiKeys.openai') : null);
@@ -103,47 +116,161 @@ function initializeOpenAIClient(apiKey = null) {
 	}
 }
 
-/* ================================ */
-//	HANDLERS IPC - GERAIS
-/* ================================ */
+/**
+ * Verifica se os arquivos do Whisper.cpp local existem
+ */
+function checkWhisperFiles() {
+	const exeExists = fs.existsSync(WHISPER_CLI_EXE);
+	const modelExists = fs.existsSync(WHISPER_MODEL);
+
+	console.log('🔍 Verificando arquivos Whisper:');
+	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_CLI_EXE}`);
+	console.log(`   Modelo: ${modelExists ? '✅' : '❌'} ${WHISPER_MODEL}`);
+
+	return exeExists && modelExists;
+}
+
+/**
+ * 🔥 NOVO: Inicia Whisper.cpp como servidor persistente
+ * Mantém o processo rodando enquanto o usuário está em modo de escuta
+ * Isso evita overhead de inicialização e problemas com WebM corrompido
+ */
+async function startWhisperServer() {
+	if (whisperServerReady) {
+		console.log('⚠️ Servidor Whisper já foi inicializado');
+		return true;
+	}
+
+	if (!checkWhisperFiles()) {
+		console.error('❌ Arquivos do Whisper não encontrados!');
+		return false;
+	}
+
+	console.log('🚀 Iniciando Whisper.cpp com warm-up do modelo...');
+
+	try {
+		// Cria arquivo dummy para warm-up
+		const dummyAudioPath = path.join(app.getPath('temp'), 'whisper-warmup.wav');
+
+		// Cria WAV simples de 1 segundo de silêncio (RIFF header + dados PCM16 silence)
+		const sampleRate = 16000;
+		const duration = 1; // 1 segundo
+		const samples = sampleRate * duration;
+
+		// WAV header (RIFF format)
+		const wavHeader = Buffer.alloc(44);
+		wavHeader.write('RIFF', 0);
+		wavHeader.writeUInt32LE(36 + samples * 2, 4); // File size - 8
+		wavHeader.write('WAVE', 8);
+		wavHeader.write('fmt ', 12);
+		wavHeader.writeUInt32LE(16, 16); // Subchunk1 size
+		wavHeader.writeUInt16LE(1, 20); // Audio format (PCM)
+		wavHeader.writeUInt16LE(1, 22); // Channels (mono)
+		wavHeader.writeUInt32LE(sampleRate, 24); // Sample rate
+		wavHeader.writeUInt32LE(sampleRate * 2, 28); // Byte rate
+		wavHeader.writeUInt16LE(2, 32); // Block align
+		wavHeader.writeUInt16LE(16, 34); // Bits per sample
+		wavHeader.write('data', 36);
+		wavHeader.writeUInt32LE(samples * 2, 40); // Subchunk2 size
+
+		const silenceData = Buffer.alloc(samples * 2); // PCM16 silence
+		const dummyWav = Buffer.concat([wavHeader, silenceData]);
+
+		fs.writeFileSync(dummyAudioPath, dummyWav);
+		console.log('✅ Arquivo de warm-up criado');
+
+		// Executa Whisper.cpp com warm-up (carrega modelo na memória)
+		console.log(`🔥 Aquecendo modelo Whisper (primeira execução, será lenta)...`);
+		const warmupStart = Date.now();
+
+		const { stdout, stderr } = await execFileAsync(
+			WHISPER_CLI_EXE,
+			['-m', WHISPER_MODEL, '-f', dummyAudioPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'],
+			{
+				timeout: 30000,
+				maxBuffer: 1024 * 1024 * 5,
+			},
+		);
+
+		const warmupTime = Date.now() - warmupStart;
+		console.log(`✅ Warm-up concluído em ${warmupTime}ms (modelo agora está em cache)`);
+
+		// Limpa arquivo dummy
+		if (fs.existsSync(dummyAudioPath)) {
+			fs.unlinkSync(dummyAudioPath);
+		}
+
+		whisperServerReady = true;
+		console.log('✅ Whisper.cpp pronto para transcrições rápidas (modelo em cache)');
+		return true;
+	} catch (error) {
+		console.error(`❌ Erro ao fazer warm-up do Whisper: ${error.message}`);
+		whisperServerReady = false;
+		return false;
+	}
+}
+
+/**
+ * Encerra o servidor Whisper.cpp (apenas reseta flag de warm-up)
+ * Nota: Não há processo persistente para matar
+ * O warm-up apenas deixa o modelo em cache do SO
+ */
+function stopWhisperServer() {
+	if (whisperServerReady) {
+		console.log('🛑 Whisper.cpp desativado (warm-up reset)');
+		whisperServerReady = false;
+	}
+}
+
+/**
+ * Converte WebM para WAV usando ffmpeg (para Whisper.cpp)
+ * Trabalha com caminhos de arquivo (não buffers)
+ * Origem: commit 9545a76
+ */
+function convertWebMToWAVFile(inputPath, outputPath) {
+	return new Promise((resolve, reject) => {
+		// Usa ffmpeg estático se disponível
+		const ffmpeg = require('fluent-ffmpeg');
+		const ffmpegPath = require('ffmpeg-static');
+		ffmpeg(inputPath)
+			.setFfmpegPath(ffmpegPath)
+			.audioCodec('pcm_s16le')
+			.audioFrequency(16000) // Whisper usa 16kHz
+			.audioChannels(1) // Mono
+			.format('wav')
+			.on('end', () => {
+				console.log('✅ Conversão WebM → WAV concluída');
+				resolve();
+			})
+			.on('error', err => {
+				console.error('❌ Erro na conversão WebM → WAV:', err);
+				reject(err);
+			})
+			.save(outputPath);
+	});
+}
+
+/* ================================
+   HANDLERS IPC - GERAIS
+=============================== */
 
 // Erros do renderer
-ipcMain.on('RENDERER_ERROR', handleRendererError);
-
-// Status do cliente OpenAI
-ipcMain.handle('GET_OPENAI_API_STATUS', handleGetOpenAIApiStatus);
-
-function handleRendererError(_, info) {
+ipcMain.on('RENDERER_ERROR', (_, info) => {
 	console.error('Renderer reported error:', info && (info.message || info));
 	if (info?.stack) console.error(info.stack);
-}
+});
 
-function handleGetOpenAIApiStatus() {
-	return {
-		initialized: !!openaiClient,
-	};
-}
+// Status do cliente OpenAI
+ipcMain.handle('GET_OPENAI_API_STATUS', () => ({
+	initialized: !!openaiClient,
+}));
 
-/* ================================ */
-//	HANDLERS IPC - API KEYS
-/* ================================ */
+/* ================================
+   HANDLERS IPC - API KEYS
+=============================== */
 
 // Verifica se há API key
-ipcMain.handle('HAS_API_KEY', handleHasApiKey);
-
-// Recupera API key
-ipcMain.handle('GET_API_KEY', handleGetApiKey);
-
-// Salva API key
-ipcMain.handle('SAVE_API_KEY', handleSaveApiKey);
-
-// Remove API key
-ipcMain.handle('DELETE_API_KEY', handleDeleteApiKey);
-
-// Inicializa cliente OpenAI com chave fornecida
-ipcMain.handle('initialize-api-client', handleInitializeApiClient);
-
-async function handleHasApiKey(_, provider) {
+ipcMain.handle('HAS_API_KEY', async (_, provider) => {
 	try {
 		const key = secureStore.get(`apiKeys.${provider}`);
 		return {
@@ -154,9 +281,10 @@ async function handleHasApiKey(_, provider) {
 		console.error('❌ Erro ao verificar API key:', error);
 		return { hasKey: false, provider };
 	}
-}
+});
 
-async function handleGetApiKey(_, provider) {
+// Recupera API key
+ipcMain.handle('GET_API_KEY', async (_, provider) => {
 	try {
 		const key = secureStore.get(`apiKeys.${provider}`);
 		return key || null;
@@ -164,9 +292,10 @@ async function handleGetApiKey(_, provider) {
 		console.error(`❌ Erro ao recuperar chave de ${provider}:`, error);
 		return null;
 	}
-}
+});
 
-async function handleSaveApiKey(_, { provider, apiKey }) {
+// Salva API key
+ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 	try {
 		if (!apiKey || apiKey.trim().length < 2) {
 			return { success: false, error: 'API key inválida' };
@@ -189,9 +318,10 @@ async function handleSaveApiKey(_, { provider, apiKey }) {
 		console.error('Erro ao salvar API key:', error);
 		return { success: false, error: error.message };
 	}
-}
+});
 
-async function handleDeleteApiKey(_, provider) {
+// Remove API key
+ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
 	try {
 		secureStore.delete(`apiKeys.${provider}`);
 
@@ -204,17 +334,262 @@ async function handleDeleteApiKey(_, provider) {
 		console.error('❌ Erro ao deletar API key:', error);
 		return { success: false, error: error.message };
 	}
-}
+});
 
-async function handleInitializeApiClient(_, apiKey) {
+// Inicializa cliente OpenAI com chave fornecida
+ipcMain.handle('initialize-api-client', async (_, apiKey) => {
 	const initialized = initializeOpenAIClient(apiKey);
 	if (mainWindow?.webContents) mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
 	return { initialized };
+});
+
+/* ================================
+   HANDLERS IPC - TRANSCRIÇÃO ONLINE (OpenAI)
+=============================== */
+
+/**
+ * Transcrição com OpenAI Whisper-1 (online)
+ * Chamado por: renderer.js → transcribeAudio() quando sttModel === 'whisper-1'
+ * Referência: handlers IPC 'transcribe-audio' e 'transcribe-audio-partial'
+ */
+async function transcribeAudioCommon(audioBuffer, isPartial = false) {
+	console.log('\n--------------------------------------------------------');
+	console.log('📋 STT HANDLER ATIVO: WHISPER-1 OPENAI (Cloud, Versátil)');
+	console.log('--------------------------------------------------------');
+	// Verifica se o cliente está inicializado
+	if (!openaiClient) {
+		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
+		const initialized = initializeOpenAIClient();
+		if (!initialized) {
+			throw new Error('OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
+		}
+	}
+
+	// Proteção para buffers muito pequenos
+	const size = audioBuffer?.byteLength || audioBuffer?.length || 0;
+	if (isPartial && size < 800) {
+		console.log('STT main (partial): buffer demasiado pequeno, ignorando');
+		return '';
+	}
+
+	// Salva arquivo temporário
+	const tempFileName = isPartial ? 'temp-audio-partial.webm' : 'temp-audio.webm';
+	const tempFilePath = path.join(app.getPath('temp'), tempFileName);
+
+	try {
+		fs.writeFileSync(tempFilePath, Buffer.from(audioBuffer));
+
+		const transcription = await openaiClient.audio.transcriptions.create({
+			file: fs.createReadStream(tempFilePath),
+			model: 'whisper-1',
+			language: 'pt',
+		});
+
+		return transcription.text;
+	} catch (error) {
+		console.error(`❌ Erro na transcrição ${isPartial ? 'parcial' : ''}:`, error.message);
+
+		if (error.status === 401 || error.message.includes('authentication')) {
+			openaiClient = null;
+			throw new Error('Chave da API inválida ou expirada. Verifique suas configurações.');
+		}
+
+		if (isPartial && error.status === 400 && error.error?.message?.includes('Invalid file format')) {
+			return '';
+		}
+
+		throw error;
+	} finally {
+		if (fs.existsSync(tempFilePath)) {
+			fs.unlinkSync(tempFilePath);
+		}
+	}
 }
 
-/* ================================ */
-//	HANDLERS IPC - GPT
-/* ================================ */
+/**
+ * Transcrição local com Whisper.cpp
+ * Origem: commit 9545a76
+ * Processa WebM → WAV → Whisper.cpp
+ */
+/**
+ * Transcrição com Whisper.cpp local (alta precisão, offline)
+ * Chamado por: renderer.js → transcribeAudio() quando sttModel === 'whisper-cpp-local'
+ * Referência: handlers IPC 'transcribe-local' e 'transcribe-local-partial'
+ * Processo: WebM → WAV → Whisper.cpp → Texto
+ */
+// Helper function para processar arquivo WAV no Whisper
+async function processWhisperFile(whisperModelPath, tempWavPath, isPartial = false) {
+	const whisperStart = Date.now();
+
+	const args = ['-m', whisperModelPath, '-f', tempWavPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'];
+
+	if (isPartial) {
+		args.push('-d', '3000', '-ml', '50');
+	}
+
+	console.log(`🚀 4. Executando Whisper: ${WHISPER_CLI_EXE} ${args.join(' ')}`);
+
+	const { stdout } = await execFileAsync(WHISPER_CLI_EXE, args, {
+		timeout: isPartial ? 1500 : 10000, // 🔥 OTIMIZADO: Parcial 1.5s (era 3s), Final 10s
+		maxBuffer: 1024 * 1024 * 5,
+	});
+
+	const whisperTime = Date.now() - whisperStart;
+	console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
+
+	if (stdout?.trim()) {
+		console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
+	} else {
+		console.log(`📝 STDOUT: vazio ou nulo`);
+	}
+
+	return (stdout || '').trim();
+}
+
+// Helper para log de erro durante execução do Whisper
+function logWhisperError(execError, tempWavPath) {
+	console.error(`❌ ERRO NA EXECUÇÃO DO WHISPER:`);
+	console.error(`   Código: ${execError.code}`);
+	console.error(`   Sinal: ${execError.signal}`);
+	console.error(`   Mensagem: ${execError.message}`);
+	if (execError.stderr) {
+		console.error(`   STDERR do processo: ${execError.stderr}`);
+	}
+	if (execError.stdout) {
+		console.error(`   STDOUT do processo: ${execError.stdout}`);
+	}
+
+	if (fs.existsSync(tempWavPath)) {
+		const stats = fs.statSync(tempWavPath);
+		console.error(`   📝 WAV file existe: ${stats.size} bytes`);
+	} else {
+		console.error(`   ❌ WAV file NÃO EXISTE!`);
+	}
+}
+
+// Helper para validar e preparar arquivo WAV
+async function prepareWavFile(audioBuffer, tempWebmPath, tempWavPath, isPartial) {
+	fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
+	console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
+
+	const convertStart = Date.now();
+	await convertWebMToWAVFile(tempWebmPath, tempWavPath);
+	const convertTime = Date.now() - convertStart;
+	console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
+
+	if (!fs.existsSync(tempWavPath)) {
+		throw new Error('Arquivo WAV não foi criado');
+	}
+
+	const wavStats = fs.statSync(tempWavPath);
+	console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
+
+	if (wavStats.size < 1000) {
+		console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
+	}
+}
+
+async function transcribeLocalCommon(audioBuffer, isPartial = false) {
+	console.log('\n--------------------------------------------------------');
+	console.log('📋 STT HANDLER ATIVO: WHISPER.CPP LOCAL (Offline, Alta Precisão)');
+	console.log('--------------------------------------------------------');
+
+	// Informa status do warm-up
+	if (whisperServerReady) {
+		console.log('🔥 Warm-up completado ✅ - Transcrição será RÁPIDA (modelo em cache)');
+	} else {
+		console.log('⚠️ Primeiro warm-up ainda não feito - Transcrição pode ser LENTA (carregando modelo)');
+	}
+
+	const startTime = Date.now();
+	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
+	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes`);
+
+	if (!checkWhisperFiles()) {
+		if (isPartial) return '';
+		throw new Error('Arquivos do Whisper.cpp não encontrados!');
+	}
+
+	const tempDir = app.getPath('temp');
+	const tempWebmPath = path.join(tempDir, `whisper-${isPartial ? 'partial' : 'temp'}-${Date.now()}.webm`);
+	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
+
+	try {
+		await prepareWavFile(audioBuffer, tempWebmPath, tempWavPath, isPartial);
+
+		let result = '';
+		try {
+			result = await processWhisperFile(WHISPER_MODEL, tempWavPath, isPartial);
+		} catch (execError) {
+			logWhisperError(execError, tempWavPath);
+			// 🔥 [NOVO] Ao invés de relançar silenciosamente, log claro
+			const timeoutMs = isPartial ? 3000 : 10000;
+			const errorMsg =
+				execError.signal === 'SIGTERM'
+					? `⏱️ Whisper timeout (${timeoutMs}ms) - arquivo grande demais ou modelo carregando`
+					: `❌ Whisper erro: ${execError.message}`;
+			console.error(`🚨 TRANSCRIBE-LOCAL FALHOU: ${errorMsg}`);
+			throw new Error(errorMsg); // Propaga para renderer saber que falhou
+		}
+
+		const elapsedTotal = Date.now() - startTime;
+		console.log(`📊 Tempo total: ${elapsedTotal}ms`);
+		console.log(
+			`✨ Resultado (${result.length} chars): "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
+		);
+
+		return result;
+	} finally {
+		try {
+			if (fs.existsSync(tempWebmPath)) {
+				fs.unlinkSync(tempWebmPath);
+				console.log(`🗑️ Deletado WebM temp`);
+			}
+			if (fs.existsSync(tempWavPath)) {
+				fs.unlinkSync(tempWavPath);
+				console.log(`🗑️ Deletado WAV temp`);
+			}
+		} catch (cleanupError) {
+			console.warn('⚠️ Erro ao limpar arquivos temp:', cleanupError.message);
+		}
+	}
+}
+
+// ==========================================
+// HANDLERS IPC - STT (Speech-to-Text)
+// ==========================================
+// Referências de quem chama:
+//   - OpenAI Whisper-1: renderer.js → transcribeAudio() com sttModel === 'whisper-1'
+//   - Whisper.cpp Local: renderer.js → transcribeAudio() com sttModel === 'whisper-cpp-local'
+
+// Handler: Transcrição OpenAI Whisper-1 (online)
+ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, false));
+ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, true));
+
+// Handlers para Whisper.cpp (local, alta precisão)
+ipcMain.handle('transcribe-local', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, false));
+// 🔥 [DESABILITADO] transcribe-local-partial foi desabilitado
+// Motivo: WebM chunks incompletos causam erro ffmpeg constantemente (código 3199971767)
+// Transcrição completa funciona perfeitamente - confiar apenas nela
+ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => {
+	return ''; // Retorna vazio silenciosamente - transcrição parcial desabilitada
+});
+
+// 🔥 NOVO: Handlers para gerenciar servidor Whisper persistente
+ipcMain.handle('start-whisper-server', async () => {
+	console.log('📡 Solicitação para iniciar servidor Whisper');
+	return await startWhisperServer();
+});
+
+ipcMain.handle('stop-whisper-server', () => {
+	console.log('📡 Solicitação para parar servidor Whisper');
+	stopWhisperServer();
+	return true;
+});
+
+/* ================================
+   HANDLERS IPC - GPT
+=============================== */
 
 async function ensureOpenAIClient() {
 	if (!openaiClient) {
@@ -316,9 +691,9 @@ async function* fakeStreamGPT() {
 	}
 }
 
-/* ================================ */
-//	HANDLERS IPC - CONTROLE DA JANELA
-/* ================================ */
+/* ================================
+   HANDLERS IPC - CONTROLE DA JANELA
+=============================== */
 
 // Click-through
 ipcMain.on('SET_CLICK_THROUGH', (_, enabled) => {
@@ -372,9 +747,9 @@ ipcMain.on('MOVE_WINDOW_TO', (_, { x, y }) => {
 	}
 });
 
-/* ================================ */
-//	SCREENSHOT CAPTURE - DISCRETO E INDETECTÁVEL
-/* ================================ */
+/* ===============================
+   SCREENSHOT CAPTURE - DISCRETO E INDETECTÁVEL
+=============================== */
 
 const { desktopCapturer } = require('electron');
 
@@ -382,7 +757,10 @@ let lastCaptureTime = 0;
 const CAPTURE_COOLDOWN = 2000; // 2 segundos
 const SCREENSHOT_RETENTION = 5 * 60 * 1000; // 5 minutos
 
-// Captura screenshot da tela sem indicadores visíveis
+/**
+ * Captura screenshot da tela sem indicadores visíveis
+ * Exclui a própria janela do App da captura
+ */
 ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 	const now = Date.now();
 
@@ -464,7 +842,9 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 	}
 });
 
-// Analisa screenshots com OpenAI Vision API (gpt-4o)
+/**
+ * Analisa screenshots com OpenAI Vision API (gpt-4o)
+ */
 ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 	try {
 		await ensureOpenAIClient();
@@ -561,7 +941,9 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 	}
 });
 
-// Limpa screenshots antigos do diretório temp
+/**
+ * Limpa screenshots antigos do diretório temp
+ */
 async function cleanupScreenshots() {
 	try {
 		const tempDir = app.getPath('temp');
@@ -608,20 +990,17 @@ async function cleanupScreenshots() {
 // Handler IPC para limpeza manual de screenshots
 ipcMain.handle('CLEANUP_SCREENSHOTS', cleanupScreenshots);
 
-/* ================================ */
+/* ================================
 // FECHAMENTO DA APLICAÇÃO
-/* ================================ */
-
-// Encerra a aplicação
+=============================== */
 ipcMain.on('APP_CLOSE', () => {
 	console.log('❌ APP_CLOSE recebido — encerrando aplicação');
 	app.quit();
 });
 
-/* ================================ */
-//	CRIAÇÃO DA JANELA
-/* ================================ */
-
+/* ================================
+   CRIAÇÃO DA JANELA
+=============================== */
 function createWindow() {
 	console.log('🪟 Criando janela principal (frameless)');
 
@@ -679,10 +1058,9 @@ function createWindow() {
 	});
 }
 
-/* ================================ */
-//	INICIALIZAÇÃO DO APP
-/* ================================ */
-
+/* ================================
+   INICIALIZAÇÃO DO APP
+=============================== */
 app.whenReady().then(() => {
 	// Cria a janela principal
 	createWindow();
@@ -730,11 +1108,9 @@ app.whenReady().then(() => {
 	console.log('✅ Atalhos de screenshot registrados');
 });
 
-/* ================================ */
-//	FINALIZAÇÃO DO APP
-/* ================================ */
-
-// Desregistra atalhos ao sair
+/* ================================
+   FINALIZAÇÃO DO APP
+=============================== */
 app.on('will-quit', () => {
 	globalShortcut.unregisterAll();
 });
