@@ -1,5 +1,5 @@
 /**
- * 🔥 VOSK TRANSCRIBE - MÓDULO INDEPENDENTE
+ * 🔥 VOSK STT (Speech-to-Text) - MÓDULO INDEPENDENTE
  *
  * Implementação isolada de transcrição local com Vosk,
  * - Spawn vosk-server.py AQUI no renderer (não via IPC)
@@ -9,8 +9,8 @@
  * - Consolida interim results e transcrições finais
  *
  * Uso:
- * - startAudioVoskLocal(UIElements) - inicia captura input + output
- * - stopAudioVoskLocal() - para captura input + output
+ * - startAudioVoskLocal(UIElements) -> startVosk(INPUT|OUTPUT, UIElements)
+ * - stopAudioVoskLocal()
  */
 
 /* ================================ */
@@ -22,14 +22,16 @@ const { spawn } = require('node:child_process');
 //	CONSTANTES
 /* ================================ */
 
+// Configuração Geral
 const INPUT = 'input';
 const OUTPUT = 'output';
 
 // Configuração de Áudio 16kHz
 const AUDIO_SAMPLE_RATE = 16000; // Hz
 
-// AudioWorklet path
-const AUDIO_CONTEXT_WORKLET_PATH = './stt-audio-worklet-processor.js';
+// AudioWorkletProcessor
+const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor'; // Nome
+const AUDIO_WORKLET_PROCESSOR_PATH = './stt-audio-worklet-processor.js'; // Path
 
 // Configuração de VAD (Voice Activity Detection)
 const VAD_MODE = 2; // Modo agressivo do webrtcvad
@@ -42,22 +44,14 @@ const ENERGY_THRESHOLD = 500; // Limiar de energia RMS para fallback
 const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
 const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
-/* ================================ */
-//	ESTADO DO Vosk
-/* ================================ */
-
 // Configuração Vosk
 const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3' };
-
-// Configuração de VAD nativo (compatível com deepgram)
-let useNativeVAD = true;
-let vadAvailable = false;
-let vadInstance = null;
 
 /* ================================ */
 //	ESTADO GLOBAL DO VOSK
 /* ================================ */
 
+// voskState mantém seu próprio estado interno
 const voskState = {
 	input: {
 		_isActive: false,
@@ -123,6 +117,11 @@ const voskState = {
 		noiseStopTime: null,
 	},
 };
+
+// Configuração de VAD nativo (compatível com deepgram)
+let useNativeVAD = true;
+let vadAvailable = false;
+let vadInstance = null;
 
 /* ================================ */
 //	SERVER VOSK PROCESS
@@ -283,13 +282,13 @@ async function startVosk(source, UIElements) {
 		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
 			sampleRate: AUDIO_SAMPLE_RATE,
 		});
-		await audioCtx.audioWorklet.addModule(AUDIO_CONTEXT_WORKLET_PATH);
+		await audioCtx.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
 
 		// Cria MediaStreamSource e guarda via voskState
 		const mediaSource = audioCtx.createMediaStreamSource(stream);
 
 		// Inicia AudioWorklet para captura e processamento de áudio
-		const processor = new AudioWorkletNode(audioCtx, 'stt-audio-worklet-processor');
+		const processor = new AudioWorkletNode(audioCtx, STT_AUDIO_WORKLET_PROCESSOR);
 		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
 			processIncomingAudioMessage(source, event.data).catch(error_ =>
@@ -793,12 +792,12 @@ async function startAudioVoskLocal(UIElements) {
 		vadInstance = initVAD();
 		if (vadInstance) {
 			vadAvailable = true;
-			console.log(`✅ VAD nativo inicializado`);
+			debugLogVosk(`✅ VAD nativo inicializado`, true);
 		} else {
-			console.log(`⚠️ VAD nativo não disponível, usando fallback de energia`);
+			debugLogVosk(`⚠️ VAD nativo não disponível, usando fallback de energia`, true);
 		}
 
-		// Inicia INPUT (você) + OUTPUT (outros)
+		// 🔥 Vosk: Inicia INPUT/OUTPUT
 		if (UIElements.inputSelect?.value) await startVosk(INPUT, UIElements);
 		if (UIElements.outputSelect?.value) await startVosk(OUTPUT, UIElements);
 	} catch (error) {
