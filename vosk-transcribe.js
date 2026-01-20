@@ -62,12 +62,20 @@ const voskState = {
 		_recordingActive: false,
 		_canSend: false,
 		_voskProcess: null,
+		_isSwitching: false,
+		_deviceId: null,
 
 		startAt() {
 			return this._startAt;
 		},
 		setStartAt(val) {
 			this._startAt = val;
+		},
+		isSwitching() {
+			return this._isSwitching;
+		},
+		setIsSwitching(val) {
+			this._isSwitching = val;
 		},
 
 		author: 'Você',
@@ -93,12 +101,20 @@ const voskState = {
 		_recordingActive: false,
 		_canSend: false,
 		_voskProcess: null,
+		_isSwitching: false,
+		_deviceId: null,
 
 		startAt() {
 			return this._startAt;
 		},
 		setStartAt(val) {
 			this._startAt = val;
+		},
+		isSwitching() {
+			return this._isSwitching;
+		},
+		setIsSwitching(val) {
+			this._isSwitching = val;
 		},
 
 		author: 'Outros',
@@ -162,7 +178,7 @@ function initVoskProcess(source) {
 					return;
 				}
 
-				handleVoskMessage(source, msg);
+				handleVoskMessage(msg, source);
 			} catch (error) {
 				console.error(`❌ Erro ao processar mensagem Vosk (${source}):`, error);
 				debugLogVosk(`[RAW] ${line}`, false);
@@ -425,8 +441,8 @@ function handleSilenceDetection(source, percent) {
 //	PROCESSAMENTO DE MENSAGENS
 /* ================================ */
 
-// Processa resultado do Vosk (final ou parcial)
-function handleVoskMessage(source, result) {
+// Processa mensagens do Vosk (final ou parcial)
+function handleVoskMessage(result, source = INPUT) {
 	if (result?.isFinal && result?.final?.trim()) {
 		handleFinalVoskMessage(source, result.final);
 	} else if (result?.partial?.trim()) {
@@ -434,7 +450,7 @@ function handleVoskMessage(source, result) {
 	}
 }
 
-// Processa resultado interim (parcial) do Vosk
+// Processa mensagens interim do Vosk (transcrições parciais)
 function handleInterimVoskMessage(source, transcript) {
 	debugLogVosk(`⏳ 🟠 Handle INTERIM [${source}]: "${transcript}"`, true);
 
@@ -453,7 +469,7 @@ function handleInterimVoskMessage(source, transcript) {
 	updateCurrentQuestion(source, transcript, true);
 }
 
-// Processa resultado final do Vosk
+// Processa mensagens finais do Vosk (transcrições completas)
 function handleFinalVoskMessage(source, transcript) {
 	debugLogVosk(`📝 🟢 Handle FINAL [${source.toUpperCase()}]: "${transcript}"`, true);
 
@@ -477,9 +493,7 @@ function handleFinalVoskMessage(source, transcript) {
 	updateCurrentQuestion(source, transcript, false);
 }
 
-/**
- * Adiciona transcrição com placeholder ao UI
- */
+// Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
 	if (globalThis.RendererAPI?.emitUIChange) {
 		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
@@ -525,9 +539,7 @@ function updateInterim(source, transcript, author) {
 	}
 }
 
-/**
- * Atualiza CURRENT question (apenas para output)
- */
+// Atualiza CURRENT question (apenas para output)
 function updateCurrentQuestion(source, transcript, isInterim = false) {
 	const vars = voskState[source];
 	if (source === OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
@@ -552,6 +564,81 @@ function calculateTimingMetrics(vars) {
 		latency: (elapsedMs / 1000).toFixed(2),
 		total: (elapsedMs / 1000).toFixed(2),
 	};
+}
+
+/* ================================ */
+//	TROCA DE DISPOSITIVO
+/* ================================ */
+
+// Troca dinâmica do dispositivo Vosk (input/output)
+async function changeDeviceVoskLocal(source, newDeviceId) {
+	const vars = voskState[source];
+
+	// Verifica se já está trocando
+	if (vars.isSwitching?.()) {
+		console.warn(`⚠️ Já em processo de troca de dispositivo ${source.toUpperCase()}`);
+		return;
+	}
+
+	// Verifica se está ativo
+	if (!vars._isActive) {
+		console.warn(`⚠️ Vosk ${source.toUpperCase()} não está ativo; nada a trocar`);
+		return;
+	}
+
+	vars.setIsSwitching(true);
+	try {
+		// Pausa temporariamente a gravação
+		vars._canSend = false;
+
+		// Obtém novo stream do dispositivo
+		const newStream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				deviceId: { exact: newDeviceId },
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false,
+			},
+		});
+
+		// Cria nova MediaStreamSource
+		const audioCtx = vars._audioContext;
+		const newSource = audioCtx.createMediaStreamSource(newStream);
+
+		// Desconecta source anterior
+		try {
+			if (vars._source) vars._source.disconnect();
+		} catch (e) {
+			console.warn(`⚠️ Falha ao desconectar source anterior (${source}):`, e);
+		}
+
+		// Conecta nova source -> processor
+		newSource.connect(vars._processor);
+
+		// Para tracks do stream anterior, para evitar leaks
+		try {
+			if (vars._stream) vars._stream.getTracks().forEach(t => t.stop());
+		} catch (e) {
+			console.warn(`⚠️ Falha ao parar tracks do stream anterior (${source}):`, e);
+		}
+
+		// Atualiza referências
+		vars._stream = newStream;
+		vars._source = newSource;
+		vars._deviceId = newDeviceId;
+
+		// Retoma gravação
+		vars._canSend = true;
+
+		debugLogVosk(`✅ Troca de dispositivo ${source.toUpperCase()} concluída com sucesso`, true);
+	} catch (e) {
+		console.error(`❌ Falha ao trocar dispositivo ${source.toUpperCase()}:`, e);
+		// Tenta restaurar gravação em caso de erro
+		vars._canSend = true;
+		throw e;
+	} finally {
+		vars.setIsSwitching(false);
+	}
 }
 
 /* ================================ */
@@ -671,15 +758,12 @@ function stopAudioVoskLocal() {
 }
 
 /**
- * Muda dispositivo para um source
+ * Muda dispositivo para um source mantendo Vosk ativo
  */
-function switchDeviceVoskLocal(source, newDeviceId) {
-	const vars = voskState[source];
-	if (vars._isActive) {
-		stopVosk(source);
-		// TODO: Implementar reinício com novo dispositivo após mudança
-		vars.currentDeviceId = newDeviceId;
-	}
+async function switchDeviceVoskLocal(source, newDeviceId) {
+	debugLogVosk('Início da função: "switchDeviceVoskLocal"');
+	debugLogVosk('Fim da função: "switchDeviceVoskLocal"');
+	return await changeDeviceVoskLocal(source, newDeviceId);
 }
 
 /* ================================ */

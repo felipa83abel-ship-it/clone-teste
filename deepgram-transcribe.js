@@ -298,8 +298,8 @@ async function initDeepgramWS(source = INPUT) {
 		ws.onmessage = event => {
 			try {
 				// Recepção e Processamento de Transcrições
-				const data = JSON.parse(event.data);
-				handleDeepgramMessage(data, source);
+				const msg = JSON.parse(event.data);
+				handleDeepgramMessage(msg, source);
 			} catch (e) {
 				console.error(`❌ Erro ao processar mensagem Deepgram ${source}:`, e);
 			}
@@ -327,81 +327,6 @@ async function initDeepgramWS(source = INPUT) {
 			}
 		};
 	});
-}
-
-// Troca dinâmica do dispositivo Deepgram (input/output)
-async function changeDeviceDeepgram(source, newDeviceId) {
-	const vars = deepgramState[source];
-
-	// Verifica se já está trocando
-	if (vars.isSwitching?.()) {
-		console.warn(`Já em processo de troca de dispositivo ${source.toUpperCase()}`);
-		return;
-	}
-
-	// Verifica se está ativo
-	if (!vars.isActive()) {
-		console.warn(`Deepgram ${source.toUpperCase()} não está ativo; nada a trocar`);
-		return;
-	}
-
-	vars.setIsSwitching(true);
-	try {
-		sendDeepgramFinalize(source);
-
-		// Novo MediaStream
-		const newStream = await navigator.mediaDevices.getUserMedia({
-			audio: {
-				deviceId: { exact: newDeviceId },
-				echoCancellation: true,
-				noiseSuppression: true,
-				autoGainControl: false,
-			},
-		});
-
-		// Cria nova source e conecta ao HPF existente (ou cria HPF se necessário)
-		const audioCtx = vars.audioContext();
-		const newSource = audioCtx.createMediaStreamSource(newStream);
-		if (!vars.hpf()) {
-			const hpf = audioCtx.createBiquadFilter();
-			hpf.type = HPF_TYPE;
-			hpf.frequency.value = HPF_FREQUENCY;
-			hpf.Q.value = HPF_Q_FACTOR;
-			vars.setHPF(hpf);
-		}
-
-		// Desconecta antiga source
-		try {
-			const curSource = vars.source?.();
-			if (curSource) curSource.disconnect();
-		} catch (e) {
-			console.warn(`Aviso: falha ao desconectar source durante troca (${source}):`, e);
-		}
-
-		// Conecta nova source -> HPF -> processor
-		newSource.connect(vars.hpf());
-		const proc = vars.processor?.();
-		if (vars.hpf() && proc) vars.hpf().connect(proc);
-
-		// Para evitar leaks, para tracks do stream anterior
-		try {
-			const prevStream = vars.stream?.();
-			if (prevStream) prevStream.getTracks().forEach(t => t.stop());
-		} catch (e) {
-			console.warn(`Aviso: falha ao parar tracks do stream anterior (${source}):`, e);
-		}
-
-		// Atualiza referências
-		vars.setStream(newStream);
-		vars.setSource(newSource);
-
-		debugLogDeepgram(`✅ Troca de dispositivo ${source.toUpperCase()} concluída`, true);
-	} catch (e) {
-		console.error(`❌ Falha ao trocar dispositivo ${source.toUpperCase()}:`, e);
-		throw e;
-	} finally {
-		vars.setIsSwitching(false);
-	}
 }
 
 // Envia mensagem "KeepAlive" a cada 5 segundos para manter WebSocket Deepgram vivo
@@ -715,16 +640,14 @@ function handleSilenceDetection(source, percent) {
 //	PROCESSAMENTO DE MENSAGENS
 /* ================================ */
 
-// Processa mensagens do Deepgram para INPUT ou OUTPUT
-function handleDeepgramMessage(data, source = INPUT) {
-	const transcript = data.channel?.alternatives?.[0]?.transcript || '';
-
-	const isFinal = data.is_final || false;
-	const speechFinal = data.speech_final;
+// Processa mensagens do Deepgram (final ou parcial)
+function handleDeepgramMessage(result, source = INPUT) {
+	const transcript = result.channel?.alternatives?.[0]?.transcript || '';
+	const isFinal = result.is_final || false;
 
 	debugLogDeepgram(`📥 RESPOSTA DO DEEPGRAM - (${source})`, false);
-	debugLogDeepgram(`📥 Mensagem Deepgram ${source} recebida:`, data, false);
-	debugLogDeepgram(`📥 Type: ${data.type} | isFinal: ${isFinal} | speechFinal: ${speechFinal}`, false);
+	debugLogDeepgram(`📥 Mensagem Deepgram ${source} recebida:`, result, false);
+	debugLogDeepgram(`📥 Type: ${result.type} | isFinal: ${isFinal} | speechFinal: ${result.speech_final}`, false);
 	debugLogDeepgram(`📥 Transcript presente: ${transcript?.trim() ? 'SIM' : 'NÃO'}`, false);
 
 	if (isFinal) {
@@ -844,6 +767,86 @@ function calculateTimingMetrics(vars) {
 		latency: (elapsedMs / 1000).toFixed(2),
 		total: (elapsedMs / 1000).toFixed(2),
 	};
+}
+
+/* ================================ */
+//	TROCA DE DISPOSITIVO
+/* ================================ */
+
+// Troca dinâmica do dispositivo Deepgram (input/output)
+async function changeDeviceDeepgram(source, newDeviceId) {
+	const vars = deepgramState[source];
+
+	// Verifica se já está trocando
+	if (vars.isSwitching?.()) {
+		console.warn(`Já em processo de troca de dispositivo ${source.toUpperCase()}`);
+		return;
+	}
+
+	// Verifica se está ativo
+	if (!vars.isActive()) {
+		console.warn(`Deepgram ${source.toUpperCase()} não está ativo; nada a trocar`);
+		return;
+	}
+
+	vars.setIsSwitching(true);
+	try {
+		sendDeepgramFinalize(source);
+
+		// Novo MediaStream
+		const newStream = await navigator.mediaDevices.getUserMedia({
+			audio: {
+				deviceId: { exact: newDeviceId },
+				echoCancellation: true,
+				noiseSuppression: true,
+				autoGainControl: false,
+			},
+		});
+
+		// Cria nova source e conecta ao HPF existente (ou cria HPF se necessário)
+		const audioCtx = vars.audioContext();
+		const newSource = audioCtx.createMediaStreamSource(newStream);
+
+		if (!vars.hpf()) {
+			const hpf = audioCtx.createBiquadFilter();
+			hpf.type = HPF_TYPE;
+			hpf.frequency.value = HPF_FREQUENCY;
+			hpf.Q.value = HPF_Q_FACTOR;
+			vars.setHPF(hpf);
+		}
+
+		// Desconecta source anterior
+		try {
+			const curSource = vars.source?.();
+			if (curSource) curSource.disconnect();
+		} catch (e) {
+			console.warn(`⚠️ Falha ao desconectar source anterior (${source}):`, e);
+		}
+
+		// Conecta nova source -> HPF -> processor
+		newSource.connect(vars.hpf());
+		const proc = vars.processor?.();
+		if (vars.hpf() && proc) vars.hpf().connect(proc);
+
+		// Para tracks do stream anterior, para evitar leaks
+		try {
+			const prevStream = vars.stream?.();
+			if (prevStream) prevStream.getTracks().forEach(t => t.stop());
+		} catch (e) {
+			console.warn(`⚠️ Falha ao parar tracks do stream anterior (${source}):`, e);
+		}
+
+		// Atualiza referências
+		vars.setStream(newStream);
+		vars.setSource(newSource);
+
+		debugLogDeepgram(`✅ Troca de dispositivo ${source.toUpperCase()} concluída`, true);
+	} catch (e) {
+		console.error(`❌ Falha ao trocar dispositivo ${source.toUpperCase()}:`, e);
+		throw e;
+	} finally {
+		vars.setIsSwitching(false);
+	}
 }
 
 /* ================================ */
