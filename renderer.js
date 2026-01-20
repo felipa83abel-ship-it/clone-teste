@@ -4,9 +4,9 @@
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
-const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./deepgram-transcribe.js');
-const { startAudioWhisperLocal, stopAudioWhisperLocal, switchDeviceWhisperLocal } = require('./whisper-transcribe.js');
-const { startAudioVoskLocal, stopAudioVoskLocal, switchDeviceVoskLocal } = require('./vosk-transcribe.js');
+const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt-deepgram.js');
+const { startAudioVoskLocal, stopAudioVoskLocal, switchDeviceVoskLocal } = require('./stt-vosk.js');
+const { startAudioWhisperLocal, stopAudioWhisperLocal, switchDeviceWhisperLocal } = require('./stt-whisper.js');
 
 // 🔥 Sistema de eventos para módulos de transcrição (desacoplamento)
 window.transcriptionEvents = new EventTarget();
@@ -331,6 +331,10 @@ onUIChange('onAudioDeviceChanged', async data => {
 		const sttModel = getConfiguredSTTModel();
 		if (sttModel === 'deepgram') {
 			if (typeof switchDeviceDeepgram === 'function') await switchDeviceDeepgram(data.type, data.deviceId);
+		} else if (sttModel === 'vosk-local') {
+			if (typeof switchDeviceVoskLocal === 'function') await switchDeviceVoskLocal(data.type, data.deviceId);
+		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
+			if (typeof switchDeviceWhisperLocal === 'function') await switchDeviceWhisperLocal(data.type, data.deviceId);
 		}
 	} catch (err) {
 		console.warn('Erro ao processar onAudioDeviceChanged:', err);

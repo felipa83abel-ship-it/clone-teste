@@ -6,7 +6,7 @@ const { marked } = require('marked');
 const hljs = require('highlight.js');
 
 // 🌊 Transcrição Deepgram
-const { startAudioDeepgram, stopAudioDeepgram } = require('./deepgram-transcribe.js');
+const { startAudioDeepgram, stopAudioDeepgram } = require('./stt-deepgram.js');
 
 // 🔒 DESABILITADO TEMPORARIAMENTE
 const DESABILITADO_TEMPORARIAMENTE = false;

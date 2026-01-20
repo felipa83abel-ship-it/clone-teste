@@ -21,11 +21,11 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 - **Função/Evento**: `startAudio()` (linha ~1020)
 - **Descrição**: Coordena início da captura detectando modelo STT.
   - Chama `getConfiguredSTTModel()` que lê `window.configManager.config.api[provider].selectedSTTModel` (deve ser 'deepgram').
-  - Como é 'deepgram', chama `startAudioDeepgram(UIElements)` de `deepgram-transcribe.js`.
+  - Como é 'deepgram', chama `startAudioDeepgram(UIElements)` de `stt-deepgram.js`.
 
 ### 2.1. Inicialização do Deepgram (startAudioDeepgram)
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `startAudioDeepgram(UIElements)` (linha ~185)
 - **Descrição**: Inicializa captura para input e output separadamente.
   - Se `UIElements.inputSelect?.value`: chama `startDeepgram('input', UIElements)`.
@@ -33,7 +33,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 
 #### 2.1.1. Captura de Entrada (Microfone) e Saída (Sistema)
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `startDeepgram(source, UIElements)` (linha ~475)
 - **Descrição**: Função genérica que inicializa captura tanto para entrada quanto saída, parametrizando por source.
   - `source` pode ser `'input'` (microfone) ou `'output'` (sistema).
@@ -60,7 +60,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 
 ### 2.2. Inicialização do WebSocket (initDeepgramWS)
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `initDeepgramWS(source)` (linha ~50)
 - **Descrição**: Cria conexão WebSocket com Deepgram.
   - Obtém chave: `ipcRenderer.invoke('GET_API_KEY', 'deepgram')`.
@@ -81,7 +81,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
   - Envia via `this.port.postMessage({ type: 'audioData', pcm16 })`.
   - Também calcula volume e envia `this.port.postMessage({ type: 'volumeUpdate', percent })`.
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `deepgramInputProcessor.port.onmessage` / `deepgramOutputProcessor.port.onmessage` (linhas ~251 e ~331)
 - **Descrição**:
   - Recebe `{ type, pcm16, percent }`.
@@ -90,7 +90,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 
 ## 4. Recepção e Processamento de Transcrições
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `deepgramInputWebSocket.onmessage` / `deepgramOutputWebSocket.onmessage` (via `initDeepgramWS`)
 - **Descrição**: Recebe JSON do Deepgram.
   - Parseia `data = JSON.parse(event.data)`.
@@ -98,7 +98,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 
 ### 4.1. Processamento de Mensagens (handleDeepgramMessage)
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `handleDeepgramMessage(data, source)` (linha ~630)
 - **Descrição**:
   - Extrai `transcript = data.channel?.alternatives?.[0]?.transcript`.
@@ -112,7 +112,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 
 ### 4.2. Processamento de Interims (transcrições parciais)
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `handleInterimDeepgramMessage(transcript, source)` (linha ~588)
 - **Descrição**:
   - Define autor da transcrição (Input ou Output): `author = isInput ? YOU : OTHER;`.
@@ -122,7 +122,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 
 ### 4.3. Processamento de Finals (transcrições completas)
 
-- **Arquivo**: `deepgram-transcribe.js`
+- **Arquivo**: `stt-deepgram.js`
 - **Função/Evento**: `handleFinalDeepgramMessage(transcript, confidence, source)` (linha ~490)
 - **Descrição**:
   - Define `deepgramInputStopAt = Date.now()` ou output.
