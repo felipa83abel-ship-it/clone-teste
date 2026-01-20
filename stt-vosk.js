@@ -1,7 +1,7 @@
 /**
  * 🔥 VOSK STT (Speech-to-Text) - MÓDULO INDEPENDENTE
  *
- * Implementação isolada de transcrição local com Vosk,
+ * Implementação isolada de transcrição com Vosk,
  * - Spawn server-vosk.py AQUI no renderer (não via IPC)
  * - Comunicação stdin/stdout direta (JSON)
  * - AudioWorklet para captura e processamento de áudio bruto PCM16
@@ -9,8 +9,9 @@
  * - Consolida interim results e transcrições finais
  *
  * Uso:
- * - startAudioVoskLocal(UIElements) -> startVosk(INPUT|OUTPUT, UIElements)
- * - stopAudioVoskLocal()
+ * - startAudioVosk(UIElements)
+ * - stopAudioVosk()
+ * - switchDeviceVosk(INPUT|OUTPUT, newDeviceId)
  */
 
 /* ================================ */
@@ -571,7 +572,7 @@ function calculateTimingMetrics(vars) {
 /* ================================ */
 
 // Troca dinâmica do dispositivo Vosk (input/output)
-async function changeDeviceVoskLocal(source, newDeviceId) {
+async function changeDeviceVosk(source, newDeviceId) {
 	const vars = voskState[source];
 
 	// Verifica se já está trocando
@@ -700,7 +701,7 @@ async function stopVosk(source) {
 /* ================================ */
 
 /**
- * Log de debug padronizado para config-manager.js
+ * Log de debug padronizado para stt-vosk.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
  * @param {*} msg
  * @param {boolean} showLog - true para mostrar, false para ignorar
@@ -734,7 +735,7 @@ function debugLogVosk(...args) {
 /**
  * Inicia Vosk para INPUT + OUTPUT
  */
-async function startAudioVoskLocal(UIElements) {
+async function startAudioVosk(UIElements) {
 	try {
 		// Inicializa VAD Engine (singleton)
 		vad = getVADEngine();
@@ -752,7 +753,7 @@ async function startAudioVoskLocal(UIElements) {
 /**
  * Para Vosk para INPUT + OUTPUT
  */
-function stopAudioVoskLocal() {
+function stopAudioVosk() {
 	stopVosk(INPUT);
 	stopVosk(OUTPUT);
 }
@@ -760,10 +761,10 @@ function stopAudioVoskLocal() {
 /**
  * Muda dispositivo para um source mantendo Vosk ativo
  */
-async function switchDeviceVoskLocal(source, newDeviceId) {
-	debugLogVosk('Início da função: "switchDeviceVoskLocal"');
-	debugLogVosk('Fim da função: "switchDeviceVoskLocal"');
-	return await changeDeviceVoskLocal(source, newDeviceId);
+async function switchDeviceVosk(source, newDeviceId) {
+	debugLogVosk('Início da função: "switchDeviceVosk"');
+	debugLogVosk('Fim da função: "switchDeviceVosk"');
+	return await changeDeviceVosk(source, newDeviceId);
 }
 
 /* ================================ */
@@ -771,7 +772,7 @@ async function switchDeviceVoskLocal(source, newDeviceId) {
 /* ================================ */
 
 module.exports = {
-	startAudioVoskLocal,
-	stopAudioVoskLocal,
-	switchDeviceVoskLocal,
+	startAudioVosk,
+	stopAudioVosk,
+	switchDeviceVosk,
 };

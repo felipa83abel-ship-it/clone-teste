@@ -10,8 +10,10 @@
  * - Consolida interim results e transcrições finais
  *
  * Uso:
- * - startAudioDeepgram(UIElements) -> startDeepgram(INPUT|OUTPUT, UIElements)
- * - stopDeepgram(INPUT|OUTPUT)
+ * - startAudioDeepgram(UIElements)
+ * - stopAudioDeepgram()
+ * - switchDeviceDeepgram(INPUT|OUTPUT, newDeviceId)
+ *
  */
 
 /* ================================ */
@@ -963,7 +965,7 @@ function stopDeepgram(source) {
 /* ================================ */
 
 /**
- * Log de debug padronizado para config-manager.js
+ * Log de debug padronizado para stt-deepgram.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
  * @param {*} msg
  * @param {boolean} showLog - true para mostrar, false para ignorar

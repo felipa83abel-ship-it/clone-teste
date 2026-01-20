@@ -22,7 +22,7 @@ O fluxo usa MediaRecorder para capturar áudio em chunks e IPC para enviar ao ma
 - **Arquivo**: `renderer.js`
 - **Função/Evento**: `startAudio()` (linha ~1020)
 - **Descrição**: Esta função coordena o início da captura de áudio de entrada (microfone) e saída (áudio do sistema). Detecta o modelo STT configurado e roteia para o fluxo apropriado.
-  - Chama `getConfiguredSTTModel()` para obter o modelo selecionado (ex: 'vosk-local', 'whisper-cpp-local', 'whisper-1').
+  - Chama `getConfiguredSTTModel()` para obter o modelo selecionado (ex: 'vosk', 'whisper-cpp-local', 'whisper-1').
   - Se modelo for 'deepgram': chama `startAudioDeepgram(UIElements)` (não coberto aqui).
   - Caso contrário: Inicia servidor 'whisper-cpp-local' se necessário via IPC `start-whisper-server` e chama `startInputOutput()`.
 
@@ -111,7 +111,7 @@ A transcrição é feita no processo main (Electron) para acessar APIs ou arquiv
   - Recebe Buffer de áudio e source ('input' ou 'output').
   - Salva temporariamente em arquivo WAV usando `os.tmpdir()` + `wav` library (ex: `temp_audio_input.wav`).
   - Chama `transcribeAudio(buffer, source)` que roteia pelo modelo:
-    - 'vosk-local': `transcribeVoskComplete(buffer, source)` (usa server-vosk.py via HTTP).
+    - 'vosk': `transcribeVoskComplete(buffer, source)` (usa server-vosk.py via HTTP).
     - 'whisper-cpp-local': Envia para servidor local iniciado em `startAudio()`.
     - 'whisper-1': Usa OpenAI API com chave de `electron-store`.
   - Recebe texto transcrito.

@@ -918,7 +918,7 @@ function resetInterviewTurnState() {
 
 /**
  * Obtém o modelo STT configurado para o provider ativo
- * @returns {string} 'vosk-local' | 'whisper-1' | 'google-stt' etc
+ * @returns {string} 'vosk' | 'whisper-1' | 'google-stt' etc
  */
 function getConfiguredSTTModel() {
 	try {
@@ -954,7 +954,7 @@ function getConfiguredSTTModel() {
  * Roteia transcrição de áudio para o modelo STT configurado
  *
  * Modelos suportados (via config-manager):
- * 1. vosk-local          → main.js handlers: vosk-transcribe + vosk-finalize
+ * 1. vosk          → main.js handlers: vosk-transcribe + vosk-finalize
  * 2. whisper-cpp-local   → main.js handler: transcribe-local (alta precisão)
  * 3. whisper-1           → main.js handler: transcribe-audio (online, OpenAI)
  *
@@ -974,7 +974,7 @@ async function transcribeAudio(blob) {
 	);
 
 	// Roteia para o modelo configurado
-	if (sttModel === 'vosk-local') {
+	if (sttModel === 'vosk') {
 		// Modelo: Vosk local
 		// Vantagem: Rápido (500-1000ms), offline, leve
 		// Desvantagem: Menor precisão (modelo pequeno ~50MB)
@@ -1011,7 +1011,7 @@ async function transcribeAudio(blob) {
 		} catch (error) {
 			console.error('❌ Vosk falhou:', error.message);
 			// 🔥 [CRÍTICO] SEM FALLBACK AUTOMÁTICO!
-			// Se o usuário escolhe vosk-local, APENAS vosk-local será usado.
+			// Se o usuário escolhe vosk, APENAS vosk será usado.
 			// Se falhar, o erro é propagado e o usuário deve mudar o modelo nas Configurações.
 			throw new Error(`Vosk local falhou: ${error.message}. Altere o modelo em "Configurações → API e Modelos"`);
 		}
@@ -1068,7 +1068,7 @@ async function transcribeAudioPartial(blob) {
 	const buffer = Buffer.from(await blob.arrayBuffer());
 	const sttModel = getConfiguredSTTModel();
 
-	if (sttModel === 'vosk-local') {
+	if (sttModel === 'vosk') {
 		// ⚠️ Para Vosk, não fazemos transcrição parcial em tempo real
 		// Vosk acumula e retorna parciais, mas não queremos enviá-las para a UI
 		// A transcrição real será feita em transcribeAudio() quando a gravação terminar

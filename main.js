@@ -2,7 +2,7 @@
    IMPORTS E CONFIGURAÇÕES INICIAIS
 =============================== */
 
-// 🔥 DEEPGRAM: Carrega variáveis de ambiente do .env
+// Carrega variáveis de ambiente do .env
 require('dotenv').config();
 
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
@@ -42,12 +42,6 @@ try {
 =============================== */
 
 const USE_FAKE_STREAM_GPT = true; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
-
-// Configuração de modelo Vosk (local)
-const VOSK_CONFIG = {
-	// MODEL: 'vosk-models/vosk-model-small-pt-0.3' ( Modelo pequeno, rápido, menos preciso)
-	MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3',
-};
 
 // Configuração do modelo Whisper.cpp (local)
 const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
@@ -142,8 +136,8 @@ function checkWhisperFiles() {
  * Isso evita overhead de inicialização e problemas com WebM corrompido
  */
 async function startWhisperServer() {
-	if (whisperServerProcess) {
-		console.log('⚠️ Servidor Whisper já rodando');
+	if (whisperServerReady) {
+		console.log('⚠️ Servidor Whisper já foi inicializado');
 		return true;
 	}
 
@@ -152,55 +146,79 @@ async function startWhisperServer() {
 		return false;
 	}
 
-	console.log('🚀 Iniciando Whisper.cpp como servidor persistente...');
+	console.log('🚀 Iniciando Whisper.cpp com warm-up do modelo...');
 
 	try {
-		// Inicia Whisper.cpp em modo de espera por stdin
-		whisperServerProcess = spawn(WHISPER_CLI_EXE, ['-m', WHISPER_MODEL, '-l', 'pt', '--print-progress'], {
-			stdio: ['pipe', 'pipe', 'pipe'],
-			detached: false,
-		});
+		// Cria arquivo dummy para warm-up
+		const dummyAudioPath = path.join(app.getPath('temp'), 'whisper-warmup.wav');
 
-		whisperServerProcess.on('close', code => {
-			console.log(`📌 Processo Whisper encerrado com código: ${code}`);
-			whisperServerProcess = null;
-			whisperServerReady = false;
-		});
+		// Cria WAV simples de 1 segundo de silêncio (RIFF header + dados PCM16 silence)
+		const sampleRate = 16000;
+		const duration = 1; // 1 segundo
+		const samples = sampleRate * duration;
 
-		whisperServerProcess.on('error', err => {
-			console.error(`❌ Erro no processo Whisper: ${err.message}`);
-			whisperServerProcess = null;
-			whisperServerReady = false;
-		});
+		// WAV header (RIFF format)
+		const wavHeader = Buffer.alloc(44);
+		wavHeader.write('RIFF', 0);
+		wavHeader.writeUInt32LE(36 + samples * 2, 4); // File size - 8
+		wavHeader.write('WAVE', 8);
+		wavHeader.write('fmt ', 12);
+		wavHeader.writeUInt32LE(16, 16); // Subchunk1 size
+		wavHeader.writeUInt16LE(1, 20); // Audio format (PCM)
+		wavHeader.writeUInt16LE(1, 22); // Channels (mono)
+		wavHeader.writeUInt32LE(sampleRate, 24); // Sample rate
+		wavHeader.writeUInt32LE(sampleRate * 2, 28); // Byte rate
+		wavHeader.writeUInt16LE(2, 32); // Block align
+		wavHeader.writeUInt16LE(16, 34); // Bits per sample
+		wavHeader.write('data', 36);
+		wavHeader.writeUInt32LE(samples * 2, 40); // Subchunk2 size
+
+		const silenceData = Buffer.alloc(samples * 2); // PCM16 silence
+		const dummyWav = Buffer.concat([wavHeader, silenceData]);
+
+		fs.writeFileSync(dummyAudioPath, dummyWav);
+		console.log('✅ Arquivo de warm-up criado');
+
+		// Executa Whisper.cpp com warm-up (carrega modelo na memória)
+		console.log(`🔥 Aquecendo modelo Whisper (primeira execução, será lenta)...`);
+		const warmupStart = Date.now();
+
+		const { stdout, stderr } = await execFileAsync(
+			WHISPER_CLI_EXE,
+			['-m', WHISPER_MODEL, '-f', dummyAudioPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'],
+			{
+				timeout: 30000,
+				maxBuffer: 1024 * 1024 * 5,
+			},
+		);
+
+		const warmupTime = Date.now() - warmupStart;
+		console.log(`✅ Warm-up concluído em ${warmupTime}ms (modelo agora está em cache)`);
+
+		// Limpa arquivo dummy
+		if (fs.existsSync(dummyAudioPath)) {
+			fs.unlinkSync(dummyAudioPath);
+		}
 
 		whisperServerReady = true;
-		console.log('✅ Servidor Whisper iniciado com sucesso');
+		console.log('✅ Whisper.cpp pronto para transcrições rápidas (modelo em cache)');
 		return true;
 	} catch (error) {
-		console.error(`❌ Erro ao iniciar servidor Whisper: ${error.message}`);
-		whisperServerProcess = null;
+		console.error(`❌ Erro ao fazer warm-up do Whisper: ${error.message}`);
 		whisperServerReady = false;
 		return false;
 	}
 }
 
 /**
- * Encerra o servidor Whisper.cpp persistente
+ * Encerra o servidor Whisper.cpp (apenas reseta flag de warm-up)
+ * Nota: Não há processo persistente para matar
+ * O warm-up apenas deixa o modelo em cache do SO
  */
 function stopWhisperServer() {
-	if (!whisperServerProcess) {
-		console.log('⚠️ Servidor Whisper não está rodando');
-		return;
-	}
-
-	console.log('🛑 Encerrando servidor Whisper...');
-	try {
-		whisperServerProcess.kill();
-		whisperServerProcess = null;
+	if (whisperServerReady) {
+		console.log('🛑 Whisper.cpp desativado (warm-up reset)');
 		whisperServerReady = false;
-		console.log('✅ Servidor Whisper encerrado');
-	} catch (error) {
-		console.error(`❌ Erro ao encerrar servidor: ${error.message}`);
 	}
 }
 
@@ -230,60 +248,6 @@ function convertWebMToWAVFile(inputPath, outputPath) {
 			})
 			.save(outputPath);
 	});
-}
-
-/**
- * Converte WebM/Ogg para PCM 16-bit 16kHz (formato que Vosk espera)
- * Usa ffmpeg para decodificação
- */
-async function convertWebMToWAV(webmBuffer) {
-	try {
-		const ffmpegPath = require('ffmpeg-static');
-		const inputFile = path.join(app.getPath('temp'), `input-${Date.now()}.webm`);
-		const outputFile = path.join(app.getPath('temp'), `output-${Date.now()}.wav`);
-
-		try {
-			// Escreve WebM temporário
-			fs.writeFileSync(inputFile, webmBuffer);
-
-			// Converte com ffmpeg: WebM → WAV 16-bit 16kHz mono (MESMA FORMA DE ANTES)
-			await execFileAsync(
-				ffmpegPath,
-				[
-					'-i',
-					inputFile,
-					'-acodec',
-					'pcm_s16le', // PCM 16-bit signed
-					'-ar',
-					'16000', // 16kHz sample rate
-					'-ac',
-					'1', // Mono
-					'-f',
-					'wav', // WAV container (melhor preservação de qualidade)
-					outputFile,
-				],
-				{ maxBuffer: 10 * 1024 * 1024 },
-			);
-
-			// Lê arquivo WAV convertido
-			const wavBuffer = fs.readFileSync(outputFile);
-
-			// Limpa arquivos temporários
-			fs.unlinkSync(inputFile);
-			fs.unlinkSync(outputFile);
-
-			console.log(`✅ Convertido WebM (${webmBuffer.length} bytes) → WAV (${wavBuffer.length} bytes)`);
-			return wavBuffer;
-		} catch (error) {
-			// Limpa se houver erro
-			if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
-			if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
-			throw error;
-		}
-	} catch (error) {
-		console.error('❌ Erro ao converter WebM para WAV:', error.message);
-		throw error;
-	}
 }
 
 /* ================================
@@ -529,6 +493,14 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 	console.log('\n--------------------------------------------------------');
 	console.log('📋 STT HANDLER ATIVO: WHISPER.CPP LOCAL (Offline, Alta Precisão)');
 	console.log('--------------------------------------------------------');
+
+	// Informa status do warm-up
+	if (whisperServerReady) {
+		console.log('🔥 Warm-up completado ✅ - Transcrição será RÁPIDA (modelo em cache)');
+	} else {
+		console.log('⚠️ Primeiro warm-up ainda não feito - Transcrição pode ser LENTA (carregando modelo)');
+	}
+
 	const startTime = Date.now();
 	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
 	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes`);
@@ -589,7 +561,6 @@ async function transcribeLocalCommon(audioBuffer, isPartial = false) {
 // Referências de quem chama:
 //   - OpenAI Whisper-1: renderer.js → transcribeAudio() com sttModel === 'whisper-1'
 //   - Whisper.cpp Local: renderer.js → transcribeAudio() com sttModel === 'whisper-cpp-local'
-//   - Vosk Local: renderer.js → transcribeAudio() com sttModel === 'vosk-local'
 
 // Handler: Transcrição OpenAI Whisper-1 (online)
 ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, false));
@@ -614,47 +585,6 @@ ipcMain.handle('stop-whisper-server', () => {
 	console.log('📡 Solicitação para parar servidor Whisper');
 	stopWhisperServer();
 	return true;
-});
-
-/* ================================
-   HANDLERS IPC - DEEPGRAM (STT)
-=============================== */
-
-// 🔥 DEEPGRAM: Transcrição via SDK com suporte a chunks
-ipcMain.handle('transcribe-audio-deepgram', async (_, audioDataBase64) => {
-	try {
-		const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
-		if (!deepgramApiKey) {
-			throw new Error('DEEPGRAM_API_KEY não configurada no .env');
-		}
-
-		// Converte base64 (string) de volta para Buffer
-		const buffer = Buffer.from(audioDataBase64, 'base64');
-		console.log('🎤 Enviando chunk para Deepgram | size:', buffer.length);
-
-		// Usa Deepgram SDK com prerecorded (para chunks isolados)
-		const { createClient } = require('@deepgram/sdk');
-		const deepgram = createClient(deepgramApiKey);
-
-		const { result, error } = await deepgram.listen.prerecorded.transcribeFile(buffer, {
-			model: 'nova-2',
-			language: 'pt-BR',
-			smart_format: true,
-			container: 'webm',
-		});
-
-		if (error) {
-			console.error('❌ Erro Deepgram SDK:', error);
-			throw new Error(`Deepgram error: ${error.message}`);
-		}
-
-		const transcript = result?.results?.channels[0]?.alternatives[0]?.transcript || '';
-		console.log('✅ Transcrição Deepgram:', transcript || '(vazio)');
-		return transcript;
-	} catch (err) {
-		console.error('❌ Erro ao transcrever com Deepgram:', err.message);
-		throw err;
-	}
 });
 
 /* ================================
@@ -816,14 +746,6 @@ ipcMain.on('MOVE_WINDOW_TO', (_, { x, y }) => {
 		console.warn('MOVE_WINDOW_TO falhou:', err);
 	}
 });
-
-/* ================================
-   HANDLERS IPC - VOSK (REMOVIDO)
-   
-   ✅ Vosk agora é gerenciado DIRETO no renderer.js usando spawn()
-   ✅ SEM IPC = SEM corrupção de dados binários
-   ✅ Padrão idêntico ao teste-vosk.js
-=============================== */
 
 /* ===============================
    SCREENSHOT CAPTURE - DISCRETO E INDETECTÁVEL

@@ -5,8 +5,8 @@ const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
 const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt-deepgram.js');
-const { startAudioVoskLocal, stopAudioVoskLocal, switchDeviceVoskLocal } = require('./stt-vosk.js');
-const { startAudioWhisperLocal, stopAudioWhisperLocal, switchDeviceWhisperLocal } = require('./stt-whisper.js');
+const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt-vosk.js');
+const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./stt-whisper.js');
 
 // 🔥 Sistema de eventos para módulos de transcrição (desacoplamento)
 window.transcriptionEvents = new EventTarget();
@@ -331,10 +331,10 @@ onUIChange('onAudioDeviceChanged', async data => {
 		const sttModel = getConfiguredSTTModel();
 		if (sttModel === 'deepgram') {
 			if (typeof switchDeviceDeepgram === 'function') await switchDeviceDeepgram(data.type, data.deviceId);
-		} else if (sttModel === 'vosk-local') {
-			if (typeof switchDeviceVoskLocal === 'function') await switchDeviceVoskLocal(data.type, data.deviceId);
+		} else if (sttModel === 'vosk') {
+			if (typeof switchDeviceVosk === 'function') await switchDeviceVosk(data.type, data.deviceId);
 		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			if (typeof switchDeviceWhisperLocal === 'function') await switchDeviceWhisperLocal(data.type, data.deviceId);
+			if (typeof switchDeviceWhisper === 'function') await switchDeviceWhisper(UIElements);
 		}
 	} catch (err) {
 		console.warn('Erro ao processar onAudioDeviceChanged:', err);
@@ -669,17 +669,17 @@ async function startAudio() {
 		// 🔥 ROTEAMENTO: Por modelo STT
 		if (sttModel === 'deepgram') {
 			await startAudioDeepgram(UIElements);
-		} else if (sttModel === 'vosk-local') {
-			await startAudioVoskLocal(UIElements);
+		} else if (sttModel === 'vosk') {
+			await startAudioVosk(UIElements);
 		} else if (sttModel === 'whisper-cpp-local') {
 			const serverStarted = await ipcRenderer.invoke('start-whisper-server');
 			if (serverStarted) {
-				console.log('🎤 Roteando para startAudioWhisperLocal');
-				await startAudioWhisperLocal(UIElements);
+				console.log('🎤 Roteando para Whisper (local)');
+				await startAudioWhisper(UIElements);
 			}
 		} else if (sttModel === 'whisper-1') {
-			console.log('🌐 Roteando para startAudioWhisperLocal (Whisper-1 via API)');
-			await startAudioWhisperLocal(UIElements); // verificar se precisa criar um novo
+			console.log('🌐 Roteando para Whisper (API OpenAI)');
+			await startAudioWhisper(UIElements);
 		} else {
 			// Modelo não suportado
 			console.error('❌ Erro ao obter modelo STT configurado');
@@ -2605,7 +2605,7 @@ function getConfiguredSTTModel() {
 // 	);
 
 // 	// Roteia para o modelo configurado
-// 	if (sttModel === 'vosk-local') {
+// 	if (sttModel === 'vosk') {
 // 		return await transcribeVoskComplete(buffer, source);
 // 	} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
 // 		return await transcribeWhisperComplete(buffer, source);
@@ -2621,7 +2621,7 @@ function getConfiguredSTTModel() {
 // 	const buffer = Buffer.from(await blob.arrayBuffer());
 // 	const sttModel = getConfiguredSTTModel();
 
-// 	if (sttModel === 'vosk-local') {
+// 	if (sttModel === 'vosk') {
 // 		return await transcribeVoskPartial(buffer, source);
 // 	} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
 // 		return await transcribeWhisperPartial(buffer, source);
@@ -2649,14 +2649,14 @@ async function stopAudio() {
 		// 🔥 ROTEAMENTO: Por modelo STT
 		if (sttModel === 'deepgram') {
 			stopAudioDeepgram();
+		} else if (sttModel === 'vosk') {
+			stopAudioVosk();
 		} else if (sttModel === 'whisper-cpp-local') {
-			stopAudioWhisperLocal();
+			stopAudioWhisper();
 			await ipcRenderer.invoke('stop-whisper-server');
 			console.log('🛑 Servidor Whisper.cpp parado');
-		} else if (sttModel === 'vosk-local') {
-			stopAudioVoskLocal();
 		} else if (sttModel === 'whisper-1') {
-			stopAudioWhisperLocal(); // verificar se precisa criar um novo
+			stopAudioWhisper();
 		} else {
 			// Modelo não suportado
 			console.error('❌ Erro ao obter modelo STT configurado');

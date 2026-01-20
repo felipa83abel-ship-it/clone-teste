@@ -37,19 +37,19 @@ class ConfigManager {
 					activeProvider: 'openai',
 					openai: {
 						// 🔥 MODIFICADO: Agora usa selectedSTTModel e selectedLLMModel
-						selectedSTTModel: 'vosk-local',
+						selectedSTTModel: 'vosk',
 						selectedLLMModel: 'gpt-4o-mini',
 						enabled: true,
 					},
 					google: {
 						// 🔥 MODIFICADO: Agora usa selectedSTTModel e selectedLLMModel
-						selectedSTTModel: 'vosk-local',
+						selectedSTTModel: 'vosk',
 						selectedLLMModel: 'gemini-pro',
 						enabled: false,
 					},
 					openrouter: {
 						// 🔥 MODIFICADO: Agora usa selectedSTTModel e selectedLLMModel
-						selectedSTTModel: 'vosk-local',
+						selectedSTTModel: 'vosk',
 						selectedLLMModel: '',
 						enabled: false,
 					},
@@ -724,7 +724,7 @@ class ConfigManager {
 			// Restaurar STT Model
 			const sttSelectId = `${provider}-stt-model`;
 			const sttSelect = document.getElementById(sttSelectId);
-			const savedSTTModel = this.config.api[provider]?.selectedSTTModel || 'vosk-local';
+			const savedSTTModel = this.config.api[provider]?.selectedSTTModel || 'vosk';
 
 			if (sttSelect) {
 				console.log(`   📝 ${sttSelectId}: antes="${sttSelect.value}" → depois="${savedSTTModel}"`);
