@@ -654,7 +654,7 @@ async function processIncomingAudioMessageWhisper(source, data, mediaRecorder, v
 		vars.lastPercent = data.percent;
 
 		// Processa atualização de volume/VAD
-		handleVolumeUpdate(source, data);
+		handleVolumeUpdate(source, data.percent);
 
 		// Detecta silêncio e dispara transcrição automática
 		handleSilenceDetectionWhisper(source, data.percent, mediaRecorder);
@@ -776,11 +776,11 @@ function getConfiguredSTTModel() {
 }
 
 // Atualiza volume recebido do AudioWorklet
-function handleVolumeUpdate(source, data) {
+function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
 	if (globalThis.RendererAPI?.emitUIChange) {
 		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
+		globalThis.RendererAPI.emitUIChange(ev, { percent });
 	}
 }
 
@@ -862,23 +862,44 @@ function calculateTimingMetrics(vars) {
 /* ================================ */
 
 // Troca dinâmica do dispositivo Whisper (input/output)
-async function changeDeviceWhisper(source, UIElements) {
-	debugLogWhisper(`🔄 Trocando dispositivo Whisper (${source})...`, false);
-
+async function changeDeviceWhisper(source, newDeviceId) {
 	const vars = whisperState[source];
-	const wasActive = vars.isActive();
 
-	if (wasActive) {
-		vars.setIsSwitching(true);
-		stopWhisper(source);
+	debugLogWhisper(`🔄 changeDeviceWhisper CHAMADO: source=${source}, newDeviceId="${newDeviceId}"`, false);
+
+	// Verifica se já está trocando
+	if (vars.isSwitching?.()) {
+		console.warn(`⚠️ Já em processo de troca de dispositivo ${source.toUpperCase()}`);
+		return;
 	}
 
-	// Aguarda um pouco para liberar recursos
-	await new Promise(resolve => setTimeout(resolve, 300));
+	// CASO 1: Device vazio → STOP
+	const normalizedDeviceId = newDeviceId?.toString().toLowerCase().trim() || '';
+	if (!normalizedDeviceId || normalizedDeviceId === 'nenhum') {
+		debugLogWhisper(
+			`🛑 Device vazio para ${source.toUpperCase()}, parando Whisper... (deviceId="${newDeviceId}")`,
+			false,
+		);
+		stopWhisper(source);
+		return;
+	}
 
-	if (wasActive) {
+	// CASO 2: Inativo + device válido → START
+	if (!vars.isActive()) {
+		debugLogWhisper(`🚀 Whisper ${source.toUpperCase()} inativo, iniciando com novo dispositivo...`, false);
+		await startWhisper(source, newDeviceId);
+		return;
+	}
+
+	// CASO 3: Ativo + device alterado → RESTART
+	if (vars.deviceId?.() !== newDeviceId) {
+		debugLogWhisper(`🔄 Whisper ${source.toUpperCase()} ativo com device diferente, reiniciando...`, false);
+		vars.setIsSwitching(true);
 		try {
-			await startWhisper(source, UIElements);
+			stopWhisper(source);
+			// Aguarda um pouco para liberar recursos
+			await new Promise(resolve => setTimeout(resolve, 300));
+			await startWhisper(source, newDeviceId);
 		} catch (error) {
 			console.error(`❌ Erro ao reiniciar após troca de dispositivo:`, error);
 		} finally {
@@ -895,10 +916,8 @@ async function changeDeviceWhisper(source, UIElements) {
 function stopWhisper(source) {
 	const vars = whisperState[source];
 
-	if (!vars.isActive()) {
-		console.warn(`⚠️ Whisper ${source.toUpperCase()} não está ativo`);
-		return;
-	}
+	// 🔥 IMPORTANTE: Faz cleanup MESMO que isActive() seja false
+	// Pode haver estado inconsistente (ex: recorder ativo mas isActive=false)
 
 	try {
 		// Desconecta AudioWorklet
@@ -941,6 +960,9 @@ function stopWhisper(source) {
 		vars.setStream(null);
 		vars.setMediaRecorder(null);
 		vars.setAudioChunks([]);
+
+		// Zera o oscilador no UI
+		handleVolumeUpdate(source, 0);
 
 		debugLogWhisper(`🛑 Captura Whisper ${source.toUpperCase()} parada`, true);
 	} catch (error) {
@@ -1014,9 +1036,14 @@ function stopAudioWhisper() {
  * Muda dispositivo para um source mantendo Whisper ativo
  */
 async function switchDeviceWhisper(source, newDeviceId) {
-	debugLogWhisper('Início da função: "switchDeviceWhisper"');
-	debugLogWhisper('Fim da função: "switchDeviceWhisper"');
-	return await changeDeviceWhisper(source, newDeviceId);
+	try {
+		debugLogWhisper(`🔄 [switchDeviceWhisper] Início: source=${source}, newDeviceId="${newDeviceId}"`, false);
+		const result = await changeDeviceWhisper(source, newDeviceId);
+		return result;
+	} catch (err) {
+		console.error(`❌ [switchDeviceWhisper] Erro em changeDeviceWhisper:`, err);
+		throw err;
+	}
 }
 
 /* ================================ */

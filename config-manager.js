@@ -297,44 +297,30 @@ class ConfigManager {
 		// Inputs que salvam automaticamente
 		document.querySelectorAll('input, select, textarea').forEach(input => {
 			if (input.id && !input.classList.contains('api-key-input')) {
-				input.addEventListener('change', () => {
+				input.addEventListener('change', async () => {
 					this.saveField(input.id, input.value);
 					this.saveConfig(); // 🔥 CRÍTICO: Salva configuração para persistir mudanças
 
-					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, reinicia monitoramento
+					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, usa novo módulo
 					if (input.id === 'audio-input-device') {
-						console.log('📝 Input device mudou');
+						console.log('📝 Input device mudou para:', input.value || 'NENHUM');
 
-						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
-						if (globalThis.RendererAPI?.stopInput) {
-							globalThis.RendererAPI.stopInput().catch(err => {
-								console.warn('⚠️ Erro ao parar input monitor:', err);
-							});
+						// 🔥 Troca dispositivo no monitor de volume (com await!)
+						await globalThis.RendererAPI?.switchAudioVolumeDevice('input', input.value);
 
-							// 🔥 Reinicia monitoramento com novo dispositivo
-							this.restartInputMonitoring();
-
-							// Emite evento para notificar mudança de dispositivo (renderer fica cego ao DOM)
-							if (globalThis.RendererAPI?.emitUIChange) {
-								globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'input', deviceId: input.value });
-							}
+						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
+						if (globalThis.RendererAPI?.emitUIChange) {
+							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'input', deviceId: input.value });
 						}
 					} else if (input.id === 'audio-output-device') {
-						console.log('📝 Output device mudou');
+						console.log('📝 Output device mudou para:', input.value || 'NENHUM');
 
-						// 🔥 Limpa streams antigas - verifica se RendererAPI existe
-						if (globalThis.RendererAPI?.stopOutput) {
-							globalThis.RendererAPI.stopOutput().catch(err => {
-								console.warn('⚠️ Erro ao parar output monitor:', err);
-							});
+						// 🔥 Troca dispositivo no monitor de volume (com await!)
+						await globalThis.RendererAPI?.switchAudioVolumeDevice('output', input.value);
 
-							// 🔥 Reinicia monitoramento com novo dispositivo
-							this.restartOutputMonitoring();
-
-							// Emite evento para notificar mudança de dispositivo (renderer fica cego ao DOM)
-							if (globalThis.RendererAPI?.emitUIChange) {
-								globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
-							}
+						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
+						if (globalThis.RendererAPI?.emitUIChange) {
+							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
 						}
 					}
 				});
@@ -787,17 +773,47 @@ class ConfigManager {
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
 
-		// Verifica se o RendererAPI está disponível (carregado via renderer.js)
-		if (!globalThis.RendererAPI) return;
+		console.log('📊 [initAudioMonitoring] Estado dos dispositivos:');
+		console.log(
+			`   Input: valor="${inputSelect?.value || 'VAZIO'}", text="${inputSelect?.options[inputSelect?.selectedIndex]?.text || 'N/A'}"`,
+		);
+		console.log(
+			`   Output: valor="${outputSelect?.value || 'VAZIO'}", text="${outputSelect?.options[outputSelect?.selectedIndex]?.text || 'N/A'}"`,
+		);
 
-		if (inputSelect?.value) {
-			console.log('📊 [Tab Audio] Iniciando monitoramento input:', inputSelect.value);
-			await globalThis.RendererAPI.startInputVolumeMonitoring();
+		// 🔥 CRÍTICO: Ambos DEVEM iniciar INDEPENDENTEMENTE se tiverem dispositivo selecionado
+		const promises = [];
+
+		// Input
+		if (inputSelect?.value && inputSelect.value !== '') {
+			console.log('📊 [Tab Audio] Iniciando monitoramento VOLUME (INPUT):', inputSelect.value);
+			promises.push(
+				globalThis.RendererAPI?.startAudioVolumeMonitor('input', inputSelect.value)
+					.then(() => console.log('✅ Input monitor iniciado'))
+					.catch(err => console.error('❌ Erro ao iniciar input monitor:', err)),
+			);
+		} else {
+			console.log('ℹ️ Input: nenhum dispositivo selecionado (DESATIVADO)');
 		}
 
-		if (outputSelect?.value) {
-			console.log('📊 [Tab Audio] Iniciando monitoramento output:', outputSelect.value);
-			await globalThis.RendererAPI.startOutputVolumeMonitoring();
+		// Output
+		if (outputSelect?.value && outputSelect.value !== '') {
+			console.log('📊 [Tab Audio] Iniciando monitoramento VOLUME (OUTPUT):', outputSelect.value);
+			promises.push(
+				globalThis.RendererAPI?.startAudioVolumeMonitor('output', outputSelect.value)
+					.then(() => console.log('✅ Output monitor iniciado'))
+					.catch(err => console.error('❌ Erro ao iniciar output monitor:', err)),
+			);
+		} else {
+			console.log('ℹ️ Output: nenhum dispositivo selecionado (DESATIVADO)');
+		}
+
+		// Aguarda AMBOS (se houver)
+		if (promises.length > 0) {
+			await Promise.all(promises);
+			console.log(`✅ Monitoramento de volume inicializado (${promises.length} dispositivo(s))`);
+		} else {
+			console.log('ℹ️ Nenhum dispositivo de áudio ativado para monitoramento');
 		}
 
 		debugLogConfig('Fim da função: "initAudioMonitoring"');
@@ -805,12 +821,11 @@ class ConfigManager {
 
 	// Método opcional para desligar os medidores ao sair da aba
 	stopAudioMonitoring() {
-		if (globalThis.RendererAPI?.stopInputVolumeMonitoring) {
-			globalThis.RendererAPI.stopInputVolumeMonitoring();
-		}
-		if (globalThis.RendererAPI?.stopOutputVolumeMonitoring) {
-			globalThis.RendererAPI.stopOutputVolumeMonitoring();
-		}
+		// 🔥 NOVO: Usa novo módulo audio-volume-monitor.js via RendererAPI
+		console.log('🛑 [stopAudioMonitoring] Parando monitoramento de AMBOS (input + output)');
+		globalThis.RendererAPI?.stopAudioVolumeMonitor('input');
+		globalThis.RendererAPI?.stopAudioVolumeMonitor('output');
+		console.log('✅ Monitoramento parado');
 	}
 
 	// Alterna entre tabs

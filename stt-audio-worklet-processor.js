@@ -1,3 +1,37 @@
+/**
+ * 🎛️ CLASSE CALCULADORA DE VOLUME (AudioVolumeCalculator)
+ *
+ * ⚠️ DUPLICADO em stt-audio-worklet-processor.js e audio-volume-monitor-worklet.js
+ *
+ * POR QUÊ duplicado?
+ * - AudioWorklets rodam em thread isolada (Web Worker)
+ * - Não suportam require() ou import de módulos Node.js
+ * - Cada worklet precisa ter código self-contained
+ *
+ * Garante que ambos worklets usem MESMA FÓRMULA para cálculo de volume,
+ * facilitando manutenção futura se a fórmula de RMS→dB→% precisar mudar.
+ */
+class AudioVolumeCalculator {
+	static calculatePercent(rms, thresholdRms = 0.002) {
+		if (typeof rms !== 'number' || rms < 0) return 0;
+		const db = 20 * Math.log10(rms || 1e-8);
+		let percent = Math.max(0, Math.min(100, ((db - -60) / -(-60)) * 100));
+		if (rms <= thresholdRms) percent = 0;
+		return percent;
+	}
+}
+
+/**
+ * 🎛️ STT AUDIO WORKLET PROCESSOR
+ *
+ * AudioWorklet usado pelos módulos de STT para captura de áudio,
+ * cálculo de volume (RMS → dB → percentual) e envio dos dados PCM16
+ * para o thread principal.
+ * Permite que o main thread receba áudio em PCM16 para envio
+ * nos serviços de STT que exigem esse formato.
+ *
+ * 🔥 ADICIONADO: Envia também percentual de volume junto com os dados de áudio.
+ */
 class STTAudioWorkletProcessor extends AudioWorkletProcessor {
 	constructor() {
 		super();
@@ -31,15 +65,8 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
 		}
 		const rms = Math.sqrt(sum / inputData.length);
 
-		// Se volume acima do threshold
-		const isAboveThreshold = rms > this.thresholdRms;
-
-		// Calcula percentual de volume para o VU meter
-		const db = 20 * Math.log10(rms || 1e-8);
-		let percent = Math.max(0, Math.min(100, ((db - -60) / -(-60)) * 100));
-
-		// 🔥 OTIMIZAÇÃO: Se abaixo do threshold, forçamos o percentual para 0 evitando ruído residual (ventilador, etc).
-		if (!isAboveThreshold) percent = 0;
+		// 🔥 Usa calculadora compartilhada para cálculo de volume (RMS → dB → percentual)
+		const percent = AudioVolumeCalculator.calculatePercent(rms, this.thresholdRms);
 
 		// Converte sempre para PCM16 e envia --- envia continuamente para permitir VAD no lado do main thread
 		const pcm16 = new Int16Array(inputData.length);

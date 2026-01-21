@@ -8,6 +8,11 @@ const hljs = require('highlight.js');
 const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt-deepgram.js');
 const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt-vosk.js');
 const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./stt-whisper.js');
+const {
+	startAudioVolumeMonitor,
+	stopAudioVolumeMonitor,
+	switchAudioVolumeDevice,
+} = require('./audio-volume-monitor.js');
 
 // 🔥 Sistema de eventos para módulos de transcrição (desacoplamento)
 window.transcriptionEvents = new EventTarget();
@@ -104,21 +109,9 @@ let transcriptionMetrics = {
 	audioSize: 0,
 };
 
-/* 🎤 INPUT (VOCÊ) */
-let inputStream;
-let inputAnalyser;
-let inputSilenceTimer = null;
-let inputPartialTimer = null;
-
-/* 🔊 OUTPUT (OUTROS) */
-let outputStream;
-let outputAnalyser;
-let outputSilenceTimer = null;
-let outputPartialTimer = null;
-
-// 🔥 NOVO: IDs para rastrear e parar os loops de animation
-let inputVolumeAnimationId = null;
-let outputVolumeAnimationId = null;
+// 🔥 REMOVED: inputStream, inputAnalyser, outputStream, outputAnalyser
+// Agora usamos audio-volume-monitor.js para monitoramento de volume
+// quando usuário está na seção "Áudio e Tela" (sem transcrição ativa)
 
 /* 🧠 PERGUNTAS */
 let currentQuestion = {
@@ -297,226 +290,64 @@ const ModeController = {
  */
 onUIChange('onAudioDeviceChanged', async data => {
 	try {
-		if (!isRunning) return; // só trocar se app estiver em execução
-		if (!data || !data.type || !data.deviceId) return; // dados inválidos
+		console.log('🔔 [onAudioDeviceChanged] Evento disparado:', { type: data?.type, deviceId: data?.deviceId });
+
+		// 🔥 CRÍTICO: deviceId pode ser "" (vazio) para DESATIVAR o STT
+		// Validar apenas type, não deviceId
+		if (!data || !data.type) {
+			console.warn('⚠️ [onAudioDeviceChanged] Dados inválidos (falta type):', data);
+		}
 
 		// 🔥 ORQUESTRADOR: Roteia por modelo STT
 		const sttModel = getConfiguredSTTModel();
+
 		if (sttModel === 'deepgram') {
-			if (typeof switchDeviceDeepgram === 'function') await switchDeviceDeepgram(data.type, data.deviceId);
+			console.log('🔄 [onAudioDeviceChanged] Chamando switchDeviceDeepgram...');
+			if (typeof switchDeviceDeepgram === 'function') {
+				console.log('✅ [onAudioDeviceChanged] switchDeviceDeepgram é função, executando...');
+				await switchDeviceDeepgram(data.type, data.deviceId);
+				console.log('✅ [onAudioDeviceChanged] switchDeviceDeepgram executada');
+			} else {
+				console.error('❌ [onAudioDeviceChanged] switchDeviceDeepgram NÃO é função!', typeof switchDeviceDeepgram);
+			}
 		} else if (sttModel === 'vosk') {
-			if (typeof switchDeviceVosk === 'function') await switchDeviceVosk(data.type, data.deviceId);
+			console.log('🔄 [onAudioDeviceChanged] Chamando switchDeviceVosk...');
+			if (typeof switchDeviceVosk === 'function') {
+				console.log('✅ [onAudioDeviceChanged] switchDeviceVosk é função, executando...');
+				await switchDeviceVosk(data.type, data.deviceId);
+				console.log('✅ [onAudioDeviceChanged] switchDeviceVosk executada');
+			} else {
+				console.error('❌ [onAudioDeviceChanged] switchDeviceVosk NÃO é função!', typeof switchDeviceVosk);
+			}
 		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			if (typeof switchDeviceWhisper === 'function') await switchDeviceWhisper(UIElements);
+			console.log('🔄 [onAudioDeviceChanged] Chamando switchDeviceWhisper...');
+			if (typeof switchDeviceWhisper === 'function') {
+				console.log('✅ [onAudioDeviceChanged] switchDeviceWhisper é função, executando...');
+				await switchDeviceWhisper(UIElements);
+				console.log('✅ [onAudioDeviceChanged] switchDeviceWhisper executada');
+			} else {
+				console.error('❌ [onAudioDeviceChanged] switchDeviceWhisper NÃO é função!', typeof switchDeviceWhisper);
+			}
+		} else {
+			console.warn(`⚠️ [onAudioDeviceChanged] Modelo STT não reconhecido: ${sttModel}`);
 		}
 	} catch (err) {
-		console.warn('Erro ao processar onAudioDeviceChanged:', err);
+		console.error('❌ Erro ao processar onAudioDeviceChanged:', err);
 	}
 });
 
 /* ================================ */
-//	5. MONITORAMENTO DE VOLUME
+//	5. MONITORAMENTO DE VOLUME (REFATORADO)
 /* ================================ */
 
-/**
- * Inicia monitoramento de volume de entrada (sem gravar)
- */
-async function startInputVolumeMonitoring() {
-	debugLogRenderer('Início da função: "startInputVolumeMonitoring"');
-
-	if (APP_CONFIG.MODE_DEBUG) {
-		console.log('🎤 Monitoramento de volume entrada (modo teste)...');
-		return;
-	}
-
-	if (!UIElements.inputSelect?.value) {
-		console.log('⚠️ Nenhum dispositivo input selecionado');
-		return;
-	}
-
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
-
-	// 🔥 NOVO: Se já tem stream ativa, não faz nada
-	if (inputStream && inputAnalyser) {
-		console.log('ℹ️ Monitoramento de volume de entrada já ativo');
-		return;
-	}
-
-	try {
-		// Verificar se isRunning é false antes de iniciar o stream
-		if (!isRunning) {
-			console.log('🔄 Iniciando stream de áudio (input)...');
-
-			inputStream = await navigator.mediaDevices.getUserMedia({
-				audio: { deviceId: { exact: UIElements.inputSelect.value } },
-			});
-
-			const source = audioContext.createMediaStreamSource(inputStream);
-
-			inputAnalyser = audioContext.createAnalyser();
-			inputAnalyser.fftSize = 256;
-			source.connect(inputAnalyser);
-
-			console.log('✅ Monitoramento de volume de entrada iniciado com sucesso');
-			updateInputVolume(); // 🔥 Inicia o loop de atualização
-		}
-	} catch (error) {
-		console.error('❌ Erro ao iniciar monitoramento de volume de entrada:', error);
-		inputStream = null;
-		inputAnalyser = null;
-	}
-
-	debugLogRenderer('Fim da função: "startInputVolumeMonitoring"');
-}
-
-/**
- * Inicia monitoramento de volume de saída (sem gravar)
- */
-async function startOutputVolumeMonitoring() {
-	debugLogRenderer('Início da função: "startOutputVolumeMonitoring"');
-
-	// Se o modo de debug estiver ativo, retorna
-	if (APP_CONFIG.MODE_DEBUG) {
-		console.log('🔊 Monitoramento de volume saída (modo teste)...');
-		return;
-	}
-
-	// Se não houver dispositivo de saída selecionado, retorna
-	if (!UIElements.outputSelect?.value) {
-		console.log('⚠️ Nenhum dispositivo output selecionado');
-		return;
-	}
-
-	// Se não houver contexto de áudio, cria um novo
-	if (!audioContext) {
-		audioContext = new AudioContext();
-	}
-
-	// Se já houver stream e analisador de frequência ativos, retorna
-	if (outputStream && outputAnalyser) {
-		console.log('ℹ️ Monitoramento de volume de saída já ativo');
-		return;
-	}
-
-	try {
-		// Se isRunning for false, inicia o stream de áudio (output)
-		if (!isRunning) {
-			console.log('🔄 Iniciando stream de áudio (output)...');
-
-			// Cria a stream de áudio (outputStream)
-			await createOutputStream();
-		}
-
-		debugLogRenderer('Fim da função: "startOutputVolumeMonitoring"');
-	} catch (error) {
-		console.error('❌ Erro ao iniciar monitoramento de volume de saída:', error);
-
-		// Limpa a stream e o analisador de frequência (outputStream e outputAnalyser)
-		outputStream = null;
-		outputAnalyser = null;
-	}
-}
-
-/**
- * Para monitoramento de volume de entrada
- */
-function stopInputVolumeMonitoring() {
-	debugLogRenderer('Início da função: "stopInputVolumeMonitoring"');
-
-	// Se isRunning true, não para o monitoramento
-	if (isRunning) {
-		console.log('ℹ️ Monitoramento de volume de entrada em execução, isRunning = true — pulando parada');
-
-		debugLogRenderer('Fim da função: "stopInputVolumeMonitoring"');
-		return;
-	}
-
-	// 1. Para o loop de animação
-	if (inputVolumeAnimationId) {
-		cancelAnimationFrame(inputVolumeAnimationId);
-		inputVolumeAnimationId = null;
-	}
-
-	// 2. Para as tracks de áudio para economizar energia/recurso
-	if (inputStream) {
-		inputStream.getTracks().forEach(track => track.stop());
-		inputStream = null;
-	}
-
-	inputAnalyser = null;
-
-	// 3. Zera a UI
-	emitUIChange('onInputVolumeUpdate', { percent: 0 });
-
-	console.log('🛑 Monitoramento de volume de entrada parado');
-
-	debugLogRenderer('Fim da função: "stopInputVolumeMonitoring"');
-}
-
-/**
- * Para monitoramento de volume de saída
- */
-function stopOutputVolumeMonitoring() {
-	debugLogRenderer('Início da função: "stopOutputVolumeMonitoring"');
-
-	// Se isRunning true, não para o monitoramento
-	if (isRunning) {
-		console.log('ℹ️ Monitoramento de volume de saída em execução, isRunning = true — pulando parada');
-
-		debugLogRenderer('Fim da função: "stopOutputVolumeMonitoring"');
-		return;
-	}
-
-	// 1. Para o loop de animação
-	if (outputVolumeAnimationId) {
-		cancelAnimationFrame(outputVolumeAnimationId);
-		outputVolumeAnimationId = null;
-	}
-
-	// 2.Para as tracks de áudio para economizar energia/recurso
-	if (outputStream) {
-		outputStream.getTracks().forEach(track => track.stop());
-		outputStream = null;
-	}
-
-	outputAnalyser = null;
-
-	// 3. Zera a UI
-	emitUIChange('onOutputVolumeUpdate', { percent: 0 });
-
-	console.log('🛑 Monitoramento de volume de saída parado');
-
-	debugLogRenderer('Fim da função: "stopOutputVolumeMonitoring"');
-}
-
-/**
- * Cria stream de áudio para saída
- * @returns {object} Source de áudio criado
- */
-async function createOutputStream() {
-	debugLogRenderer('Início da função: "createOutputStream"');
-
-	// Cria a stream de áudio (outputStream)
-	outputStream = await navigator.mediaDevices.getUserMedia({
-		audio: { deviceId: { exact: UIElements.outputSelect.value } },
-	});
-
-	// Cria o source de áudio (source)
-	const source = audioContext.createMediaStreamSource(outputStream);
-
-	// Cria o analisador de frequência (outputAnalyser)
-	outputAnalyser = audioContext.createAnalyser();
-	// Define o tamanho do FFT (fftSize) como 256
-	outputAnalyser.fftSize = 256;
-	// Conecta o source ao analisador de frequência
-	source.connect(outputAnalyser);
-
-	debugLogRenderer('Fim da função: "createOutputStream"');
-
-	return source;
-}
+// 🔥 REMOVED: startInputVolumeMonitoring, stopInputVolumeMonitoring, startOutputVolumeMonitoring, stopOutputVolumeMonitoring, createOutputStream
+// Agora usar audio-volume-monitor.js para visualização de volume
+// quando usuário está na seção "Áudio e Tela" (sem transcrição ativa).
+//
+// Lógica de segurança:
+// - Se isRunning = true (transcrição ativa), o STT module cuida do volume
+// - Se isRunning = false e usuário entra em "Áudio e Tela", o monitor é iniciado
+// - Verificação em audio-volume-monitor.js previne conflito de captura
 
 /* ================================ */
 //	6. FUNÇÕES UTILITÁRIAS (HELPERS)
@@ -2216,11 +2047,15 @@ const RendererAPI = {
 	askGpt,
 	restartAudioPipeline,
 
+	// 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
+	get isRunning() {
+		return isRunning;
+	},
+
 	// Áudio - Monitoramento de volume
-	startInputVolumeMonitoring,
-	startOutputVolumeMonitoring,
-	stopInputVolumeMonitoring,
-	stopOutputVolumeMonitoring,
+	startAudioVolumeMonitor,
+	stopAudioVolumeMonitor,
+	switchAudioVolumeDevice,
 
 	// Entrevista - Reset (centralizado em resetAppState)
 	resetAppState,
