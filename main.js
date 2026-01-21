@@ -868,6 +868,8 @@ function createWindow() {
 //	INICIALIZAÇÃO DO APP
 /* ================================ */
 
+// NOSONAR javascript:S7785
+// eslint-disable-next-line prefer-top-level-await
 app.whenReady().then(() => {
 	// Registra todos os handlers IPC
 	registerIPCHandlers();
