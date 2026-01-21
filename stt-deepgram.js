@@ -19,6 +19,7 @@
 /* ================================ */
 //	IMPORTS
 /* ================================ */
+
 const { ipcRenderer } = require('electron');
 const { getVADEngine } = require('./vad-engine');
 
@@ -510,24 +511,27 @@ async function startDeepgram(source, UIElements) {
 
 		debugLogDeepgram(`✅ Acesso ao áudio ${source.toUpperCase()} autorizado`, true);
 
-		// Cria AudioContext com 16kHz
-		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({ sampleRate: AUDIO_SAMPLE_RATE });
-		await audioCtx.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
+		// Cria AudioContext 16kHz para processamento em tempo real (VAD)
+		const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
+			sampleRate: AUDIO_SAMPLE_RATE,
+		});
+		await audioContext.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
 
 		// Cria MediaStreamSource e guarda via deepgramState
-		const mediaSource = audioCtx.createMediaStreamSource(stream);
+		const mediaSource = audioContext.createMediaStreamSource(stream);
 
 		// Filtro Passa-Alta
-		const hpf = audioCtx.createBiquadFilter();
+		const hpf = audioContext.createBiquadFilter();
 		hpf.type = HPF_TYPE;
 		hpf.frequency.value = HPF_FREQUENCY;
 		hpf.Q.value = HPF_Q_FACTOR;
 
-		// Inicia AudioWorklet para captura e processamento de áudio
-		const processor = new AudioWorkletNode(audioCtx, STT_AUDIO_WORKLET_PROCESSOR);
+		// Inicia AudioWorklet para captura e processamento de áudio em tempo real
+		const processor = new AudioWorkletNode(audioContext, STT_AUDIO_WORKLET_PROCESSOR);
 		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
-			processIncomingAudioMessage(source, event.data).catch(error_ =>
+			// Processa mensagens do AudioWorklet (audioData e volumeUpdate separadamente)
+			processIncomingAudioMessageDeepgram(source, event.data).catch(error_ =>
 				console.error(`❌ Erro ao processar mensagem do worklet (${source}):`, error_),
 			);
 		};
@@ -535,11 +539,11 @@ async function startDeepgram(source, UIElements) {
 		// Conecta fluxo: Source -> HPF -> processor -> destination
 		mediaSource.connect(hpf);
 		hpf.connect(processor);
-		processor.connect(audioCtx.destination);
+		processor.connect(audioContext.destination);
 
 		// Atualiza referências de estado
 		vars.setStream(stream);
-		vars.setAudioContext(audioCtx);
+		vars.setAudioContext(audioContext);
 		vars.setSource(mediaSource);
 		vars.setHPF(hpf);
 		vars.setProcessor(processor);
@@ -558,7 +562,7 @@ async function startDeepgram(source, UIElements) {
 }
 
 // Processa mensagens de áudio recebida do AudioWorklet
-async function processIncomingAudioMessage(source, data) {
+async function processIncomingAudioMessageDeepgram(source, data) {
 	const vars = deepgramState[source];
 	if (data.type === 'audioData') {
 		storePreRollBuffer(vars, data.pcm16);
@@ -582,16 +586,17 @@ async function processIncomingAudioMessage(source, data) {
 		}
 	} else if (data.type === 'volumeUpdate') {
 		vars.lastPercent = data.percent;
-		if (globalThis.RendererAPI?.emitUIChange) {
-			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-			globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
-		}
-		handleSilenceDetection(source, data.percent);
+
+		// Processa atualização de volume/VAD
+		handleVolumeUpdate(source, data);
+
+		// Detecta silêncio
+		handleSilenceDetectionDeepgram(source, data.percent);
 	}
 }
 
 // Trata detecção de silêncio com VAD ou fallback
-function handleSilenceDetection(source, percent) {
+function handleSilenceDetectionDeepgram(source, percent) {
 	const vars = deepgramState[source];
 	const silenceTimeout = source === INPUT ? SILENCE_TIMEOUT_INPUT : SILENCE_TIMEOUT_OUTPUT;
 	const now = Date.now();
@@ -696,6 +701,19 @@ function handleFinalDeepgramMessage(source, transcript) {
 
 	// Atualiza CURRENT question (apenas para output)
 	updateCurrentQuestion(source, transcript, false);
+}
+
+/* ================================ */
+//	HELPERS
+/* ================================ */
+
+// Atualiza volume recebido do AudioWorklet
+function handleVolumeUpdate(source, data) {
+	// Emite volume para UI
+	if (globalThis.RendererAPI?.emitUIChange) {
+		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
+		globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
+	}
 }
 
 // Adiciona transcrição com placeholder ao UI
@@ -961,7 +979,7 @@ function stopDeepgram(source) {
 }
 
 /* ================================ */
-// FUNÇÃO PARA LOGAR
+// DEBUG LOG DEEPGRAM
 /* ================================ */
 
 /**

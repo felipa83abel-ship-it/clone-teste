@@ -17,6 +17,7 @@
 /* ================================ */
 //	IMPORTS
 /* ================================ */
+
 const { spawn } = require('node:child_process');
 const { getVADEngine } = require('./vad-engine');
 
@@ -133,7 +134,7 @@ const voskState = {
 };
 
 /* ================================ */
-//	SERVER VOSK PROCESS
+//	SERVIDOR VOSK
 /* ================================ */
 
 // Inicia processo Vosk (input/output) no servidor
@@ -297,33 +298,34 @@ async function startVosk(source, UIElements) {
 
 		debugLogVosk(`✅ Acesso ao áudio ${source.toUpperCase()} autorizado`, true);
 
-		// Cria AudioContext com 16kHz
-		const audioCtx = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
+		// Cria AudioContext 16kHz para processamento em tempo real (VAD)
+		const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
 			sampleRate: AUDIO_SAMPLE_RATE,
 		});
-		await audioCtx.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
+		await audioContext.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
 
 		// Cria MediaStreamSource e guarda via voskState
-		const mediaSource = audioCtx.createMediaStreamSource(stream);
+		const mediaSource = audioContext.createMediaStreamSource(stream);
 
-		// Inicia AudioWorklet para captura e processamento de áudio
-		const processor = new AudioWorkletNode(audioCtx, STT_AUDIO_WORKLET_PROCESSOR);
+		// Inicia AudioWorklet para captura e processamento de áudio em tempo real
+		const processor = new AudioWorkletNode(audioContext, STT_AUDIO_WORKLET_PROCESSOR);
 		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
-			processIncomingAudioMessage(source, event.data).catch(error_ =>
+			// Processa mensagens do AudioWorklet (audioData e volumeUpdate separadamente)
+			processIncomingAudioMessageVosk(source, event.data).catch(error_ =>
 				console.error(`❌ Erro ao processar mensagem do worklet (${source}):`, error_),
 			);
 		};
 
 		// Conecta fluxo: Source -> processor -> destination
 		mediaSource.connect(processor);
-		processor.connect(audioCtx.destination);
+		processor.connect(audioContext.destination);
 
 		vars._processor = processor;
 
 		// Atualiza referências de estado
 		vars._stream = stream;
-		vars._audioContext = audioCtx;
+		vars._audioContext = audioContext;
 		vars._source = mediaSource;
 		vars._isActive = true;
 		vars._startAt = Date.now();
@@ -340,22 +342,24 @@ async function startVosk(source, UIElements) {
 }
 
 // Processa mensagens de áudio recebida do AudioWorklet
-async function processIncomingAudioMessage(source, data) {
+async function processIncomingAudioMessageVosk(source, data) {
 	const vars = voskState[source];
 	if (data.type === 'audioData') {
-		onAudioChunk(source, vars, data);
+		// Processa chunk de áudio PCM16
+		onAudioChunkVosk(source, data, vars);
 	} else if (data.type === 'volumeUpdate') {
 		vars.lastPercent = data.percent;
-		if (globalThis.RendererAPI?.emitUIChange) {
-			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-			globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
-		}
-		handleSilenceDetection(source, data.percent);
+
+		// Processa atualização de volume/VAD
+		handleVolumeUpdate(source, data);
+
+		// Detecta silêncio
+		handleSilenceDetectionVosk(source, data.percent);
 	}
 }
 
 // Processa chunk de áudio PCM16 vindo do AudioWorklet
-async function onAudioChunk(source, vars, data) {
+async function onAudioChunkVosk(source, data, vars) {
 	const pcm16Array = data.pcm16 instanceof ArrayBuffer ? new Int16Array(data.pcm16) : data.pcm16;
 
 	if (!pcm16Array || pcm16Array.length === 0 || !vars._canSend) {
@@ -366,13 +370,7 @@ async function onAudioChunk(source, vars, data) {
 	const isSpeech = vad.detectSpeech(data.pcm16, vars.lastPercent, vars.vadWindow);
 	updateVADState(vars, isSpeech);
 
-	// Se detectou fala, atualiza lastActive
-	if (isSpeech) {
-		vars.lastActive = Date.now();
-	}
-
 	try {
-		// 🔥 EXATAMENTE como teste-vosk.js
 		const buffer = Buffer.from(pcm16Array.buffer, pcm16Array.byteOffset, pcm16Array.byteLength);
 		const audioBase64 = buffer.toString('base64');
 
@@ -391,7 +389,7 @@ async function onAudioChunk(source, vars, data) {
 }
 
 // Trata detecção de silêncio com VAD ou fallback
-function handleSilenceDetection(source, percent) {
+function handleSilenceDetectionVosk(source, percent) {
 	const vars = voskState[source];
 	const silenceTimeout = source === INPUT ? SILENCE_TIMEOUT_INPUT : SILENCE_TIMEOUT_OUTPUT;
 	const now = Date.now();
@@ -492,6 +490,19 @@ function handleFinalVoskMessage(source, transcript) {
 
 	// Atualiza CURRENT question (apenas para output)
 	updateCurrentQuestion(source, transcript, false);
+}
+
+/* ================================ */
+//	HELPERS
+/* ================================ */
+
+// Atualiza volume recebido do AudioWorklet
+function handleVolumeUpdate(source, data) {
+	// Emite volume para UI
+	if (globalThis.RendererAPI?.emitUIChange) {
+		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
+		globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
+	}
 }
 
 // Adiciona transcrição com placeholder ao UI
@@ -697,7 +708,7 @@ async function stopVosk(source) {
 }
 
 /* ================================ */
-// FUNÇÃO PARA LOGAR
+// DEBUG LOG VOSK
 /* ================================ */
 
 /**
