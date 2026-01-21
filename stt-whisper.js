@@ -369,7 +369,6 @@ function convertWebMToWAVFile(inputPath, outputPath) {
 
 // Processa arquivo WAV com Whisper.cpp
 async function processWhisperFile(whisperModelPath, tempWavPath, isPartial = false) {
-	const whisperStart = Date.now();
 	const args = ['-m', whisperModelPath, '-f', tempWavPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'];
 	if (isPartial) {
 		args.push('-d', '3000', '-ml', '50');
@@ -560,18 +559,6 @@ async function startWhisper(source, UIElements) {
 
 		debugLogWhisper(`✅ Acesso ao áudio ${source.toUpperCase()} autorizado`, true);
 
-		// Cria AudioContext 16kHz para processamento em tempo real (VAD)
-		const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
-			sampleRate: AUDIO_SAMPLE_RATE,
-		});
-		await audioContext.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
-
-		// Cria MediaStreamSource e guarda via whisperState
-		const mediaSource = audioContext.createMediaStreamSource(stream);
-
-		// { ********* MediaRecorder ********* }
-		// TODO: verificar MediaRecorder depois
-
 		// Cria MediaRecorder para captura de áudio (ANTES de AudioWorklet para ter referência)
 		const mediaRecorder = new MediaRecorder(stream, { mimeType: AUDIO_MIME_TYPE });
 
@@ -615,7 +602,14 @@ async function startWhisper(source, UIElements) {
 			}
 		};
 
-		// { ********* MediaRecorder ********* }
+		// Cria AudioContext 16kHz para processamento em tempo real (VAD)
+		const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
+			sampleRate: AUDIO_SAMPLE_RATE,
+		});
+		await audioContext.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
+
+		// Cria MediaStreamSource e guarda via whisperState
+		const mediaSource = audioContext.createMediaStreamSource(stream);
 
 		// Inicia AudioWorklet para captura e processamento de áudio em tempo real
 		const processor = new AudioWorkletNode(audioContext, STT_AUDIO_WORKLET_PROCESSOR);

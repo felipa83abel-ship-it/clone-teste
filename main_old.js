@@ -1,29 +1,3 @@
-/**
- *	🚀 Inicio do APP - main.js
- *
- *	Responsável por:
- *	- Inicializar a aplicação Electron
- *	- Criar a janela overlay principal
- *	- Gerenciar IPC handlers para comunicação com o renderer
- *	- Integrar com OpenAI API para GPT e visão computacional
- *	- Capturar screenshots discretamente
- *	- Controlar comportamento da janela (click-through, drag, etc)
- *
- *	Como Usar no Futuro:
- *
- *	1. Precisa adicionar um novo handler?
- *		- Veja qual categoria ele pertence
- *		- Crie a função `handle[NomeHandler]()`
- *		- Adicione na função `register[Categoria]Handlers()`
- *		- Adicione a chamada em `registerIPCHandlers()`
- *
- *	2. Precisa entender um handler?
- *		- Procure pela função `handle[Nome]`
- *		- Leia o JSDoc
- *		- Veja a seção de registro para entender qual evento ativa
- *
- */
-
 /* ================================ */
 //	IMPORTS E CONFIGURAÇÕES INICIAIS
 /* ================================ */
@@ -715,7 +689,7 @@ async function handleAnalyzeScreenshots(_, screenshotPaths) {
 		const analysis = response.choices[0].message.content;
 
 		// Limpa screenshots antigos
-		handleCleanupScreenshots();
+		await handleCleanupScreenshots();
 
 		return {
 			success: true,
@@ -867,70 +841,3 @@ function createWindow() {
 /* ================================ */
 //	INICIALIZAÇÃO DO APP
 /* ================================ */
-
-app.whenReady().then(() => {
-	// Registra todos os handlers IPC
-	registerIPCHandlers();
-
-	// Cria a janela principal
-	createWindow();
-
-	// Registra atalhos globais
-	registerGlobalShortcuts();
-
-	console.log('✅ Aplicação inicializada com sucesso');
-});
-
-/**
- * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)
- */
-function registerGlobalShortcuts() {
-	// 🛠️ DevTools em desenvolvimento
-	if (!app.isPackaged) {
-		globalShortcut.register('Control+Shift+I', () => {
-			mainWindow.webContents.toggleDevTools();
-			console.log('🛠️ DevTools acionado via Ctrl+Shift+I');
-		});
-	}
-
-	// Começar/parar de ouvir (Ctrl+D)
-	globalShortcut.register('Control+D', () => {
-		mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
-	});
-
-	// Enviar pergunta ao GPT (Ctrl+Enter)
-	globalShortcut.register('Control+Enter', () => {
-		mainWindow.webContents.send('CMD_ASK_GPT');
-	});
-
-	// Navegação de histórico de perguntas (Ctrl+Shift+ArrowUp)
-	globalShortcut.register('Control+Shift+Up', () => {
-		mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'up');
-	});
-
-	// Navegação de histórico de perguntas (Ctrl+Shift+ArrowDown)
-	globalShortcut.register('Control+Shift+Down', () => {
-		mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'down');
-	});
-
-	// 📸 Capturar screenshot (Ctrl+Shift+F)
-	globalShortcut.register('Control+Shift+F', () => {
-		mainWindow.webContents.send('CMD_CAPTURE_SCREENSHOT');
-	});
-
-	// 🔍 Analisar screenshots (Ctrl+Shift+G)
-	globalShortcut.register('Control+Shift+G', () => {
-		mainWindow.webContents.send('CMD_ANALYZE_SCREENSHOTS');
-	});
-
-	console.log('✅ Atalhos globais registrados');
-}
-
-/* ================================ */
-//	FINALIZAÇÃO DO APP
-/* ================================ */
-
-app.on('will-quit', () => {
-	globalShortcut.unregisterAll();
-	console.log('👋 Aplicação encerrada');
-});
