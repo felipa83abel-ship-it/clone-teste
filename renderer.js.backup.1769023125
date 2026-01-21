@@ -1,7 +1,6 @@
 /* ================================ */
-//	1. IMPORTAÇÕES E PROTEÇÃO CONTRA CAPTURA DE TELA
+//	IMPORTS
 /* ================================ */
-
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
@@ -12,10 +11,10 @@ const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./
 // 🔥 Sistema de eventos para módulos de transcrição (desacoplamento)
 window.transcriptionEvents = new EventTarget();
 
-/**
- * Proteção contra captura de tela externa
- * Desabilita/limita APIs usadas por Zoom, Teams, Meet, OBS, Discord, Snipping Tool, etc.
- */
+/* =============================== */
+//	🔐 PROTEÇÃO CONTRA CAPTURA DE TELA EXTERNA (Desabilita/limita APIs usadas por Zoom, Teams, Meet, OBS, Discord, Snipping Tool, etc.)
+/* =============================== */
+
 (function protectAgainstScreenCapture() {
 	// ✅ Desabilita getDisplayMedia (usado por Zoom, Meet, Teams para capturar)
 	if (navigator && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
@@ -38,7 +37,7 @@ window.transcriptionEvents = new EventTarget();
 		});
 	}
 
-	// ✅ Intercepta getUserMedia para avisar sobre tentativas de captura de áudio
+	// ✅ Intercepta getUserMedia para avisar sobre tentativas de captura de áudio (pode ser usado em combo com vídeo)
 	if (navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
 		const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
 		navigator.mediaDevices.getUserMedia = async function (constraints) {
@@ -56,9 +55,10 @@ window.transcriptionEvents = new EventTarget();
 	console.log('✅ Proteção contra captura externa ativada');
 })();
 
-/**
- * Constantes globais
- */
+/* =============================== */
+//	CONSTANTES
+/* =============================== */
+
 const YOU = 'Você';
 const OTHER = 'Outros';
 
@@ -75,9 +75,9 @@ Regras de resposta (priorize sempre estas):
 - Quando necessário, entregue um exemplo mínimo de 1 linha apenas.
 `;
 
-/* ================================ */
-//	2. ESTADO GLOBAL
-/* ================================ */
+/* =============================== */
+//	ESTADO GLOBAL
+/* =============================== */
 
 let APP_CONFIG = {
 	MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
@@ -140,20 +140,18 @@ let gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta f
 let autoCloseQuestionTimer = null;
 let lastAskedQuestionNormalized = null;
 
-/* ================================ */
-//	3. SISTEMA DE CALLBACKS E UI ELEMENTS
-/* ================================ */
+/* =============================== */
+//	CALLBACKS / OBSERVERS SYSTEM
+// (renderer.js DEVE ser "cego" para DOM e config-manager.js se inscreve em mudanças)
+/* =============================== */
 
-/**
- * Callbacks/Observers registrados pela UI (config-manager.js)
- * renderer.js é "cego" para DOM - config-manager se inscreve em mudanças
- */
 const UICallbacks = {
 	onError: null, // 🔥 NOVO: Para mostrar erros de validação
 	onTranscriptAdd: null,
 	onCurrentQuestionUpdate: null,
 	onQuestionsHistoryUpdate: null,
-	onStatusUpdate: null,
+	// onAnswerAdd: null,
+	onStatusUpdate: null, // ← Adicionado: Para atualizar status na UI
 	onInputVolumeUpdate: null,
 	onOutputVolumeUpdate: null,
 	onMockBadgeUpdate: null,
@@ -176,11 +174,7 @@ const UICallbacks = {
 	onAudioDeviceChanged: null,
 };
 
-/**
- * Registra callback para evento de UI
- * @param {string} eventName - Nome do evento
- * @param {function} callback - Função a ser chamada quando evento ocorre
- */
+// Função para config-manager se inscrever em eventos
 function onUIChange(eventName, callback) {
 	if (UICallbacks.hasOwnProperty(eventName)) {
 		UICallbacks[eventName] = callback;
@@ -188,11 +182,7 @@ function onUIChange(eventName, callback) {
 	}
 }
 
-/**
- * Emite evento de UI para config-manager
- * @param {string} eventName - Nome do evento
- * @param {any} data - Dados do evento
- */
+// Função para emitir/enviar eventos para config-manager
 function emitUIChange(eventName, data) {
 	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
 		UICallbacks[eventName](data);
@@ -201,16 +191,16 @@ function emitUIChange(eventName, data) {
 	}
 }
 
-/**
- * Elementos UI solicitados por callback
- * config-manager.js fornece esses elementos via registerUIElements()
- */
+/* =============================== */
+//	ELEMENTOS UI - Solicitado por callback (config-manager.js fornece esses elementos)
+/* =============================== */
+
 let UIElements = {
 	inputSelect: null,
 	outputSelect: null,
 	listenBtn: null,
 	statusText: null,
-	transcriptionBox: null,
+	transcriptionBox: null, // Mantido para compatibilidade, mas pode receber 'conversation'
 	currentQuestionBox: null,
 	currentQuestionTextBox: null,
 	questionsHistoryBox: null,
@@ -230,19 +220,15 @@ let UIElements = {
 	opacitySlider: null,
 };
 
-/**
- * Registra elementos UI no renderer
- * config-manager.js chama isso para registrar elementos
- * @param {object} elements - Mapeamento de elementos UI
- */
+// config-manager.js chama isso para registrar elementos
 function registerUIElements(elements) {
 	UIElements = { ...UIElements, ...elements };
 	console.log('✅ UI Elements registrados no renderer.js');
 }
 
-/* ================================ */
-//	4. MODO E ORQUESTRADOR
-/* ================================ */
+/* =============================== */
+//	MODO / ORQUESTRADOR
+/* =============================== */
 
 const MODES = {
 	NORMAL: 'NORMAL',
@@ -252,49 +238,36 @@ const MODES = {
 // 🔄 modo atual (default = comportamento atual)
 let CURRENT_MODE = MODES.NORMAL;
 
-/**
- * Controlador central de estratégia por modo
- */
+// 🎼 controlador central de estratégia
 const ModeController = {
-	/**
-	 * Verifica se está em modo entrevista
-	 * @returns {boolean} true se modo entrevista
-	 */
 	isInterviewMode() {
 		return CURRENT_MODE === MODES.INTERVIEW;
 	},
 
-	/**
-	 * Retorna timeslice para MediaRecorder.start()
-	 * @returns {number|null} timeslice em ms ou null
-	 */
+	// ⏱️ MediaRecorder.start(timeslice)
 	mediaRecorderTimeslice() {
 		if (!this.isInterviewMode()) return null;
+
+		// OUTPUT pode ser mais agressivo que INPUT
 		return 60; // reduzido para janelas parciais mais responsivas
 	},
 
-	/**
-	 * Verifica se permite GPT streaming
-	 * @returns {boolean} true se streaming permitido
-	 */
+	// 🤖 GPT streaming
 	allowGptStreaming() {
 		return this.isInterviewMode();
 	},
 
-	/**
-	 * Calcula tamanho mínimo de áudio aceito
-	 * @param {number} defaultSize - Tamanho padrão
-	 * @returns {number} Tamanho mínimo ajustado
-	 */
+	// 📦 tamanho mínimo de áudio aceito
 	minInputAudioSize(defaultSize) {
 		return this.isInterviewMode() ? Math.min(400, defaultSize) : defaultSize;
 	},
 };
 
-/**
- * Escuta evento de mudança de dispositivo
- * Emitido pelo config-manager
- */
+/* =============================== */
+//	EVENTOS DE CONFIGURAÇÃO / UI
+/* =============================== */
+
+// Escuta evento de mudança de dispositivo emitido pelo config-manager
 onUIChange('onAudioDeviceChanged', async data => {
 	try {
 		if (!isRunning) return; // só trocar se app estiver em execução
@@ -314,13 +287,11 @@ onUIChange('onAudioDeviceChanged', async data => {
 	}
 });
 
-/* ================================ */
-//	5. MONITORAMENTO DE VOLUME
-/* ================================ */
+/* =============================== */
+//	AUDIO - VOLUME MONITORING
+/* =============================== */
 
-/**
- * Inicia monitoramento de volume de entrada (sem gravar)
- */
+// Inicia apenas monitoramento de volume (sem gravar)
 async function startInputVolumeMonitoring() {
 	debugLogRenderer('Início da função: "startInputVolumeMonitoring"');
 
@@ -371,9 +342,7 @@ async function startInputVolumeMonitoring() {
 	debugLogRenderer('Fim da função: "startInputVolumeMonitoring"');
 }
 
-/**
- * Inicia monitoramento de volume de saída (sem gravar)
- */
+// Inicia apenas monitoramento de volume para output (sem gravar)
 async function startOutputVolumeMonitoring() {
 	debugLogRenderer('Início da função: "startOutputVolumeMonitoring"');
 
@@ -419,9 +388,6 @@ async function startOutputVolumeMonitoring() {
 	}
 }
 
-/**
- * Para monitoramento de volume de entrada
- */
 function stopInputVolumeMonitoring() {
 	debugLogRenderer('Início da função: "stopInputVolumeMonitoring"');
 
@@ -455,9 +421,6 @@ function stopInputVolumeMonitoring() {
 	debugLogRenderer('Fim da função: "stopInputVolumeMonitoring"');
 }
 
-/**
- * Para monitoramento de volume de saída
- */
 function stopOutputVolumeMonitoring() {
 	debugLogRenderer('Início da função: "stopOutputVolumeMonitoring"');
 
@@ -491,10 +454,6 @@ function stopOutputVolumeMonitoring() {
 	debugLogRenderer('Fim da função: "stopOutputVolumeMonitoring"');
 }
 
-/**
- * Cria stream de áudio para saída
- * @returns {object} Source de áudio criado
- */
 async function createOutputStream() {
 	debugLogRenderer('Início da função: "createOutputStream"');
 
@@ -518,14 +477,11 @@ async function createOutputStream() {
 	return source;
 }
 
-/* ================================ */
-//	6. FUNÇÕES UTILITÁRIAS (HELPERS)
-/* ================================ */
+/* =============================== */
+//	HELPERS PUROS (novo)
+/* =============================== */
 
-/**
- * Obtém o modelo STT configurado via config-manager
- * @returns {string} Nome do modelo STT ou 'error'
- */
+// Obtém o modelo STT configurado via config-manager
 function getConfiguredSTTModel() {
 	try {
 		if (!window.configManager || !window.configManager.config) {
@@ -549,20 +505,13 @@ function getConfiguredSTTModel() {
 	}
 }
 
-/**
- * Finaliza pergunta adicionando "?" se necessário
- * @param {string} t - Texto da pergunta
- * @returns {string} Pergunta finalizada
- */
 function finalizeQuestion(t) {
 	debugLogRenderer('Início da função: "finalizeQuestion"');
 	debugLogRenderer('Fim da função: "finalizeQuestion"');
 	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
 }
 
-/**
- * Reseta o estado da pergunta atual (CURRENT)
- */
+// Reseta o estado da pergunta atual (CURRENT)
 function resetCurrentQuestion() {
 	debugLogRenderer('Início da função: "resetCurrentQuestion"');
 
@@ -579,9 +528,7 @@ function resetCurrentQuestion() {
 	debugLogRenderer('Fim da função: "resetCurrentQuestion"');
 }
 
-/**
- * Renderiza o histórico de perguntas
- */
+// Renderiza o histórico de perguntas
 function renderQuestionsHistory() {
 	debugLogRenderer('Início da função: "renderQuestionsHistory"');
 
@@ -609,10 +556,7 @@ function renderQuestionsHistory() {
 	debugLogRenderer('Fim da função: "renderQuestionsHistory"');
 }
 
-/**
- * Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
- * @returns {string} Texto da pergunta selecionada
- */
+// Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
 function getSelectedQuestionText() {
 	debugLogRenderer('Início da função: "getSelectedQuestionText"');
 	debugLogRenderer('Fim da função: "getSelectedQuestionText"');
@@ -635,12 +579,7 @@ function getSelectedQuestionText() {
 	return '';
 }
 
-/**
- * Normaliza texto para comparação
- * Remove pontuação, converte para lowercase, remove espaços extras
- * @param {string} t - Texto a normalizar
- * @returns {string} Texto normalizado
- */
+// Normaliza texto para comparação (lowercase, remove pontuação, espaços extras)
 function normalizeForCompare(t) {
 	debugLogRenderer('Início da função: "normalizeForCompare"');
 	debugLogRenderer('Fim da função: "normalizeForCompare"');
@@ -651,21 +590,14 @@ function normalizeForCompare(t) {
 		.trim();
 }
 
-/**
- * Atualiza a mensagem de status na UI
- * @param {string} message - Mensagem de status
- */
+// Atualiza a mensagem de status na UI
 function updateStatusMessage(message) {
 	debugLogRenderer('Início da função: "updateStatusMessage"');
 	emitUIChange('onStatusUpdate', { message });
 	debugLogRenderer('Fim da função: "updateStatusMessage"');
 }
 
-/**
- * Verifica se uma pergunta já foi respondida pelo ID
- * @param {string} questionId - ID da pergunta
- * @returns {boolean} true se pergunta já foi respondida
- */
+// Verifica se uma pergunta já foi respondida (pelo ID)
 function findAnswerByQuestionId(questionId) {
 	debugLogRenderer('Início da função: "findAnswerByQuestionId"');
 
@@ -679,10 +611,6 @@ function findAnswerByQuestionId(questionId) {
 	return answeredQuestions.has(questionId);
 }
 
-/**
- * Promove pergunta atual para histórico
- * @param {string} text - Texto da pergunta
- */
 function promoteCurrentToHistory(text) {
 	debugLogRenderer('Início da função: "promoteCurrentToHistory"');
 
@@ -769,32 +697,10 @@ function promoteCurrentToHistory(text) {
 	debugLogRenderer('Fim da função: "promoteCurrentToHistory"');
 }
 
-/**
- * Limpa todas as seleções visuais
- */
-function clearAllSelections() {
-	// Emite evento para o controller limpar as seleções visuais
-	emitUIChange('onClearAllSelections', {});
-}
+/* =============================== */
+//	DISPOSITIVOS / CONTROLE DE ÁUDIO
+/* =============================== */
 
-/**
- * Obtém IDs navegáveis de perguntas (CURRENT + histórico)
- * @returns {array} Array de IDs navegáveis
- */
-function getNavigableQuestionIds() {
-	const ids = [];
-	if (currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
-	questionsHistory.forEach(q => ids.push(q.id));
-	return ids;
-}
-
-/* ================================ */
-//	7. CONTROLE DE ÁUDIO
-/* ================================ */
-
-/**
- * Inicia captura de áudio
- */
 async function startAudio() {
 	debugLogRenderer('Início da função: "startAudio"');
 
@@ -825,52 +731,11 @@ async function startAudio() {
 	debugLogRenderer('Fim da função: "startAudio"');
 }
 
-/**
- * Para captura de áudio
- */
-async function stopAudio() {
-	debugLogRenderer('Início da função: "stopAudio"');
+/* =============================== */
+//	UI (RENDER / SELEÇÃO / SCROLL)
+/* =============================== */
 
-	// Fecha pergunta atual se estava aberta
-	if (currentQuestion.text) closeCurrentQuestionForced();
-
-	const sttModel = getConfiguredSTTModel();
-	console.log(`🛑 stopAudio: Modelo STT = ${sttModel}`);
-
-	try {
-		// 🔥 ROTEAMENTO: Por modelo STT
-		if (sttModel === 'deepgram') {
-			stopAudioDeepgram();
-		} else if (sttModel === 'vosk') {
-			stopAudioVosk();
-		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			stopAudioWhisper();
-		} else {
-			// Modelo não suportado
-			console.error('❌ Erro ao obter modelo STT configurado');
-			return;
-		}
-	} catch (error) {
-		console.error('❌ Erro em stopAudio:', error);
-	}
-
-	debugLogRenderer('Fim da função: "stopAudio"');
-}
-
-/**
- * Reinicia pipeline de áudio
- */
-async function restartAudioPipeline() {
-	debugLogRenderer('Início da função: "restartAudioPipeline"');
-
-	stopAudio();
-
-	debugLogRenderer('Fim da função: "restartAudioPipeline"');
-}
-
-/**
- * Toggle do botão de iniciar/parar escuta (Ctrl+D)
- */
+// Função principal para o botão de iniciar/parar escuta (Começar a Ouvir... (Ctrl+d))
 async function listenToggleBtn() {
 	debugLogRenderer('Início da função: "listenToggleBtn"');
 
@@ -920,10 +785,7 @@ async function listenToggleBtn() {
 	debugLogRenderer('Fim da função: "listenToggleBtn"');
 }
 
-/**
- * Verifica se há um modelo de IA ativo na configuração
- * @returns {object} { active: boolean, model: string|null }
- */
+// Verifica se há um modelo de IA ativo na configuração e retorna o status e o nome do modelo
 function hasActiveModel() {
 	debugLogRenderer('Início da função: "hasActiveModel"');
 	if (!window.configManager) {
@@ -952,49 +814,7 @@ function hasActiveModel() {
 	return { active: false, model: null };
 }
 
-/* ================================ */
-//	8. RENDERIZAÇÃO E NAVEGAÇÃO DE UI
-/* ================================ */
-
-/**
- * Renderiza a pergunta atual (CURRENT)
- */
-function renderCurrentQuestion() {
-	debugLogRenderer('Início da função: "renderCurrentQuestion"');
-
-	// Se não há texto, emite vazio
-	if (!currentQuestion.text) {
-		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
-		return;
-	}
-
-	let label = currentQuestion.text;
-
-	// Adiciona timestamp se modo debug métricas ativo
-	if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && currentQuestion.lastUpdateTime) {
-		const time = new Date(currentQuestion.lastUpdateTime).toLocaleTimeString();
-		label = `⏱️ ${time} — ${label}`;
-	}
-
-	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
-	const questionData = {
-		text: label,
-		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
-		rawText: currentQuestion.text,
-		createdAt: currentQuestion.createdAt,
-		lastUpdateTime: currentQuestion.lastUpdateTime,
-	};
-
-	// Emite evento para o config-manager renderizar no DOM
-	emitUIChange('onCurrentQuestionUpdate', questionData);
-
-	debugLogRenderer('Fim da função: "renderCurrentQuestion"');
-}
-
-/**
- * Manipula clique em pergunta
- * @param {string} questionId - ID da pergunta selecionada
- */
+// Manipula o clique em uma pergunta do histórico ou CURRENT
 function handleQuestionClick(questionId) {
 	debugLogRenderer('Início da função: "handleQuestionClick"');
 	selectedQuestionId = questionId;
@@ -1038,15 +858,13 @@ function handleQuestionClick(questionId) {
 	}
 
 	// ❓ Ainda não respondida → chama GPT (click ou atalho)
-	askGpt();
+	//console.error('closeCurrentQuestion: askGpt() 2978; 🔒 COMENTADA até transcrição em tempo real funcionar');
+	askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
 
 	debugLogRenderer('Fim da função: "handleQuestionClick"');
 }
 
-/**
- * Aplica opacidade na interface
- * @param {number} value - Valor de opacidade (0-1)
- */
+// Aplica opacidade na interface
 function applyOpacity(value) {
 	debugLogRenderer('Início da função: "applyOpacity"');
 	const appOpacity = parseFloat(value);
@@ -1066,18 +884,7 @@ function applyOpacity(value) {
 	debugLogRenderer('Fim da função: "applyOpacity"');
 }
 
-/**
- * Rola a lista de perguntas para a pergunta selecionada
- */
-function scrollToSelectedQuestion() {
-	emitUIChange('onScrollToQuestion', {
-		questionId: selectedQuestionId,
-	});
-}
-
-/**
- * Configuração do Marked.js para renderização de Markdown
- */
+// Configuração do Marked.js para renderização de Markdown
 marked.setOptions({
 	html: true, // 🔥 Permite renderização de HTML (não escapa entidades)
 	breaks: true,
@@ -1090,17 +897,57 @@ marked.setOptions({
 	},
 });
 
-/* ================================ */
-//	9. CONSOLIDAÇÃO E FINALIZAÇÃO DE PERGUNTAS
-/* ================================ */
+// Limpa todas as seleções visuais de perguntas
+function clearAllSelections() {
+	// Emite evento para o controller limpar as seleções visuais
+	emitUIChange('onClearAllSelections', {});
+}
 
-/**
- * Fluxo para consolidar transcrições no CURRENT
- * Concatena transcrição interims e finais
- * @param {string} author - Autor da fala (YOU ou OTHER)
- * @param {string} text - Texto da fala
- * @param {object} options - Opções (isInterim, shouldFinalizeAskCurrent)
- */
+// Renderiza a pergunta atual (CURRENT)
+function renderCurrentQuestion() {
+	debugLogRenderer('Início da função: "renderCurrentQuestion"');
+
+	// Se não há texto, emite vazio
+	if (!currentQuestion.text) {
+		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
+		return;
+	}
+
+	let label = currentQuestion.text;
+
+	// Adiciona timestamp se modo debug métricas ativo
+	if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && currentQuestion.lastUpdateTime) {
+		const time = new Date(currentQuestion.lastUpdateTime).toLocaleTimeString();
+		label = `⏱️ ${time} — ${label}`;
+	}
+
+	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
+	const questionData = {
+		text: label,
+		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
+		rawText: currentQuestion.text,
+		createdAt: currentQuestion.createdAt,
+		lastUpdateTime: currentQuestion.lastUpdateTime,
+	};
+
+	// Emite evento para o config-manager renderizar no DOM
+	emitUIChange('onCurrentQuestionUpdate', questionData);
+
+	debugLogRenderer('Fim da função: "renderCurrentQuestion"');
+}
+
+// Rola a lista de perguntas para a pergunta selecionada
+function scrollToSelectedQuestion() {
+	emitUIChange('onScrollToQuestion', {
+		questionId: selectedQuestionId,
+	});
+}
+
+/* =============================== */
+//	CONSOLIDAÇÃO DE PERGUNTAS
+/* =============================== */
+
+// Fluxo para consolidar transcrições no CURRENT. Concatena transcrição interims e finais.
 function handleCurrentQuestion(author, text, options = {}) {
 	debugLogRenderer('Início da função: "handleCurrentQuestion"');
 
@@ -1161,95 +1008,11 @@ function handleCurrentQuestion(author, text, options = {}) {
 	debugLogRenderer('Fim da função: "handleCurrentQuestion"');
 }
 
-/**
- * Finaliza a pergunta atual para histórico
- */
-function finalizeCurrentQuestion() {
-	debugLogRenderer('Início da função: "finalizeCurrentQuestion"');
+/* =============================== */
+//	GPT (Novo)
+/* =============================== */
 
-	// Se não há texto, ignorar
-	if (!currentQuestion.text || !currentQuestion.text.trim()) {
-		console.log('⚠️ finalizeCurrentQuestion: Sem texto para finalizar');
-		return;
-	}
-
-	// 🔒 GUARDA ABSOLUTA: Se a pergunta já foi finalizada, NÃO faça nada.
-	if (currentQuestion.finalized) {
-		console.log('⛔ finalizeCurrentQuestion ignorado — pergunta já finalizada');
-		return;
-	}
-
-	// ⚠️ No modo entrevista, NÃO abortar o fechamento
-	if (ModeController.isInterviewMode()) {
-		currentQuestion.text = finalizeQuestion(currentQuestion.text);
-		currentQuestion.lastUpdateTime = Date.now();
-		currentQuestion.finalized = true;
-
-		// garante seleção lógica
-		selectedQuestionId = CURRENT_QUESTION_ID;
-
-		// chama GPT automaticamente se ainda não respondeu este turno
-		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
-			askGpt();
-		}
-
-		return;
-	}
-
-	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
-	if (!ModeController.isInterviewMode()) {
-		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', currentQuestion.text);
-
-		// promoteCurrentToHistory(currentQuestion.text);
-		const newId = String(questionsHistory.length + 1);
-		questionsHistory.push({
-			id: newId,
-			text: currentQuestion.text,
-			createdAt: currentQuestion.createdAt || Date.now(),
-			lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
-		});
-
-		selectedQuestionId = newId;
-		resetCurrentQuestion();
-		renderQuestionsHistory();
-
-		return;
-	}
-}
-
-/**
- * Força o fechamento da pergunta atual, promovendo-a ao histórico
- */
-function closeCurrentQuestionForced() {
-	debugLogRenderer('Início da função: "closeCurrentQuestionForced"');
-
-	// log temporario para testar a aplicação só remover depois
-	console.log('🚪 Fechando pergunta:', currentQuestion.text);
-
-	if (!currentQuestion.text) return;
-
-	questionsHistory.push({
-		id: crypto.randomUUID(),
-		text: finalizeQuestion(currentQuestion.text),
-		createdAt: currentQuestion.createdAt || Date.now(),
-	});
-
-	currentQuestion.text = '';
-	selectedQuestionId = null; // 👈 libera seleção
-	renderQuestionsHistory();
-	renderCurrentQuestion();
-
-	debugLogRenderer('Fim da função: "closeCurrentQuestionForced"');
-}
-
-/* ================================ */
-//	10. SISTEMA GPT E STREAMING
-/* ================================ */
-
-/**
- * Envia pergunta selecionada ao GPT
- * FUNÇÃO PRINCIPAL de comunicação com GPT
- */
+// Envia pergunta selecionada ao GPT
 async function askGpt() {
 	debugLogRenderer('Início da função: "askGpt"');
 
@@ -1299,7 +1062,7 @@ async function askGpt() {
 		lastAskedQuestionNormalized = normalizedText;
 	}
 
-	// 🌀 MODO ENTREVISTA — STREAMING
+	// � MODO ENTREVISTA — STREAMING
 	if (ModeController.isInterviewMode()) {
 		let streamedText = '';
 
@@ -1486,41 +1249,259 @@ async function askGpt() {
 	debugLogRenderer('Fim da função: "askGpt"');
 }
 
-/**
- * Log detalhado das métricas de tempo da transcrição
- */
-function logTranscriptionMetrics() {
-	if (!transcriptionMetrics.audioStartTime) return;
+/* =============================== */
+//	FECHAMENTO DE PERGUNTAS
+/* =============================== */
 
-	const gptTime = transcriptionMetrics.gptEndTime - transcriptionMetrics.gptStartTime;
-	const totalTime = transcriptionMetrics.totalTime;
+// Finaliza a pergunta atual para histórico.
+function finalizeCurrentQuestion() {
+	debugLogRenderer('Início da função: "finalizeCurrentQuestion"');
 
-	console.log(`📊 ================================`);
-	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
-	console.log(`📊 ================================`);
-	console.log(`📊 TAMANHO ÁUDIO: ${transcriptionMetrics.audioSize} bytes`);
-	console.log(`📊 GPT: ${gptTime}ms`);
-	console.log(`📊 TOTAL: ${totalTime}ms`);
-	console.log(`📊 GPT % DO TOTAL: ${Math.round((gptTime / totalTime) * 100)}%`);
-	console.log(`📊 ================================`);
+	// Se não há texto, ignorar
+	if (!currentQuestion.text || !currentQuestion.text.trim()) {
+		console.log('⚠️ finalizeCurrentQuestion: Sem texto para finalizar');
+		return;
+	}
 
-	// Reset para próxima medição
-	transcriptionMetrics = {
-		audioStartTime: null,
-		gptStartTime: null,
-		gptEndTime: null,
-		totalTime: null,
-		audioSize: 0,
-	};
+	// 🔒 GUARDA ABSOLUTA: Se a pergunta já foi finalizada, NÃO faça nada.
+	if (currentQuestion.finalized) {
+		console.log('⛔ finalizeCurrentQuestion ignorado — pergunta já finalizada');
+		return;
+	}
+
+	// ⚠️ No modo entrevista, NÃO abortar o fechamento
+	if (ModeController.isInterviewMode()) {
+		currentQuestion.text = finalizeQuestion(currentQuestion.text);
+		currentQuestion.lastUpdateTime = Date.now();
+		currentQuestion.finalized = true;
+
+		// garante seleção lógica
+		selectedQuestionId = CURRENT_QUESTION_ID;
+
+		// chama GPT automaticamente se ainda não respondeu este turno
+		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
+			askGpt();
+		}
+
+		return;
+	}
+
+	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
+	if (!ModeController.isInterviewMode()) {
+		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', currentQuestion.text);
+
+		// promoteCurrentToHistory(currentQuestion.text);
+		const newId = String(questionsHistory.length + 1);
+		questionsHistory.push({
+			id: newId,
+			text: currentQuestion.text,
+			createdAt: currentQuestion.createdAt || Date.now(),
+			lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
+		});
+
+		selectedQuestionId = newId;
+		resetCurrentQuestion();
+		renderQuestionsHistory();
+
+		return;
+	}
 }
 
-/* ================================ */
-//	11. RESET COMPLETO
-/* ================================ */
+// Força o fechamento da pergunta atual, promovendo-a ao histórico  (Antigo)
+function closeCurrentQuestionForced() {
+	debugLogRenderer('Início da função: "closeCurrentQuestionForced"');
 
-/**
- * Reseta todo o estado do app
- */
+	// log temporario para testar a aplicação só remover depois
+	console.log('🚪 Fechando pergunta:', currentQuestion.text);
+
+	if (!currentQuestion.text) return;
+
+	questionsHistory.push({
+		id: crypto.randomUUID(),
+		text: finalizeQuestion(currentQuestion.text),
+		createdAt: currentQuestion.createdAt || Date.now(),
+	});
+
+	currentQuestion.text = '';
+	selectedQuestionId = null; // 👈 libera seleção
+	renderQuestionsHistory();
+	renderCurrentQuestion();
+
+	debugLogRenderer('Fim da função: "closeCurrentQuestionForced"');
+}
+
+/* =============================== */
+//	SCREENSHOT CAPTURE - FUNÇÕES
+/* =============================== */
+
+// Captura screenshot discretamente e armazena em memória
+async function captureScreenshot() {
+	if (isCapturing) {
+		console.log('⏳ Captura já em andamento...');
+		return;
+	}
+
+	isCapturing = true;
+	updateStatusMessage('📸 Capturando tela...');
+
+	try {
+		const result = await ipcRenderer.invoke('CAPTURE_SCREENSHOT');
+
+		if (!result.success) {
+			console.warn('⚠️ Falha na captura:', result.error);
+			updateStatusMessage(`❌ ${result.error}`);
+			emitUIChange('onScreenshotBadgeUpdate', {
+				count: capturedScreenshots.length,
+				visible: capturedScreenshots.length > 0,
+			});
+			return;
+		}
+
+		// ✅ Armazena referência do screenshot
+		capturedScreenshots.push({
+			filepath: result.filepath,
+			filename: result.filename,
+			timestamp: result.timestamp,
+			size: result.size,
+		});
+
+		console.log(`✅ Screenshot capturado: ${result.filename}`);
+		console.log(`📦 Total em memória: ${capturedScreenshots.length}`);
+
+		// Atualiza UI
+		updateStatusMessage(`✅ ${capturedScreenshots.length} screenshot(s) capturado(s)`);
+		emitUIChange('onScreenshotBadgeUpdate', {
+			count: capturedScreenshots.length,
+			visible: true,
+		});
+	} catch (error) {
+		console.error('❌ Erro ao capturar screenshot:', error);
+		updateStatusMessage('❌ Erro na captura');
+	} finally {
+		isCapturing = false;
+	}
+}
+
+// Envia screenshots para análise com OpenAI Vision
+async function analyzeScreenshots() {
+	if (isAnalyzing) {
+		console.log('⏳ Análise já em andamento...');
+		return;
+	}
+
+	if (capturedScreenshots.length === 0) {
+		console.warn('⚠️ Nenhum screenshot para analisar');
+		updateStatusMessage('⚠️ Nenhum screenshot para analisar (capture com Ctrl+Shift+F)');
+		return;
+	}
+
+	isAnalyzing = true;
+	updateStatusMessage(`🔍 Analisando ${capturedScreenshots.length} screenshot(s)...`);
+
+	try {
+		// Extrai caminhos dos arquivos
+		const filepaths = capturedScreenshots.map(s => s.filepath);
+
+		console.log('🚀 Enviando para análise:', filepaths);
+
+		// Envia para main.js
+		const result = await ipcRenderer.invoke('ANALYZE_SCREENSHOTS', filepaths);
+
+		if (!result.success) {
+			console.error('❌ Falha na análise:', result.error);
+			updateStatusMessage(`❌ ${result.error}`);
+			return;
+		}
+
+		// ✅ Renderiza resposta do GPT
+		const questionText = `📸 Análise de ${capturedScreenshots.length} screenshot(s)`;
+		// 🔢 USA ID SEQUENCIAL COMO AS PERGUNTAS NORMAIS (não UUID)
+		const questionId = String(questionsHistory.length + 1);
+
+		// Adiciona "pergunta" ao histórico ANTES de renderizar respostas
+		questionsHistory.push({
+			id: questionId,
+			text: questionText,
+			createdAt: Date.now(),
+			lastUpdateTime: Date.now(),
+			answered: true,
+		});
+
+		// ✅ MARCA COMO RESPONDIDA (importante para clique não gerar duplicata)
+		answeredQuestions.add(questionId);
+
+		renderQuestionsHistory();
+
+		// ✅ RENDERIZA VIA STREAMING (fluxo real) - usa onAnswerStreamChunk como GPT normal
+		// Divide análise em tokens e emite como se fosse stream
+		const analysisText = result.analysis;
+		const tokens = analysisText.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
+
+		console.log(`📸 [ANÁLISE] Simulando stream: ${tokens.length} tokens`);
+
+		// Emite tokens assim como o GPT faz (permite UI renderizar em tempo real)
+		let accumulated = '';
+		for (const token of tokens) {
+			accumulated += token;
+
+			// ✅ USA O MESMO EVENTO onAnswerStreamChunk (fluxo real)
+			emitUIChange('onAnswerStreamChunk', {
+				questionId: questionId,
+				token: token,
+				accum: accumulated,
+			});
+
+			// Pequeno delay entre tokens para simular streaming real
+			await new Promise(resolve => setTimeout(resolve, 2));
+		}
+
+		console.log('✅ Análise concluída e renderizada');
+		updateStatusMessage('✅ Análise concluída');
+
+		// 🗑️ Limpa screenshots após análise
+		console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s) da memória...`);
+		capturedScreenshots = [];
+
+		// Atualiza badge
+		emitUIChange('onScreenshotBadgeUpdate', {
+			count: 0,
+			visible: false,
+		});
+
+		// Força limpeza no sistema
+		await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
+	} catch (error) {
+		console.error('❌ Erro ao analisar screenshots:', error);
+		updateStatusMessage('❌ Erro na análise');
+	} finally {
+		isAnalyzing = false;
+	}
+}
+
+// Limpa todos os screenshots armazenados
+function clearScreenshots() {
+	if (capturedScreenshots.length === 0) return;
+
+	console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
+	capturedScreenshots = [];
+
+	updateStatusMessage('✅ Screenshots limpos');
+	emitUIChange('onScreenshotBadgeUpdate', {
+		count: 0,
+		visible: false,
+	});
+
+	// Força limpeza no sistema
+	ipcRenderer.invoke('CLEANUP_SCREENSHOTS').catch(err => {
+		console.warn('⚠️ Erro na limpeza:', err);
+	});
+}
+
+/* =============================== */
+// 🧹 RESET COMPLETO DO APP
+/* =============================== */
+
+// Reseta todo o estado do app
 async function resetAppState() {
 	console.log('🧹 ═══════════════════════════════════════════════════════════');
 	console.log('🧹 INICIANDO RESET COMPLETO DO APP');
@@ -1659,9 +1640,306 @@ async function resetAppState() {
 	}
 }
 
-/**
- * Função acionada pelo botão de reset na UI
- */
+/* =============================== */
+//   EXPORTAÇÕES PÚBLICAS
+/* =============================== */
+
+// Exporta funções públicas que podem ser chamadas de fora
+const RendererAPI = {
+	// Áudio - Gravação
+	// startInput,
+	// stopInput,
+	// stopInputMonitor,
+	listenToggleBtn,
+	askGpt,
+	// startOutput,
+	// stopOutput,
+	// stopOutputMonitor,
+	restartAudioPipeline,
+
+	// Áudio - Monitoramento de volume
+	startInputVolumeMonitoring,
+	startOutputVolumeMonitoring,
+	stopInputVolumeMonitoring,
+	stopOutputVolumeMonitoring,
+	// Entrevista - Reset (centralizado em resetAppState)
+	resetAppState,
+
+	// Modo
+	changeMode: mode => {
+		CURRENT_MODE = mode;
+	},
+	getMode: () => CURRENT_MODE,
+
+	// Questions
+	handleCurrentQuestion,
+	handleQuestionClick,
+
+	// UI
+	applyOpacity,
+	updateMockBadge: show => {
+		emitUIChange('onMockBadgeUpdate', { visible: show });
+	},
+	setMockToggle: checked => {
+		if (UIElements.mockToggle) {
+			UIElements.mockToggle.checked = checked;
+		}
+		APP_CONFIG.MODE_DEBUG = checked;
+	},
+	setModeSelect: mode => {
+		emitUIChange('onModeSelectUpdate', { mode });
+	},
+
+	// Drag
+	initDragHandle: (dragHandle, documentElement) => {
+		if (!dragHandle) return;
+		const doc = documentElement || document; // fallback para document global
+		dragHandle.addEventListener('pointerdown', async event => {
+			console.log('🪟 Drag iniciado (pointerdown)');
+			isDraggingWindow = true;
+			dragHandle.classList.add('drag-active');
+
+			const _pid = event.pointerId;
+			try {
+				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
+			} catch (err) {
+				console.warn('setPointerCapture falhou:', err);
+			}
+
+			setTimeout(() => ipcRenderer.send('START_WINDOW_DRAG'), 40);
+
+			const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || {
+				x: 0,
+				y: 0,
+			};
+			const startCursor = { x: event.screenX, y: event.screenY };
+			let lastAnimation = 0;
+
+			function onPointerMove(ev) {
+				const now = performance.now();
+				if (now - lastAnimation < 16) return;
+				lastAnimation = now;
+
+				const dx = ev.screenX - startCursor.x;
+				const dy = ev.screenY - startCursor.y;
+
+				ipcRenderer.send('MOVE_WINDOW_TO', {
+					x: startBounds.x + dx,
+					y: startBounds.y + dy,
+				});
+			}
+
+			function onPointerUp(ev) {
+				try {
+					dragHandle.removeEventListener('pointermove', onPointerMove);
+					dragHandle.removeEventListener('pointerup', onPointerUp);
+				} catch (err) {}
+
+				if (dragHandle.classList.contains('drag-active')) {
+					dragHandle.classList.remove('drag-active');
+				}
+
+				try {
+					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
+				} catch (err) {}
+
+				isDraggingWindow = false;
+			}
+
+			dragHandle.addEventListener('pointermove', onPointerMove);
+			dragHandle.addEventListener('pointerup', onPointerUp, { once: true });
+			event.stopPropagation();
+		});
+
+		doc.addEventListener('pointerup', () => {
+			if (!dragHandle.classList.contains('drag-active')) return;
+			console.log('🪟 Drag finalizado (pointerup)');
+			dragHandle.classList.remove('drag-active');
+			isDraggingWindow = false;
+		});
+
+		dragHandle.addEventListener('pointercancel', () => {
+			if (dragHandle.classList.contains('drag-active')) {
+				dragHandle.classList.remove('drag-active');
+				isDraggingWindow = false;
+			}
+		});
+	},
+
+	// Click-through
+	setClickThrough: enabled => {
+		ipcRenderer.send('SET_CLICK_THROUGH', enabled);
+	},
+	updateClickThroughButton: (enabled, btnToggle) => {
+		if (!btnToggle) return;
+		btnToggle.style.opacity = enabled ? '0.5' : '1';
+		btnToggle.title = enabled
+			? 'Click-through ATIVO (clique para desativar)'
+			: 'Click-through INATIVO (clique para ativar)';
+		console.log('🎨 Botão atualizado - opacity:', btnToggle.style.opacity);
+	},
+
+	// UI Registration
+	registerUIElements: elements => {
+		registerUIElements(elements);
+	},
+	onUIChange: (eventName, callback) => {
+		onUIChange(eventName, callback);
+	},
+	// Emit UI changes (para config-manager enviar eventos para renderer)
+	emitUIChange,
+
+	// API Key
+	setAppConfig: config => {
+		APP_CONFIG = config;
+	},
+	getAppConfig: () => APP_CONFIG,
+
+	// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut IPC)
+	navigateQuestions: direction => {
+		const all = getNavigableQuestionIds();
+		if (all.length === 0) return;
+
+		let index = all.indexOf(selectedQuestionId);
+		if (index === -1) {
+			index = direction === 'up' ? all.length - 1 : 0;
+		} else {
+			index += direction === 'up' ? -1 : 1;
+			index = Math.max(0, Math.min(index, all.length - 1));
+		}
+
+		selectedQuestionId = all[index];
+		clearAllSelections();
+		renderQuestionsHistory();
+		renderCurrentQuestion();
+
+		if (APP_CONFIG.MODE_DEBUG) {
+			const msg = direction === 'up' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
+			updateStatusMessage(msg);
+			console.log('📌 Atalho Selecionou:', selectedQuestionId);
+		}
+	},
+
+	// IPC Listeners
+	onApiKeyUpdated: callback => {
+		ipcRenderer.on('API_KEY_UPDATED', callback);
+	},
+	onToggleAudio: callback => {
+		// Começar a ouvir / Parar de ouvir (Ctrl+D)
+		ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
+	},
+	onAskGpt: callback => {
+		ipcRenderer.on('CMD_ASK_GPT', callback);
+	},
+	onGptStreamChunk: callback => {
+		ipcRenderer.on('GPT_STREAM_CHUNK', callback);
+	},
+	onGptStreamEnd: callback => {
+		ipcRenderer.on('GPT_STREAM_END', callback);
+	},
+	sendRendererError: error => {
+		try {
+			console.error('RENDERER ERROR', error.error || error.message || error);
+			ipcRenderer.send('RENDERER_ERROR', {
+				message: String(error.message || error),
+				stack: error.error?.stack || null,
+			});
+		} catch (err) {
+			console.error('Falha ao enviar RENDERER_ERROR', err);
+		}
+	},
+
+	// 📸 NOVO: Screenshot functions
+	captureScreenshot,
+	analyzeScreenshots,
+	clearScreenshots,
+	getScreenshotCount: () => capturedScreenshots.length,
+
+	// 📸 NOVO: Screenshot shortcuts
+	onCaptureScreenshot: callback => {
+		ipcRenderer.on('CMD_CAPTURE_SCREENSHOT', callback);
+	},
+	onAnalyzeScreenshots: callback => {
+		ipcRenderer.on('CMD_ANALYZE_SCREENSHOTS', callback);
+	},
+	// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut)
+	onNavigateQuestions: callback => {
+		ipcRenderer.on('CMD_NAVIGATE_QUESTIONS', (_, direction) => {
+			callback(direction);
+		});
+	},
+};
+if (typeof module !== 'undefined' && module.exports) {
+	// Node.js / CommonJS export
+	module.exports = RendererAPI;
+}
+
+// 🎭 Exporta para o escopo global (usado em mocks e testes)
+if (typeof globalThis !== 'undefined') {
+	globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
+	globalThis.runMockAutoPlay = runMockAutoPlay; // 🎭 Exportar Mock autoplay
+	globalThis.mockScenarioIndex = 0; // 🎭 Índice global para cenários
+	globalThis.mockAutoPlayActive = false; // 🎭 Flag global para evitar múltiplas execuções
+}
+
+/* =============================== */
+// FUNÇÕES PARA LOGAR
+/* =============================== */
+
+// Log de debug padronizado para renderer. Último argumento opcional é booleano para mostrar ou não o log
+function debugLogRenderer(...args) {
+	const maybeFlag = args.at(-1);
+	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+
+	const nowLog = new Date();
+	const timeStr =
+		`${nowLog.getHours().toString().padStart(2, '0')}:` +
+		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
+		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
+		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+
+	if (showLog) {
+		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+		// prettier-ignore
+		console.log(
+			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em renderer.js:`,
+			'color: brown; font-weight: bold;', 
+			...cleanArgs
+		);
+	}
+}
+
+// Log detalhado das métricas de tempo da transcrição
+function logTranscriptionMetrics() {
+	if (!transcriptionMetrics.audioStartTime) return;
+
+	const gptTime = transcriptionMetrics.gptEndTime - transcriptionMetrics.gptStartTime;
+	const totalTime = transcriptionMetrics.totalTime;
+
+	console.log(`📊 ================================`);
+	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
+	console.log(`📊 ================================`);
+	console.log(`📊 TAMANHO ÁUDIO: ${transcriptionMetrics.audioSize} bytes`);
+	console.log(`📊 GPT: ${gptTime}ms`);
+	console.log(`📊 TOTAL: ${totalTime}ms`);
+	console.log(`📊 GPT % DO TOTAL: ${Math.round((gptTime / totalTime) * 100)}%`);
+	console.log(`📊 ================================`);
+
+	// Reset para próxima medição
+	transcriptionMetrics = {
+		audioStartTime: null,
+		gptStartTime: null,
+		gptEndTime: null,
+		totalTime: null,
+		audioSize: 0,
+	};
+}
+
+/* =============================== */
+//	RESET COMPLETO (TEMPORÁRIO PARA TESTES)
+/* =============================== */
+
+// Função acionada pelo botão de reset na UI
 function resetHomeSection() {
 	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
 	console.log('🔄 RESET COMPLETO ACIONADO PELO BOTÃO resetHomeBtn');
@@ -1678,186 +1956,27 @@ function resetHomeSection() {
 	});
 }
 
-/* ================================ */
-//	12. SCREENSHOT E ANÁLISE
-/* ================================ */
-
-/**
- * Captura screenshot discretamente e armazena em memória
- */
-async function captureScreenshot() {
-	if (isCapturing) {
-		console.log('⏳ Captura já em andamento...');
-		return;
-	}
-
-	isCapturing = true;
-	updateStatusMessage('📸 Capturando tela...');
-
-	try {
-		const result = await ipcRenderer.invoke('CAPTURE_SCREENSHOT');
-
-		if (!result.success) {
-			console.warn('⚠️ Falha na captura:', result.error);
-			updateStatusMessage(`❌ ${result.error}`);
-			emitUIChange('onScreenshotBadgeUpdate', {
-				count: capturedScreenshots.length,
-				visible: capturedScreenshots.length > 0,
-			});
-			return;
-		}
-
-		// ✅ Armazena referência do screenshot
-		capturedScreenshots.push({
-			filepath: result.filepath,
-			filename: result.filename,
-			timestamp: result.timestamp,
-			size: result.size,
+// Adiciona listener ao botão de reset após o DOM carregar
+document.addEventListener('DOMContentLoaded', () => {
+	const resetBtn = document.getElementById('resetHomeBtn');
+	if (resetBtn) {
+		resetBtn.addEventListener('click', () => {
+			const confirmed = confirm('⚠️ Isso vai limpar toda transcrição, histórico e respostas.\n\nTem certeza?');
+			if (confirmed) {
+				resetHomeSection();
+			}
 		});
-
-		console.log(`✅ Screenshot capturado: ${result.filename}`);
-		console.log(`📦 Total em memória: ${capturedScreenshots.length}`);
-
-		// Atualiza UI
-		updateStatusMessage(`✅ ${capturedScreenshots.length} screenshot(s) capturado(s)`);
-		emitUIChange('onScreenshotBadgeUpdate', {
-			count: capturedScreenshots.length,
-			visible: true,
-		});
-	} catch (error) {
-		console.error('❌ Erro ao capturar screenshot:', error);
-		updateStatusMessage('❌ Erro na captura');
-	} finally {
-		isCapturing = false;
+		console.log('✅ Listener do botão reset instalado');
+	} else {
+		console.warn('⚠️ Botão reset não encontrado no DOM');
 	}
-}
+});
 
-/**
- * Envia screenshots para análise com OpenAI Vision
- */
-async function analyzeScreenshots() {
-	if (isAnalyzing) {
-		console.log('⏳ Análise já em andamento...');
-		return;
-	}
+/* =============================== */
+//	🎭  MOCK / DEBUGGING FUNCTIONS
+/* =============================== */
 
-	if (capturedScreenshots.length === 0) {
-		console.warn('⚠️ Nenhum screenshot para analisar');
-		updateStatusMessage('⚠️ Nenhum screenshot para analisar (capture com Ctrl+Shift+F)');
-		return;
-	}
-
-	isAnalyzing = true;
-	updateStatusMessage(`🔍 Analisando ${capturedScreenshots.length} screenshot(s)...`);
-
-	try {
-		// Extrai caminhos dos arquivos
-		const filepaths = capturedScreenshots.map(s => s.filepath);
-
-		console.log('🚀 Enviando para análise:', filepaths);
-
-		// Envia para main.js
-		const result = await ipcRenderer.invoke('ANALYZE_SCREENSHOTS', filepaths);
-
-		if (!result.success) {
-			console.error('❌ Falha na análise:', result.error);
-			updateStatusMessage(`❌ ${result.error}`);
-			return;
-		}
-
-		// ✅ Renderiza resposta do GPT
-		const questionText = `📸 Análise de ${capturedScreenshots.length} screenshot(s)`;
-		// 🔢 USA ID SEQUENCIAL COMO AS PERGUNTAS NORMAIS (não UUID)
-		const questionId = String(questionsHistory.length + 1);
-
-		// Adiciona "pergunta" ao histórico ANTES de renderizar respostas
-		questionsHistory.push({
-			id: questionId,
-			text: questionText,
-			createdAt: Date.now(),
-			lastUpdateTime: Date.now(),
-			answered: true,
-		});
-
-		// ✅ MARCA COMO RESPONDIDA (importante para clique não gerar duplicata)
-		answeredQuestions.add(questionId);
-
-		renderQuestionsHistory();
-
-		// ✅ RENDERIZA VIA STREAMING (fluxo real) - usa onAnswerStreamChunk como GPT normal
-		// Divide análise em tokens e emite como se fosse stream
-		const analysisText = result.analysis;
-		const tokens = analysisText.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
-
-		console.log(`📸 [ANÁLISE] Simulando stream: ${tokens.length} tokens`);
-
-		// Emite tokens assim como o GPT faz (permite UI renderizar em tempo real)
-		let accumulated = '';
-		for (const token of tokens) {
-			accumulated += token;
-
-			// ✅ USA O MESMO EVENTO onAnswerStreamChunk (fluxo real)
-			emitUIChange('onAnswerStreamChunk', {
-				questionId: questionId,
-				token: token,
-				accum: accumulated,
-			});
-
-			// Pequeno delay entre tokens para simular streaming real
-			await new Promise(resolve => setTimeout(resolve, 2));
-		}
-
-		console.log('✅ Análise concluída e renderizada');
-		updateStatusMessage('✅ Análise concluída');
-
-		// 🗑️ Limpa screenshots após análise
-		console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s) da memória...`);
-		capturedScreenshots = [];
-
-		// Atualiza badge
-		emitUIChange('onScreenshotBadgeUpdate', {
-			count: 0,
-			visible: false,
-		});
-
-		// Força limpeza no sistema
-		await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
-	} catch (error) {
-		console.error('❌ Erro ao analisar screenshots:', error);
-		updateStatusMessage('❌ Erro na análise');
-	} finally {
-		isAnalyzing = false;
-	}
-}
-
-/**
- * Limpa todos os screenshots armazenados
- */
-function clearScreenshots() {
-	if (capturedScreenshots.length === 0) return;
-
-	console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
-	capturedScreenshots = [];
-
-	updateStatusMessage('✅ Screenshots limpos');
-	emitUIChange('onScreenshotBadgeUpdate', {
-		count: 0,
-		visible: false,
-	});
-
-	// Força limpeza no sistema
-	ipcRenderer.invoke('CLEANUP_SCREENSHOTS').catch(err => {
-		console.warn('⚠️ Erro na limpeza:', err);
-	});
-}
-
-/* ================================ */
-//	13. MOCK / DEBUG
-/* ================================ */
-
-/**
- * Respostas mockadas por pergunta
- */
+// 🔍 Respostas mockadas por pergunta
 const MOCK_RESPONSES = {
 	'Mock - O que é JVM e para que serve?':
 		'Mock - A JVM (Java Virtual Machine) é uma máquina virtual que executa bytecode Java. Ela permite que programas Java rodem em qualquer plataforma sem modificação. A JVM gerencia memória, garbage collection e fornece um ambiente isolado e seguro para execução de código.',
@@ -1873,10 +1992,7 @@ const MOCK_RESPONSES = {
 		'Mock - Encapsulamento é o princípio de ocultar detalhes internos da implementação. Usa modificadores de acesso como private, protected e public. Protege dados e métodos críticos, permitindo controle sobre como são acessados. É uma pilar da segurança e manutenção do código orientado a objetos.',
 };
 
-/**
- * Cenários automáticos para teste
- * screenshotsCount: 0 = sem screenshot, 1 = tira 1 foto, 2 = tira 2 fotos, etc
- */
+// 🎬 Cenários automáticos para teste. (screenshotsCount: 0 = sem screenshot, 1 = tira 1 foto, 2 = tira 2 fotos, etc)
 const MOCK_SCENARIOS = [
 	{ question: 'Mock - O que é JVM e para que serve?', screenshotsCount: 1 },
 	{ question: 'Mock - Qual a diferença entre JDK e JRE?', screenshotsCount: 0 },
@@ -1889,12 +2005,7 @@ const MOCK_SCENARIOS = [
 let mockScenarioIndex = 0;
 let mockAutoPlayActive = false;
 
-/**
- * Retorna resposta mockada para pergunta
- * Busca exata ou parcial
- * @param {string} question - Pergunta
- * @returns {string} Resposta mockada
- */
+//	🎭 Retorna resposta mockada para pergunta (busca exata ou parcial)
 function getMockResponse(question) {
 	// Match exato
 	if (MOCK_RESPONSES[question]) {
@@ -1912,9 +2023,7 @@ function getMockResponse(question) {
 	return `Resposta mockada para: "${question}"\n\nEste é um teste do sistema em modo Mock.`;
 }
 
-/**
- * Intercepta chamadas IPC para MOCK quando APP_CONFIG.MODE_DEBUG está ativo
- */
+// 🎭 Intercepta chamadas IPC para MOCK quando APP_CONFIG.MODE_DEBUG está ativo
 const originalInvoke = ipcRenderer.invoke;
 ipcRenderer.invoke = function (channel, ...args) {
 	// Intercepta análise de screenshots quando MODE_DEBUG
@@ -2033,9 +2142,7 @@ ipcRenderer.invoke = function (channel, ...args) {
 	return originalInvoke.call(this, channel, ...args);
 };
 
-/**
- * Função de autoplay automático para mockar perguntas e respostas
- */
+//	🎭 Função de autoplay automático para mockar perguntas e respostas
 async function runMockAutoPlay() {
 	if (mockAutoPlayActive) return;
 	mockAutoPlayActive = true;
@@ -2043,9 +2150,9 @@ async function runMockAutoPlay() {
 	while (mockScenarioIndex < MOCK_SCENARIOS.length && APP_CONFIG.MODE_DEBUG && mockAutoPlayActive) {
 		const scenario = MOCK_SCENARIOS[mockScenarioIndex];
 		console.log(
-			`\n🎬 ════════════════════════════════════════════════════════\n🎬 MOCK CENÁRIO ${mockScenarioIndex + 1}/${
+			`\n🎬 ════════════════════════════════════════════════════\n🎬 MOCK CENÁRIO ${mockScenarioIndex + 1}/${
 				MOCK_SCENARIOS.length
-			}\n🎬 ════════════════════════════════════════════════════════`,
+			}\n🎬 ════════════════════════════════════════════════════`,
 		);
 
 		// FASE 1: Simula captura de áudio (2-4s)
@@ -2171,314 +2278,43 @@ async function runMockAutoPlay() {
 	mockAutoPlayActive = false;
 }
 
-/* ================================ */
-//	14. DEBUG UTILITIES
-/* ================================ */
+/* =============================== */
+//	DISPOSITIVOS / CONTROLE DE ÁUDIO
+/* =============================== */
 
-/**
- * Log de debug padronizado para renderer
- * Último argumento opcional é booleano para mostrar ou não o log
- * @param {...any} args - Argumentos a logar
- */
-function debugLogRenderer(...args) {
-	const maybeFlag = args.at(-1);
-	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+async function stopAudio() {
+	debugLogRenderer('Início da função: "stopAudio"');
 
-	const nowLog = new Date();
-	const timeStr =
-		`${nowLog.getHours().toString().padStart(2, '0')}:` +
-		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
-		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
-		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+	// Fecha pergunta atual se estava aberta
+	if (currentQuestion.text) closeCurrentQuestionForced();
 
-	if (showLog) {
-		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
-		// prettier-ignore
-		console.log(
-			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em renderer.js:`,
-			'color: brown; font-weight: bold;', 
-			...cleanArgs
-		);
-	}
-}
+	const sttModel = getConfiguredSTTModel();
+	console.log(`🛑 stopAudio: Modelo STT = ${sttModel}`);
 
-/* ================================ */
-//	15. EXPORTAÇÃO PUBLIC API (RendererAPI)
-/* ================================ */
-
-/**
- * API Pública exposta do Renderer
- * Métodos públicos que podem ser chamados de fora
- */
-const RendererAPI = {
-	// Áudio - Gravação
-	listenToggleBtn,
-	askGpt,
-	restartAudioPipeline,
-
-	// Áudio - Monitoramento de volume
-	startInputVolumeMonitoring,
-	startOutputVolumeMonitoring,
-	stopInputVolumeMonitoring,
-	stopOutputVolumeMonitoring,
-
-	// Entrevista - Reset (centralizado em resetAppState)
-	resetAppState,
-
-	// Modo
-	changeMode: mode => {
-		CURRENT_MODE = mode;
-	},
-	getMode: () => CURRENT_MODE,
-
-	// Questions
-	handleCurrentQuestion,
-	handleQuestionClick,
-
-	// UI
-	applyOpacity,
-	updateMockBadge: show => {
-		emitUIChange('onMockBadgeUpdate', { visible: show });
-	},
-	setMockToggle: checked => {
-		if (UIElements.mockToggle) {
-			UIElements.mockToggle.checked = checked;
-		}
-		APP_CONFIG.MODE_DEBUG = checked;
-	},
-	setModeSelect: mode => {
-		emitUIChange('onModeSelectUpdate', { mode });
-	},
-
-	// Drag
-	/**
-	 * Inicializa drag handle para movimento de janela
-	 * @param {element} dragHandle - Elemento para drag
-	 * @param {element} documentElement - Documento (opcional)
-	 */
-	initDragHandle: (dragHandle, documentElement) => {
-		if (!dragHandle) return;
-		const doc = documentElement || document; // fallback para document global
-		dragHandle.addEventListener('pointerdown', async event => {
-			console.log('🪟 Drag iniciado (pointerdown)');
-			isDraggingWindow = true;
-			dragHandle.classList.add('drag-active');
-
-			const _pid = event.pointerId;
-			try {
-				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
-			} catch (err) {
-				console.warn('setPointerCapture falhou:', err);
-			}
-
-			setTimeout(() => ipcRenderer.send('START_WINDOW_DRAG'), 40);
-
-			const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || {
-				x: 0,
-				y: 0,
-			};
-			const startCursor = { x: event.screenX, y: event.screenY };
-			let lastAnimation = 0;
-
-			function onPointerMove(ev) {
-				const now = performance.now();
-				if (now - lastAnimation < 16) return;
-				lastAnimation = now;
-
-				const dx = ev.screenX - startCursor.x;
-				const dy = ev.screenY - startCursor.y;
-
-				ipcRenderer.send('MOVE_WINDOW_TO', {
-					x: startBounds.x + dx,
-					y: startBounds.y + dy,
-				});
-			}
-
-			function onPointerUp(ev) {
-				try {
-					dragHandle.removeEventListener('pointermove', onPointerMove);
-					dragHandle.removeEventListener('pointerup', onPointerUp);
-				} catch (err) {}
-
-				if (dragHandle.classList.contains('drag-active')) {
-					dragHandle.classList.remove('drag-active');
-				}
-
-				try {
-					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
-				} catch (err) {}
-
-				isDraggingWindow = false;
-			}
-
-			dragHandle.addEventListener('pointermove', onPointerMove);
-			dragHandle.addEventListener('pointerup', onPointerUp, { once: true });
-			event.stopPropagation();
-		});
-
-		doc.addEventListener('pointerup', () => {
-			if (!dragHandle.classList.contains('drag-active')) return;
-			console.log('🪟 Drag finalizado (pointerup)');
-			dragHandle.classList.remove('drag-active');
-			isDraggingWindow = false;
-		});
-
-		dragHandle.addEventListener('pointercancel', () => {
-			if (dragHandle.classList.contains('drag-active')) {
-				dragHandle.classList.remove('drag-active');
-				isDraggingWindow = false;
-			}
-		});
-	},
-
-	// Click-through
-	setClickThrough: enabled => {
-		ipcRenderer.send('SET_CLICK_THROUGH', enabled);
-	},
-	/**
-	 * Atualiza botão de click-through
-	 * @param {boolean} enabled - Se click-through está ativo
-	 * @param {element} btnToggle - Botão a atualizar
-	 */
-	updateClickThroughButton: (enabled, btnToggle) => {
-		if (!btnToggle) return;
-		btnToggle.style.opacity = enabled ? '0.5' : '1';
-		btnToggle.title = enabled
-			? 'Click-through ATIVO (clique para desativar)'
-			: 'Click-through INATIVO (clique para ativar)';
-		console.log('🎨 Botão atualizado - opacity:', btnToggle.style.opacity);
-	},
-
-	// UI Registration
-	registerUIElements: elements => {
-		registerUIElements(elements);
-	},
-	onUIChange: (eventName, callback) => {
-		onUIChange(eventName, callback);
-	},
-	// Emit UI changes (para config-manager enviar eventos para renderer)
-	emitUIChange,
-
-	// API Key
-	setAppConfig: config => {
-		APP_CONFIG = config;
-	},
-	getAppConfig: () => APP_CONFIG,
-
-	// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut IPC)
-	/**
-	 * Navega entre perguntas
-	 * @param {string} direction - 'up' ou 'down'
-	 */
-	navigateQuestions: direction => {
-		const all = getNavigableQuestionIds();
-		if (all.length === 0) return;
-
-		let index = all.indexOf(selectedQuestionId);
-		if (index === -1) {
-			index = direction === 'up' ? all.length - 1 : 0;
+	try {
+		// 🔥 ROTEAMENTO: Por modelo STT
+		if (sttModel === 'deepgram') {
+			stopAudioDeepgram();
+		} else if (sttModel === 'vosk') {
+			stopAudioVosk();
+		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
+			stopAudioWhisper();
 		} else {
-			index += direction === 'up' ? -1 : 1;
-			index = Math.max(0, Math.min(index, all.length - 1));
+			// Modelo não suportado
+			console.error('❌ Erro ao obter modelo STT configurado');
+			return;
 		}
-
-		selectedQuestionId = all[index];
-		clearAllSelections();
-		renderQuestionsHistory();
-		renderCurrentQuestion();
-
-		if (APP_CONFIG.MODE_DEBUG) {
-			const msg = direction === 'up' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
-			updateStatusMessage(msg);
-			console.log('📌 Atalho Selecionou:', selectedQuestionId);
-		}
-	},
-
-	// IPC Listeners
-	onApiKeyUpdated: callback => {
-		ipcRenderer.on('API_KEY_UPDATED', callback);
-	},
-	onToggleAudio: callback => {
-		// Começar a ouvir / Parar de ouvir (Ctrl+D)
-		ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
-	},
-	onAskGpt: callback => {
-		ipcRenderer.on('CMD_ASK_GPT', callback);
-	},
-	onGptStreamChunk: callback => {
-		ipcRenderer.on('GPT_STREAM_CHUNK', callback);
-	},
-	onGptStreamEnd: callback => {
-		ipcRenderer.on('GPT_STREAM_END', callback);
-	},
-	/**
-	 * Envia erro do renderer para main
-	 * @param {error} error - Erro a enviar
-	 */
-	sendRendererError: error => {
-		try {
-			console.error('RENDERER ERROR', error.error || error.message || error);
-			ipcRenderer.send('RENDERER_ERROR', {
-				message: String(error.message || error),
-				stack: error.error?.stack || null,
-			});
-		} catch (err) {
-			console.error('Falha ao enviar RENDERER_ERROR', err);
-		}
-	},
-
-	// 📸 NOVO: Screenshot functions
-	captureScreenshot,
-	analyzeScreenshots,
-	clearScreenshots,
-	getScreenshotCount: () => capturedScreenshots.length,
-
-	// 📸 NOVO: Screenshot shortcuts
-	onCaptureScreenshot: callback => {
-		ipcRenderer.on('CMD_CAPTURE_SCREENSHOT', callback);
-	},
-	onAnalyzeScreenshots: callback => {
-		ipcRenderer.on('CMD_ANALYZE_SCREENSHOTS', callback);
-	},
-	// Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut)
-	onNavigateQuestions: callback => {
-		ipcRenderer.on('CMD_NAVIGATE_QUESTIONS', (_, direction) => {
-			callback(direction);
-		});
-	},
-};
-
-if (typeof module !== 'undefined' && module.exports) {
-	// Node.js / CommonJS export
-	module.exports = RendererAPI;
-}
-
-// 🎭 Exporta para o escopo global (usado em mocks e testes)
-if (typeof globalThis !== 'undefined') {
-	globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
-	globalThis.runMockAutoPlay = runMockAutoPlay; // 🎭 Exportar Mock autoplay
-	globalThis.mockScenarioIndex = 0; // 🎭 Índice global para cenários
-	globalThis.mockAutoPlayActive = false; // 🎭 Flag global para evitar múltiplas execuções
-}
-
-/* ================================ */
-//	LISTENER DO BOTÃO RESET
-/* ================================ */
-
-/**
- * Adiciona listener ao botão de reset após o DOM carregar
- */
-document.addEventListener('DOMContentLoaded', () => {
-	const resetBtn = document.getElementById('resetHomeBtn');
-	if (resetBtn) {
-		resetBtn.addEventListener('click', () => {
-			const confirmed = confirm('⚠️ Isso vai limpar toda transcrição, histórico e respostas.\n\nTem certeza?');
-			if (confirmed) {
-				resetHomeSection();
-			}
-		});
-		console.log('✅ Listener do botão reset instalado');
-	} else {
-		console.warn('⚠️ Botão reset não encontrado no DOM');
+	} catch (error) {
+		console.error('❌ Erro em stopAudio:', error);
 	}
-});
+
+	debugLogRenderer('Fim da função: "stopAudio"');
+}
+
+async function restartAudioPipeline() {
+	debugLogRenderer('Início da função: "restartAudioPipeline"');
+
+	stopAudio();
+
+	debugLogRenderer('Fim da função: "restartAudioPipeline"');
+}

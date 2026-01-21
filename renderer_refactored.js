@@ -1,5 +1,5 @@
 /* ================================ */
-//	1. IMPORTAÇÕES E PROTEÇÃO CONTRA CAPTURA DE TELA
+//	1. IMPORTAÇÕES E PROTEÇÃO CONTRA CAPTURA
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
