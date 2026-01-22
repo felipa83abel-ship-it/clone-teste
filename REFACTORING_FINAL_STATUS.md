@@ -2,122 +2,162 @@
 
 ## 🎉 REFATORAÇÃO CONCLUÍDA COM SUCESSO
 
-Data: 21 de janeiro de 2026
-Tempo: Iniciado → Finalizado (4 etapas)
-Status: **100% PRONTO PARA PRODUÇÃO**
+## 🏗️ ESTRUTURA FINAL
 
----
-
-## 📊 NÚMEROS FINAIS
-
-### main.js
+### main.js (911 linhas)
 
 ```
-✅ Funções: 32
-✅ JSDoc blocks: 24
-✅ Seções: 6 categorias
-✅ Linhas: 911 (de 741)
-✅ Aumento: +170 linhas (+23%)
-```
-
-### renderer.js
-
-```
-✅ Funções: 41
-✅ JSDoc blocks: 61 (!)
-✅ Seções: 15 categorias
-✅ Linhas: 2.484 (de 2.320)
-✅ Aumento: +164 linhas (+7%)
-```
-
-### TOTAL
-
-```
-🎯 Funções refatoradas: 73
-🎯 JSDoc adicionado: 85 blocks
-🎯 Linhas: 3.395 (de 3.061)
-🎯 Aumento total: +334 linhas (+11%)
-```
-
----
-
-## ✨ O QUE FOI FEITO
-
-### Etapa 1️⃣: main.js
-
-- ✅ Criado backup `main.js.bak`
-- ✅ Reorganizado em 6 seções lógicas:
-  1. Imports e Configurações
-  2. Constantes e Estado Global
-  3. Secure Store e OpenAI
-  4. Registro Central de IPC
-  5. Handlers (6 categorias de responsabilidade)
-  6. Inicialização e Finalização
-- ✅ Adicionado JSDoc em 24 funções
-- ✅ Testado: `npm start` ✅
-
-### Etapa 2️⃣: renderer.js
-
-- ✅ Criado backup `renderer.js.backup.1769023125`
-- ✅ Reorganizado em 15 seções lógicas:
-  1. Importações e Proteção
-  2. Estado Global
-  3. Callbacks e UI Elements
-  4. Modo e Orquestrador
-  5. Monitoramento de Volume
-  6. Funções Utilitárias
-  7. Controle de Áudio
-  8. Renderização e Navegação
-  9. Consolidação de Perguntas
-  10. Sistema GPT e Streaming
-  11. Reset Completo
-  12. Screenshot e Análise
-  13. Mock/Debug
-  14. Debug Utilities
-  15. Public API (RendererAPI)
-- ✅ Adicionado JSDoc em 61 funções
-- ✅ Testado: `npm start` ✅
-
-### Etapa 3️⃣: Documentação
-
-- ✅ `REFACTORING_SUMMARY.md` - Resumo main.js
-- ✅ `RENDERER_REFACTORING_SUMMARY.md` - Resumo renderer.js
-- ✅ `REFACTORING_COMPLETE.md` - Visão geral completa
-
-### Etapa 4️⃣: Validação
-
-- ✅ Aplicação inicia sem erros
-- ✅ IPC handlers registrados corretamente
-- ✅ SecureStore funcional
-- ✅ OpenAI client inicializado
-- ✅ Atalhos globais registrados
-
----
-
-## 🏗️ ARQUITETURA FINAL
-
-```
-Application (Electron)
-├─ main.js (911 linhas)
-│  ├─ IPC Handlers (6 categorias)
-│  │  ├─ Gerais (error, status)
-│  │  ├─ API Keys (save, load, delete)
-│  │  ├─ GPT (ask, stream)
-│  │  ├─ Janela (click-through, drag, bounds)
-│  │  ├─ Screenshots (capture, analyze, cleanup)
-│  │  └─ App (close)
-│  ├─ Window Management
-│  └─ Atalhos Globais
+main.js
+├─ IMPORTS E CONFIGURAÇÕES
+│  └─ Electron, OpenAI, electron-store, electron-reload
 │
-└─ renderer.js (2.484 linhas)
-   ├─ UI Layer (15 seções)
-   │  ├─ Audio Management
-   │  ├─ Question Handling
-   │  ├─ GPT Integration
-   │  ├─ Screenshot Integration
-   │  ├─ Mock/Debug System
-   │  └─ Public API
-   └─ IPC Communication ← → main.js
+├─ CONSTANTES E ESTADO GLOBAL
+│  └─ USE_FAKE_STREAM_GPT, mainWindow, openaiClient, secureStore
+│
+├─ SECURE STORE E OPENAI CLIENT
+│  └─ initializeOpenAIClient(apiKey)
+│
+├─ REGISTRO CENTRAL DE IPC (registerIPCHandlers)
+│  ├─ registerGeneralHandlers()
+│  ├─ registerApiKeyHandlers()
+│  ├─ registerGPTHandlers()
+│  ├─ registerWindowControlHandlers()
+│  ├─ registerScreenshotHandlers()
+│  └─ registerAppCloseHandler()
+│
+├─ HANDLERS GERAIS
+│  ├─ handleRendererError()
+│  └─ handleGetOpenAIApiStatus()
+│
+├─ HANDLERS API KEYS
+│  ├─ handleHasApiKey()
+│  ├─ handleGetApiKey()
+│  ├─ handleSaveApiKey()
+│  ├─ handleDeleteApiKey()
+│  └─ handleInitializeApiClient()
+│
+├─ HANDLERS GPT
+│  ├─ ensureOpenAIClient()
+│  ├─ handleAskGPT()
+│  ├─ handleAskGPTStream()
+│  └─ fakeStreamGPT()
+│
+├─ HANDLERS JANELA
+│  ├─ handleSetClickThrough()
+│  ├─ handleGetClickThrough()
+│  ├─ handleSetInteractiveZone()
+│  ├─ handleStartWindowDrag()
+│  ├─ handleMoveWindowTo()
+│  ├─ handleGetWindowBounds()
+│  └─ handleGetCursorScreenPoint()
+│
+├─ HANDLERS SCREENSHOTS
+│  ├─ handleCaptureScreenshot()
+│  ├─ handleAnalyzeScreenshots()
+│  └─ handleCleanupScreenshots()
+│
+├─ HANDLER FECHAMENTO
+│  └─ handleAppClose()
+│
+├─ CRIAÇÃO DA JANELA
+│  └─ createWindow()
+│
+├─ INICIALIZAÇÃO
+│  └─ app.whenReady() → registerIPCHandlers() → createWindow()
+│
+└─ FINALIZAÇÃO
+   └─ app.on('will-quit')
+```
+
+### renderer.js (2.484 linhas)
+
+```
+renderer.js
+├─ IMPORTAÇÕES E PROTEÇÃO (Seção 1)
+│  ├─ requires (electron, marked, highlight.js, STT modules)
+│  ├─ protectAgainstScreenCapture()
+│  └─ Constantes globais
+│
+├─ ESTADO GLOBAL (Seção 2)
+│  ├─ APP_CONFIG
+│  ├─ Streams de áudio
+│  ├─ Questions e perguntas
+│  └─ Métricas de performance
+│
+├─ CALLBACKS E UI ELEMENTS (Seção 3)
+│  ├─ UICallbacks object (20+ callbacks)
+│  ├─ onUIChange() / emitUIChange()
+│  ├─ UIElements registry
+│  └─ registerUIElements()
+│
+├─ MODO E ORQUESTRADOR (Seção 4)
+│  ├─ MODES constants
+│  ├─ CURRENT_MODE
+│  └─ ModeController object
+│
+├─ MONITORAMENTO DE VOLUME (Seção 5)
+│  ├─ startInputVolumeMonitoring()
+│  ├─ stopInputVolumeMonitoring()
+│  ├─ startOutputVolumeMonitoring()
+│  ├─ stopOutputVolumeMonitoring()
+│  └─ createOutputStream()
+│
+├─ FUNÇÕES UTILITÁRIAS (Seção 6)
+│  ├─ getConfiguredSTTModel()
+│  ├─ normalizeForCompare()
+│  ├─ updateStatusMessage()
+│  ├─ renderQuestionsHistory()
+│  ├─ findAnswerByQuestionId()
+│  ├─ promoteCurrentToHistory()
+│  └─ clearAllSelections()
+│
+├─ CONTROLE DE ÁUDIO (Seção 7)
+│  ├─ startAudio()
+│  ├─ stopAudio()
+│  ├─ restartAudioPipeline()
+│  ├─ listenToggleBtn()
+│  └─ hasActiveModel()
+│
+├─ RENDERIZAÇÃO E NAVEGAÇÃO (Seção 8)
+│  ├─ renderCurrentQuestion()
+│  ├─ handleQuestionClick()
+│  ├─ applyOpacity()
+│  ├─ scrollToSelectedQuestion()
+│  └─ marked.js setup
+│
+├─ CONSOLIDAÇÃO DE PERGUNTAS (Seção 9)
+│  ├─ handleCurrentQuestion()
+│  ├─ finalizeCurrentQuestion()
+│  ├─ closeCurrentQuestionForced()
+│  └─ resetCurrentQuestion()
+│
+├─ SISTEMA GPT (Seção 10)
+│  ├─ askGpt() [PRINCIPAL]
+│  └─ logTranscriptionMetrics()
+│
+├─ RESET COMPLETO (Seção 11)
+│  ├─ resetAppState()
+│  └─ resetHomeSection()
+│
+├─ SCREENSHOT E ANÁLISE (Seção 12)
+│  ├─ captureScreenshot()
+│  ├─ analyzeScreenshots()
+│  └─ clearScreenshots()
+│
+├─ MOCK / DEBUG (Seção 13)
+│  ├─ getMockResponse()
+│  ├─ MOCK_RESPONSES / MOCK_SCENARIOS
+│  ├─ IPC Interceptor
+│  └─ runMockAutoPlay()
+│
+├─ DEBUG UTILITIES (Seção 14)
+│  ├─ debugLogRenderer()
+│  └─ Logging helpers
+│
+└─ PUBLIC API (Seção 15)
+   ├─ RendererAPI object
+   ├─ module.exports
+   └─ Exports globais
 ```
 
 ---

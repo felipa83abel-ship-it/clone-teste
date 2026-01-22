@@ -1,5 +1,5 @@
 /* ================================ */
-//	1. IMPORTAÇÕES E PROTEÇÃO CONTRA CAPTURA DE TELA
+//	IMPORTAÇÕES E PROTEÇÃO CONTRA CAPTURA DE TELA
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
@@ -81,12 +81,15 @@ Regras de resposta (priorize sempre estas):
 `;
 
 /* ================================ */
-//	2. ESTADO GLOBAL
+//	ESTADO GLOBAL
 /* ================================ */
 
 let APP_CONFIG = {
 	MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
 };
+
+// Estado de execução do STT
+let isRunning = false;
 
 // Screenshots capturados
 let capturedScreenshots = []; // Array de { filepath, filename, timestamp }
@@ -95,9 +98,6 @@ let isAnalyzing = false;
 
 // Drag and Drop da janela
 let isDraggingWindow = false;
-
-let isRunning = false;
-let audioContext;
 
 // 🔥 MODIFICADO: STT model vem da config agora (removido USE_LOCAL_WHISPER)
 let transcriptionMetrics = {
@@ -134,7 +134,7 @@ let autoCloseQuestionTimer = null;
 let lastAskedQuestionNormalized = null;
 
 /* ================================ */
-//	3. SISTEMA DE CALLBACKS E UI ELEMENTS
+//	SISTEMA DE CALLBACKS E UI ELEMENTS
 /* ================================ */
 
 /**
@@ -234,7 +234,7 @@ function registerUIElements(elements) {
 }
 
 /* ================================ */
-//	4. MODO E ORQUESTRADOR
+//	MODO E ORQUESTRADOR
 /* ================================ */
 
 const MODES = {
@@ -256,33 +256,11 @@ const ModeController = {
 	isInterviewMode() {
 		return CURRENT_MODE === MODES.INTERVIEW;
 	},
-
-	/**
-	 * Retorna timeslice para MediaRecorder.start()
-	 * @returns {number|null} timeslice em ms ou null
-	 */
-	mediaRecorderTimeslice() {
-		if (!this.isInterviewMode()) return null;
-		return 60; // reduzido para janelas parciais mais responsivas
-	},
-
-	/**
-	 * Verifica se permite GPT streaming
-	 * @returns {boolean} true se streaming permitido
-	 */
-	allowGptStreaming() {
-		return this.isInterviewMode();
-	},
-
-	/**
-	 * Calcula tamanho mínimo de áudio aceito
-	 * @param {number} defaultSize - Tamanho padrão
-	 * @returns {number} Tamanho mínimo ajustado
-	 */
-	minInputAudioSize(defaultSize) {
-		return this.isInterviewMode() ? Math.min(400, defaultSize) : defaultSize;
-	},
 };
+
+/* ================================ */
+//	MONITORAMENTO DE VOLUME
+/* ================================ */
 
 /**
  * Escuta evento de mudança de dispositivo
@@ -343,20 +321,7 @@ onUIChange('onAudioDeviceChanged', async data => {
 });
 
 /* ================================ */
-//	5. MONITORAMENTO DE VOLUME (REFATORADO)
-/* ================================ */
-
-// 🔥 REMOVED: startInputVolumeMonitoring, stopInputVolumeMonitoring, startOutputVolumeMonitoring, stopOutputVolumeMonitoring, createOutputStream
-// Agora usar audio-volume-monitor.js para visualização de volume
-// quando usuário está na seção "Áudio e Tela" (sem transcrição ativa).
-//
-// Lógica de segurança:
-// - Se isRunning = true (transcrição ativa), o STT module cuida do volume
-// - Se isRunning = false e usuário entra em "Áudio e Tela", o monitor é iniciado
-// - Verificação em audio-volume-monitor.js previne conflito de captura
-
-/* ================================ */
-//	6. FUNÇÕES UTILITÁRIAS (HELPERS)
+//	FUNÇÕES UTILITÁRIAS (HELPERS)
 /* ================================ */
 
 /**
@@ -626,7 +591,7 @@ function getNavigableQuestionIds() {
 }
 
 /* ================================ */
-//	7. CONTROLE DE ÁUDIO
+//	CONTROLE DE ÁUDIO
 /* ================================ */
 
 /**
@@ -790,7 +755,7 @@ function hasActiveModel() {
 }
 
 /* ================================ */
-//	8. RENDERIZAÇÃO E NAVEGAÇÃO DE UI
+//	RENDERIZAÇÃO E NAVEGAÇÃO DE UI
 /* ================================ */
 
 /**
@@ -928,7 +893,7 @@ marked.setOptions({
 });
 
 /* ================================ */
-//	9. CONSOLIDAÇÃO E FINALIZAÇÃO DE PERGUNTAS
+//	CONSOLIDAÇÃO E FINALIZAÇÃO DE PERGUNTAS
 /* ================================ */
 
 /**
@@ -1080,7 +1045,7 @@ function closeCurrentQuestionForced() {
 }
 
 /* ================================ */
-//	10. SISTEMA GPT E STREAMING
+//	SISTEMA GPT E STREAMING
 /* ================================ */
 
 /**
@@ -1352,7 +1317,7 @@ function logTranscriptionMetrics() {
 }
 
 /* ================================ */
-//	11. RESET COMPLETO
+//	RESET COMPLETO
 /* ================================ */
 
 /**
@@ -1516,7 +1481,7 @@ function resetHomeSection() {
 }
 
 /* ================================ */
-//	12. SCREENSHOT E ANÁLISE
+//	SCREENSHOT E ANÁLISE
 /* ================================ */
 
 /**
@@ -1689,7 +1654,7 @@ function clearScreenshots() {
 }
 
 /* ================================ */
-//	13. MOCK / DEBUG
+//	MOCK / DEBUG
 /* ================================ */
 
 /**
@@ -2009,7 +1974,7 @@ async function runMockAutoPlay() {
 }
 
 /* ================================ */
-//	14. DEBUG UTILITIES
+//	DEBUG UTILITIES
 /* ================================ */
 
 /**
@@ -2040,7 +2005,7 @@ function debugLogRenderer(...args) {
 }
 
 /* ================================ */
-//	15. EXPORTAÇÃO PUBLIC API (RendererAPI)
+//	EXPORTAÇÃO PUBLIC API (RendererAPI)
 /* ================================ */
 
 /**
