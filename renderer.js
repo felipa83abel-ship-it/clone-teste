@@ -12,10 +12,7 @@ const {
 	startAudioVolumeMonitor,
 	stopAudioVolumeMonitor,
 	switchAudioVolumeDevice,
-} = require('./audio-volume-monitor.js');
-
-// 🔥 Sistema de eventos para módulos de transcrição (desacoplamento)
-window.transcriptionEvents = new EventTarget();
+} = require('./volume-audio-monitor.js');
 
 /**
  * Proteção contra captura de tela externa

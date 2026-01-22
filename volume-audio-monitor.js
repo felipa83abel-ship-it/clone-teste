@@ -27,8 +27,8 @@ const OUTPUT = 'output';
 const AUDIO_SAMPLE_RATE = 16000; // Hz
 
 // AudioWorkletProcessor
-const VOLUME_MONITOR_WORKLET = 'volume-monitor-worklet';
-const VOLUME_MONITOR_WORKLET_PATH = './audio-volume-monitor-worklet.js';
+const VOLUME_MONITOR_WORKLET = 'volume-audio-worklet-processor';
+const VOLUME_MONITOR_WORKLET_PATH = './volume-audio-worklet-processor.js';
 
 /* ================================ */
 //	ESTADO GLOBAL DO MONITOR

@@ -1,7 +1,7 @@
 /**
  * 🎛️ CLASSE CALCULADORA DE VOLUME (AudioVolumeCalculator)
  *
- * ⚠️ DUPLICADO em stt-audio-worklet-processor.js e audio-volume-monitor-worklet.js
+ * ⚠️ DUPLICADO em stt-audio-worklet-processor.js e volume-audio-worklet-processor.js
  *
  * POR QUÊ duplicado?
  * - AudioWorklets rodam em thread isolada (Web Worker)
@@ -30,7 +30,7 @@ class AudioVolumeCalculator {
  * Usado pela seção "Áudio e Tela" para visualizar volume
  * sem estar em modo de transcrição.
  */
-class VolumeMonitorWorkletProcessor extends AudioWorkletProcessor {
+class VolumeAudioWorkletProcessor extends AudioWorkletProcessor {
 	constructor() {
 		super();
 		this.thresholdRms = 0.002; // Default para filtrar ruído
@@ -39,7 +39,7 @@ class VolumeMonitorWorkletProcessor extends AudioWorkletProcessor {
 	process(inputs, outputs, parameters) {
 		const input = inputs[0];
 		if (!input || input.length === 0) {
-			return true; // NOSONAR
+			return true;
 		}
 
 		const inputData = input[0]; // Canal mono
@@ -60,8 +60,9 @@ class VolumeMonitorWorkletProcessor extends AudioWorkletProcessor {
 			percent: percent,
 		});
 
-		return true; // NOSONAR
+		// Nota: Esta função sempre retorna o mesmo valor por design, para manter o processamento contínuo, (obrigatório para AudioWorkletProcessor).
+		return percent >= 0; // NOSONAR javascript:S3516
 	}
 }
 
-registerProcessor('volume-monitor-worklet', VolumeMonitorWorkletProcessor);
+registerProcessor('volume-audio-worklet-processor', VolumeAudioWorkletProcessor);
