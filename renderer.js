@@ -152,7 +152,6 @@ let interviewTurnId = 0;
 let gptAnsweredTurnId = null;
 let gptRequestedTurnId = null;
 let gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta foi realmente solicitada ao GPT
-let autoCloseQuestionTimer = null;
 let lastAskedQuestionNormalized = null;
 
 /* ================================ */
@@ -242,7 +241,7 @@ let UIElements = {
 	btnToggleClick: null,
 	dragHandle: null,
 	darkToggle: null,
-	opacitySlider: null,
+	opacityRange: null,
 };
 
 /**
@@ -844,26 +843,9 @@ function handleQuestionClick(questionId) {
 
 /**
  * Aplica opacidade na interface
- * @param {number} value - Valor de opacidade (0-1)
+ * MOVIDA PARA: config-manager.js
+ * @deprecated Usar ConfigManager.applyOpacity(value) em vez disso
  */
-function applyOpacity(value) {
-	debugLogRenderer('Início da função: "applyOpacity"');
-	const appOpacity = parseFloat(value);
-
-	// aplica opacidade no conteúdo geral
-	document.documentElement.style.setProperty('--app-opacity', appOpacity.toFixed(2));
-
-	// topBar nunca abaixo de 0.75
-	const topbarOpacity = Math.max(appOpacity, 0.75);
-	document.documentElement.style.setProperty('--app-opacity-75', topbarOpacity.toFixed(2));
-
-	localStorage.setItem('overlayOpacity', appOpacity);
-
-	// logs temporários para debug
-	console.log('🎚️ Opacity change | app:', value, '| topBar:', topbarOpacity);
-
-	debugLogRenderer('Fim da função: "applyOpacity"');
-}
 
 /**
  * Rola a lista de perguntas para a pergunta selecionada
@@ -1491,7 +1473,16 @@ function clearScreenshots() {
 /* ================================ */
 
 /**
+ * Libera a thread para o navegador processar eventos
+ * @param {number} ms - Milissegundos para aguardar (default 0 = próximo frame)
+ */
+function releaseThread(ms = 0) {
+	return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
  * Reseta todo o estado do app
+ * Quebrado em chunks para não bloquear a UI thread
  */
 async function resetAppState() {
 	console.log('🧹 ═══════════════════════════════════════════════════════════');
@@ -1499,41 +1490,17 @@ async function resetAppState() {
 	console.log('🧹 ═══════════════════════════════════════════════════════════');
 
 	try {
-		// 1️⃣ PARAR AUTOPLAY DO MOCK (prevent async operations)
+		// 1️⃣ CHUNK 1: Parar autoplay e áudio
 		mockAutoPlayActive = false;
 		mockScenarioIndex = 0;
-		console.log('✅ Autoplay do mock parado');
-
-		// 2️⃣ PARAR ÁUDIO IMEDIATAMENTE (input/output)
 		if (isRunning) {
 			console.log('🎤 Parando captura de áudio...');
 			isRunning = false;
 		}
+		console.log('✅ Autoplay do mock parado');
+		await releaseThread();
 
-		// 3️⃣ LIMPAR TIMERS DE ÁUDIO
-		if (inputSilenceTimer) {
-			clearTimeout(inputSilenceTimer);
-			inputSilenceTimer = null;
-		}
-		if (outputSilenceTimer) {
-			clearTimeout(outputSilenceTimer);
-			outputSilenceTimer = null;
-		}
-		if (inputPartialTimer) {
-			clearTimeout(inputPartialTimer);
-			inputPartialTimer = null;
-		}
-		if (outputPartialTimer) {
-			clearTimeout(outputPartialTimer);
-			outputPartialTimer = null;
-		}
-		if (autoCloseQuestionTimer) {
-			clearTimeout(autoCloseQuestionTimer);
-			autoCloseQuestionTimer = null;
-		}
-		console.log('✅ Timers limpos');
-
-		// 4️⃣ LIMPAR PERGUNTAS E RESPOSTAS
+		// 2️⃣ CHUNK 2: Limpar perguntas e respostas
 		currentQuestion = {
 			text: '',
 			lastUpdate: 0,
@@ -1548,15 +1515,13 @@ async function resetAppState() {
 		selectedQuestionId = null;
 		lastAskedQuestionNormalized = null;
 		console.log('✅ Perguntas e respostas limpas');
+		await releaseThread();
 
-		// 5️⃣ LIMPAR ESTADO GPT/ENTREVISTA
+		// 3️⃣ CHUNK 3: Limpar estado GPT e métricas
 		interviewTurnId = 0;
 		gptAnsweredTurnId = null;
 		gptRequestedTurnId = null;
 		gptRequestedQuestionId = null;
-		console.log('✅ Estado de entrevista resetado');
-
-		// 6️⃣ RESETAR MÉTRICAS
 		transcriptionMetrics = {
 			audioStartTime: null,
 			gptStartTime: null,
@@ -1564,9 +1529,11 @@ async function resetAppState() {
 			totalTime: null,
 			audioSize: 0,
 		};
+		console.log('✅ Estado de entrevista resetado');
 		console.log('✅ Métricas resetadas');
+		await releaseThread();
 
-		// 7️⃣ LIMPAR SCREENSHOTS (sem chamar API!)
+		// 4️⃣ CHUNK 4: Limpar screenshots
 		if (capturedScreenshots.length > 0) {
 			console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
 			capturedScreenshots = [];
@@ -1574,7 +1541,7 @@ async function resetAppState() {
 				count: 0,
 				visible: false,
 			});
-			// Força limpeza no sistema
+			// Força limpeza no sistema (async, não bloqueia)
 			try {
 				await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
 			} catch (err) {
@@ -1582,44 +1549,51 @@ async function resetAppState() {
 			}
 		}
 		console.log('✅ Screenshots limpos');
+		await releaseThread();
 
-		// 8️⃣ LIMPAR FLAGS
+		// 5️⃣ CHUNK 5: Limpar flags
 		isCapturing = false;
 		isAnalyzing = false;
 		console.log('✅ Flags resetadas');
+		await releaseThread();
 
-		// 9️⃣ ATUALIZAR UI - PERGUNTAS
+		// 6️⃣ CHUNK 6: Atualizar UI - Perguntas
 		emitUIChange('onCurrentQuestionUpdate', {
 			text: '',
 			isSelected: false,
 		});
 		emitUIChange('onQuestionsHistoryUpdate', []);
 		console.log('✅ Perguntas UI limpa');
+		await releaseThread();
 
-		// 🔟 ATUALIZAR UI - TRANSCRIÇÕES E RESPOSTAS
+		// 7️⃣ CHUNK 7: Atualizar UI - Transcrições e Respostas
 		emitUIChange('onTranscriptionCleared');
 		emitUIChange('onAnswersCleared');
 		console.log('✅ Transcrições e respostas UI limpas');
+		await releaseThread();
 
-		// 1️⃣1️⃣ ATUALIZAR UI - BOTÃO LISTEN
+		// 8️⃣ CHUNK 8: Atualizar UI - Botão Listen
 		emitUIChange('onListenButtonToggle', {
 			isRunning: false,
 			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
 		});
 		console.log('✅ Botão listen resetado');
+		await releaseThread();
 
-		// 1️⃣2️⃣ ATUALIZAR UI - STATUS
+		// 9️⃣ CHUNK 9: Atualizar UI - Status
 		emitUIChange('onStatusUpdate', {
 			status: 'ready',
 			message: '✅ Pronto',
 		});
 		console.log('✅ Status atualizado');
+		await releaseThread();
 
-		// 1️⃣3️⃣ LIMPAR SELEÇÕES
+		// 🔟 CHUNK 10: Limpar seleções
 		clearAllSelections();
 		console.log('✅ Seleções limpas');
+		await releaseThread();
 
-		// 1️⃣4️⃣ LOG FINAL
+		// 1️⃣1️⃣ LOG FINAL
 		console.log('✅ ═══════════════════════════════════════════════════════════');
 		console.log('✅ RESET COMPLETO CONCLUÍDO COM SUCESSO');
 		console.log('✅ ═══════════════════════════════════════════════════════════');
@@ -1632,22 +1606,11 @@ async function resetAppState() {
 }
 
 /**
- * Função acionada pelo botão de reset na UI
+ * Função auxiliar para liberar a thread do navegador
+ * Usada em resetAppState() para quebrar operações longas em chunks
  */
-function resetHomeSection() {
-	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
-	console.log('🔄 RESET COMPLETO ACIONADO PELO BOTÃO resetHomeBtn');
-	console.log('════════════════════════════════════════════════════════════════════════════════════════');
-
-	// 🔥 Usar a função centralizada de reset
-	resetAppState().then(success => {
-		if (success) {
-			console.log('✅ Reset via resetAppState() concluído com sucesso!');
-		} else {
-			console.error('❌ Erro ao executar resetAppState()');
-		}
-		console.log('════════════════════════════════════════════════════════════════════════════════════════\n');
-	});
+function releaseThread(ms = 0) {
+	return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /* ================================ */
@@ -2039,15 +2002,13 @@ const RendererAPI = {
 	handleQuestionClick,
 
 	// UI
-	applyOpacity,
+	// 🔥 MOVED: applyOpacity foi para config-manager.js
 	updateMockBadge: show => {
 		emitUIChange('onMockBadgeUpdate', { visible: show });
 	},
 	setMockToggle: checked => {
-		if (UIElements.mockToggle) {
-			UIElements.mockToggle.checked = checked;
-		}
 		APP_CONFIG.MODE_DEBUG = checked;
+		// UI será atualizada via emitUIChange
 	},
 	setModeSelect: mode => {
 		emitUIChange('onModeSelectUpdate', { mode });
@@ -2056,83 +2017,9 @@ const RendererAPI = {
 	// Drag
 	/**
 	 * Inicializa drag handle para movimento de janela
-	 * @param {element} dragHandle - Elemento para drag
-	 * @param {element} documentElement - Documento (opcional)
+	 * MOVIDA PARA: config-manager.js
+	 * @deprecated Usar ConfigManager.initDragHandle(dragHandle) em vez disso
 	 */
-	initDragHandle: (dragHandle, documentElement) => {
-		if (!dragHandle) return;
-		const doc = documentElement || document; // fallback para document global
-		dragHandle.addEventListener('pointerdown', async event => {
-			console.log('🪟 Drag iniciado (pointerdown)');
-			isDraggingWindow = true;
-			dragHandle.classList.add('drag-active');
-
-			const _pid = event.pointerId;
-			try {
-				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
-			} catch (err) {
-				console.warn('setPointerCapture falhou:', err);
-			}
-
-			setTimeout(() => ipcRenderer.send('START_WINDOW_DRAG'), 40);
-
-			const startBounds = (await ipcRenderer.invoke('GET_WINDOW_BOUNDS')) || {
-				x: 0,
-				y: 0,
-			};
-			const startCursor = { x: event.screenX, y: event.screenY };
-			let lastAnimation = 0;
-
-			function onPointerMove(ev) {
-				const now = performance.now();
-				if (now - lastAnimation < 16) return;
-				lastAnimation = now;
-
-				const dx = ev.screenX - startCursor.x;
-				const dy = ev.screenY - startCursor.y;
-
-				ipcRenderer.send('MOVE_WINDOW_TO', {
-					x: startBounds.x + dx,
-					y: startBounds.y + dy,
-				});
-			}
-
-			function onPointerUp(ev) {
-				try {
-					dragHandle.removeEventListener('pointermove', onPointerMove);
-					dragHandle.removeEventListener('pointerup', onPointerUp);
-				} catch (err) {}
-
-				if (dragHandle.classList.contains('drag-active')) {
-					dragHandle.classList.remove('drag-active');
-				}
-
-				try {
-					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
-				} catch (err) {}
-
-				isDraggingWindow = false;
-			}
-
-			dragHandle.addEventListener('pointermove', onPointerMove);
-			dragHandle.addEventListener('pointerup', onPointerUp, { once: true });
-			event.stopPropagation();
-		});
-
-		doc.addEventListener('pointerup', () => {
-			if (!dragHandle.classList.contains('drag-active')) return;
-			console.log('🪟 Drag finalizado (pointerup)');
-			dragHandle.classList.remove('drag-active');
-			isDraggingWindow = false;
-		});
-
-		dragHandle.addEventListener('pointercancel', () => {
-			if (dragHandle.classList.contains('drag-active')) {
-				dragHandle.classList.remove('drag-active');
-				isDraggingWindow = false;
-			}
-		});
-	},
 
 	// Click-through
 	setClickThrough: enabled => {
@@ -2270,18 +2157,8 @@ if (typeof globalThis !== 'undefined') {
 
 /**
  * Adiciona listener ao botão de reset após o DOM carregar
+
+ * docListener do botão de reset
+ * MOVIDO PARA: config-manager.js (initEventListeners)
+ * @deprecated Registrado em config-manager.js
  */
-document.addEventListener('DOMContentLoaded', () => {
-	const resetBtn = document.getElementById('resetHomeBtn');
-	if (resetBtn) {
-		resetBtn.addEventListener('click', () => {
-			const confirmed = confirm('⚠️ Isso vai limpar toda transcrição, histórico e respostas.\n\nTem certeza?');
-			if (confirmed) {
-				resetHomeSection();
-			}
-		});
-		console.log('✅ Listener do botão reset instalado');
-	} else {
-		console.warn('⚠️ Botão reset não encontrado no DOM');
-	}
-});

@@ -82,6 +82,9 @@ class ConfigManager {
 					theme: 'auto',
 					autoUpdate: true,
 					logLevel: 'info',
+					darkMode: false,
+					interviewMode: 'INTERVIEW',
+					overlayOpacity: 0.75,
 				},
 			};
 
@@ -187,11 +190,12 @@ class ConfigManager {
 			// 🔥 Quando o campo recebe foco
 			input.addEventListener('focus', async e => {
 				const hasKey = e.target.dataset.hasKey === 'true';
+				const isMasked = e.target.type === 'password';
 				if (hasKey && isMasked) {
 					// 🔥 OPÇÃO 1: Limpa para permitir nova chave
 					e.target.value = '';
 					e.target.type = 'text'; // 🔥 NOVO: Inicia em texto para não mascarar entrada
-					e.target.placeholder = 'Insira uma nova API key (ou cancele para manter a atual)';
+					e.target.placeholder = 'Insira uma nova API key';
 					console.log(`📝 Campo limpo para edição - provider: ${e.target.id}`);
 				} else if (!hasKey && e.target.value === '') {
 					// 🔥 NOVO: Campo vazio sem chave salva - inicia em texto para entrada clara
@@ -295,10 +299,14 @@ class ConfigManager {
 		document.querySelector('.btn-reset-config')?.addEventListener('click', () => this.resetConfig());
 
 		// Inputs que salvam automaticamente
+		// 🔥 EXCLUDENDO: opacityRange (gerenciado separadamente em initEventListeners)
+		// 🔥 EXCLUDENDO: mockToggle (estado temporário de DEBUG - não deve ser persistido)
 		document.querySelectorAll('input, select, textarea').forEach(input => {
-			if (input.id && !input.classList.contains('api-key-input')) {
+			if (input.id && !input.classList.contains('api-key-input') && input.id !== 'mockToggle') {
 				input.addEventListener('change', async () => {
-					this.saveField(input.id, input.value);
+					// 🔥 CORRIGIDO: Para checkboxes, usar .checked em vez de .value
+					const value = input.type === 'checkbox' ? input.checked : input.value;
+					this.saveField(input.id, value);
 					this.saveConfig(); // 🔥 CRÍTICO: Salva configuração para persistir mudanças
 
 					// 🔥 NOVO: Se foi mudança de dispositivo de áudio, usa novo módulo
@@ -322,16 +330,27 @@ class ConfigManager {
 						if (globalThis.RendererAPI?.emitUIChange) {
 							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
 						}
+					} else if (input.id === 'darkModeToggle') {
+						// 🔥 NOVO: Aplica classe CSS quando darkModeToggle muda
+						const isDark = input.checked;
+						document.body.classList.toggle('dark', isDark);
+						console.log('🌙 Dark mode toggled:', isDark);
 					}
 				});
 			}
 		});
 
-		// Gravar atalho para screenshot
-		const recordBtn = document.querySelector('.btn-record-hotkey');
-		if (recordBtn) {
-			recordBtn.addEventListener('click', () => this.recordHotkey(recordBtn));
+		// 🔥 NOVO: Inicializa slider de opacidade (listener apenas, restauração em restoreUserPreferences)
+		const opacityRange = document.getElementById('opacityRange');
+		if (opacityRange) {
+			opacityRange.addEventListener('input', e => {
+				this.saveField('opacityRange', e.target.value);
+				this.applyOpacity(e.target.value);
+			});
 		}
+
+		// 🔥 NOVO: Inicializar listener do botão reset
+		this.initResetButtonListener();
 
 		console.log('✅ Listeners de eventos inicializados');
 
@@ -738,6 +757,46 @@ class ConfigManager {
 		debugLogConfig('Fim da função: "restoreSTTLLMModels"');
 	}
 
+	// 🔥 NOVO: Restaura preferências do usuário (darkMode, interviewMode, overlayOpacity)
+	restoreUserPreferences() {
+		debugLogConfig('Início da função: "restoreUserPreferences"');
+		console.log('🔄 RESTAURANDO PREFERÊNCIAS DO USUÁRIO...');
+
+		// 1️⃣ Restaurar Dark Mode
+		const darkModeToggle = document.getElementById('darkModeToggle');
+		const savedDarkMode = this.config.other?.darkMode ?? false;
+		if (darkModeToggle) {
+			darkModeToggle.checked = savedDarkMode;
+			console.log(`   ✅ Dark Mode restaurado: ${savedDarkMode ? 'ATIVADO' : 'DESATIVADO'}`);
+		} else {
+			console.warn('   ⚠️ darkModeToggle não encontrado no DOM');
+		}
+
+		// 2️⃣ Restaurar Interview Mode
+		const interviewModeSelect = document.getElementById('interviewModeSelect');
+		const savedInterviewMode = this.config.other?.interviewMode ?? 'INTERVIEW';
+		if (interviewModeSelect) {
+			interviewModeSelect.value = savedInterviewMode;
+			console.log(`   ✅ Interview Mode restaurado: ${savedInterviewMode}`);
+		} else {
+			console.warn('   ⚠️ interviewModeSelect não encontrado no DOM');
+		}
+
+		// 3️⃣ Restaurar Opacity
+		const opacityRange = document.getElementById('opacityRange');
+		const savedOpacity = this.config.other?.overlayOpacity ?? 0.75;
+		if (opacityRange) {
+			opacityRange.value = savedOpacity;
+			this.applyOpacity(savedOpacity);
+			console.log(`   ✅ Opacidade restaurada: ${savedOpacity}`);
+		} else {
+			console.warn('   ⚠️ opacityRange não encontrado no DOM');
+		}
+
+		console.log('🎉 PREFERÊNCIAS RESTAURADAS COM SUCESSO');
+		debugLogConfig('Fim da função: "restoreUserPreferences"');
+	}
+
 	// Alterna entre seções de configuração
 	switchConfigSection(sectionId) {
 		debugLogConfig(`Início da função: "switchConfigSection" para sectionId: "${sectionId}"`);
@@ -1047,6 +1106,9 @@ class ConfigManager {
 			theme: ['other', 'theme'],
 			'auto-update': ['other', 'autoUpdate'],
 			'log-level': ['other', 'logLevel'],
+			darkModeToggle: ['other', 'darkMode'],
+			interviewModeSelect: ['other', 'interviewMode'],
+			opacityRange: ['other', 'overlayOpacity'],
 		};
 
 		debugLogConfig('Fim da função: "getConfigPath"');
@@ -1301,7 +1363,7 @@ class ConfigManager {
 			this.restoreTheme();
 
 			// ✅ 5. Restaurar opacidade
-			this.restoreOpacity();
+			// 🔥 MOVED: agora feito em initEventListeners()
 
 			// ✅ 6. Restaurar modo (NORMAL | INTERVIEW)
 			this.restoreMode();
@@ -1318,23 +1380,20 @@ class ConfigManager {
 			// ✅ 10. Restaura modelos STT e LLM salvos
 			this.restoreSTTLLMModels();
 
-			// ✅ 11. Sincronizar API key
+			// ✅ 11. Restaura preferências do usuário (darkMode, interviewMode, opacity)
+			this.restoreUserPreferences();
+
+			// ✅ 12. Sincronizar API key
 			await this.syncApiKeyOnStart();
 
-			// ✅ 12. Inicializar Click-through
+			// ✅ 13. Inicializar Click-through
 			await this.initClickThroughController();
 
-			// ✅ 13. Registrar listeners de eventos DOM
+			// ✅ 14. Registrar listeners de eventos DOM
 			this.registerDOMEventListeners();
 
-			// ✅ 14. Registrar listeners de IPC
+			// ✅ 15. Registrar listeners de IPC
 			this.registerIPCListeners();
-
-			// ✅ 15. Inicializar drag handle
-			const dragHandle = document.getElementById('dragHandle');
-			if (dragHandle) {
-				globalThis.RendererAPI.initDragHandle(dragHandle, document);
-			}
 
 			// ✅ 16. Registrar listeners de erro global
 			this.registerErrorHandlers();
@@ -1372,7 +1431,7 @@ class ConfigManager {
 			btnToggleClick: document.getElementById('btnToggleClick'),
 			dragHandle: document.getElementById('dragHandle'),
 			darkToggle: document.getElementById('darkModeToggle'),
-			opacitySlider: document.getElementById('opacityRange'),
+			opacityRange: document.getElementById('opacityRange'),
 		};
 
 		globalThis.RendererAPI.registerUIElements(elements);
@@ -2083,6 +2142,15 @@ class ConfigManager {
 			});
 		}
 
+		// 🔥 NOVO: Inicializar drag handle
+		const dragHandle = document.getElementById('dragHandle');
+		if (dragHandle) {
+			this.initDragHandle(dragHandle);
+			console.log('✅ Drag handle inicializado');
+		} else {
+			console.warn('⚠️ dragHandle não encontrado no DOM');
+		}
+
 		console.log('✅ registerDOMEventListeners: Todos os listeners registrados com sucesso');
 
 		debugLogConfig('Fim da função: "registerDOMEventListeners"');
@@ -2214,50 +2282,22 @@ class ConfigManager {
 		debugLogConfig('Início da função: "restoreTheme"');
 		try {
 			const darkToggle = document.getElementById('darkModeToggle');
-			const savedTheme = localStorage.getItem('theme');
+			// 🔥 CORRIGIDO: Usa config.other.darkMode em vez de localStorage
+			const isDark = this.config.other?.darkMode ?? false;
 
-			if (savedTheme === 'dark') {
+			if (isDark) {
 				document.body.classList.add('dark');
-				if (darkToggle) darkToggle.checked = true;
 			}
 
 			if (darkToggle) {
-				darkToggle.addEventListener('change', () => {
-					const isDark = darkToggle.checked;
-					document.body.classList.toggle('dark', isDark);
-					localStorage.setItem('theme', isDark ? 'dark' : 'light');
-					console.log('🌙 Dark mode:', isDark);
-				});
+				darkToggle.checked = isDark;
+				console.log(`✅ Dark mode restaurado: ${isDark ? 'ATIVADO' : 'DESATIVADO'}`);
 			}
 		} catch (err) {
 			console.warn('⚠️ Erro ao restaurar tema:', err);
 		}
 
 		debugLogConfig('Fim da função: "restoreTheme"');
-	}
-
-	restoreOpacity() {
-		debugLogConfig('Início da função: "restoreOpacity"');
-		try {
-			const opacitySlider = document.getElementById('opacityRange');
-			if (!opacitySlider) return;
-
-			const savedOpacity = localStorage.getItem('overlayOpacity');
-			if (savedOpacity) {
-				opacitySlider.value = savedOpacity;
-				globalThis.RendererAPI.applyOpacity(savedOpacity);
-			} else {
-				globalThis.RendererAPI.applyOpacity(opacitySlider.value || 0.75);
-			}
-
-			opacitySlider.addEventListener('input', e => {
-				globalThis.RendererAPI.applyOpacity(e.target.value);
-			});
-		} catch (err) {
-			console.warn('⚠️ Erro ao restaurar opacidade:', err);
-		}
-
-		debugLogConfig('Fim da função: "restoreOpacity"');
 	}
 
 	restoreMode() {
@@ -2324,6 +2364,133 @@ class ConfigManager {
 		}
 
 		debugLogConfig('Fim da função: "initClickThroughController"');
+	}
+
+	/**
+	 * Aplica opacidade ao elemento root da app
+	 * @param {number} value - Opacidade (0-1)
+	 */
+	applyOpacity(value) {
+		debugLogConfig('Início da função: "applyOpacity"');
+		const appOpacity = parseFloat(value);
+
+		// aplica opacidade no conteúdo geral
+		document.documentElement.style.setProperty('--app-opacity', appOpacity.toFixed(2));
+
+		// topBar nunca abaixo de 0.75
+		const topbarOpacity = Math.max(appOpacity, 0.75);
+		document.documentElement.style.setProperty('--app-opacity-75', topbarOpacity.toFixed(2));
+
+		localStorage.setItem('overlayOpacity', appOpacity);
+
+		// logs
+		console.log('🎚️ Opacity change | app:', value, '| topBar:', topbarOpacity);
+
+		debugLogConfig('Fim da função: "applyOpacity"');
+	}
+
+	/**
+	 * Inicializa drag handle para movimento de janela
+	 * @param {element} dragHandle - Elemento para drag
+	 */
+	initDragHandle(dragHandle) {
+		debugLogConfig('Início da função: "initDragHandle"');
+		if (!dragHandle) {
+			console.warn('⚠️ dragHandle não fornecido');
+			return;
+		}
+
+		dragHandle.addEventListener('pointerdown', async event => {
+			console.log('🪟 Drag iniciado (pointerdown)');
+
+			dragHandle.classList.add('drag-active');
+
+			const _pid = event.pointerId;
+			try {
+				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
+			} catch (err) {
+				console.warn('setPointerCapture falhou:', err);
+			}
+
+			setTimeout(() => _ipc.send('START_WINDOW_DRAG'), 40);
+
+			const startBounds = (await _ipc.invoke('GET_WINDOW_BOUNDS')) || {
+				x: 0,
+				y: 0,
+			};
+			const startCursor = { x: event.screenX, y: event.screenY };
+			let lastAnimation = 0;
+
+			const onPointerMove = ev => {
+				const now = performance.now();
+				if (now - lastAnimation < 16) return;
+				lastAnimation = now;
+
+				const dx = ev.screenX - startCursor.x;
+				const dy = ev.screenY - startCursor.y;
+
+				_ipc.send('MOVE_WINDOW_TO', {
+					x: startBounds.x + dx,
+					y: startBounds.y + dy,
+				});
+			};
+
+			const onPointerUp = ev => {
+				try {
+					dragHandle.removeEventListener('pointermove', onPointerMove);
+					dragHandle.removeEventListener('pointerup', onPointerUp);
+				} catch (err) {}
+
+				if (dragHandle.classList.contains('drag-active')) {
+					dragHandle.classList.remove('drag-active');
+				}
+
+				try {
+					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
+				} catch (err) {}
+			};
+
+			dragHandle.addEventListener('pointermove', onPointerMove);
+			dragHandle.addEventListener('pointerup', onPointerUp, { once: true });
+			event.stopPropagation();
+		});
+
+		document.addEventListener('pointerup', () => {
+			if (!dragHandle.classList.contains('drag-active')) return;
+			console.log('🪟 Drag finalizado (pointerup)');
+			dragHandle.classList.remove('drag-active');
+		});
+
+		dragHandle.addEventListener('pointercancel', () => {
+			if (dragHandle.classList.contains('drag-active')) {
+				dragHandle.classList.remove('drag-active');
+			}
+		});
+
+		debugLogConfig('Fim da função: "initDragHandle"');
+	}
+
+	/**
+	 * Inicializa listener do botão de reset home
+	 * Chamado durante initEventListeners()
+	 */
+	initResetButtonListener() {
+		debugLogConfig('Início da função: "initResetButtonListener"');
+		const resetBtn = document.getElementById('resetHomeBtn');
+		if (resetBtn) {
+			resetBtn.addEventListener('click', () => {
+				const confirmed = confirm('⚠️ Isso vai limpar toda transcrição, histórico e respostas.\n\nTem certeza?');
+				if (confirmed) {
+					globalThis.RendererAPI?.resetAppState?.().then(() => {
+						console.log('✅ Reset home concluído');
+					});
+				}
+			});
+			console.log('✅ Listener do botão reset instalado');
+		} else {
+			console.warn('⚠️ Botão reset não encontrado no DOM');
+		}
+		debugLogConfig('Fim da função: "initResetButtonListener"');
 	}
 }
 
