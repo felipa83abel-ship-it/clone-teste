@@ -298,11 +298,17 @@ onUIChange('onAudioDeviceChanged', async data => {
 			console.warn('⚠️ [onAudioDeviceChanged] Dados inválidos (falta type):', data);
 		}
 
+		// ✅ Se STT não está rodando, ignora mudança de dispositivo
+		if (!isRunning) {
+			console.log('⏸️ [onAudioDeviceChanged] STT não está ativo, ignorando mudança de dispositivo');
+			return;
+		}
+
 		// 🔥 ORQUESTRADOR: Roteia por modelo STT
 		const sttModel = getConfiguredSTTModel();
 
 		if (sttModel === 'deepgram') {
-			console.log('🔄 [onAudioDeviceChanged] Chamando switchDeviceDeepgram...');
+			console.log('🔄 [onAudioDeviceChanged] Deepgram está ativo, chamando switchDeviceDeepgram...');
 			if (typeof switchDeviceDeepgram === 'function') {
 				console.log('✅ [onAudioDeviceChanged] switchDeviceDeepgram é função, executando...');
 				await switchDeviceDeepgram(data.type, data.deviceId);
@@ -311,7 +317,7 @@ onUIChange('onAudioDeviceChanged', async data => {
 				console.error('❌ [onAudioDeviceChanged] switchDeviceDeepgram NÃO é função!', typeof switchDeviceDeepgram);
 			}
 		} else if (sttModel === 'vosk') {
-			console.log('🔄 [onAudioDeviceChanged] Chamando switchDeviceVosk...');
+			console.log('🔄 [onAudioDeviceChanged] Vosk está ativo, chamando switchDeviceVosk...');
 			if (typeof switchDeviceVosk === 'function') {
 				console.log('✅ [onAudioDeviceChanged] switchDeviceVosk é função, executando...');
 				await switchDeviceVosk(data.type, data.deviceId);
@@ -320,7 +326,7 @@ onUIChange('onAudioDeviceChanged', async data => {
 				console.error('❌ [onAudioDeviceChanged] switchDeviceVosk NÃO é função!', typeof switchDeviceVosk);
 			}
 		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			console.log('🔄 [onAudioDeviceChanged] Chamando switchDeviceWhisper...');
+			console.log('🔄 [onAudioDeviceChanged] Whisper está ativo, chamando switchDeviceWhisper...');
 			if (typeof switchDeviceWhisper === 'function') {
 				console.log('✅ [onAudioDeviceChanged] switchDeviceWhisper é função, executando...');
 				await switchDeviceWhisper(UIElements);

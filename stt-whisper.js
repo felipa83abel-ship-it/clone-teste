@@ -11,7 +11,7 @@
  * Uso:
  * - startAudioWhisper(UIElements)
  * - stopAudioWhisper()
- * - switchDeviceWhisper(source, UIElements)
+ * - switchDeviceWhisper(INPUT|OUTPUT, newDeviceId)
  */
 
 /* ================================ */
@@ -44,12 +44,12 @@ const INPUT = 'input';
 const OUTPUT = 'output';
 
 // Configuração de Áudio 16kHz
+const AUDIO_SAMPLE_RATE = 16000; // 16kHz
 const AUDIO_MIME_TYPE = 'audio/webm';
-const AUDIO_SAMPLE_RATE = 16000; // Hz
 
 // AudioWorkletProcessor
-const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor';
-const AUDIO_WORKLET_PROCESSOR_PATH = './stt-audio-worklet-processor.js';
+const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor'; // Nome
+const AUDIO_WORKLET_PROCESSOR_PATH = './stt-audio-worklet-processor.js'; // Path
 
 // Detecção de silêncio
 const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
@@ -65,26 +65,32 @@ const WHISPER_WARMUP_FILENAME = 'whisper-warmup.wav';
 const WARMUP_DURATION_SECONDS = 1;
 const WARMUP_SAMPLE_RATE = 16000;
 
-// VAD Engine
-let vad = null;
-
 /* ================================ */
 //	ESTADO GLOBAL DO WHISPER
 /* ================================ */
 
+// VAD Engine
+let vad = null;
+
+// Cliente OpenAI
+let openaiClient = null;
+let whisperLocalReady = false;
+let whisperLocalWarmupPromise = null;
+
 // whisperState mantém seu próprio estado interno
 const whisperState = {
 	input: {
+		// ========== PROPRIEDADES COMUNS (CORE) ==========
 		_isActive: false,
 		_stream: null,
-		_mediaRecorder: null,
-		_audioChunks: [],
+		_audioContext: null,
+		_processor: null,
+		_source: null,
 		_startAt: null,
 		_isSwitching: false,
-		_processor: null,
-		_audioContext: null,
-		_source: null,
+		_deviceId: null,
 
+		// ========== GETTERS/SETTERS PADRÃO (COMUM A TODOS) ==========
 		isActive() {
 			return this._isActive;
 		},
@@ -97,17 +103,23 @@ const whisperState = {
 		setStream(val) {
 			this._stream = val;
 		},
-		mediaRecorder() {
-			return this._mediaRecorder;
+		audioContext() {
+			return this._audioContext;
 		},
-		setMediaRecorder(val) {
-			this._mediaRecorder = val;
+		setAudioContext(val) {
+			this._audioContext = val;
 		},
-		audioChunks() {
-			return this._audioChunks;
+		processor() {
+			return this._processor;
 		},
-		setAudioChunks(val) {
-			this._audioChunks = val;
+		setProcessor(val) {
+			this._processor = val;
+		},
+		source() {
+			return this._source;
+		},
+		setSource(val) {
+			this._source = val;
 		},
 		startAt() {
 			return this._startAt;
@@ -121,25 +133,31 @@ const whisperState = {
 		setIsSwitching(val) {
 			this._isSwitching = val;
 		},
-		processor() {
-			return this._processor;
+		deviceId() {
+			return this._deviceId;
 		},
-		setProcessor(val) {
-			this._processor = val;
-		},
-		audioContext() {
-			return this._audioContext;
-		},
-		setAudioContext(val) {
-			this._audioContext = val;
-		},
-		source() {
-			return this._source;
-		},
-		setSource(val) {
-			this._source = val;
+		setDeviceId(val) {
+			this._deviceId = val;
 		},
 
+		// ========== PROPRIEDADES ESPECÍFICAS DO WHISPER ==========
+		_mediaRecorder: null,
+		_audioChunks: [],
+
+		mediaRecorder() {
+			return this._mediaRecorder;
+		},
+		setMediaRecorder(val) {
+			this._mediaRecorder = val;
+		},
+		audioChunks() {
+			return this._audioChunks;
+		},
+		setAudioChunks(val) {
+			this._audioChunks = val;
+		},
+
+		// ========== PROPRIEDADES AUXILIARES (VAD + UI STATE) ==========
 		author: 'Você',
 		lastTranscript: '',
 		inSilence: false,
@@ -153,16 +171,17 @@ const whisperState = {
 		noiseStopTime: null,
 	},
 	output: {
+		// ========== PROPRIEDADES COMUNS (CORE) ==========
 		_isActive: false,
 		_stream: null,
-		_mediaRecorder: null,
-		_audioChunks: [],
+		_audioContext: null,
+		_processor: null,
+		_source: null,
 		_startAt: null,
 		_isSwitching: false,
-		_processor: null,
-		_audioContext: null,
-		_source: null,
+		_deviceId: null,
 
+		// ========== GETTERS/SETTERS PADRÃO (COMUM A TODOS) ==========
 		isActive() {
 			return this._isActive;
 		},
@@ -175,17 +194,23 @@ const whisperState = {
 		setStream(val) {
 			this._stream = val;
 		},
-		mediaRecorder() {
-			return this._mediaRecorder;
+		audioContext() {
+			return this._audioContext;
 		},
-		setMediaRecorder(val) {
-			this._mediaRecorder = val;
+		setAudioContext(val) {
+			this._audioContext = val;
 		},
-		audioChunks() {
-			return this._audioChunks;
+		processor() {
+			return this._processor;
 		},
-		setAudioChunks(val) {
-			this._audioChunks = val;
+		setProcessor(val) {
+			this._processor = val;
+		},
+		source() {
+			return this._source;
+		},
+		setSource(val) {
+			this._source = val;
 		},
 		startAt() {
 			return this._startAt;
@@ -199,25 +224,31 @@ const whisperState = {
 		setIsSwitching(val) {
 			this._isSwitching = val;
 		},
-		processor() {
-			return this._processor;
+		deviceId() {
+			return this._deviceId;
 		},
-		setProcessor(val) {
-			this._processor = val;
-		},
-		audioContext() {
-			return this._audioContext;
-		},
-		setAudioContext(val) {
-			this._audioContext = val;
-		},
-		source() {
-			return this._source;
-		},
-		setSource(val) {
-			this._source = val;
+		setDeviceId(val) {
+			this._deviceId = val;
 		},
 
+		// ========== PROPRIEDADES ESPECÍFICAS DO WHISPER ==========
+		_mediaRecorder: null,
+		_audioChunks: [],
+
+		mediaRecorder() {
+			return this._mediaRecorder;
+		},
+		setMediaRecorder(val) {
+			this._mediaRecorder = val;
+		},
+		audioChunks() {
+			return this._audioChunks;
+		},
+		setAudioChunks(val) {
+			this._audioChunks = val;
+		},
+
+		// ========== PROPRIEDADES AUXILIARES (VAD + UI STATE) ==========
 		author: 'Outros',
 		lastTranscript: '',
 		inSilence: false,
@@ -231,10 +262,6 @@ const whisperState = {
 		noiseStopTime: null,
 	},
 };
-
-let openaiClient = null;
-let whisperLocalReady = false;
-let whisperLocalWarmupPromise = null;
 
 /* ================================ */
 //	SERVIÇO WHISPER
@@ -511,8 +538,9 @@ function updateVADState(vars, isSpeech) {
 //	WHISPER - INICIAR FLUXO (STT)
 /* ================================ */
 
-// // Inicia captura de áudio do dispositivo de entrada ou saída com Whisper
+// Inicia captura de áudio do dispositivo de entrada ou saída com Whisper
 async function startWhisper(source, UIElements) {
+	// Configurações específicas por source
 	const config = {
 		input: {
 			deviceKey: 'inputSelect',
@@ -529,11 +557,13 @@ async function startWhisper(source, UIElements) {
 	};
 
 	const cfg = config[source];
-	if (!cfg) throw new Error(`❌ Source inválido: ${source}`);
+	if (!cfg) {
+		throw new Error(`❌ Source inválido: ${source}. Use ${INPUT} ou ${OUTPUT}`);
+	}
 
 	const vars = whisperState[source];
 
-	if (vars.isActive()) {
+	if (vars.isActive?.()) {
 		console.warn(`⚠️ Whisper ${source.toUpperCase()} já ativo`);
 		return;
 	}
@@ -616,7 +646,7 @@ async function startWhisper(source, UIElements) {
 		processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
 		processor.port.onmessage = event => {
 			// Processa mensagens do AudioWorklet (audioData e volumeUpdate separadamente)
-			processIncomingAudioMessageWhisper(source, event.data, mediaRecorder, vars).catch(error_ =>
+			processIncomingAudioMessageWhisper(source, event.data, mediaRecorder).catch(error_ =>
 				console.error(`❌ Erro ao processar mensagem do worklet (${source}):`, error_),
 			);
 		};
@@ -625,13 +655,14 @@ async function startWhisper(source, UIElements) {
 		mediaSource.connect(processor);
 		processor.connect(audioContext.destination);
 
-		// Atualiza estado
+		// Atualiza referências de estado
 		vars.setStream(stream);
 		vars.setAudioContext(audioContext);
 		vars.setSource(mediaSource);
 		vars.setProcessor(processor);
 		vars.setActive(true);
 		vars.setStartAt(Date.now());
+		vars.lastActive = Date.now();
 		vars.setMediaRecorder(mediaRecorder);
 
 		// Inicia gravação
@@ -640,13 +671,19 @@ async function startWhisper(source, UIElements) {
 		debugLogWhisper(cfg.startLog, true);
 	} catch (error) {
 		console.error(`❌ Erro ao iniciar Whisper ${source.toUpperCase()}:`, error);
+		try {
+			vars.setActive(false);
+		} catch (error_) {
+			console.warn('⚠️ Aviso ao resetar active flag:', error_ && (error_.message || error_));
+		}
 		stopWhisper(source);
 		throw error;
 	}
 }
 
 // Processa mensagens de áudio recebida do AudioWorklet
-async function processIncomingAudioMessageWhisper(source, data, mediaRecorder, vars) {
+async function processIncomingAudioMessageWhisper(source, data, mediaRecorder) {
+	const vars = whisperState[source];
 	if (data.type === 'audioData') {
 		// Processa chunk de áudio PCM16
 		onAudioChunkWhisper(source, data, vars);
@@ -679,7 +716,7 @@ function handleSilenceDetectionWhisper(source, percent, mediaRecorder) {
 	const now = Date.now();
 
 	// Decisão principal: VAD se disponível, senão fallback por volume
-	const useVADDecision = vad?.isEnabled?.() && vars._lastIsSpeech !== undefined;
+	const useVADDecision = vad?.isEnabled() && vars._lastIsSpeech !== undefined;
 	const effectiveSpeech = useVADDecision ? !!vars._lastIsSpeech : percent > 0;
 
 	debugLogWhisper(
@@ -688,7 +725,7 @@ function handleSilenceDetectionWhisper(source, percent, mediaRecorder) {
 	);
 
 	if (effectiveSpeech) {
-		// Se detectou fala, resetamos timer de silêncio
+		// Se detectou fala, resetamos estado de silêncio
 		if (vars.inSilence) {
 			if (!vars.noiseStartTime) vars.noiseStartTime = Date.now();
 
@@ -873,38 +910,48 @@ async function changeDeviceWhisper(source, newDeviceId) {
 		return;
 	}
 
-	// CASO 1: Device vazio → STOP
-	const normalizedDeviceId = newDeviceId?.toString().toLowerCase().trim() || '';
-	if (!normalizedDeviceId || normalizedDeviceId === 'nenhum') {
-		debugLogWhisper(
-			`🛑 Device vazio para ${source.toUpperCase()}, parando Whisper... (deviceId="${newDeviceId}")`,
-			false,
-		);
-		stopWhisper(source);
-		return;
-	}
+	// 🔥 INÍCIO: Marca como trocando para evitar chamadas duplicadas
+	vars.setIsSwitching(true);
 
-	// CASO 2: Inativo + device válido → START
-	if (!vars.isActive()) {
-		debugLogWhisper(`🚀 Whisper ${source.toUpperCase()} inativo, iniciando com novo dispositivo...`, false);
-		await startWhisper(source, newDeviceId);
-		return;
-	}
-
-	// CASO 3: Ativo + device alterado → RESTART
-	if (vars.deviceId?.() !== newDeviceId) {
-		debugLogWhisper(`🔄 Whisper ${source.toUpperCase()} ativo com device diferente, reiniciando...`, false);
-		vars.setIsSwitching(true);
-		try {
+	try {
+		// CASO 1: Device vazio → STOP
+		const normalizedDeviceId = newDeviceId?.toString().toLowerCase().trim() || '';
+		if (!normalizedDeviceId || normalizedDeviceId === 'nenhum') {
+			debugLogWhisper(
+				`🛑 Device vazio para ${source.toUpperCase()}, parando Whisper... (deviceId="${newDeviceId}")`,
+				false,
+			);
 			stopWhisper(source);
-			// Aguarda um pouco para liberar recursos
-			await new Promise(resolve => setTimeout(resolve, 300));
-			await startWhisper(source, newDeviceId);
-		} catch (error) {
-			console.error(`❌ Erro ao reiniciar após troca de dispositivo:`, error);
-		} finally {
-			vars.setIsSwitching(false);
+			return;
 		}
+
+		// CASO 2: Inativo + device válido → START
+		if (!vars.isActive()) {
+			debugLogWhisper(`🚀 Whisper ${source.toUpperCase()} inativo, iniciando com novo dispositivo...`, false);
+			const uiElement = { [source === 'input' ? 'inputSelect' : 'outputSelect']: { value: newDeviceId } };
+			await startWhisper(source, uiElement);
+			return;
+		}
+
+		// CASO 3: Ativo + device alterado → RESTART
+		if (vars.deviceId?.() !== newDeviceId) {
+			debugLogWhisper(`🔄 Whisper ${source.toUpperCase()} ativo com device diferente, reiniciando...`, false);
+			try {
+				// Para completamente o Whisper anterior
+				stopWhisper(source);
+				// Aguarda um pouco para liberar recursos
+				await new Promise(resolve => setTimeout(resolve, 300));
+				// Reinicia com novo dispositivo
+				const uiElement = { [source === 'input' ? 'inputSelect' : 'outputSelect']: { value: newDeviceId } };
+				await startWhisper(source, uiElement);
+			} catch (error) {
+				console.error(`❌ Erro ao reiniciar após troca de dispositivo:`, error);
+			}
+		}
+	} finally {
+		// 🔥 FIM: Seta deviceId e marca como não trocando mais
+		vars.setDeviceId(newDeviceId);
+		vars.setIsSwitching(false);
 	}
 }
 
@@ -1028,12 +1075,18 @@ async function startAudioWhisper(UIElements) {
  * Para Whisper para INPUT + OUTPUT
  */
 function stopAudioWhisper() {
-	stopWhisper(INPUT);
-	stopWhisper(OUTPUT);
+	try {
+		// 🎤 Whisper: Para INPUT e OUTPUT
+		stopWhisper(INPUT);
+		stopWhisper(OUTPUT);
+		debugLogWhisper('🛑 Whisper completamente parado', true);
+	} catch (error) {
+		console.error('❌ Erro ao parar Whisper:', error);
+	}
 }
 
 /**
- * Muda dispositivo para um source mantendo Whisper ativo
+ * Troca dinâmica do dispositivo (input/output) mantendo Whisper ativo
  */
 async function switchDeviceWhisper(source, newDeviceId) {
 	try {

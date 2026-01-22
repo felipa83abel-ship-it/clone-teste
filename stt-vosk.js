@@ -30,7 +30,7 @@ const INPUT = 'input';
 const OUTPUT = 'output';
 
 // Configuração de Áudio 16kHz
-const AUDIO_SAMPLE_RATE = 16000; // Hz
+const AUDIO_SAMPLE_RATE = 16000; // 16kHz
 
 // AudioWorkletProcessor
 const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor'; // Nome
@@ -43,30 +43,57 @@ const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 // Configuração Vosk
 const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3' };
 
-// VAD Engine
-let vad = null;
-
 /* ================================ */
 //	ESTADO GLOBAL DO VOSK
 /* ================================ */
 
+// VAD Engine
+let vad = null;
+
 // voskState mantém seu próprio estado interno
 const voskState = {
 	input: {
+		// ========== PROPRIEDADES COMUNS (CORE) ==========
 		_isActive: false,
 		_stream: null,
 		_audioContext: null,
 		_processor: null,
 		_source: null,
 		_startAt: null,
-		_lastChunkTime: null,
-		_silenceCheckTimer: null,
-		_recordingActive: false,
-		_canSend: false,
-		_voskProcess: null,
 		_isSwitching: false,
 		_deviceId: null,
 
+		// ========== GETTERS/SETTERS PADRÃO (COMUM A TODOS) ==========
+		isActive() {
+			return this._isActive;
+		},
+		setActive(val) {
+			this._isActive = val;
+		},
+		stream() {
+			return this._stream;
+		},
+		setStream(val) {
+			this._stream = val;
+		},
+		audioContext() {
+			return this._audioContext;
+		},
+		setAudioContext(val) {
+			this._audioContext = val;
+		},
+		processor() {
+			return this._processor;
+		},
+		setProcessor(val) {
+			this._processor = val;
+		},
+		source() {
+			return this._source;
+		},
+		setSource(val) {
+			this._source = val;
+		},
 		startAt() {
 			return this._startAt;
 		},
@@ -79,7 +106,20 @@ const voskState = {
 		setIsSwitching(val) {
 			this._isSwitching = val;
 		},
+		deviceId() {
+			return this._deviceId;
+		},
+		setDeviceId(val) {
+			this._deviceId = val;
+		},
 
+		// ========== PROPRIEDADES ESPECÍFICAS DO VOSK ==========
+		_lastChunkTime: null,
+		_recordingActive: false,
+		_canSend: false,
+		_voskProcess: null,
+
+		// ========== PROPRIEDADES AUXILIARES (VAD + UI STATE) ==========
 		author: 'Você',
 		lastTranscript: '',
 		inSilence: false,
@@ -93,19 +133,47 @@ const voskState = {
 		noiseStopTime: null,
 	},
 	output: {
+		// ========== PROPRIEDADES COMUNS (CORE) ==========
 		_isActive: false,
 		_stream: null,
 		_audioContext: null,
 		_processor: null,
 		_source: null,
 		_startAt: null,
-		_silenceCheckTimer: null,
-		_recordingActive: false,
-		_canSend: false,
-		_voskProcess: null,
 		_isSwitching: false,
 		_deviceId: null,
 
+		// ========== GETTERS/SETTERS PADRÃO (COMUM A TODOS) ==========
+		isActive() {
+			return this._isActive;
+		},
+		setActive(val) {
+			this._isActive = val;
+		},
+		stream() {
+			return this._stream;
+		},
+		setStream(val) {
+			this._stream = val;
+		},
+		audioContext() {
+			return this._audioContext;
+		},
+		setAudioContext(val) {
+			this._audioContext = val;
+		},
+		processor() {
+			return this._processor;
+		},
+		setProcessor(val) {
+			this._processor = val;
+		},
+		source() {
+			return this._source;
+		},
+		setSource(val) {
+			this._source = val;
+		},
 		startAt() {
 			return this._startAt;
 		},
@@ -118,7 +186,19 @@ const voskState = {
 		setIsSwitching(val) {
 			this._isSwitching = val;
 		},
+		deviceId() {
+			return this._deviceId;
+		},
+		setDeviceId(val) {
+			this._deviceId = val;
+		},
 
+		// ========== PROPRIEDADES ESPECÍFICAS DO VOSK ==========
+		_recordingActive: false,
+		_canSend: false,
+		_voskProcess: null,
+
+		// ========== PROPRIEDADES AUXILIARES (VAD + UI STATE) ==========
 		author: 'Outros',
 		lastTranscript: '',
 		inSilence: false,
@@ -249,6 +329,7 @@ function updateVADState(vars, isSpeech) {
 
 // Inicia captura de áudio do dispositivo de entrada ou saída com Vosk
 async function startVosk(source, UIElements) {
+	// Configurações específicas por source
 	const config = {
 		input: {
 			deviceKey: 'inputSelect',
@@ -265,11 +346,13 @@ async function startVosk(source, UIElements) {
 	};
 
 	const cfg = config[source];
-	if (!cfg) throw new Error(`❌ Source inválido: ${source}`);
+	if (!cfg) {
+		throw new Error(`❌ Source inválido: ${source}. Use ${INPUT} ou ${OUTPUT}`);
+	}
 
 	const vars = voskState[source];
 
-	if (vars._isActive) {
+	if (vars.isActive?.()) {
 		console.warn(`⚠️ Vosk ${source.toUpperCase()} já ativo`);
 		return;
 	}
@@ -321,14 +404,15 @@ async function startVosk(source, UIElements) {
 		mediaSource.connect(processor);
 		processor.connect(audioContext.destination);
 
-		vars._processor = processor;
+		vars.setProcessor(processor);
 
 		// Atualiza referências de estado
-		vars._stream = stream;
-		vars._audioContext = audioContext;
-		vars._source = mediaSource;
-		vars._isActive = true;
-		vars._startAt = Date.now();
+		vars.setStream(stream);
+		vars.setAudioContext(audioContext);
+		vars.setSource(mediaSource);
+		vars.setProcessor(processor);
+		vars.setActive(true);
+		vars.setStartAt(Date.now());
 		vars.lastActive = Date.now();
 		vars._recordingActive = true;
 		vars._canSend = true;
@@ -336,6 +420,11 @@ async function startVosk(source, UIElements) {
 		debugLogVosk(cfg.startLog, true);
 	} catch (error) {
 		console.error(`❌ Erro ao iniciar Vosk ${source.toUpperCase()}:`, error);
+		try {
+			vars.setActive(false);
+		} catch (error_) {
+			console.warn('⚠️ Aviso ao resetar active flag:', error_ && (error_.message || error_));
+		}
 		stopVosk(source);
 		throw error;
 	}
@@ -358,7 +447,7 @@ async function processIncomingAudioMessageVosk(source, data) {
 	}
 }
 
-// Processa chunk de áudio PCM16 vindo do AudioWorklet
+// Processa chunk de áudio PCM16 do AudioWorklet
 async function onAudioChunkVosk(source, data, vars) {
 	const pcm16Array = data.pcm16 instanceof ArrayBuffer ? new Int16Array(data.pcm16) : data.pcm16;
 
@@ -367,7 +456,7 @@ async function onAudioChunkVosk(source, data, vars) {
 	}
 
 	// VAD: Detecta fala usando VAD Engine
-	const isSpeech = vad.detectSpeech(data.pcm16, vars.lastPercent, vars.vadWindow);
+	const isSpeech = vad?.detectSpeech(data.pcm16, vars.lastPercent, vars.vadWindow);
 	updateVADState(vars, isSpeech);
 
 	try {
@@ -594,81 +683,45 @@ async function changeDeviceVosk(source, newDeviceId) {
 		return;
 	}
 
-	// CASO 1: Device vazio → STOP
-	const normalizedDeviceId = newDeviceId?.toString().toLowerCase().trim() || '';
-	if (!normalizedDeviceId || normalizedDeviceId === 'nenhum') {
-		debugLogVosk(`🛑 Device vazio para ${source.toUpperCase()}, parando Vosk... (deviceId="${newDeviceId}")`, false);
-		await stopVosk(source);
-		return;
-	}
+	// 🔥 INÍCIO: Marca como trocando para evitar chamadas duplicadas
+	vars.setIsSwitching(true);
 
-	// CASO 2: Inativo + device válido → START
-	if (!vars._isActive) {
-		debugLogVosk(`🚀 Vosk ${source.toUpperCase()} inativo, iniciando com novo dispositivo...`, false);
-		vars._deviceId = newDeviceId;
-		await startVosk(source, {
-			inputSelect: { value: source === 'input' ? newDeviceId : voskState.input._deviceId },
-			outputSelect: { value: source === 'output' ? newDeviceId : voskState.output._deviceId },
-		});
-		return;
-	}
-
-	// CASO 3: Ativo + device alterado → RESTART
-	if (vars._deviceId !== newDeviceId) {
-		debugLogVosk(`🔄 Vosk ${source.toUpperCase()} ativo com device diferente, reiniciando...`, false);
-		vars.setIsSwitching(true);
-		try {
-			// Pausa temporariamente a gravação
-			vars._canSend = false;
-
-			// Obtém novo stream do dispositivo
-			const newStream = await navigator.mediaDevices.getUserMedia({
-				audio: {
-					deviceId: { exact: newDeviceId },
-					echoCancellation: true,
-					noiseSuppression: true,
-					autoGainControl: false,
-				},
-			});
-
-			// Cria nova MediaStreamSource
-			const audioCtx = vars._audioContext;
-			const newSource = audioCtx.createMediaStreamSource(newStream);
-
-			// Desconecta source anterior
-			try {
-				if (vars._source) vars._source.disconnect();
-			} catch (e) {
-				console.warn(`⚠️ Falha ao desconectar source anterior (${source}):`, e);
-			}
-
-			// Conecta nova source -> processor
-			newSource.connect(vars._processor);
-
-			// Para tracks do stream anterior, para evitar leaks
-			try {
-				if (vars._stream) vars._stream.getTracks().forEach(t => t.stop());
-			} catch (e) {
-				console.warn(`⚠️ Falha ao parar tracks do stream anterior (${source}):`, e);
-			}
-
-			// Atualiza referências
-			vars._stream = newStream;
-			vars._source = newSource;
-			vars._deviceId = newDeviceId;
-
-			// Retoma gravação
-			vars._canSend = true;
-
-			debugLogVosk(`✅ Troca de dispositivo ${source.toUpperCase()} concluída`, true);
-		} catch (e) {
-			console.error(`❌ Falha ao trocar dispositivo ${source.toUpperCase()}:`, e);
-			// Tenta restaurar gravação em caso de erro
-			vars._canSend = true;
-			throw e;
-		} finally {
-			vars.setIsSwitching(false);
+	try {
+		// CASO 1: Device vazio → STOP
+		const normalizedDeviceId = newDeviceId?.toString().toLowerCase().trim() || '';
+		if (!normalizedDeviceId || normalizedDeviceId === 'nenhum') {
+			debugLogVosk(`🛑 Device vazio para ${source.toUpperCase()}, parando Vosk... (deviceId="${newDeviceId}")`, false);
+			await stopVosk(source);
+			return;
 		}
+
+		// CASO 2: Inativo + device válido → START
+		if (!vars.isActive?.()) {
+			debugLogVosk(`🚀 Vosk ${source.toUpperCase()} inativo, iniciando com novo dispositivo...`, false);
+			const uiElement = { [source === 'input' ? 'inputSelect' : 'outputSelect']: { value: newDeviceId } };
+			await startVosk(source, uiElement);
+			return;
+		}
+
+		// CASO 3: Ativo + device alterado → RESTART
+		if (vars.deviceId?.() !== newDeviceId) {
+			debugLogVosk(`🔄 Vosk ${source.toUpperCase()} ativo com device diferente, reiniciando...`, false);
+			try {
+				// Para completamente o Vosk anterior
+				await stopVosk(source);
+				// Aguarda um pouco para liberar recursos
+				await new Promise(resolve => setTimeout(resolve, 300));
+				// Reinicia com novo dispositivo
+				const uiElement = { [source === 'input' ? 'inputSelect' : 'outputSelect']: { value: newDeviceId } };
+				await startVosk(source, uiElement);
+			} catch (error) {
+				console.error(`❌ Erro ao reiniciar após troca de dispositivo:`, error);
+			}
+		}
+	} finally {
+		// 🔥 FIM: Seta deviceId e marca como não trocando mais
+		vars.setDeviceId(newDeviceId);
+		vars.setIsSwitching(false);
 	}
 }
 
@@ -684,19 +737,13 @@ async function stopVosk(source) {
 	// Pode haver estado inconsistente (ex: Vosk rodando mas _isActive=false)
 
 	try {
-		// Para timer de silêncio
-		if (vars._silenceCheckTimer) {
-			clearInterval(vars._silenceCheckTimer);
-			vars._silenceCheckTimer = null;
-		}
-
 		// Para Vosk
 		stopVoskProcess(source);
 
 		// Desconecta processor
-		if (vars._processor) {
+		if (vars.processor?.()) {
 			try {
-				vars._processor.disconnect?.();
+				vars.processor()?.disconnect?.();
 			} catch (e) {
 				console.warn(`⚠️ Erro ao desconectar processor (${source}):`, e);
 			}
@@ -712,14 +759,17 @@ async function stopVosk(source) {
 		}
 
 		// Fecha stream
-		vars._stream?.getTracks?.().forEach(track => track.stop());
+		vars
+			.stream?.()
+			?.getTracks?.()
+			.forEach(track => track.stop());
 
-		vars._isActive = false;
-		vars._stream = null;
-		vars._processor = null;
+		vars.setActive(false);
+		vars.setStream(null);
+		vars.setProcessor(null);
 		vars._source = null;
-		vars._audioContext = null;
-		vars._startAt = null;
+		vars.setAudioContext(null);
+		vars.setStartAt(null);
 
 		// Zera o oscilador no UI
 		handleVolumeUpdate(source, 0);
@@ -788,12 +838,18 @@ async function startAudioVosk(UIElements) {
  * Para Vosk para INPUT + OUTPUT
  */
 function stopAudioVosk() {
-	stopVosk(INPUT);
-	stopVosk(OUTPUT);
+	try {
+		// 🔥 Vosk: Para INPUT e OUTPUT
+		stopVosk(INPUT);
+		stopVosk(OUTPUT);
+		debugLogVosk('🛑 Vosk completamente parado', true);
+	} catch (error) {
+		console.error('❌ Erro ao parar Vosk:', error);
+	}
 }
 
 /**
- * Muda dispositivo para um source mantendo Vosk ativo
+ * Troca dinâmica do dispositivo (input/output) mantendo Vosk ativo
  */
 async function switchDeviceVosk(source, newDeviceId) {
 	try {
