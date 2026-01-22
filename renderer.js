@@ -1,5 +1,5 @@
 /* ================================ */
-//	IMPORTAÇÕES E PROTEÇÃO CONTRA CAPTURA DE TELA
+//	IMPORTES E DEPENDÊNCIAS
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
@@ -13,6 +13,10 @@ const {
 	stopAudioVolumeMonitor,
 	switchAudioVolumeDevice,
 } = require('./volume-audio-monitor.js');
+
+/* ================================ */
+//	PROTEÇÃO CONTRA CAPTURA DE TELA
+/* ================================ */
 
 /**
  * Proteção contra captura de tela externa
@@ -58,11 +62,32 @@ const {
 	console.log('✅ Proteção contra captura externa ativada');
 })();
 
-/**
- * Constantes globais
- */
+/* ================================ */
+//	CONSTANTES
+/* ================================ */
+
 const YOU = 'Você';
 const OTHER = 'Outros';
+
+// Modos de operação
+const MODES = {
+	NORMAL: 'NORMAL',
+	INTERVIEW: 'INTERVIEW',
+};
+
+// 🔄 modo atual (default = comportamento atual)
+let CURRENT_MODE = MODES.NORMAL;
+
+// Controlador de modo
+const ModeController = {
+	/**
+	 * Verifica se está em modo entrevista
+	 * @returns {boolean} true se modo entrevista
+	 */
+	isInterviewMode() {
+		return CURRENT_MODE === MODES.INTERVIEW;
+	},
+};
 
 const ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
@@ -229,31 +254,6 @@ function registerUIElements(elements) {
 	UIElements = { ...UIElements, ...elements };
 	console.log('✅ UI Elements registrados no renderer.js');
 }
-
-/* ================================ */
-//	MODO E ORQUESTRADOR
-/* ================================ */
-
-const MODES = {
-	NORMAL: 'NORMAL',
-	INTERVIEW: 'INTERVIEW',
-};
-
-// 🔄 modo atual (default = comportamento atual)
-let CURRENT_MODE = MODES.NORMAL;
-
-/**
- * Controlador central de estratégia por modo
- */
-const ModeController = {
-	/**
-	 * Verifica se está em modo entrevista
-	 * @returns {boolean} true se modo entrevista
-	 */
-	isInterviewMode() {
-		return CURRENT_MODE === MODES.INTERVIEW;
-	},
-};
 
 /* ================================ */
 //	MONITORAMENTO DE VOLUME
@@ -1314,170 +1314,6 @@ function logTranscriptionMetrics() {
 }
 
 /* ================================ */
-//	RESET COMPLETO
-/* ================================ */
-
-/**
- * Reseta todo o estado do app
- */
-async function resetAppState() {
-	console.log('🧹 ═══════════════════════════════════════════════════════════');
-	console.log('🧹 INICIANDO RESET COMPLETO DO APP');
-	console.log('🧹 ═══════════════════════════════════════════════════════════');
-
-	try {
-		// 1️⃣ PARAR AUTOPLAY DO MOCK (prevent async operations)
-		mockAutoPlayActive = false;
-		mockScenarioIndex = 0;
-		console.log('✅ Autoplay do mock parado');
-
-		// 2️⃣ PARAR ÁUDIO IMEDIATAMENTE (input/output)
-		if (isRunning) {
-			console.log('🎤 Parando captura de áudio...');
-			isRunning = false;
-		}
-
-		// 3️⃣ LIMPAR TIMERS DE ÁUDIO
-		if (inputSilenceTimer) {
-			clearTimeout(inputSilenceTimer);
-			inputSilenceTimer = null;
-		}
-		if (outputSilenceTimer) {
-			clearTimeout(outputSilenceTimer);
-			outputSilenceTimer = null;
-		}
-		if (inputPartialTimer) {
-			clearTimeout(inputPartialTimer);
-			inputPartialTimer = null;
-		}
-		if (outputPartialTimer) {
-			clearTimeout(outputPartialTimer);
-			outputPartialTimer = null;
-		}
-		if (autoCloseQuestionTimer) {
-			clearTimeout(autoCloseQuestionTimer);
-			autoCloseQuestionTimer = null;
-		}
-		console.log('✅ Timers limpos');
-
-		// 4️⃣ LIMPAR PERGUNTAS E RESPOSTAS
-		currentQuestion = {
-			text: '',
-			lastUpdate: 0,
-			finalized: false,
-			lastUpdateTime: null,
-			createdAt: null,
-			finalText: '',
-			interimText: '',
-		};
-		questionsHistory = [];
-		answeredQuestions.clear();
-		selectedQuestionId = null;
-		lastAskedQuestionNormalized = null;
-		console.log('✅ Perguntas e respostas limpas');
-
-		// 5️⃣ LIMPAR ESTADO GPT/ENTREVISTA
-		interviewTurnId = 0;
-		gptAnsweredTurnId = null;
-		gptRequestedTurnId = null;
-		gptRequestedQuestionId = null;
-		console.log('✅ Estado de entrevista resetado');
-
-		// 6️⃣ RESETAR MÉTRICAS
-		transcriptionMetrics = {
-			audioStartTime: null,
-			gptStartTime: null,
-			gptEndTime: null,
-			totalTime: null,
-			audioSize: 0,
-		};
-		console.log('✅ Métricas resetadas');
-
-		// 7️⃣ LIMPAR SCREENSHOTS (sem chamar API!)
-		if (capturedScreenshots.length > 0) {
-			console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
-			capturedScreenshots = [];
-			emitUIChange('onScreenshotBadgeUpdate', {
-				count: 0,
-				visible: false,
-			});
-			// Força limpeza no sistema
-			try {
-				await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
-			} catch (err) {
-				console.warn('⚠️ Erro ao limpar screenshots no sistema:', err);
-			}
-		}
-		console.log('✅ Screenshots limpos');
-
-		// 8️⃣ LIMPAR FLAGS
-		isCapturing = false;
-		isAnalyzing = false;
-		console.log('✅ Flags resetadas');
-
-		// 9️⃣ ATUALIZAR UI - PERGUNTAS
-		emitUIChange('onCurrentQuestionUpdate', {
-			text: '',
-			isSelected: false,
-		});
-		emitUIChange('onQuestionsHistoryUpdate', []);
-		console.log('✅ Perguntas UI limpa');
-
-		// 🔟 ATUALIZAR UI - TRANSCRIÇÕES E RESPOSTAS
-		emitUIChange('onTranscriptionCleared');
-		emitUIChange('onAnswersCleared');
-		console.log('✅ Transcrições e respostas UI limpas');
-
-		// 1️⃣1️⃣ ATUALIZAR UI - BOTÃO LISTEN
-		emitUIChange('onListenButtonToggle', {
-			isRunning: false,
-			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
-		});
-		console.log('✅ Botão listen resetado');
-
-		// 1️⃣2️⃣ ATUALIZAR UI - STATUS
-		emitUIChange('onStatusUpdate', {
-			status: 'ready',
-			message: '✅ Pronto',
-		});
-		console.log('✅ Status atualizado');
-
-		// 1️⃣3️⃣ LIMPAR SELEÇÕES
-		clearAllSelections();
-		console.log('✅ Seleções limpas');
-
-		// 1️⃣4️⃣ LOG FINAL
-		console.log('✅ ═══════════════════════════════════════════════════════════');
-		console.log('✅ RESET COMPLETO CONCLUÍDO COM SUCESSO');
-		console.log('✅ ═══════════════════════════════════════════════════════════');
-
-		return true;
-	} catch (error) {
-		console.error('❌ Erro ao resetar app:', error);
-		return false;
-	}
-}
-
-/**
- * Função acionada pelo botão de reset na UI
- */
-function resetHomeSection() {
-	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
-	console.log('🔄 RESET COMPLETO ACIONADO PELO BOTÃO resetHomeBtn');
-	console.log('════════════════════════════════════════════════════════════════════════════════════════');
-
-	// 🔥 Usar a função centralizada de reset
-	resetAppState().then(success => {
-		if (success) {
-			console.log('✅ Reset via resetAppState() concluído com sucesso!');
-		} else {
-			console.error('❌ Erro ao executar resetAppState()');
-		}
-		console.log('════════════════════════════════════════════════════════════════════════════════════════\n');
-	});
-}
-
-/* ================================ */
 //	SCREENSHOT E ANÁLISE
 /* ================================ */
 
@@ -1647,6 +1483,170 @@ function clearScreenshots() {
 	// Força limpeza no sistema
 	ipcRenderer.invoke('CLEANUP_SCREENSHOTS').catch(err => {
 		console.warn('⚠️ Erro na limpeza:', err);
+	});
+}
+
+/* ================================ */
+//	RESET COMPLETO
+/* ================================ */
+
+/**
+ * Reseta todo o estado do app
+ */
+async function resetAppState() {
+	console.log('🧹 ═══════════════════════════════════════════════════════════');
+	console.log('🧹 INICIANDO RESET COMPLETO DO APP');
+	console.log('🧹 ═══════════════════════════════════════════════════════════');
+
+	try {
+		// 1️⃣ PARAR AUTOPLAY DO MOCK (prevent async operations)
+		mockAutoPlayActive = false;
+		mockScenarioIndex = 0;
+		console.log('✅ Autoplay do mock parado');
+
+		// 2️⃣ PARAR ÁUDIO IMEDIATAMENTE (input/output)
+		if (isRunning) {
+			console.log('🎤 Parando captura de áudio...');
+			isRunning = false;
+		}
+
+		// 3️⃣ LIMPAR TIMERS DE ÁUDIO
+		if (inputSilenceTimer) {
+			clearTimeout(inputSilenceTimer);
+			inputSilenceTimer = null;
+		}
+		if (outputSilenceTimer) {
+			clearTimeout(outputSilenceTimer);
+			outputSilenceTimer = null;
+		}
+		if (inputPartialTimer) {
+			clearTimeout(inputPartialTimer);
+			inputPartialTimer = null;
+		}
+		if (outputPartialTimer) {
+			clearTimeout(outputPartialTimer);
+			outputPartialTimer = null;
+		}
+		if (autoCloseQuestionTimer) {
+			clearTimeout(autoCloseQuestionTimer);
+			autoCloseQuestionTimer = null;
+		}
+		console.log('✅ Timers limpos');
+
+		// 4️⃣ LIMPAR PERGUNTAS E RESPOSTAS
+		currentQuestion = {
+			text: '',
+			lastUpdate: 0,
+			finalized: false,
+			lastUpdateTime: null,
+			createdAt: null,
+			finalText: '',
+			interimText: '',
+		};
+		questionsHistory = [];
+		answeredQuestions.clear();
+		selectedQuestionId = null;
+		lastAskedQuestionNormalized = null;
+		console.log('✅ Perguntas e respostas limpas');
+
+		// 5️⃣ LIMPAR ESTADO GPT/ENTREVISTA
+		interviewTurnId = 0;
+		gptAnsweredTurnId = null;
+		gptRequestedTurnId = null;
+		gptRequestedQuestionId = null;
+		console.log('✅ Estado de entrevista resetado');
+
+		// 6️⃣ RESETAR MÉTRICAS
+		transcriptionMetrics = {
+			audioStartTime: null,
+			gptStartTime: null,
+			gptEndTime: null,
+			totalTime: null,
+			audioSize: 0,
+		};
+		console.log('✅ Métricas resetadas');
+
+		// 7️⃣ LIMPAR SCREENSHOTS (sem chamar API!)
+		if (capturedScreenshots.length > 0) {
+			console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
+			capturedScreenshots = [];
+			emitUIChange('onScreenshotBadgeUpdate', {
+				count: 0,
+				visible: false,
+			});
+			// Força limpeza no sistema
+			try {
+				await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
+			} catch (err) {
+				console.warn('⚠️ Erro ao limpar screenshots no sistema:', err);
+			}
+		}
+		console.log('✅ Screenshots limpos');
+
+		// 8️⃣ LIMPAR FLAGS
+		isCapturing = false;
+		isAnalyzing = false;
+		console.log('✅ Flags resetadas');
+
+		// 9️⃣ ATUALIZAR UI - PERGUNTAS
+		emitUIChange('onCurrentQuestionUpdate', {
+			text: '',
+			isSelected: false,
+		});
+		emitUIChange('onQuestionsHistoryUpdate', []);
+		console.log('✅ Perguntas UI limpa');
+
+		// 🔟 ATUALIZAR UI - TRANSCRIÇÕES E RESPOSTAS
+		emitUIChange('onTranscriptionCleared');
+		emitUIChange('onAnswersCleared');
+		console.log('✅ Transcrições e respostas UI limpas');
+
+		// 1️⃣1️⃣ ATUALIZAR UI - BOTÃO LISTEN
+		emitUIChange('onListenButtonToggle', {
+			isRunning: false,
+			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
+		});
+		console.log('✅ Botão listen resetado');
+
+		// 1️⃣2️⃣ ATUALIZAR UI - STATUS
+		emitUIChange('onStatusUpdate', {
+			status: 'ready',
+			message: '✅ Pronto',
+		});
+		console.log('✅ Status atualizado');
+
+		// 1️⃣3️⃣ LIMPAR SELEÇÕES
+		clearAllSelections();
+		console.log('✅ Seleções limpas');
+
+		// 1️⃣4️⃣ LOG FINAL
+		console.log('✅ ═══════════════════════════════════════════════════════════');
+		console.log('✅ RESET COMPLETO CONCLUÍDO COM SUCESSO');
+		console.log('✅ ═══════════════════════════════════════════════════════════');
+
+		return true;
+	} catch (error) {
+		console.error('❌ Erro ao resetar app:', error);
+		return false;
+	}
+}
+
+/**
+ * Função acionada pelo botão de reset na UI
+ */
+function resetHomeSection() {
+	console.log('\n════════════════════════════════════════════════════════════════════════════════════════');
+	console.log('🔄 RESET COMPLETO ACIONADO PELO BOTÃO resetHomeBtn');
+	console.log('════════════════════════════════════════════════════════════════════════════════════════');
+
+	// 🔥 Usar a função centralizada de reset
+	resetAppState().then(success => {
+		if (success) {
+			console.log('✅ Reset via resetAppState() concluído com sucesso!');
+		} else {
+			console.error('❌ Erro ao executar resetAppState()');
+		}
+		console.log('════════════════════════════════════════════════════════════════════════════════════════\n');
 	});
 }
 
@@ -1971,7 +1971,7 @@ async function runMockAutoPlay() {
 }
 
 /* ================================ */
-//	DEBUG UTILITIES
+//	DEBUG LOG RENDERER
 /* ================================ */
 
 /**
