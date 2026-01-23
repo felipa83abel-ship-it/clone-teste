@@ -33,7 +33,7 @@ const llmManager = new LLMManager();
 
 // 🎯 REGISTRAR LLMs
 llmManager.register('openai', openaiHandler);
-// Futuro: llmManager.register('gemini', require('./llm/handlers/gemini-handler.js'));
+// Futuro: llmManager.register('gemini', require('./llm/handlers/gemini-handler.js')); // NOSONAR
 // Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
@@ -622,12 +622,16 @@ function clearAllSelections() {
 
 /**
  * Obtém IDs navegáveis de perguntas (CURRENT + histórico)
+ * 🔥 ORDEM: CURRENT primeiro, depois histórico em ordem REVERSA (visualmente correto)
+ * Porque o histórico é renderizado com reverse(), então a ordem navegável deve ser:
+ * [CURRENT, ID_último, ID_penúltimo, ..., ID_primeiro]
  * @returns {array} Array de IDs navegáveis
  */
 function getNavigableQuestionIds() {
 	const ids = [];
 	if (currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
-	questionsHistory.forEach(q => ids.push(q.id));
+	// 🔥 CORRIGIDO: Reverter histórico para ficar coerente com ordem visual renderizada
+	[...questionsHistory].reverse().forEach(q => ids.push(q.id));
 	return ids;
 }
 
@@ -877,6 +881,45 @@ function handleQuestionClick(questionId) {
 		console.log('⛔ GPT já respondeu esse turno');
 		debugLogRenderer('Fim da função: "handleQuestionClick" (GPT já respondeu)');
 		return; // 🔥 CRÍTICO: Retornar aqui
+	}
+
+	// ❓ Ainda não respondida → promover CURRENT se necessário e chamar GPT
+	// 🔥 Se for CURRENT, promover para histórico ANTES de chamar askLLM
+	if (questionId === CURRENT_QUESTION_ID) {
+		if (!currentQuestion.text || !currentQuestion.text.trim()) {
+			updateStatusMessage('⚠️ Pergunta vazia - nada a responder');
+			debugLogRenderer('Fim da função: "handleQuestionClick" (pergunta vazia)');
+			return;
+		}
+
+		// Promover CURRENT para histórico se ainda não foi promovido
+		if (!currentQuestion.finalized) {
+			currentQuestion.text = finalizeQuestion(currentQuestion.text);
+			currentQuestion.lastUpdateTime = Date.now();
+			currentQuestion.finalized = true;
+
+			const newId = String(questionsHistory.length + 1);
+			questionsHistory.push({
+				id: newId,
+				text: currentQuestion.text,
+				turnId: currentQuestion.turnId,
+				createdAt: currentQuestion.createdAt || Date.now(),
+				lastUpdateTime: currentQuestion.lastUpdateTime || Date.now(),
+			});
+
+			currentQuestion.promotedToHistory = true;
+			resetCurrentQuestion();
+			selectedQuestionId = newId;
+			renderQuestionsHistory();
+			renderCurrentQuestion();
+
+			debugLogRenderer('🔥 CURRENT promovido para histórico via handleQuestionClick', { newId }, false);
+
+			// Chamar askLLM com o novo ID promovido
+			askLLM(newId);
+			debugLogRenderer('Fim da função: "handleQuestionClick" (CURRENT promovido e askLLM chamado)');
+			return;
+		}
 	}
 
 	// ❓ Ainda não respondida → chama GPT (click ou atalho)
@@ -1881,6 +1924,11 @@ const RendererAPI = {
 	handleCurrentQuestion,
 	handleQuestionClick,
 
+	// 🔥 NOVO: Expor selectedQuestionId para atalhos em config-manager.js
+	get selectedQuestionId() {
+		return selectedQuestionId;
+	},
+
 	// UI
 	// 🔥 MOVED: applyOpacity foi para config-manager.js
 	updateMockBadge: show => {
@@ -1946,8 +1994,12 @@ const RendererAPI = {
 
 		let index = all.indexOf(selectedQuestionId);
 		if (index === -1) {
+			// Nenhuma seleção: começa do começo ou do fim
 			index = direction === 'up' ? all.length - 1 : 0;
 		} else {
+			// 🔥 CORRIGIDO: Lógica normal (agora que getNavigableQuestionIds retorna ordem visual correta)
+			// 'up' = subir visualmente = diminuir índice
+			// 'down' = descer visualmente = aumentar índice
 			index += direction === 'up' ? -1 : 1;
 			index = Math.max(0, Math.min(index, all.length - 1));
 		}
