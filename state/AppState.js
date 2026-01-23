@@ -1,5 +1,5 @@
 /**
- * AppState - Centraliza todo o estado da aplicação
+ * AppState - Centraliza o estado de toda aplicação
  * Substitui: 15+ variáveis globais soltas no renderer.js
  */
 class AppState {

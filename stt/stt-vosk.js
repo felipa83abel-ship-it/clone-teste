@@ -473,7 +473,7 @@ async function onAudioChunkVosk(source, data, vars) {
 
 		// Envia direto ao Vosk via stdin (não IPC!)
 		// ⚠️ Verifica se o processo ainda está vivo
-		if (!vars._voskProcess || !vars._voskProcess.stdin) {
+		if (!vars._voskProcess?.stdin) {
 			console.warn(`⚠️ Processo Vosk não está disponível, ignorando chunk`);
 			return;
 		}

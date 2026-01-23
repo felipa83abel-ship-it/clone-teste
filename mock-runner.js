@@ -196,7 +196,7 @@ async function runMockAutoPlay() {
 		await simulateAudioCapture(eventBus, scenario, placeholderId);
 
 		// 🔥 CHECK: Continua se debug ainda está ativo
-		if (!await simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive)) {
+		if (!(await simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive))) {
 			break;
 		}
 
@@ -315,17 +315,17 @@ function initMockInterceptor(context) {
 			// Busca resposta mockada
 			const mockResponse = getMockResponse(questionText);
 
-		// Emite tokens com delays
-		emitTokensFromResponse(mockResponse).catch(err => {
-			console.error('❌ Erro ao emitir tokens mock:', err);
-		});
+			// Emite tokens com delays
+			emitTokensFromResponse(mockResponse).catch(err => {
+				console.error('❌ Erro ao emitir tokens mock:', err);
+			});
 
-		// Retorna promise resolvida imediatamente (esperado pela API)
-		return Promise.resolve({ success: true });
-	}
+			// Retorna promise resolvida imediatamente (esperado pela API)
+			return Promise.resolve({ success: true });
+		}
 
-	// Todas as outras chamadas passam para o invoke real
-	return originalInvoke.call(this, channel, ...args);
+		// Todas as outras chamadas passam para o invoke real
+		return originalInvoke.call(this, channel, ...args);
 	};
 }
 

@@ -35,6 +35,10 @@ const sttStrategy = new STTStrategy();
 const llmManager = new LLMManager();
 const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
 
+// 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
+let mockAutoPlayActive = false;
+let mockScenarioIndex = 0;
+
 // 🎯 REGISTRAR MODOS
 modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
 modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
@@ -98,8 +102,7 @@ eventBus.on('error', error => {
  */
 (function protectAgainstScreenCapture() {
 	// ✅ Desabilita getDisplayMedia (usado por Zoom, Meet, Teams para capturar)
-	if (navigator && navigator.mediaDevices && navigator.mediaDevices.getDisplayMedia) {
-		const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+	if (navigator?.mediaDevices?.getDisplayMedia) {
 		navigator.mediaDevices.getDisplayMedia = async function (...args) {
 			console.warn('🔐 BLOQUEADO: Tentativa de usar getDisplayMedia (captura de tela externa)');
 			throw new Error('Screen capture not available in this window');
@@ -107,8 +110,8 @@ eventBus.on('error', error => {
 	}
 
 	// ✅ Desabilita captureStream (usado para captura de janela)
-	if (window.HTMLCanvasElement && window.HTMLCanvasElement.prototype.captureStream) {
-		Object.defineProperty(window.HTMLCanvasElement.prototype, 'captureStream', {
+	if (globalThis.HTMLCanvasElement?.prototype.captureStream) {
+		Object.defineProperty(globalThis.HTMLCanvasElement.prototype, 'captureStream', {
 			value: function () {
 				console.warn('🔐 BLOQUEADO: Tentativa de usar Canvas.captureStream()');
 				throw new Error('Capture stream not available');
@@ -119,10 +122,10 @@ eventBus.on('error', error => {
 	}
 
 	// ✅ Intercepta getUserMedia para avisar sobre tentativas de captura de áudio
-	if (navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+	if (navigator?.mediaDevices?.getUserMedia) {
 		const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
 		navigator.mediaDevices.getUserMedia = async function (constraints) {
-			if (constraints && constraints.video) {
+			if (constraints?.video) {
 				console.warn('🔐 AVISO: Tentativa de usar getUserMedia com vídeo detectada');
 				// Ainda permite áudio, mas bloqueia vídeo para captura
 				if (constraints.video) {
@@ -142,12 +145,7 @@ eventBus.on('error', error => {
 
 const YOU = 'Você';
 const OTHER = 'Outros';
-
-// Modos de operação
-const MODES = {
-	NORMAL: 'NORMAL',
-	INTERVIEW: 'INTERVIEW',
-};
+// ✅ DEPRECATED: MODES definido em mode-manager.js (veja linhas 29-40)
 
 // ✅ DEPRECATED: CURRENT_MODE removido - use modeManager.getMode() (Fase 4)
 // Modo atual gerenciado por modeManager (veja linhas 36-40)
@@ -192,6 +190,7 @@ let APP_CONFIG = {
 /**
  * DEPRECATED: Registra elementos de UI (migrado para EventBus em Fase 3)
  */
+let UIElements = {};
 function registerUIElements(elements) {
 	UIElements = { ...UIElements, ...elements };
 	console.log('✅ UI Elements registrados no renderer.js');
@@ -210,7 +209,7 @@ eventBus.on('audioDeviceChanged', async data => {
 		const sttModel = getConfiguredSTTModel();
 		Logger.info('audioDeviceChanged', { model: sttModel, type: data.type });
 
-		if (!data || !data.type) {
+		if (!data?.type) {
 			Logger.warn('Dados inválidos para mudança de dispositivo', data);
 			return;
 		}
@@ -238,12 +237,12 @@ eventBus.on('audioDeviceChanged', async data => {
  */
 function getConfiguredSTTModel() {
 	try {
-		if (!window.configManager || !window.configManager.config) {
+		if (!globalThis.configManager?.config) {
 			console.warn('⚠️ configManager não disponível no escopo global');
 			return 'error'; // fallback
 		}
 
-		const config = window.configManager.config;
+		const config = globalThis.configManager.config;
 		const activeProvider = config.api?.activeProvider;
 		const sttModel = config.api?.[activeProvider]?.selectedSTTModel;
 
@@ -316,8 +315,9 @@ function renderQuestionsHistory() {
 	});
 
 	eventBus.emit('questionsHistoryUpdate', historyData);
-
-	scrollToSelectedQuestion();
+	eventBus.emit('scrollToQuestion', {
+		questionId: appState.selectedId,
+	});
 
 	Logger.debug('Fim da função: "renderQuestionsHistory"');
 }
@@ -359,8 +359,8 @@ function normalizeForCompare(t) {
 	Logger.debug('Fim da função: "normalizeForCompare"');
 	return (t || '')
 		.toLowerCase()
-		.replace(/[?!.\n\r]/g, '')
-		.replace(/\s+/g, ' ')
+		.replaceAll(/[?!.\n\r]/g, '')
+		.replaceAll(/\s+/g, ' ')
 		.trim();
 }
 
@@ -540,13 +540,13 @@ async function listenToggleBtn() {
  */
 function hasActiveModel() {
 	Logger.debug('Início da função: "hasActiveModel"');
-	if (!window.configManager) {
+	if (!globalThis.configManager) {
 		console.warn('⚠️ ConfigManager não inicializado ainda');
 		return { active: false, model: null };
 	}
 
-	const config = window.configManager.config;
-	if (!config || !config.api) {
+	const config = globalThis.configManager.config;
+	if (!config?.api) {
 		console.warn('⚠️ Config ou api não disponível');
 		return { active: false, model: null };
 	}
@@ -554,7 +554,7 @@ function hasActiveModel() {
 	// Verifica se algum modelo está ativo e retorna o nome
 	const providers = ['openai', 'google', 'openrouter', 'custom'];
 	for (const provider of providers) {
-		if (config.api[provider] && config.api[provider].enabled === true) {
+		if (config.api[provider]?.enabled === true) {
 			console.log(`✅ Modelo ativo encontrado: ${provider}`);
 			return { active: true, model: provider };
 		}
@@ -635,7 +635,7 @@ function handleQuestionClick(questionId) {
 	// Se for uma pergunta do histórico marcada como incompleta, não enviar automaticamente ao GPT
 	if (questionId !== CURRENT_QUESTION_ID) {
 		const q = appState.history.find(q => q.id === questionId);
-		if (q && q.incomplete) {
+		if (q?.incomplete) {
 			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
 			Logger.debug('Fim da função: "handleQuestionClick" (pergunta incompleta)');
@@ -657,7 +657,7 @@ function handleQuestionClick(questionId) {
 	// ❓ Ainda não respondida → promover CURRENT se necessário e chamar GPT
 	// 🔥 Se for CURRENT, promover para histórico ANTES de chamar askLLM
 	if (questionId === CURRENT_QUESTION_ID) {
-		if (!appState.interview.currentQuestion.text || !appState.interview.currentQuestion.text.trim()) {
+		if (!appState.interview.currentQuestion.text?.trim()) {
 			updateStatusMessage('⚠️ Pergunta vazia - nada a responder');
 			Logger.debug('Fim da função: "handleQuestionClick" (pergunta vazia)');
 			return;
@@ -747,7 +747,7 @@ marked.setOptions({
 function handleCurrentQuestion(author, text, options = {}) {
 	Logger.debug('Início da função: "handleCurrentQuestion"');
 
-	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
+	const cleaned = text.replaceAll(/Ê+|hum|ahn/gi, '').trim();
 
 	// Usa o tempo exato que chegou no renderer (Date.now)
 	const now = Date.now();
@@ -814,7 +814,7 @@ function finalizeCurrentQuestion() {
 	Logger.debug('Início da função: "finalizeCurrentQuestion"');
 
 	// Se não há texto, ignorar
-	if (!appState.interview.currentQuestion.text || !appState.interview.currentQuestion.text.trim()) {
+	if (!appState.interview.currentQuestion.text?.trim()) {
 		console.log('⚠️ finalizeCurrentQuestion: Sem texto para finalizar');
 		return;
 	}
@@ -878,7 +878,6 @@ function finalizeCurrentQuestion() {
 			appState.interview.currentQuestion.text,
 		);
 
-		// promoteCurrentToHistory(appState.interview.currentQuestion.text);
 		const newId = String(appState.history.length + 1);
 		appState.history.push({
 			id: newId,
@@ -895,7 +894,6 @@ function finalizeCurrentQuestion() {
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
 		Logger.debug('Fim da função: "finalizeCurrentQuestion"');
-		return;
 	}
 }
 
@@ -1115,7 +1113,7 @@ async function analyzeScreenshots() {
 		// ✅ RENDERIZA VIA EVENTBUS (consistente com LLM)
 		// Divide análise em tokens e emite como se fosse stream
 		const analysisText = result.analysis;
-		const tokens = analysisText.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
+		const tokens = analysisText.split(/(\s+|[.,!?;:\-()[\]{}\n])/g).filter(t => t.length > 0);
 
 		Logger.info('Simulando stream', { tokenCount: tokens.length });
 
@@ -1191,7 +1189,7 @@ function releaseThread(ms = 0) {
 }
 
 /**
- * Reseta todo o estado do app
+ * Reseta o estado do app
  * Quebrado em chunks para não bloquear a UI thread
  */
 async function resetAppState() {

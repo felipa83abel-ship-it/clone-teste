@@ -8,11 +8,15 @@
  * Estrutura pronta para adicionar Gemini, Anthropic, etc.
  * Basta criar gemini-handler.js com mesmo padrão!
  */
+const Logger = require('../../utils/Logger.js');
 const { ipcRenderer } = require('electron');
 
 class OpenAIHandler {
+	logger = null;
+	model = 'gpt-4o-mini';
+
 	constructor() {
-		this.model = 'gpt-4o-mini';
+		this.logger = Logger;
 	}
 
 	/**
@@ -23,7 +27,7 @@ class OpenAIHandler {
 			const response = await ipcRenderer.invoke('ask-gpt', messages);
 			return response;
 		} catch (error) {
-			console.error('❌ Erro OpenAI complete:', error);
+			this.logger.error('❌ Erro OpenAI complete:', error);
 			throw error;
 		}
 	}
@@ -40,36 +44,46 @@ class OpenAIHandler {
 		try {
 			// Invocar stream
 			ipcRenderer.invoke('ask-gpt-stream', messages).catch(err => {
-				console.error('❌ Erro ao invocar ask-gpt-stream:', err);
+				this.logger.error('❌ Erro ao invocar ask-gpt-stream:', err);
 			});
 
-			// Criar generator que espera por tokens
-			let resolved = false;
-			let tokens = [];
+			// Criar promise que resolve quando stream termina
+			const streamPromise = new Promise((resolve) => {
+				let tokens = [];
 
-			const onChunk = (_, token) => {
-				tokens.push(token);
-			};
+				const onChunk = (_, token) => {
+					tokens.push(token);
+				};
 
-			const onEnd = () => {
-				resolved = true;
-				ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
-				ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
-			};
+				const onEnd = () => {
+					ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
+					ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
+					resolve(tokens);
+				};
 
-			ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
-			ipcRenderer.once('GPT_STREAM_END', onEnd);
+				ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
+				ipcRenderer.once('GPT_STREAM_END', onEnd);
+			});
 
-			// Emitir tokens conforme chegam
-			while (!resolved || tokens.length > 0) {
-				if (tokens.length > 0) {
-					yield tokens.shift();
-				} else {
-					await new Promise(resolve => setTimeout(resolve, 10));
+			// Emitir tokens enquanto eles chegam e depois os pendentes
+			let allTokens = [];
+			let pendingChunk = setInterval(async () => {
+				if (allTokens.length > 0) {
+					yield allTokens.shift();
 				}
+			}, 10);
+
+			// Aguardar stream completo
+			const finalTokens = await streamPromise;
+			clearInterval(pendingChunk);
+			allTokens.push(...finalTokens);
+
+			// Emitir tokens restantes
+			for (const token of allTokens) {
+				yield token;
 			}
 		} catch (error) {
-			console.error('❌ Erro OpenAI stream:', error);
+			this.logger.error('❌ Erro OpenAI stream:', error);
 			throw error;
 		}
 	}

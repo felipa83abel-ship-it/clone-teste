@@ -24,7 +24,7 @@ function validateLLMRequest(appState, questionId, getSelectedQuestionText) {
 	const isCurrent = questionId === CURRENT_QUESTION_ID;
 
 	// Validação 1: Text não vazio
-	if (!text || !text.trim()) {
+	if (!text?.trim()) {
 		throw new Error('Pergunta vazia - nada a enviar para LLM');
 	}
 
@@ -32,7 +32,10 @@ function validateLLMRequest(appState, questionId, getSelectedQuestionText) {
 	if (isCurrent) {
 		const normalizedText = text
 			.toLowerCase()
-			.replace(/[?!.\n]/g, '')
+			.replaceAll('?', '')
+			.replaceAll('!', '')
+			.replaceAll('.', '')
+			.replaceAll('\n', '')
 			.trim();
 		if (normalizedText === appState.interview.lastAskedQuestionNormalized) {
 			throw new Error('Pergunta já enviada');
@@ -59,7 +62,7 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 	appState.interview.gptRequestedQuestionId = questionId;
 
 	// Obter handler LLM e invocar stream
-	const currentLLM = 'openai'; // TODO: fazer isso dinâmico (pegar de config)
+	const currentLLM = appState.selectedProvider || 'openai';
 	const handler = llmManager.getHandler(currentLLM);
 
 	try {
@@ -109,7 +112,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 	appState.metrics.gptStartTime = Date.now();
 
 	// Obter handler LLM e invocar complete
-	const currentLLM = 'openai'; // TODO: fazer isso dinâmico (pegar de config)
+	const currentLLM = appState.selectedProvider || 'openai';
 	const handler = llmManager.getHandler(currentLLM);
 
 	try {

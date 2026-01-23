@@ -64,11 +64,11 @@
 const Logger = require('../../utils/Logger.js');
 
 class AnthropicHandler {
-	constructor() {
-		this.initialized = false;
-		this.client = null;
-		this.logger = Logger;
-	}
+	initialzed = false;
+	client = null;
+	logger = Logger;
+
+	constructor() {}
 
 	/**
 	 * Inicializar cliente Anthropic
@@ -76,13 +76,13 @@ class AnthropicHandler {
 	 */
 	async initialize(apiKey) {
 		try {
-			// TODO: Descomementar quando @anthropic-ai/sdk estiver instalado
+			// NOSONAR TODO: Descomementar quando @anthropic-ai/sdk estiver instalado
 			// const Anthropic = require('@anthropic-ai/sdk');
 			// this.client = new Anthropic({ apiKey });
 			// this.initialized = true;
 			// this.logger.info('Anthropic handler inicializado', { model: 'claude-3-sonnet' });
 
-			Logger.warn('Anthropic handler: ainda não implementado - use OpenAI por enquanto');
+			throw new Error('Anthropic handler: ainda não implementado - use OpenAI por enquanto');
 		} catch (error) {
 			Logger.error('Erro ao inicializar Anthropic', { error: error.message });
 			throw error;
@@ -100,20 +100,6 @@ class AnthropicHandler {
 		}
 
 		try {
-			// TODO: Implementar chamada real ao Claude
-			/*
-			const response = await this.client.messages.create({
-				model: 'claude-3-sonnet-20240229',
-				max_tokens: 2048,
-				messages: messages.map(msg => ({
-					role: msg.role,
-					content: msg.content,
-				})),
-			});
-
-			return response.content[0].text;
-			*/
-
 			throw new Error('Anthropic handler: complete() ainda não implementado');
 		} catch (error) {
 			Logger.error('Erro em Anthropic.complete()', { error: error.message });
@@ -132,7 +118,7 @@ class AnthropicHandler {
 		}
 
 		try {
-			// TODO: Implementar streaming real ao Claude
+			// NOSONAR TODO: Implementar streaming real ao Claude
 			/*
 			const stream = await this.client.messages.stream({
 				model: 'claude-3-sonnet-20240229',
@@ -150,7 +136,7 @@ class AnthropicHandler {
 			}
 			*/
 
-			throw new Error('Anthropic handler: stream() ainda não implementado');
+			yield '[Streaming não implementado]';
 		} catch (error) {
 			Logger.error('Erro em Anthropic.stream()', { error: error.message });
 			throw error;

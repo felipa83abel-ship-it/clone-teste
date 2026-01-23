@@ -210,9 +210,9 @@ async function startAudioVolumeMonitor(source, deviceId) {
 		// 2️⃣ Registra worklet
 		try {
 			await registerVolumeMonitorWorklet(audioContext);
-		} catch (workletErr) {
-			console.error(`❌ Não consegui registrar worklet:`, workletErr.message);
-			throw new Error(`AudioWorklet registration failed: ${workletErr.message}`);
+		} catch (error_) {
+			console.error(`❌ Não consegui registrar worklet:`, error_.message);
+			throw new Error(`AudioWorklet registration failed: ${error_.message}`);
 		}
 
 		// 3️⃣ Captura stream de áudio do dispositivo
@@ -362,18 +362,19 @@ async function switchAudioVolumeDevice(source, newDeviceId) {
 	}
 
 	// Se está ativo, verifica se realmente mudou
-	if (vars.deviceId() !== newDeviceId) {
-		console.log(`   → Monitor ativo, REINICIANDO com novo dispositivo...`);
-		stopAudioVolumeMonitor(source);
-
-		// Pequeno delay para garantir que tudo foi limpo
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		// Reinicia com novo dispositivo
-		await startAudioVolumeMonitor(source, newDeviceId);
-	} else {
+	if (vars.deviceId() === newDeviceId) {
 		console.log(`   → Dispositivo é o mesmo, nenhuma mudança necessária`);
+		return;
 	}
+
+	console.log(`   → Monitor ativo, REINICIANDO com novo dispositivo...`);
+	stopAudioVolumeMonitor(source);
+
+	// Pequeno delay para garantir que tudo foi limpo
+	await new Promise(resolve => setTimeout(resolve, 100));
+
+	// Reinicia com novo dispositivo
+	await startAudioVolumeMonitor(source, newDeviceId);
 }
 
 /* ================================ */

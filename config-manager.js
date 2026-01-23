@@ -1722,7 +1722,6 @@ class ConfigManager {
 		// 📊 RASTREAMENTO SIMPLES - currentStreamingQuestionId é SUFICIENTE
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		let currentStreamingQuestionId = null; // Qual pergunta está sendo respondida AGORA
-		let currentStreamingTurnId = null; // TurnId da pergunta sendo respondida
 
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		// 📥 LISTENER: onAnswerStreamChunk
@@ -1763,7 +1762,6 @@ class ConfigManager {
 
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
-				currentStreamingTurnId = turnId;
 
 				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, false);
 			}
@@ -2299,7 +2297,7 @@ class ConfigManager {
 		debugLogConfig('Início da função: "registerErrorHandlers"');
 		globalThis.addEventListener('error', e => {
 			globalThis.RendererAPI.sendRendererError({
-				message: e.message ? e.message : String(e),
+				message: e.message || (e.error instanceof Error ? e.error.message : String(e.error)),
 				stack: e.error?.stack || null,
 			});
 		});
@@ -2408,7 +2406,7 @@ class ConfigManager {
 	 */
 	applyOpacity(value) {
 		debugLogConfig('Início da função: "applyOpacity"');
-		const appOpacity = parseFloat(value);
+		const appOpacity = Number.parseFloat(value);
 
 		// aplica opacidade no conteúdo geral
 		document.documentElement.style.setProperty('--app-opacity', appOpacity.toFixed(2));
@@ -2443,7 +2441,7 @@ class ConfigManager {
 
 			const _pid = event.pointerId;
 			try {
-				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
+				dragHandle.setPointerCapture?.(_pid);
 			} catch (err) {
 				console.warn('setPointerCapture falhou:', err);
 			}
@@ -2475,15 +2473,19 @@ class ConfigManager {
 				try {
 					dragHandle.removeEventListener('pointermove', onPointerMove);
 					dragHandle.removeEventListener('pointerup', onPointerUp);
-				} catch (err) {}
+				} catch (err) {
+					console.warn('Erro ao remover event listeners:', err);
+				}
 
 				if (dragHandle.classList.contains('drag-active')) {
 					dragHandle.classList.remove('drag-active');
 				}
 
 				try {
-					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
-				} catch (err) {}
+					dragHandle.releasePointerCapture?.(_pid);
+				} catch (err) {
+					console.warn('releasePointerCapture falhou:', err);
+				}
 			};
 
 			dragHandle.addEventListener('pointermove', onPointerMove);
