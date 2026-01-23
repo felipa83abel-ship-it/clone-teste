@@ -52,7 +52,7 @@ eventBus.on('llmStreamEnd', data => {
 	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
 
 	// 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
-	answeredQuestions.add(data.questionId);
+	appState.interview.answeredQuestions.add(data.questionId);
 
 	// 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
 	// Aqui só limpamos o CURRENT para próxima pergunta
@@ -69,7 +69,7 @@ eventBus.on('llmBatchEnd', data => {
 	Logger.info('LLM Batch finalizado', { questionId: data.questionId, responseLength: data.response?.length || 0 });
 
 	// 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
-	answeredQuestions.add(data.questionId);
+	appState.interview.answeredQuestions.add(data.questionId);
 
 	eventBus.emit('answerBatchEnd', {
 		questionId: data.questionId,
@@ -178,51 +178,14 @@ let APP_CONFIG = {
 	MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
 };
 
-// Estado de execução do STT
-let appState.audio.isRunning = false;
-
-// Screenshots capturados
-let appState.audio.capturedScreenshots = []; // Array de { filepath, filename, timestamp }
-let appState.audio.isCapturing = false;
-let appState.audio.isAnalyzing = false;
-
-// Drag and Drop da janela
-let appState.window.isDraggingWindow = false;
-
-// 🔥 MODIFICADO: STT model vem da config agora (removido USE_LOCAL_WHISPER)
-let appState.metrics = {
-	audioStartTime: null,
-	gptStartTime: null,
-	gptFirstTokenTime: null,
-	gptEndTime: null,
-	totalTime: null,
-	audioSize: 0,
-};
-
-// 🔥 REMOVED: inputStream, inputAnalyser, outputStream, outputAnalyser
-// Agora usamos audio-volume-monitor.js para monitoramento de volume
-// quando usuário está na seção "Áudio e Tela" (sem transcrição ativa)
-
-/* 🧠 PERGUNTAS */
-let appState.interview.currentQuestion = {
-	text: '',
-	lastUpdate: 0,
-	finalized: false,
-	promotedToHistory: false,
-	turnId: null, // 🔥 ID único para cada pergunta (incrementa quando nova fala chega)
-	lastUpdateTime: null,
-	createdAt: null,
-	finalText: '',
-	interimText: '',
-};
-let appState.history = [];
-const answeredQuestions = new Set(); // 🔒 Armazena respostas já geradas (questionId -> true)
-let appState.selectedId = null;
-let appState.interview.interviewTurnId = 0;
-let appState.interview.gptAnsweredTurnId = null;
-let appState.interview.gptRequestedTurnId = null;
-let appState.interview.gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta foi realmente solicitada ao GPT
-let appState.interview.lastAskedQuestionNormalized = null;
+// 🔥 NOTA: Estado agora centralizado em appState (veja linhas 30-31)
+// - appState.audio.{ isRunning, capturedScreenshots, isCapturing, isAnalyzing }
+// - appState.window.{ isDraggingWindow }
+// - appState.interview.{ currentQuestion, questionsHistory, selectedQuestionId, ... }
+// - appState.metrics.{ audioStartTime, gptStartTime, gptFirstTokenTime, ... }
+// Acesso: use helpers appState.q, appState.history, appState.selectedId
+// ou use getters/setters em AppState.js para compatibilidade
+// 🔒 answeredQuestions migrado para appState.interview.answeredQuestions (AppState.js)
 
 /* ================================ */
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
@@ -431,7 +394,7 @@ function findAnswerByQuestionId(questionId) {
 	}
 
 	Logger.debug('Fim da função: "findAnswerByQuestionId"');
-	return answeredQuestions.has(questionId);
+	return appState.interview.answeredQuestions.has(questionId);
 }
 
 /**
@@ -1140,7 +1103,7 @@ async function analyzeScreenshots() {
 		});
 
 		// ✅ MARCA COMO RESPONDIDA (importante para clique não gerar duplicata)
-		answeredQuestions.add(questionId);
+		appState.interview.answeredQuestions.add(questionId);
 
 		renderQuestionsHistory();
 
@@ -1255,7 +1218,7 @@ async function resetAppState() {
 			interimText: '',
 		};
 		appState.history = [];
-		answeredQuestions.clear();
+		appState.interview.answeredQuestions.clear();
 		appState.selectedId = null;
 		appState.interview.lastAskedQuestionNormalized = null;
 		console.log('✅ Perguntas e respostas limpas');
