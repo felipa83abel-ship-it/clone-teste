@@ -127,7 +127,7 @@ MAIN.JS (Backend Services)
 - ✅ Atalhos de teclado globais
 - ✅ Histórico de perguntas e respostas
 
-📄 **[Ver lista completa de funcionalidades →](FEATURES.md)**
+📄 **[Ver lista completa de funcionalidades →](docs/FEATURES.md)**
 
 ---
 

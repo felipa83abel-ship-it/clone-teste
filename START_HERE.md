@@ -75,7 +75,7 @@ npm start
 - 📖 [Guia de Navegação](docs/DOCS_GUIDE.md)
 
 **Entender:**
-- ✨ [Features](docs/features.md)
+- ✨ [Features](docs/FEATURES.md)
 - 📋 [Status de Refatoração](docs/REFACTORING_FINAL_STATUS.md)
 
 ---
