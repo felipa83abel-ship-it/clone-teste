@@ -23,6 +23,7 @@ const Logger = require('./utils/Logger.js');
 const STTStrategy = require('./strategies/STTStrategy.js');
 const LLMManager = require('./llm/LLMManager.js');
 const openaiHandler = require('./llm/handlers/openai-handler.js');
+const { validateLLMRequest, handleLLMStream, handleLLMBatch } = require('./handlers/llmHandlers.js');  // antigo validateAskGptRequest, handleAskGptStream, handleAskGptBatch
 
 // 🎯 INSTANCIAR
 const appState = new AppState();
@@ -1017,243 +1018,48 @@ function closeCurrentQuestionForced() {
 /* ================================ */
 
 /**
- * Envia pergunta selecionada ao GPT
- * FUNÇÃO PRINCIPAL de comunicação com GPT
+ * Envia pergunta selecionada ao LLM (qualquer provider)
+ * ✅ REFATORADA: agora é simples e legível!
+ * ✅ CENTRALIZADA: Uma única função para todos os LLMs
+ * ✅ Não há duplicação de askLLM() por LLM
  */
-async function askGpt() {
-	debugLogRenderer('Início da função: "askGpt"');
+async function askLLM() {  // antigo askGpt()
+	try {
+		const CURRENT_QUESTION_ID = 'CURRENT';
 
-	const questionId = selectedQuestionId;
-	const isCurrent = questionId === CURRENT_QUESTION_ID;
-	const text = getSelectedQuestionText();
-	const normalizedText = normalizeForCompare(text);
-	transcriptionMetrics.gptStartTime = Date.now(); // Marca início GPT
-
-	// Evita reenvio da mesma pergunta atual ao GPT (dedupe)
-	if (isCurrent && normalizedText && lastAskedQuestionNormalized === normalizedText) {
-		updateStatusMessage('⛔ Pergunta já enviada');
-		console.log('⛔ askGpt: mesma pergunta já enviada, pulando');
-		return;
-	}
-
-	// 🛡️ MODO ENTREVISTA — bloqueia duplicação APENAS para histórico
-	if (ModeController.isInterviewMode() && !isCurrent) {
-		const existingAnswer = findAnswerByQuestionId(questionId);
-		if (existingAnswer) {
-			updateStatusMessage('📌 Essa pergunta já foi respondida');
-			return;
-		}
-	}
-
-	// Nota log temporario para testar a aplicação remover depois
-	debugLogRenderer(
-		'🤖 🧾 askGpt diagnóstico',
-		{
-			currentQuestion,
-			gptAnsweredTurnId,
-			interviewTurnId,
-			isCurrent,
-			isInterviewMode: ModeController.isInterviewMode(),
-			questionId_variable: questionId, // 🔥 DEBUG: mostrar a variável questionId
+		// 1. Validar (antigo validateAskGptRequest)
+		const { questionId, text, isCurrent } = validateLLMRequest(
+			appState,
 			selectedQuestionId,
-			textGPT: normalizedText,
-			textLength: text.length,
-		},
-		false,
-	);
+			getSelectedQuestionText,
+		);
+		Logger.info('Pergunta válida', { questionId, textLength: text.length });
 
-	// marca que este turno teve uma requisição ao GPT (apenas para CURRENT)
-	if (isCurrent) {
-		gptRequestedTurnId = interviewTurnId;
-		gptRequestedQuestionId = CURRENT_QUESTION_ID; // 🔥 [IMPORTANTE] Rastreia qual pergunta foi solicitada
-		lastAskedQuestionNormalized = normalizedText;
-	}
+		// Rastreamento antigo (compatibilidade)
+		const normalizedText = normalizeForCompare(text);
+		transcriptionMetrics.gptStartTime = Date.now();
 
-	// 🌀 MODO ENTREVISTA — STREAMING
-	if (ModeController.isInterviewMode()) {
-		let streamedText = '';
-
-		debugLogRenderer('⏳ enviando para o GPT via stream...', true);
-
-		ipcRenderer
-			.invoke('ask-gpt-stream', [
-				{ role: 'system', content: SYSTEM_PROMPT },
-				{ role: 'user', content: text },
-			])
-			.catch(err => {
-				console.error('❌ Erro ao chamar ask-gpt-stream:', err);
-				updateStatusMessage('❌ Erro ao enviar para GPT');
-			});
-
-		const onChunk = (_, token) => {
-			streamedText += token;
-
-			// 🔥 PROTEÇÃO: Valida se o questionId ainda é válido
-			// (evita renderizar em question ID antigo/inválido)
-			if (
-				!questionId ||
-				(isCurrent && gptRequestedQuestionId !== CURRENT_QUESTION_ID) ||
-				(!isCurrent && !questionsHistory.find(q => q.id === questionId))
-			) {
-				console.warn('🚨 onChunk: questionId inválido ou desatualizado, ignorando token:', {
-					questionId,
-					isCurrent,
-					gptRequestedQuestionId,
-					token,
-				});
-				return;
-			}
-
-			emitUIChange('onAnswerStreamChunk', {
-				questionId,
-				token,
-				accum: streamedText,
-			});
-
-			transcriptionMetrics.gptFirstTokenTime = transcriptionMetrics.gptFirstTokenTime || Date.now();
-
-			debugLogRenderer(`🎬 🟢 GPT_STREAM_CHUNK recebido (token parcial): "${token}"`, false);
-		};
-
-		const onEnd = () => {
-			debugLogRenderer('✅ GPT_STREAM_END recebido - Stream finalizado!', true);
-
-			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
-			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
-
-			// Finaliza medições
-			transcriptionMetrics.gptEndTime = Date.now();
-			transcriptionMetrics.totalTime = Date.now() - transcriptionMetrics.audioStartTime;
-
-			// Log métricas
-			logTranscriptionMetrics();
-
-			if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS) {
-				let finalText = streamedText;
-				const endAt = Date.now();
-				const elapsed = endAt - transcriptionMetrics.gptStartTime;
-
-				const startTime = new Date(transcriptionMetrics.gptStartTime).toLocaleTimeString();
-				const endTime = new Date(endAt).toLocaleTimeString();
-
-				finalText +=
-					`\n\n⏱️ GPT iniciou: ${startTime}` + `\n⏱️ GPT finalizou: ${endTime}` + `\n⏱️ Resposta em ${elapsed}ms`;
-
-				debugLogRenderer(
-					'🤖 Resposta GPT ❓' +
-						finalText +
-						`\n⏱️ Primeiro Token: ${new Date(transcriptionMetrics.gptFirstTokenTime).toLocaleTimeString()}`,
-					false,
-				);
-			}
-
-			// garante que o turno foi realmente fechado
-			const wasRequestedForThisTurn = gptRequestedTurnId === interviewTurnId;
-			const requestedQuestionId = gptRequestedQuestionId; // 🔥 Qual pergunta foi REALMENTE solicitada
-
-			gptAnsweredTurnId = interviewTurnId;
-			gptRequestedTurnId = null;
-			gptRequestedQuestionId = null; // 🔥 Limpa após usar
-
-			// 🔒 RENDERIZAR A RESPOSTA COM O ID CORRETO
-			if (requestedQuestionId) {
-				// const finalHtml = marked.parse(finalText); // Resposta já renderizada via streaming
-
-				debugLogRenderer(
-					'✅ GPT_STREAM_END: Renderizando resposta para pergunta solicitada:',
-					{
-						requestedQuestionId,
-						wasRequestedForThisTurn,
-					},
-					false,
-				);
-
-				// Se a pergunta solicitada foi CURRENT, promover para history ANTES de renderizar
-				if (requestedQuestionId === CURRENT_QUESTION_ID && currentQuestion.text) {
-					debugLogRenderer('🔄 GPT_STREAM_END: Promovendo CURRENT para history antes de renderizar resposta', true);
-					promoteCurrentToHistory(currentQuestion.text);
-
-					// Pega a pergunta recém-promovida
-					const promotedQuestion = questionsHistory[questionsHistory.length - 1];
-					if (promotedQuestion) {
-						// Renderiza com o ID da pergunta promovida
-						promotedQuestion.answered = true;
-						answeredQuestions.add(promotedQuestion.id);
-						renderQuestionsHistory();
-						debugLogRenderer('✅ Resposta renderizada para pergunta promovida:', promotedQuestion.id, false);
-					} else {
-						console.warn('⚠️ Pergunta promovida não encontrada');
-					}
-				} else {
-					// Para perguntas do histórico, renderiza com o ID recebido
-					answeredQuestions.add(requestedQuestionId);
-
-					// Se for do histórico, atualiza o flag também
-					if (requestedQuestionId !== CURRENT_QUESTION_ID) {
-						try {
-							const q = questionsHistory.find(x => x.id === requestedQuestionId);
-							if (q) {
-								q.answered = true;
-								renderQuestionsHistory();
-							}
-						} catch (err) {
-							console.warn('⚠️ falha ao marcar pergunta como respondida:', err);
-						}
-					}
-				}
-			}
-
-			// Resete o estado da pergunta atual se ainda for CURRENT
-			resetCurrentQuestion();
-
-			// 🔥 Notificar config-manager que stream terminou (para limpar info de streaming)
-			globalThis.RendererAPI?.emitUIChange?.('onAnswerStreamEnd', {});
-		};
-
-		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
-		ipcRenderer.once('GPT_STREAM_END', onEnd);
-		return;
-	}
-
-	// 🔵 MODO NORMAL — BATCH
-	console.log('⏳ enviando para o GPT (batch)...');
-	const res = await ipcRenderer.invoke('ask-gpt', [
-		{ role: 'system', content: SYSTEM_PROMPT },
-		{ role: 'user', content: text },
-	]);
-
-	console.log('✅ resposta do GPT recebida (batch): ', res);
-
-	// Finaliza medições
-	transcriptionMetrics.gptEndTime = Date.now();
-	transcriptionMetrics.totalTime = Date.now() - transcriptionMetrics.audioStartTime;
-
-	// Log métricas
-	logTranscriptionMetrics();
-
-	const wasRequestedForThisTurn = gptRequestedTurnId === interviewTurnId;
-
-	// 🔒 FECHAMENTO ATÔMICO DO CICLO
-	if (isCurrent && wasRequestedForThisTurn) {
-		promoteCurrentToHistory(text);
-		// após promover para o histórico, a pergunta já está no histórico e resposta vinculada
-		try {
-			// Encontra a última pergunta adicionada (que acabamos de promover)
-			const q = questionsHistory[questionsHistory.length - 1];
-			if (q) {
-				q.answered = true;
-				renderQuestionsHistory();
-			}
-		} catch (err) {
-			console.warn('⚠️ falha ao marcar pergunta como respondida (batch):', err);
+		if (isCurrent) {
+			gptRequestedTurnId = interviewTurnId;
+			gptRequestedQuestionId = CURRENT_QUESTION_ID;
+			lastAskedQuestionNormalized = normalizedText;
 		}
+
+		// 2. Rotear por modo (não por LLM!)
+		const isInterviewMode = ModeController.isInterviewMode();
+
+		if (isInterviewMode) {
+			await handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);  // antigo handleAskGptStream
+		} else {
+			await handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);  // antigo handleAskGptBatch
+		}
+		// O llmManager sabe qual LLM usar (OpenAI, Gemini, etc)
+		// Sem duplicação de código!
+	} catch (error) {
+		Logger.error('Erro em askLLM', { error: error.message });
+		eventBus.emit('error', error.message);
+		updateStatusMessage(`❌ ${error.message}`);
 	}
-
-	// marca que o GPT respondeu esse turno (batch)
-	gptAnsweredTurnId = interviewTurnId;
-	gptRequestedTurnId = null;
-
-	debugLogRenderer('Fim da função: "askGpt"');
 }
 
 /**
