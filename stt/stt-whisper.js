@@ -19,7 +19,7 @@
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
-const { getVADEngine } = require('./vad-engine');
+const { getVADEngine } = require('../vad-engine');
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');

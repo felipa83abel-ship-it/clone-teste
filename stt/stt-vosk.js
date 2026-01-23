@@ -19,7 +19,7 @@
 /* ================================ */
 
 const { spawn } = require('node:child_process');
-const { getVADEngine } = require('./vad-engine');
+const { getVADEngine } = require('../vad-engine');
 
 /* ================================ */
 //	CONSTANTES
