@@ -5,9 +5,9 @@
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
-const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt-deepgram.js');
-const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt-vosk.js');
-const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./stt-whisper.js');
+const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt/stt-deepgram.js');  // reorganizado em pasta stt/
+const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt/stt-vosk.js');  // reorganizado em pasta stt/
+const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./stt/stt-whisper.js');  // reorganizado em pasta stt/
 const {
 	startAudioVolumeMonitor,
 	stopAudioVolumeMonitor,
