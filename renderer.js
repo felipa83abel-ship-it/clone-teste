@@ -149,12 +149,8 @@ const MODES = {
 	INTERVIEW: 'INTERVIEW',
 };
 
-// 🔄 modo atual (default = comportamento atual)
-let CURRENT_MODE = MODES.NORMAL;
-
-// ✅ DEPRECATED: ModeController substituído por modeManager (Fase 4)
-// Antes: modeManager.is(MODES.INTERVIEW)
-// Agora: modeManager.is(MODES.INTERVIEW) ou modeManager.is(MODES.NORMAL)
+// ✅ DEPRECATED: CURRENT_MODE removido - use modeManager.getMode() (Fase 4)
+// Modo atual gerenciado por modeManager (veja linhas 36-40)
 
 const ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
@@ -1352,9 +1348,10 @@ const RendererAPI = {
 
 	// Modo
 	changeMode: mode => {
-		CURRENT_MODE = mode;
+		modeManager.setMode(mode);
+		console.log(`📌 Modo alterado via RendererAPI: ${mode}`);
 	},
-	getMode: () => CURRENT_MODE,
+	getMode: () => modeManager.getMode(),
 
 	// Questions
 	handleCurrentQuestion,
