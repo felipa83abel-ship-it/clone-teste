@@ -47,6 +47,19 @@ eventBus.on('answerStreamChunk', data => {
 
 eventBus.on('llmStreamEnd', data => {
 	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
+	
+	// 🔥 [MODO ENTREVISTA] Após GPT responder, promover CURRENT para histórico e limpar
+	if (ModeController.isInterviewMode()) {
+		gptAnsweredTurnId = interviewTurnId;
+		
+		// Promove CURRENT para histórico se ainda não foi promovido
+		if (currentQuestion.text && !currentQuestion.promotedToHistory) {
+			debugLogRenderer(`🔥 [ENTREVISTA] Promovendo CURRENT para histórico após resposta do GPT`, true);
+			promoteCurrentToHistory(currentQuestion.text);
+			currentQuestion.promotedToHistory = true;
+		}
+	}
+	
 	emitUIChange('onAnswerStreamEnd', {});
 });
 
@@ -189,6 +202,7 @@ let currentQuestion = {
 	text: '',
 	lastUpdate: 0,
 	finalized: false,
+	promotedToHistory: false,
 	lastUpdateTime: null,
 	createdAt: null,
 	finalText: '',
@@ -389,6 +403,7 @@ function resetCurrentQuestion() {
 		text: '',
 		lastUpdate: 0,
 		finalized: false,
+		promotedToHistory: false,
 		lastUpdateTime: null,
 		createdAt: null,
 		finalText: '',
@@ -518,6 +533,7 @@ function promoteCurrentToHistory(text) {
 			text: '',
 			lastUpdate: 0,
 			finalized: false,
+			promotedToHistory: false,
 			lastUpdateTime: null,
 			createdAt: null,
 			finalText: '',
@@ -1322,6 +1338,7 @@ async function resetAppState() {
 			text: '',
 			lastUpdate: 0,
 			finalized: false,
+			promotedToHistory: false,
 			lastUpdateTime: null,
 			createdAt: null,
 			finalText: '',
