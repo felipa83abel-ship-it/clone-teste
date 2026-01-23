@@ -1641,11 +1641,11 @@ class ConfigManager {
 				if (q.isSelected) div.classList.add('selected-question');
 				if (q.isAnswered) div.classList.add('answered');
 				if (q.isIncomplete) div.classList.add('incomplete');
-				
+
 				// 🔥 Adicionar badge de turnId se disponível
 				const turnIdBadge = q.turnId ? `<span class="turn-id-badge">${q.turnId}</span>` : '';
 				div.innerHTML = `${turnIdBadge}<span>${q.text}</span>`;
-				
+
 				questionsHistoryBox.appendChild(div);
 			});
 		});
@@ -1720,7 +1720,7 @@ class ConfigManager {
 				wrapper = document.createElement('div');
 				wrapper.className = 'answer-block';
 				wrapper.dataset.questionId = questionId;
-				
+
 				// 🔥 Adicionar badge de turnId se disponível
 				const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
 				wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
