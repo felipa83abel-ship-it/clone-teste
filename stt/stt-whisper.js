@@ -49,7 +49,7 @@ const AUDIO_MIME_TYPE = 'audio/webm';
 
 // AudioWorkletProcessor
 const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor'; // Nome
-const AUDIO_WORKLET_PROCESSOR_PATH = './stt-audio-worklet-processor.js'; // Path
+const AUDIO_WORKLET_PROCESSOR_PATH = './stt/stt-audio-worklet-processor.js'; // Path relativo a index.html
 
 // Detecção de silêncio
 const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
