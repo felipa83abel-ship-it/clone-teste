@@ -64,7 +64,7 @@ try {
 //	CONSTANTES
 /* ================================ */
 
-const USE_FAKE_STREAM_GPT = true; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
+const USE_FAKE_STREAM_GPT = false; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
 
 /* ================================ */
 //	ESTADO GLOBAL
