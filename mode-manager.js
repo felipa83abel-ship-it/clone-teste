@@ -1,7 +1,7 @@
 /**
  * ModeManager - Centraliza lógica de modo (Interview/Normal)
  * Elimina ~15+ chamadas espalhadas a ModeController.isInterviewMode()
- * 
+ *
  * Padrão: Strategy Pattern + Delegation
  * Cada modo registra seus handlers específicos
  */
@@ -74,9 +74,7 @@ class ModeManager {
 		}
 
 		if (typeof handler[methodName] !== 'function') {
-			console.warn(
-				`⚠️ Método "${methodName}" não existe em modo "${this.currentMode}". Retornando undefined.`
-			);
+			console.warn(`⚠️ Método "${methodName}" não existe em modo "${this.currentMode}". Retornando undefined.`);
 			return undefined;
 		}
 

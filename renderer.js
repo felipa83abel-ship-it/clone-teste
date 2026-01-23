@@ -522,7 +522,7 @@ async function listenToggleBtn() {
 
 	// Emite o evento 'onListenButtonToggle' para atualizar o botão de escuta
 	eventBus.emit('listenButtonToggle', {
-		appState.audio.isRunning,
+		isRunning: appState.audio.isRunning,
 		buttonText,
 	});
 
@@ -772,14 +772,17 @@ function handleCurrentQuestion(author, text, options = {}) {
 		} else {
 			// Para finais: limpar interim e ACUMULAR no finalText
 			appState.interview.currentQuestion.interimText = '';
-			appState.interview.currentQuestion.finalText = (appState.interview.currentQuestion.finalText ? appState.interview.currentQuestion.finalText + ' ' : '') + cleaned;
+			appState.interview.currentQuestion.finalText =
+				(appState.interview.currentQuestion.finalText ? appState.interview.currentQuestion.finalText + ' ' : '') +
+				cleaned;
 		}
 
 		Logger.debug('appState.interview.currentQuestion durante: ', { ...appState.interview.currentQuestion }, false);
 
 		// Atualizar o texto total
 		appState.interview.currentQuestion.text =
-			appState.interview.currentQuestion.finalText.trim() + (appState.interview.currentQuestion.interimText ? ' ' + appState.interview.currentQuestion.interimText : '');
+			appState.interview.currentQuestion.finalText.trim() +
+			(appState.interview.currentQuestion.interimText ? ' ' + appState.interview.currentQuestion.interimText : '');
 
 		Logger.debug('appState.interview.currentQuestion depois: ', { ...appState.interview.currentQuestion }, false);
 
@@ -857,7 +860,10 @@ function finalizeCurrentQuestion() {
 
 		// 🔥 [NOVO] Chamar GPT DEPOIS que pergunta foi promovida e salva
 		// chama GPT automaticamente se ainda não respondeu este turno
-		if (appState.interview.gptRequestedTurnId !== appState.interview.interviewTurnId && appState.interview.gptAnsweredTurnId !== appState.interview.interviewTurnId) {
+		if (
+			appState.interview.gptRequestedTurnId !== appState.interview.interviewTurnId &&
+			appState.interview.gptAnsweredTurnId !== appState.interview.interviewTurnId
+		) {
 			askLLM(newId); // Passar ID promovido para LLM
 		}
 
@@ -867,7 +873,10 @@ function finalizeCurrentQuestion() {
 
 	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
 	if (!modeManager.is(MODES.INTERVIEW)) {
-		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', appState.interview.currentQuestion.text);
+		console.log(
+			'⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:',
+			appState.interview.currentQuestion.text,
+		);
 
 		// promoteCurrentToHistory(appState.interview.currentQuestion.text);
 		const newId = String(appState.history.length + 1);
@@ -876,7 +885,8 @@ function finalizeCurrentQuestion() {
 			text: appState.interview.currentQuestion.text,
 			turnId: appState.interview.currentQuestion.turnId,
 			createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-			lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || appState.interview.currentQuestion.createdAt || Date.now(),
+			lastUpdateTime:
+				appState.interview.currentQuestion.lastUpdateTime || appState.interview.currentQuestion.createdAt || Date.now(),
 		});
 
 		appState.selectedId = newId;
@@ -1270,13 +1280,13 @@ async function resetAppState() {
 
 		// 7️⃣ CHUNK 7: Atualizar UI - Transcrições e Respostas
 		eventBus.emit('transcriptionCleared');
-		emitUIChange('onAnswersCleared');
+		eventBus.emit('answersCleared');
 		console.log('✅ Transcrições e respostas UI limpas');
 		await releaseThread();
 
 		// 8️⃣ CHUNK 8: Atualizar UI - Botão Listen
 		eventBus.emit('listenButtonToggle', {
-			appState.audio.isRunning: false,
+			isRunning: false,
 			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
 		});
 		console.log('✅ Botão listen resetado');
@@ -1334,7 +1344,7 @@ const RendererAPI = {
 	listenToggleBtn,
 	askLLM,
 	// 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
-	get appState.audio.isRunning() {
+	get isAudioRunning() {
 		return appState.audio.isRunning;
 	},
 
@@ -1357,22 +1367,22 @@ const RendererAPI = {
 	handleCurrentQuestion,
 	handleQuestionClick,
 
-	// 🔥 NOVO: Expor appState.interview.selectedQuestionId para atalhos em config-manager.js
-	get appState.selectedId() {
+	// 🔥 NOVO: Expor selectedQuestionId via getter para atalhos em config-manager.js
+	get selectedId() {
 		return appState.selectedId;
 	},
 
 	// UI
 	// 🔥 MOVED: applyOpacity foi para config-manager.js
 	updateMockBadge: show => {
-		emitUIChange('onMockBadgeUpdate', { visible: show });
+		eventBus.emit('screenshotBadgeUpdate', { visible: show });
 	},
 	setMockToggle: checked => {
 		APP_CONFIG.MODE_DEBUG = checked;
 		// UI será atualizada via emitUIChange
 	},
 	setModeSelect: mode => {
-		emitUIChange('onModeSelectUpdate', { mode });
+		eventBus.emit('modeSelectUpdate', { mode });
 	},
 
 	// Drag
@@ -1404,8 +1414,6 @@ const RendererAPI = {
 	registerUIElements: elements => {
 		registerUIElements(elements);
 	},
-	// Emit UI changes (para config-manager enviar eventos para renderer)
-	emitUIChange,
 
 	// API Key
 	setAppConfig: config => {
@@ -1413,7 +1421,7 @@ const RendererAPI = {
 		// 🎭 Inicializa mock interceptor se MODE_DEBUG estiver ativo
 		if (APP_CONFIG.MODE_DEBUG) {
 			mockRunner.initMockInterceptor({
-				emitUIChange,
+				eventBus,
 				captureScreenshot,
 				analyzeScreenshots,
 				APP_CONFIG,

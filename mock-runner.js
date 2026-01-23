@@ -46,7 +46,7 @@ let mockAutoPlayActive = false;
 
 // Contexto do renderer (preenchido via initMockInterceptor)
 let rendererContext = {
-	emitUIChange: null,
+	eventBus: null,
 	captureScreenshot: null,
 	analyzeScreenshots: null,
 	APP_CONFIG: null,
@@ -87,12 +87,12 @@ function getMockResponse(question) {
  */
 async function runMockAutoPlay() {
 	if (mockAutoPlayActive) return;
-	if (!rendererContext.emitUIChange) {
+	if (!rendererContext.eventBus) {
 		console.warn('⚠️ Mock: Contexto do renderer ainda não inicializado');
 		return;
 	}
 
-	const { emitUIChange, captureScreenshot, analyzeScreenshots, APP_CONFIG } = rendererContext;
+	const { eventBus, captureScreenshot, analyzeScreenshots, APP_CONFIG } = rendererContext;
 
 	mockAutoPlayActive = true;
 
@@ -110,7 +110,7 @@ async function runMockAutoPlay() {
 		const placeholderId = `placeholder-${audioStartTime}-${Math.random()}`;
 
 		// Emite placeholder
-		emitUIChange('onTranscriptAdd', {
+		eventBus.emit('transcriptAdd', {
 			author: 'Outros',
 			text: '...',
 			timeStr: new Date().toLocaleTimeString(),
@@ -135,7 +135,7 @@ async function runMockAutoPlay() {
 		const totalMs = audioEndTime - audioStartTime + latencyMs;
 
 		// Atualiza placeholder com texto real
-		emitUIChange('onPlaceholderFulfill', {
+		eventBus.emit('placeholderFulfill', {
 			speaker: 'Outros',
 			text: scenario.question,
 			startStr: new Date(audioStartTime).toLocaleTimeString(),
