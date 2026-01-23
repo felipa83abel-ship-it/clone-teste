@@ -2206,14 +2206,17 @@ class ConfigManager {
 			});
 		}
 
-		// Ask GPT (global shortcut)
+		// Ask GPT (global shortcut - Ctrl+Enter)
 		if (globalThis.RendererAPI?.onAskGpt) {
 			globalThis.RendererAPI.onAskGpt(() => {
-				if (globalThis.RendererAPI?.askGpt) {
-					globalThis.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
-					// console.error(
-					// 	'registerDOMEventListeners: askGpt() 1867; 🔒 COMENTADA até transcrição em tempo real funcionar',
-					// );
+				// 🔥 CORRIGIDO: Chamar handleQuestionClick() em vez de askLLM()
+				// Isso garante que passa por todas as validações: pergunta já respondida, incompleta, etc
+				// Mesma regra que o clique do mouse
+				if (globalThis.RendererAPI?.handleQuestionClick) {
+					console.log('🔥 Atalho Ctrl+Enter detectado - chamando handleQuestionClick');
+					// Usar selectedQuestionId da API ou fallback para CURRENT
+					const selectedId = globalThis.RendererAPI?.selectedQuestionId || 'CURRENT';
+					globalThis.RendererAPI.handleQuestionClick(selectedId);
 				}
 			});
 		}
