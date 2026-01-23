@@ -36,6 +36,7 @@ Documento de referência da arquitetura após refatoração FASE 1-4 (jan 2026).
 **Arquivos**: `renderer.js`, `config-manager.js`, `index.html`, `styles.css`
 
 #### renderer.js
+
 - **Ponto de entrada** do app (rodando no contexto renderer do Electron)
 - Expõe `window.RendererAPI` com métodos:
   - `startAudioCapture()` / `stopAudioCapture()`
@@ -44,12 +45,14 @@ Documento de referência da arquitetura após refatoração FASE 1-4 (jan 2026).
   - Integração com medidores (VAD, volume)
 
 #### ModeController
+
 - **Orquestra o fluxo** principal: Fala → STT → LLM → UI
 - Gerencia turnos (questions/answers) com `turnId` único
 - Estados: `IDLE`, `LISTENING`, `TRANSCRIBING`, `ASKING_LLM`, `WAITING_RESPONSE`
 - Heurísticas de silêncio/timeout configuráveis
 
 #### config-manager.js
+
 - Persiste configurações em localStorage + secure store (electron-store)
 - Gerencia seleção de providers (OpenAI, Google/Gemini, OpenRouter)
 - UI abas: Geral, API e Modelos, Áudio, Privacidade, Reset
@@ -62,29 +65,33 @@ Documento de referência da arquitetura após refatoração FASE 1-4 (jan 2026).
 **Diretório**: `stt/` com 4 providers implementados
 
 #### stt-whisper.js (Principal)
+
 ```javascript
 class WhisperSTT extends BaseSTT {
-  // Métodos principais:
-  // • initialize(model) - Inicializa cliente
-  // • startCapture(source, deviceId) - Abre stream de áudio
-  // • transcribe() - Converte áudio em texto
-  // • changeDevice(source, deviceId) - Troca entrada/saída
-  // • stop() - Cleanup
+	// Métodos principais:
+	// • initialize(model) - Inicializa cliente
+	// • startCapture(source, deviceId) - Abre stream de áudio
+	// • transcribe() - Converte áudio em texto
+	// • changeDevice(source, deviceId) - Troca entrada/saída
+	// • stop() - Cleanup
 }
 ```
 
 **Características**:
+
 - Suporta 2 modos: local (Whisper.cpp CLI) + cloud (OpenAI Whisper-1)
 - VAD (Voice Activity Detection) integrado via vad-engine.js
 - Thresholds de silêncio/fala configuráveis
 - Dispositivos de áudio dinâmicos
 
 #### Outros STT
+
 - **stt-vosk.js**: Offline, multilingue, leve (Python subprocess)
 - **stt-deepgram.js**: Cloud, alta precisão, real-time (via SDK)
 - **stt-openrouter.js**: Agregador multimodel
 
 #### vad-engine.js
+
 - Motor centralizado de detecção de silêncio
 - 3 modos: `NATIVE`, `FALLBACK` (volume), `HYBRID`
 - Thresholds ajustáveis: silêncio (300ms), fala pré-silêncio (100ms)
@@ -96,32 +103,43 @@ class WhisperSTT extends BaseSTT {
 **Diretório**: `llm/handlers/` com handlers plugáveis
 
 #### Padrão Handler
+
 ```javascript
 class MyLLMHandler {
-  async initialize(apiKey) { /* Cliente setup */ }
-  async complete(messages) { /* Resposta completa (Promise<string>) */ }
-  async *stream(messages) { /* Generator async para tokens */ }
+	async initialize(apiKey) {
+		/* Cliente setup */
+	}
+	async complete(messages) {
+		/* Resposta completa (Promise<string>) */
+	}
+	async *stream(messages) {
+		/* Generator async para tokens */
+	}
 }
 ```
 
 #### Handlers Implementados
 
 **openai-handler.js** ✅ (Completo)
+
 - Modelos: GPT-4o, GPT-4o-mini, GPT-3.5-turbo
 - Streaming via `on('data')` + parsing de SSE
 - Timeout: 60s
 
 **gemini-handler.js** ✅ (Pronto - pendente crédito para testar)
+
 - Modelo: gemini-1.5-flash
 - Streaming via AsyncGenerator + `text()` em stream
 - Timeout: 60s
 - Requer Google API key em https://ai.google.dev/
 
 **template-handler.js** (Referência)
+
 - Guia passo-a-passo para criar novo handler
 - Inclui exemplo de formato de mensagens e registro
 
 #### LLMManager (renderer.js)
+
 ```javascript
 const llmManager = new LLMManager();
 llmManager.register('openai', openaiHandler);
@@ -137,6 +155,7 @@ const response = await llmManager.ask(messages);
 **Arquivo**: `main.js`
 
 #### Responsabilidades
+
 1. **Criação de janela**: overlay transparente, frameless, sempre visível
 2. **Armazenamento seguro**: `electron-store` com encriptação
 3. **Inicialização de clientes**: OpenAI, Gemini (baseado em chaves salvas)
@@ -145,20 +164,24 @@ const response = await llmManager.ask(messages);
 #### IPC Handlers Principais
 
 **Configuração**:
+
 - `GET_APP_CONFIG` → retorna constantes APP_CONFIG
 - `GET_API_KEY` → lê chave do secure store
 - `SAVE_API_KEY` → salva chave + inicializa cliente (OpenAI ou Gemini)
 - `DELETE_API_KEY` → remove chave + desconecta cliente
 
 **STT**:
+
 - `transcribe-audio` → chamada Whisper completa
 - `transcribe-audio-partial` → chamada Whisper streaming
 
 **LLM**:
+
 - `ask-gpt` → completação OpenAI
 - `ask-gpt-stream` → streaming OpenAI via eventos
 
 **Atalhos globais**:
+
 - `Ctrl+D` → `CMD_TOGGLE_AUDIO` (inicia/para captura)
 - `Ctrl+Enter` → `CMD_ASK_GPT` (envia pergunta)
 
@@ -167,11 +190,12 @@ const response = await llmManager.ask(messages);
 ## 🔐 Segurança & Armazenamento
 
 ### electron-store (Encrypt)
+
 ```javascript
 // Inicialização em main.js
 const secureStore = new Store({
-  configName: 'secure-config',
-  encryptionKey: 'sua-chave-segura-aqui',
+	configName: 'secure-config',
+	encryptionKey: 'sua-chave-segura-aqui',
 });
 
 // Uso
@@ -181,6 +205,7 @@ secureStore.delete('apiKeys.openai');
 ```
 
 ### Fluxo de API Key
+
 1. **UI** (config-manager.js) → input campo "Google API Key"
 2. **IPC SAVE_API_KEY** → main.js valida + encripta + salva
 3. **Client Init** → main.js cria GoogleGenerativeAI(apiKey)
@@ -242,7 +267,7 @@ const LEADING_SILENCE_THRESHOLD = 100;
 const TRANSCRIPTION_TIMEOUT = 30000; // 30s
 
 // Seleção de STT/LLM
-const DEFAULT_STT_MODEL = 'whisper';  // ou 'vosk', 'deepgram'
+const DEFAULT_STT_MODEL = 'whisper'; // ou 'vosk', 'deepgram'
 const DEFAULT_LLM_PROVIDER = 'openai'; // ou 'gemini'
 ```
 
@@ -252,19 +277,19 @@ const DEFAULT_LLM_PROVIDER = 'openai'; // ou 'gemini'
 
 ```json
 {
-  "devDependencies": {
-    "electron": "^39.2.7",
-    "electron-reload": "^2.0.0-alpha.1",
-    "cross-env": "^10.1.0"
-  },
-  "dependencies": {
-    "electron-store": "^11.0.2",
-    "openai": "^6.10.0",
-    "@google/generative-ai": "^0.x.x",
-    "marked": "^17.0.1",
-    "highlight.js": "^11.11.1",
-    "wav": "^1.0.2"
-  }
+	"devDependencies": {
+		"electron": "^39.2.7",
+		"electron-reload": "^2.0.0-alpha.1",
+		"cross-env": "^10.1.0"
+	},
+	"dependencies": {
+		"electron-store": "^11.0.2",
+		"openai": "^6.10.0",
+		"@google/generative-ai": "^0.x.x",
+		"marked": "^17.0.1",
+		"highlight.js": "^11.11.1",
+		"wav": "^1.0.2"
+	}
 }
 ```
 
@@ -275,24 +300,29 @@ const DEFAULT_LLM_PROVIDER = 'openai'; // ou 'gemini'
 ### Adicionar Novo LLM Provider
 
 1. **Criar handler** em `llm/handlers/seu-provider-handler.js`
+
    ```javascript
    const Handler = require('./template-handler.js');
    class SeuProviderHandler extends Handler {
-     // Implementar: initialize, complete, stream
+   	// Implementar: initialize, complete, stream
    }
    module.exports = new SeuProviderHandler();
    ```
 
 2. **Registrar em renderer.js**
+
    ```javascript
    const suaHandler = require('./llm/handlers/seu-provider-handler.js');
    llmManager.register('seu-provider', suaHandler);
    ```
 
 3. **Adicionar em main.js**
+
    ```javascript
    let seuClient = null;
-   function initializeSeuClient(apiKey) { /* setup */ }
+   function initializeSeuClient(apiKey) {
+   	/* setup */
+   }
    // Atualizar handleSaveApiKey e handleDeleteApiKey
    ```
 
@@ -312,6 +342,7 @@ Similar ao LLM, herde de `BaseSTT` (não existe yet - considerar refatorar).
 ## 📊 Histórico de Turnos (Turns)
 
 Cada pergunta+resposta = 1 turn com estrutura:
+
 ```javascript
 {
   turnId: 1,  // Incrementado globalmente
