@@ -40,7 +40,7 @@ llmManager.register('gemini', geminiHandler);
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
 eventBus.on('answerStreamChunk', data => {
-	emitUIChange('onAnswerStreamChunk', {
+	eventBus.emit('answerStreamChunk', {
 		questionId: data.questionId,
 		turnId: data.turnId, // 🔥 Passar turnId para UI
 		token: data.token,
@@ -62,7 +62,7 @@ eventBus.on('llmStreamEnd', data => {
 		renderCurrentQuestion();
 	}
 
-	emitUIChange('onAnswerStreamEnd', {});
+	eventBus.emit('answerStreamEnd', {});
 });
 
 eventBus.on('llmBatchEnd', data => {
@@ -71,7 +71,7 @@ eventBus.on('llmBatchEnd', data => {
 	// 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
 	answeredQuestions.add(data.questionId);
 
-	emitUIChange('onAnswerBatchEnd', {
+	eventBus.emit('answerBatchEnd', {
 		questionId: data.questionId,
 		response: data.response,
 	});
@@ -277,48 +277,6 @@ function onUIChange(eventName, callback) {
  * @param {string} eventName - Nome do evento
  * @param {any} data - Dados do evento
  */
-function emitUIChange(eventName, data) {
-	if (UICallbacks[eventName] && typeof UICallbacks[eventName] === 'function') {
-		UICallbacks[eventName](data);
-	} else {
-		console.warn(`⚠️ DEBUG: Nenhum callback registrado para '${eventName}'`);
-	}
-}
-
-/**
- * Elementos UI solicitados por callback
- * config-manager.js fornece esses elementos via registerUIElements()
- */
-let UIElements = {
-	inputSelect: null,
-	outputSelect: null,
-	listenBtn: null,
-	statusText: null,
-	transcriptionBox: null,
-	currentQuestionBox: null,
-	currentQuestionTextBox: null,
-	questionsHistoryBox: null,
-	answersHistoryBox: null,
-	askBtn: null,
-	inputVu: null,
-	outputVu: null,
-	inputVuHome: null,
-	outputVuHome: null,
-	mockToggle: null,
-	mockBadge: null,
-	interviewModeSelect: null,
-	btnClose: null,
-	btnToggleClick: null,
-	dragHandle: null,
-	darkToggle: null,
-	opacityRange: null,
-};
-
-/**
- * Registra elementos UI no renderer
- * config-manager.js chama isso para registrar elementos
- * @param {object} elements - Mapeamento de elementos UI
- */
 function registerUIElements(elements) {
 	UIElements = { ...UIElements, ...elements };
 	console.log('✅ UI Elements registrados no renderer.js');
@@ -442,7 +400,7 @@ function renderQuestionsHistory() {
 		};
 	});
 
-	emitUIChange('onQuestionsHistoryUpdate', historyData);
+	eventBus.emit('questionsHistoryUpdate', historyData);
 
 	scrollToSelectedQuestion();
 
@@ -497,7 +455,7 @@ function normalizeForCompare(t) {
  */
 function updateStatusMessage(message) {
 	Logger.debug('Início da função: "updateStatusMessage"');
-	emitUIChange('onStatusUpdate', { message });
+	eventBus.emit('statusUpdate', { message });
 	Logger.debug('Fim da função: "updateStatusMessage"');
 }
 
@@ -529,7 +487,7 @@ function findAnswerByQuestionId(questionId) {
  */
 function clearAllSelections() {
 	// Emite evento para o controller limpar as seleções visuais
-	emitUIChange('onClearAllSelections', {});
+	eventBus.emit('clearAllSelections', {});
 }
 
 /**
@@ -625,7 +583,7 @@ async function listenToggleBtn() {
 		if (!hasModel) {
 			const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
 			console.warn(`⚠️ ${errorMsg}`);
-			emitUIChange('onError', errorMsg);
+			eventBus.emit('error', errorMsg);
 			return;
 		}
 
@@ -637,7 +595,7 @@ async function listenToggleBtn() {
 			const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
 			console.warn(`⚠️ ${errorMsg}`);
 			console.log('📡 DEBUG: Emitindo onError:', errorMsg);
-			emitUIChange('onError', errorMsg);
+			eventBus.emit('error', errorMsg);
 			return;
 		}
 	}
@@ -648,7 +606,7 @@ async function listenToggleBtn() {
 	const statusMsg = appState.audio.isRunning ? 'Status: ouvindo...' : 'Status: parado';
 
 	// Emite o evento 'onListenButtonToggle' para atualizar o botão de escuta
-	emitUIChange('onListenButtonToggle', {
+	eventBus.emit('listenButtonToggle', {
 		appState.audio.isRunning,
 		buttonText,
 	});
@@ -705,7 +663,7 @@ function renderCurrentQuestion() {
 
 	// Se não há texto, emite vazio
 	if (!appState.interview.currentQuestion.text) {
-		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
+		eventBus.emit('currentQuestionUpdate', { text: '', isSelected: false });
 		return;
 	}
 
@@ -727,7 +685,7 @@ function renderCurrentQuestion() {
 	};
 
 	// Emite evento para o config-manager renderizar no DOM
-	emitUIChange('onCurrentQuestionUpdate', questionData);
+	eventBus.emit('currentQuestionUpdate', questionData);
 
 	Logger.debug('Fim da função: "renderCurrentQuestion"');
 }
@@ -748,7 +706,7 @@ function handleQuestionClick(questionId) {
 		const existingAnswer = findAnswerByQuestionId(questionId);
 
 		if (existingAnswer) {
-			emitUIChange('onAnswerSelected', {
+			eventBus.emit('answerSelected', {
 				questionId: questionId,
 				shouldScroll: true,
 			});
@@ -840,7 +798,7 @@ function handleQuestionClick(questionId) {
  * Rola a lista de perguntas para a pergunta selecionada
  */
 function scrollToSelectedQuestion() {
-	emitUIChange('onScrollToQuestion', {
+	eventBus.emit('scrollToQuestion', {
 		questionId: appState.selectedId,
 	});
 }
@@ -1146,7 +1104,7 @@ async function captureScreenshot() {
 		if (!result.success) {
 			console.warn('⚠️ Falha na captura:', result.error);
 			updateStatusMessage(`❌ ${result.error}`);
-			emitUIChange('onScreenshotBadgeUpdate', {
+			eventBus.emit('screenshotBadgeUpdate', {
 				count: appState.audio.capturedScreenshots.length,
 				visible: appState.audio.capturedScreenshots.length > 0,
 			});
@@ -1166,7 +1124,7 @@ async function captureScreenshot() {
 
 		// Atualiza UI
 		updateStatusMessage(`✅ ${appState.audio.capturedScreenshots.length} screenshot(s) capturado(s)`);
-		emitUIChange('onScreenshotBadgeUpdate', {
+		eventBus.emit('screenshotBadgeUpdate', {
 			count: appState.audio.capturedScreenshots.length,
 			visible: true,
 		});
@@ -1259,7 +1217,7 @@ async function analyzeScreenshots() {
 		appState.audio.capturedScreenshots = [];
 
 		// Atualiza badge
-		emitUIChange('onScreenshotBadgeUpdate', {
+		eventBus.emit('screenshotBadgeUpdate', {
 			count: 0,
 			visible: false,
 		});
@@ -1284,7 +1242,7 @@ function clearScreenshots() {
 	appState.audio.capturedScreenshots = [];
 
 	updateStatusMessage('✅ Screenshots limpos');
-	emitUIChange('onScreenshotBadgeUpdate', {
+	eventBus.emit('screenshotBadgeUpdate', {
 		count: 0,
 		visible: false,
 	});
@@ -1366,7 +1324,7 @@ async function resetAppState() {
 		if (appState.audio.capturedScreenshots.length > 0) {
 			console.log(`🗑️ Limpando ${appState.audio.capturedScreenshots.length} screenshot(s)...`);
 			appState.audio.capturedScreenshots = [];
-			emitUIChange('onScreenshotBadgeUpdate', {
+			eventBus.emit('screenshotBadgeUpdate', {
 				count: 0,
 				visible: false,
 			});
@@ -1387,22 +1345,22 @@ async function resetAppState() {
 		await releaseThread();
 
 		// 6️⃣ CHUNK 6: Atualizar UI - Perguntas
-		emitUIChange('onCurrentQuestionUpdate', {
+		eventBus.emit('currentQuestionUpdate', {
 			text: '',
 			isSelected: false,
 		});
-		emitUIChange('onQuestionsHistoryUpdate', []);
+		eventBus.emit('questionsHistoryUpdate', []);
 		console.log('✅ Perguntas UI limpa');
 		await releaseThread();
 
 		// 7️⃣ CHUNK 7: Atualizar UI - Transcrições e Respostas
-		emitUIChange('onTranscriptionCleared');
+		eventBus.emit('transcriptionCleared');
 		emitUIChange('onAnswersCleared');
 		console.log('✅ Transcrições e respostas UI limpas');
 		await releaseThread();
 
 		// 8️⃣ CHUNK 8: Atualizar UI - Botão Listen
-		emitUIChange('onListenButtonToggle', {
+		eventBus.emit('listenButtonToggle', {
 			appState.audio.isRunning: false,
 			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
 		});
@@ -1410,7 +1368,7 @@ async function resetAppState() {
 		await releaseThread();
 
 		// 9️⃣ CHUNK 9: Atualizar UI - Status
-		emitUIChange('onStatusUpdate', {
+		eventBus.emit('statusUpdate', {
 			status: 'ready',
 			message: '✅ Pronto',
 		});
