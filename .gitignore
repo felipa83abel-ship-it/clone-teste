@@ -55,12 +55,8 @@ Thumbs.db
 # =============================== 
 # Outros
 # ===============================
+audio/samples/*
 vosk-models/
 whisper-local/
 exemplo-deepgram/
-copiar dll/
 backup/
-audio/
-backup-deepgram-old/
-microfone.html
-transcriber-test.html

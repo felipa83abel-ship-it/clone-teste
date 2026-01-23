@@ -12,7 +12,7 @@ const {
 	startAudioVolumeMonitor,
 	stopAudioVolumeMonitor,
 	switchAudioVolumeDevice,
-} = require('./volume-audio-monitor.js');
+} = require('./audio/volume-audio-monitor.js');
 
 /* ================================ */
 //	🎯 NOVAS CLASSES (Refatoração Fase 2)
