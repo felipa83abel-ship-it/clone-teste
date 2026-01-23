@@ -21,7 +21,7 @@
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
-const { getVADEngine } = require('./vad-engine');
+const { getVADEngine } = require('../vad-engine');
 
 /* ================================ */
 //	CONSTANTES
