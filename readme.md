@@ -7,6 +7,8 @@
 ![Node](https://img.shields.io/badge/Node-18%2B-339933?logo=node.js)
 ![License](https://img.shields.io/badge/license-ISC-green)
 
+> **👉 Novo por aqui?** Leia [START_HERE.md](START_HERE.md) primeiro! (5 minutos)
+
 ---
 
 ## 📋 Índice
