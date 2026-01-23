@@ -48,7 +48,7 @@ class AppState {
 	// ============================================
 	// GETTERS / SETTERS PARA COMPATIBILIDADE
 	// ============================================
-	
+
 	// Audio state getters/setters
 	get isRunning() {
 		return this.audio.isRunning;
@@ -168,7 +168,7 @@ class AppState {
 	// ============================================
 	// MÉTODOS AUXILIARES
 	// ============================================
-	
+
 	// Helper para acesso rápido a currentQuestion (usado 72+ vezes)
 	get q() {
 		return this.interview.currentQuestion;
