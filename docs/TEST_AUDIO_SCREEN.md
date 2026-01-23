@@ -17,6 +17,7 @@
 ## 🎯 Preparação para Testes
 
 ### Requisitos
+
 ```
 ✅ Dispositivo(s) de áudio conectado(s)
 ✅ VoiceMeeter instalado (opcional, para saída)
@@ -34,6 +35,7 @@
 **Objetivo:** Validar seleção e listagem de microfones
 
 **Passos:**
+
 1. ⚙️ Ir para **"Áudio e Tela"** → **"Áudio"**
 2. 📋 Observar dropdown **"Dispositivo de Entrada"**
 3. 👀 Verificar opções disponíveis
@@ -42,6 +44,7 @@
 6. 📊 Observar VU meter de entrada
 
 **Resultado Esperado:**
+
 ```
 Dropdown contém:
   🔇 Nenhum (Desativado)
@@ -60,9 +63,11 @@ SEM precisar clicar "Começar a Ouvir"
 **Objetivo:** Confirmar que volume oscila em tempo real
 
 **Pré-condições:**
+
 - Microfone selecionado (Teste 1)
 
 **Passos:**
+
 1. ⚙️ Aba **"Áudio"**
 2. 👀 Observar barra verde **"Nível de Volume (Entrada)"**
 3. 🎙️ **Fazer barulho** perto do microfone
@@ -71,6 +76,7 @@ SEM precisar clicar "Começar a Ouvir"
 6. 📊 Observar barra voltar para 0%
 
 **Resultado Esperado:**
+
 ```
 Barra oscila IMEDIATAMENTE ao fazer barulho
 Cores mudam:
@@ -87,9 +93,11 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar reinicialização de monitoramento
 
 **Pré-condições:**
+
 - Dispositivo de entrada já selecionado
 
 **Passos:**
+
 1. ⚙️ Aba **"Áudio"**
 2. 🎤 **Selecionar outro microfone**
 3. ⏳ Aguardar 2 segundos
@@ -97,6 +105,7 @@ Barra volta para 0% no silêncio
 5. 📊 Observar VU meter
 
 **Resultado Esperado:**
+
 ```
 ✅ Stream anterior é fechada
 ✅ Nova stream inicia automaticamente
@@ -110,10 +119,12 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar captura de áudio de outros participantes
 
 **Pré-requisitos:**
+
 - VoiceMeeter instalado
 - Áudio tocando no sistema
 
 **Passos:**
+
 1. ⚙️ Ir para **"Dispositivo de Saída"**
 2. 🔊 Selecionar **VoiceMeeter Output**
 3. ⏳ Aguardar 2 segundos
@@ -121,6 +132,7 @@ Barra volta para 0% no silêncio
 5. 📊 Observar VU meter de saída
 
 **Resultado Esperado:**
+
 ```
 ✅ VU meter OSCILA conforme áudio do sistema
 ✅ Independente de "Começar a Ouvir"
@@ -133,6 +145,7 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar comportamento quando permissões são negadas
 
 **Passos:**
+
 1. 🚀 Abrir aplicação
 2. ⚠️ Navegador pede permissão de microfone
 3. ❌ **Negar permissão**
@@ -140,12 +153,14 @@ Barra volta para 0% no silêncio
 5. 🎤 Tentar selecionar microfone
 
 **Resultado Esperado:**
+
 ```
 ❌ Dropdown vazio ou com erro
 ⚠️ Mensagem de erro no console
 ```
 
 **Solução:**
+
 ```
 1. Conceder permissões nas configurações do navegador
 2. Reabrir aplicação
@@ -159,6 +174,7 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar monitoramento também na aba Home
 
 **Passos:**
+
 1. 🏠 Ir para **"Home"**
 2. 👀 Observar seção **"Monitoramento de Volume"**
 3. 👀 Verificar se há dois VU meters (entrada e saída)
@@ -166,6 +182,7 @@ Barra volta para 0% no silêncio
 5. 📊 Observar oscilação
 
 **Resultado Esperado:**
+
 ```
 ✅ Dois VU meters visíveis (entrada e saída)
 ✅ Oscilam em tempo real sem precisar de "Começar a Ouvir"
@@ -179,12 +196,14 @@ Barra volta para 0% no silêncio
 **Objetivo:** Confirmar que monitoramento é em tempo real
 
 **Passos:**
+
 1. ⚙️ Na aba **"Áudio"**
 2. 👀 Observar VU meter
 3. 🎙️ Fazer som curto (bater palma)
 4. ⏱️ Cronometrar delay até barra responder
 
 **Resultado Esperado:**
+
 ```
 ✅ Delay < 50ms (imperceptível)
 ✅ Sem lag no monitoramento
@@ -199,6 +218,7 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar atalho padrão Ctrl+Shift+S
 
 **Passos:**
+
 1. ⚙️ Ir para **"Áudio e Tela"** → **"Captura de Tela"**
 2. 👀 Observar **"Atalho para Screenshot"**
 3. ✅ Deve exibir: **"Ctrl+Shift+S"**
@@ -207,6 +227,7 @@ Barra volta para 0% no silêncio
 6. 👀 Observar se screenshot é capturado
 
 **Resultado Esperado:**
+
 ```
 ✅ Badge no topo muda: "📸 1 screenshots"
 ✅ Imagem é salva internamente
@@ -219,12 +240,14 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar personalização de atalho
 
 **Passos:**
+
 1. ⚙️ Na aba **"Captura de Tela"**
 2. 🔘 Clicar em **"Gravar Atalho"**
 3. ⌨️ Pressionar nova combinação (ex: **Alt+S**)
 4. 👀 Observar atualização
 
 **Resultado Esperado:**
+
 ```
 ✅ Campo atualiza para novo atalho
 ✅ Próximas capturas usam novo atalho
@@ -238,12 +261,14 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar opção PNG
 
 **Passos:**
+
 1. ⚙️ Na aba **"Captura de Tela"**
 2. 📋 Selecionar **"PNG (maior qualidade)"**
 3. ⌨️ Tirar screenshot
 4. 👀 Observar badge (número aumenta)
 
 **Resultado Esperado:**
+
 ```
 ✅ Imagem é salva como PNG
 ✅ Qualidade máxima
@@ -256,12 +281,14 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar opção JPG
 
 **Passos:**
+
 1. ⚙️ Na aba **"Captura de Tela"**
 2. 📋 Selecionar **"JPG (menor tamanho)"**
 3. ⌨️ Tirar screenshot
 4. 👀 Observar tamanho menor (se possível comparar)
 
 **Resultado Esperado:**
+
 ```
 ✅ Imagem é salva como JPG
 ✅ Arquivo menor que PNG
@@ -274,6 +301,7 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar opção de invisibilidade
 
 **Passos:**
+
 1. ⚙️ Na aba **"Captura de Tela"**
 2. ☑️ Marcar **"Excluir esta aplicação das capturas"**
 3. 💾 Salvar configuração
@@ -282,6 +310,7 @@ Barra volta para 0% no silêncio
 6. 👀 Observar se aplicação AskMe aparece
 
 **Resultado Esperado:**
+
 ```
 ❌ Aplicação AskMe NÃO aparece na captura
 ✅ Transparente para screenshots externos
@@ -294,6 +323,7 @@ Barra volta para 0% no silêncio
 **Objetivo:** Validar limpeza de screenshots
 
 **Passos:**
+
 1. 🏠 Ir para **"Home"**
 2. 📸 Tirar 3-5 screenshots
 3. 👀 Observar badge: "📸 3 screenshots"
@@ -301,6 +331,7 @@ Barra volta para 0% no silêncio
 5. 👀 Observar resultado
 
 **Resultado Esperado:**
+
 ```
 ✅ Badge muda para: "📸 0 screenshots"
 ✅ Todas as screenshots removidas
@@ -334,6 +365,7 @@ Captura de Tela:
 ## 🐛 Troubleshooting
 
 ### Volume não oscila
+
 ```
 • Verificar se o dispositivo está selecionado
 • Verificar se há áudio no ambiente
@@ -343,6 +375,7 @@ Captura de Tela:
 ```
 
 ### Permissões não funcionam
+
 ```
 • Verificar configurações do navegador
 • Verificar permissões do sistema (Windows/macOS)
@@ -351,6 +384,7 @@ Captura de Tela:
 ```
 
 ### Atalho screenshot não funciona
+
 ```
 • Verificar se novo atalho foi salvo
 • Tentar atalho padrão novamente
@@ -359,6 +393,7 @@ Captura de Tela:
 ```
 
 ### Aplicação ainda aparece em capturas
+
 ```
 • Verificar se checkbox está marcado
 • Salvar configuração novamente

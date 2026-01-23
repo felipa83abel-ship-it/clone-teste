@@ -23,6 +23,7 @@
 **Objetivo:** Validar alternância de tema
 
 **Passos:**
+
 1. ⚙️ Ir para **"Outros"**
 2. 👀 Observar **"Dark Mode"** toggle (com slider)
 3. 🌙 Clicar no toggle
@@ -32,6 +33,7 @@
 7. 👀 Verificar se tema persiste
 
 **Resultado Esperado:**
+
 ```
 Modo Dark:
   ✅ Body recebe classe "dark"
@@ -56,11 +58,13 @@ Persistência:
 **Objetivo:** Validar que tema dark é padrão
 
 **Passos:**
+
 1. 🗑️ Limpar localStorage
 2. 🚀 Reabrir aplicação
 3. 👀 Observar tema inicial
 
 **Resultado Esperado:**
+
 ```
 ✅ Tema dark é aplicado por padrão
 ✅ Toggle está marcado ("On")
@@ -73,6 +77,7 @@ Persistência:
 **Objetivo:** Validar paleta de cores em dark mode
 
 **Passos:**
+
 1. 🌙 Ativar dark mode
 2. 👀 Observar cores de:
    - Fundo
@@ -83,6 +88,7 @@ Persistência:
 3. 📐 Usar DevTools (F12) para inspecionar cores
 
 **Resultado Esperado:**
+
 ```
 Fundo principal: #0f172a
 Texto principal: #e5e7eb
@@ -100,6 +106,7 @@ Menu: preto com hover azul
 **Objetivo:** Confirmar diferença de comportamento
 
 **Passos:**
+
 1. ⚙️ Na aba **"Home"** (topbar)
 2. 📋 Combobox **"Modo"**: selecionar **"Padrão"**
 3. 👀 Observar comportamento
@@ -107,6 +114,7 @@ Menu: preto com hover azul
 5. 👀 Observar mudança
 
 **Resultado Esperado:**
+
 ```
 Modo Padrão:
   • Transcrição não promove automaticamente
@@ -124,11 +132,13 @@ Modo Entrevista:
 **Objetivo:** Validar que modo é salvo
 
 **Passos:**
+
 1. 👀 Selecionar **"Padrão"**
 2. 🔄 Fechar e reabrir aplicação
 3. 👀 Verificar modo
 
 **Resultado Esperado:**
+
 ```
 ✅ Modo "Padrão" é restaurado
 ✅ Combobox exibe "Padrão"
@@ -141,11 +151,13 @@ Modo Entrevista:
 **Objetivo:** Validar opções disponíveis
 
 **Passos:**
+
 1. 🏠 Na aba Home
 2. 📋 Clicar em combobox **"Modo"**
 3. 👀 Observar opções
 
 **Resultado Esperado:**
+
 ```
 Opções:
   ✅ Padrão
@@ -161,6 +173,7 @@ Opções:
 **Objetivo:** Validar seleção de idioma
 
 **Passos:**
+
 1. ⚙️ Ir para **"Outros"**
 2. 📋 Observar **"Idioma da Interface"**
 3. 👀 Verificar opções
@@ -168,6 +181,7 @@ Opções:
 5. 👀 Observar mudanças (se implementado)
 
 **Resultado Esperado:**
+
 ```
 Opções disponíveis:
   ✅ Português (Brasil) - padrão
@@ -182,11 +196,13 @@ Opções disponíveis:
 **Objetivo:** Validar que idioma é salvo
 
 **Passos:**
+
 1. 📋 Selecionar **"English (US)"**
 2. 🔄 Fechar e reabrir
 3. 👀 Verificar seleção
 
 **Resultado Esperado:**
+
 ```
 ✅ Idioma "English (US)" é restaurado
 ```
@@ -200,6 +216,7 @@ Opções disponíveis:
 **Objetivo:** Validar opções de verbosidade
 
 **Passos:**
+
 1. ⚙️ Na aba **"Outros"**
 2. 📋 Observar **"Nível de Log"**
 3. 👀 Verificar opções
@@ -209,6 +226,7 @@ Opções disponíveis:
 7. 👀 Observar volume de logs
 
 **Resultado Esperado:**
+
 ```
 Opções:
   ✅ Somente erros
@@ -228,12 +246,14 @@ Console:
 **Objetivo:** Validar que mudança funciona imediatamente
 
 **Passos:**
+
 1. F12 Abrir console
 2. 📋 Mudar **"Log Level"** para **"Debug"**
 3. 🏠 Executar ação (ex: clicar botão)
 4. 👀 Observar console
 
 **Resultado Esperado:**
+
 ```
 ✅ Logs aparecem imediatamente
 ✅ Sem necessidade de reabrir
@@ -248,6 +268,7 @@ Console:
 **Objetivo:** Validar restauração para padrões
 
 **Pré-condições:**
+
 - Várias configurações modificadas:
   - Dark mode: ON
   - Opacidade: 0.5
@@ -255,6 +276,7 @@ Console:
   - Modo: Padrão
 
 **Passos:**
+
 1. ⚙️ Na aba **"Outros"**
 2. 👀 Localizar seção **"Restaure as configurações..."** (danger zone)
 3. 🔘 Clicar **"🔄 Restaurar Configurações de Fábrica"**
@@ -263,6 +285,7 @@ Console:
 6. 👀 Verificar se voltou ao padrão
 
 **Resultado Esperado:**
+
 ```
 Antes:
   • Dark: ON
@@ -286,10 +309,12 @@ Depois do reset:
 **Objetivo:** Validar que reset pede confirmação
 
 **Passos:**
+
 1. 🔘 Clicar **"Restaurar Configurações"**
 2. 👀 Observar diálogo
 
 **Resultado Esperado:**
+
 ```
 ✅ Diálogo exibido
 ✅ Pergunta: "Tem certeza..."
@@ -303,11 +328,13 @@ Depois do reset:
 **Objetivo:** Validar que cancelamento funciona
 
 **Passos:**
+
 1. 🔘 Clicar **"Restaurar Configurações"**
 2. ❌ Clicar **"Cancelar"**
 3. 👀 Observar se nada muda
 
 **Resultado Esperado:**
+
 ```
 ✅ Diálogo fecha
 ✅ Configurações NÃO são alteradas
@@ -323,6 +350,7 @@ Depois do reset:
 **Objetivo:** Validar opção de atualização automática
 
 **Passos:**
+
 1. ⚙️ Na aba **"Outros"**
 2. ☑️ Observar **"Buscar atualizações automaticamente"**
 3. ✅ Marcar/desmarcar checkbox
@@ -330,6 +358,7 @@ Depois do reset:
 5. 👀 Verificar persistência
 
 **Resultado Esperado:**
+
 ```
 ✅ Estado do checkbox é persistido
 ✅ Pode ser marcado/desmarcado
@@ -342,6 +371,7 @@ Depois do reset:
 **Objetivo:** Validar toggle de modo mock (debug)
 
 **Passos:**
+
 1. ⚙️ Na aba **"Outros"**
 2. 👀 Observar **"Modo Mock"** toggle
 3. ✅ Marcar toggle
@@ -351,6 +381,7 @@ Depois do reset:
 7. 👀 Confirmar que badge desaparece
 
 **Resultado Esperado:**
+
 ```
 Modo Mock ON:
   ✅ Badge aparece no topo
@@ -398,6 +429,7 @@ Outros:
 ## 🐛 Troubleshooting
 
 ### Dark mode não persiste
+
 ```
 • Verificar localStorage (F12 → Application)
 • Limpar cache se necessário
@@ -406,6 +438,7 @@ Outros:
 ```
 
 ### Reset não funciona
+
 ```
 • Confirmar clique no "Confirmar" do diálogo
 • Aguardar reload completar
@@ -414,6 +447,7 @@ Outros:
 ```
 
 ### Modo não muda
+
 ```
 • Selecionar novamente no combobox
 • Ir para Home para ver efeito
@@ -422,6 +456,7 @@ Outros:
 ```
 
 ### Log level não muda
+
 ```
 • Selecionar novo nível
 • Executar ação para gerar logs
