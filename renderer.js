@@ -1010,6 +1010,7 @@ function finalizeCurrentQuestion() {
 		selectedQuestionId = newId;
 		resetCurrentQuestion();
 		renderQuestionsHistory();
+		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
 		return;
 	}

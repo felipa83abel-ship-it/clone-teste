@@ -272,8 +272,7 @@ function initVoskProcess(source) {
 	vars._voskProcess.stderr.on('data', data => {
 		const line = data.toString().trim();
 		if (line) {
-			// Exibe todos os erros de stderr do servidor Vosk
-			console.error(`[Vosk stderr] ${line}`);
+			debugLogVosk(`[Vosk stderr] ${line}`, false);
 		}
 	});
 
