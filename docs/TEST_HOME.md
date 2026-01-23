@@ -19,9 +19,10 @@
 ## 🎯 Preparação para Testes
 
 ### Requisitos
+
 ```bash
 ✅ Node.js 18+ instalado
-✅ npm 8+ instalado  
+✅ npm 8+ instalado
 ✅ npm install executado
 ✅ API key OpenAI configurada
 ✅ Microfone funcional
@@ -29,6 +30,7 @@
 ```
 
 ### Setup Inicial
+
 ```bash
 npm start
 # Navegue até "Home"
@@ -44,16 +46,19 @@ npm start
 **Objetivo:** Confirmar que não consegue iniciar escuta sem modelo ativo
 
 **Pré-condições:**
+
 - Aplicação aberta
 - Nenhum modelo ativo
 
 **Passos:**
+
 1. 🏠 Ir para aba **Home**
 2. 👀 Observar botão "Começar a Ouvir"
 3. ⏯️ Clicar no botão
 4. 👀 Observar mensagem de status
 
 **Resultado Esperado:**
+
 ```
 ❌ Botão NÃO inicia escuta
 ⚠️ Status: "ative um modelo de IA antes de começar a ouvir"
@@ -61,6 +66,7 @@ npm start
 ```
 
 **Console esperado:**
+
 ```javascript
 ⚠️ hasActiveModel() retornou false
 ```
@@ -72,16 +78,19 @@ npm start
 **Objetivo:** Validar início de captura de áudio
 
 **Pré-condições:**
+
 - Modelo OpenAI ativo
 - Microfone selecionado
 
 **Passos:**
+
 1. 🏠 Aba **Home**
 2. ⏯️ Clicar **"Começar a Ouvir"**
 3. 👀 Observar mudanças visuais
 4. 👀 Observar status
 
 **Resultado Esperado:**
+
 ```
 ✅ Botão muda para: "Stop"
 ✅ Status: "Status: ouvindo..."
@@ -89,6 +98,7 @@ npm start
 ```
 
 **Console esperado:**
+
 ```javascript
 🎯 Modo restaurado: INTERVIEW
 ✅ Controller inicializado com sucesso
@@ -101,15 +111,18 @@ npm start
 **Objetivo:** Confirmar que áudio é capturado ao falar
 
 **Pré-condições:**
+
 - Escuta ativa (Teste 2)
 
 **Passos:**
+
 1. 🎙️ **Falar no microfone**: "Olá, este é um teste"
 2. 👀 Observar seção **"Transcrição"**
 3. ⏳ Aguardar 2-5 segundos
 4. 👀 Observar resultado
 
 **Resultado Esperado:**
+
 ```
 Seção "Transcrição" exibe:
 [14:30:15] Você: ...
@@ -119,6 +132,7 @@ Seção "Transcrição" exibe:
 ```
 
 **Console esperado:**
+
 ```javascript
 🎙️ iniciando gravação de entrada - startAt 14:30:15
 ⏹️ parando gravação de entrada por silêncio
@@ -134,21 +148,25 @@ STT main: received transcribe-audio buffer, size: 38400
 **Objetivo:** Confirmar que ruídos pequenos são ignorados
 
 **Pré-condições:**
+
 - Escuta ativa
 
 **Passos:**
+
 1. 🤫 Ficar em **silêncio total** por 5 segundos
 2. 💨 Fazer **ruído muito baixo** (respirar/esfregar dedo)
 3. 👀 Observar se aparece na transcrição
 4. ⏳ Aguardar 5 segundos
 
 **Resultado Esperado:**
+
 ```
 ❌ Nenhuma transcrição gerada
 ✅ Blob muito pequeno é descartado (< 1000 bytes)
 ```
 
 **Console esperado:**
+
 ```javascript
 (nada ou)
 ⚠️ Buffer muito pequeno, ignorando
@@ -161,9 +179,11 @@ STT main: received transcribe-audio buffer, size: 38400
 **Objetivo:** Validar transcrição de áudio prolongado
 
 **Pré-condições:**
+
 - Escuta ativa
 
 **Passos:**
+
 1. 🎙️ **Falar continuamente** por 10-15 segundos:
    ```
    "O que é programação orientada a objetos?
@@ -175,6 +195,7 @@ STT main: received transcribe-audio buffer, size: 38400
 4. 👀 Observar transcrição
 
 **Resultado Esperado:**
+
 ```
 Transcrição aparece completa:
 [14:32:10] Você: O que é programação orientada a objetos? Como implementar herança múltipla em Java? Explique o padrão Singleton e suas vantagens.
@@ -182,6 +203,7 @@ Transcrição aparece completa:
 ```
 
 **Console esperado:**
+
 ```javascript
 STT main: received transcribe-audio buffer, size: 96000
 timing: ipc_stt_roundtrip 580 ms
@@ -194,15 +216,18 @@ timing: ipc_stt_roundtrip 580 ms
 **Objetivo:** Confirmar que escuta pode ser interrompida
 
 **Pré-condições:**
+
 - Escuta ativa
 
 **Passos:**
+
 1. ⏯️ Clicar **"Stop"**
 2. 👀 Observar mudanças
 3. 🎙️ Tentar falar no microfone
 4. 👀 Confirmar que não transcreve
 
 **Resultado Esperado:**
+
 ```
 ✅ Botão volta para: "Começar a Ouvir"
 ✅ Status: "Status: parado"
@@ -211,6 +236,7 @@ timing: ipc_stt_roundtrip 580 ms
 ```
 
 **Console esperado:**
+
 ```javascript
 ⏹️ inputRecorder.onstop chamado
 ```
@@ -224,11 +250,13 @@ timing: ipc_stt_roundtrip 580 ms
 **Objetivo:** Validar detecção automática de perguntas
 
 **Pré-condições:**
+
 - Modo **"Entrevista"** selecionado
 - Escuta ativa
 - VoiceMeeter capturando áudio de outro participante
 
 **Passos:**
+
 1. 🔊 **Reproduzir pergunta** via speaker (simula entrevistador):
    ```
    "O que é polimorfismo em Java?"
@@ -237,6 +265,7 @@ timing: ipc_stt_roundtrip 580 ms
 3. 👀 Observar seção **"Perguntas Consolidadas"**
 
 **Resultado Esperado:**
+
 ```
 Seção "Perguntas Consolidadas" exibe:
 ┌─────────────────────────────────────────┐
@@ -248,6 +277,7 @@ Seção "Perguntas Consolidadas" exibe:
 ```
 
 **Console esperado:**
+
 ```javascript
 🟠 handleSpeech - author: Outros
 🧠 currentQuestion (parcial): O que é polimorfismo
@@ -262,14 +292,17 @@ Seção "Perguntas Consolidadas" exibe:
 **Objetivo:** Confirmar timeout de 300ms fecha pergunta
 
 **Pré-condições:**
+
 - Pergunta detectada (Teste 7)
 
 **Passos:**
+
 1. 👀 Observar **"Pergunta Atual"** (amarelo)
 2. ⏳ Aguardar **300ms** (sem nova fala)
 3. 👀 Observar mudança
 
 **Resultado Esperado:**
+
 ```
 Pergunta Atual PERMANECE visível
 (modo entrevista NÃO promove automaticamente)
@@ -277,6 +310,7 @@ Aguarda GPT responder primeiro
 ```
 
 **Console esperado:**
+
 ```javascript
 ⏱️ Auto close question disparado
 ➡️ closeCurrentQuestion chamou askGpt
@@ -289,9 +323,11 @@ Aguarda GPT responder primeiro
 **Objetivo:** Validar detecção de perguntas cortadas
 
 **Pré-condições:**
+
 - Modo entrevista ativo
 
 **Passos:**
+
 1. 🔊 Reproduzir pergunta **incompleta**:
    ```
    "O que é abstra..." (corta antes de terminar)
@@ -300,6 +336,7 @@ Aguarda GPT responder primeiro
 3. 👀 Observar histórico
 
 **Resultado Esperado:**
+
 ```
 Histórico contém:
 ┌───────────────────────────────────────┐
@@ -311,6 +348,7 @@ Histórico contém:
 ```
 
 **Console esperado:**
+
 ```javascript
 ⚠️ pergunta incompleta detectada
 ✅ promovendo ao histórico como incompleta
@@ -323,9 +361,11 @@ Histórico contém:
 **Objetivo:** Validar gerenciamento de múltiplas perguntas
 
 **Pré-condições:**
+
 - Modo entrevista ativo
 
 **Passos:**
+
 1. 🔊 Reproduzir 3 perguntas rapidamente:
    ```
    "O que é herança?"
@@ -336,6 +376,7 @@ Histórico contém:
 3. 👀 Observar histórico e respostas
 
 **Resultado Esperado:**
+
 ```
 Histórico contém 3 perguntas (ordem reversa)
 Apenas a ÚLTIMA recebe resposta automática
@@ -343,6 +384,7 @@ Outras ficam no histórico aguardando envio manual
 ```
 
 **Console esperado:**
+
 ```javascript
 🎯 interviewTurnId: 1
 🎯 interviewTurnId: 2
@@ -359,14 +401,17 @@ Outras ficam no histórico aguardando envio manual
 **Objetivo:** Validar streaming de resposta em tempo real
 
 **Pré-condições:**
+
 - Pergunta consolidada (Teste 8)
 
 **Passos:**
+
 1. 👀 Observar seção **"Respostas GPT"** (direita)
 2. ⏳ Aguardar início do streaming
 3. 👀 Observar tokens aparecendo
 
 **Resultado Esperado:**
+
 ```
 Resposta aparece token por token:
 ┌────────────────────────────────────────┐
@@ -381,6 +426,7 @@ Resposta aparece token por token:
 ```
 
 **Console esperado:**
+
 ```javascript
 ⏳ enviando para o GPT via stream...
 🟢 GPT_STREAM_CHUNK recebido (token parcial) Polim
@@ -397,14 +443,17 @@ Resposta aparece token por token:
 **Objetivo:** Confirmar que pergunta vai para histórico após resposta
 
 **Pré-condições:**
+
 - Resposta GPT finalizada (Teste 11)
 
 **Passos:**
+
 1. 👀 Observar **"Pergunta Atual"** (amarelo)
 2. 👀 Observar **"Histórico de Perguntas"** (abaixo)
 3. ⏳ Aguardar 1 segundo
 
 **Resultado Esperado:**
+
 ```
 Pergunta Atual LIMPA (vazia)
 Histórico contém:
@@ -414,6 +463,7 @@ Histórico contém:
 ```
 
 **Console esperado:**
+
 ```javascript
 📚 promovendo pergunta para histórico
 ✅ gptAnsweredTurnId definido: 1
@@ -426,9 +476,11 @@ Histórico contém:
 **Objetivo:** Validar que modo normal NÃO envia automaticamente
 
 **Pré-condições:**
+
 - Modo **"Padrão"** selecionado
 
 **Passos:**
+
 1. ⚙️ Ir para **"Outros"** → Modo: **"Padrão"**
 2. 🏠 Voltar para **"Home"**
 3. ⏯️ Clicar **"Começar a Ouvir"**
@@ -440,6 +492,7 @@ Histórico contém:
 6. 👀 Observar se GPT responde automaticamente
 
 **Resultado Esperado:**
+
 ```
 ❌ GPT NÃO responde automaticamente
 ✅ Pergunta vai para histórico
@@ -447,6 +500,7 @@ Histórico contém:
 ```
 
 **Console esperado:**
+
 ```javascript
 🔵 modo NORMAL — promovendo CURRENT para histórico sem chamar GPT
 ```
@@ -458,20 +512,24 @@ Histórico contém:
 **Objetivo:** Confirmar envio manual de pergunta
 
 **Pré-condições:**
+
 - Pergunta no histórico (Teste 13)
 
 **Passos:**
+
 1. 👆 **Clicar na pergunta** no histórico
 2. ⌨️ Pressionar **Ctrl+Enter**
 3. 👀 Observar seção **"Respostas GPT"**
 
 **Resultado Esperado:**
+
 ```
 ✅ Nova resposta aparece (batch, não streaming)
 ✅ Pergunta marcada com borda verde (respondida)
 ```
 
 **Console esperado:**
+
 ```javascript
 🤖 askGpt chamado | questionId: uuid-123
 ⏳ enviando para o GPT (batch)...
@@ -487,12 +545,14 @@ Histórico contém:
 **Objetivo:** Validar estado e feedback do botão principal
 
 **Passos:**
+
 1. 👀 Localizar botão **"Começar a Ouvir... (Ctrl+d)"**
 2. 🎨 Observar estilo (cor, cursor, efeitos)
 3. ⏯️ Clicar no botão
 4. 👀 Observar mudança de estado
 
 **Resultado Esperado:**
+
 ```
 Estado parado:
   ✅ Cor: azul claro
@@ -513,11 +573,13 @@ Estado escutando:
 **Objetivo:** Validar exibição de transcrição
 
 **Passos:**
+
 1. 🏠 Na aba Home
 2. 🎙️ Falar algo enquanto escuta ativa
 3. 👀 Observar seção **"Transcrição"**
 
 **Resultado Esperado:**
+
 ```
 Seção exibe:
   ✅ Título: "Transcrição"
@@ -534,11 +596,13 @@ Seção exibe:
 **Objetivo:** Validar layout de perguntas
 
 **Passos:**
+
 1. 👀 Observar seção **"❔ Perguntas Consolidadas"**
 2. 🎙️ Gerar pergunta (modo entrevista)
 3. 👀 Observar "Pergunta Atual" (amarelo)
 
 **Resultado Esperado:**
+
 ```
 Layout contém:
   ✅ Titulo: "❔ Perguntas Consolidadas"
@@ -554,11 +618,13 @@ Layout contém:
 **Objetivo:** Validar layout de respostas
 
 **Passos:**
+
 1. 👀 Observar seção **"🤖 Respostas GPT"** (direita)
 2. 🎯 Enviar pergunta ao GPT
 3. 👀 Observar resposta aparecer
 
 **Resultado Esperado:**
+
 ```
 Layout contém:
   ✅ Titulo: "🤖 Respostas GPT"
@@ -574,12 +640,14 @@ Layout contém:
 **Objetivo:** Validar limpeza de dados
 
 **Passos:**
+
 1. 🏠 Na aba Home
 2. 🔘 Localizar botão **"🔄"** (reset - canto inferior da seção de volume)
 3. 🖱️ Clicar no botão
 4. 👀 Observar resultado
 
 **Resultado Esperado:**
+
 ```
 ✅ Transcrição limpa
 ✅ Pergunta Atual limpa
@@ -595,12 +663,14 @@ Layout contém:
 **Objetivo:** Validar limpeza de screenshots
 
 **Passos:**
+
 1. 🏠 Na aba Home
 2. 🔘 Localizar botão **"🗑️"** (ao lado do botão reset)
 3. 🖱️ Clicar no botão
 4. 👀 Observar badge de screenshots
 
 **Resultado Esperado:**
+
 ```
 ✅ Badge muda de "📸 5 screenshots" para "📸 0 screenshots"
 ✅ Todos os screenshots são removidos
@@ -645,6 +715,7 @@ Interface:
 ## 🐛 Troubleshooting
 
 ### Botão "Começar a Ouvir" desabilitado
+
 ```
 • Ativar um modelo em "API e Modelos"
 • Selecionar um dispositivo de áudio
@@ -654,6 +725,7 @@ Interface:
 ```
 
 ### Transcrição não aparece
+
 ```
 • Confirmar que modelo está ativo
 • Verificar se clicou "Começar a Ouvir"
@@ -664,6 +736,7 @@ Interface:
 ```
 
 ### GPT não responde
+
 ```
 • Verificar se pergunta está selecionada (borda azul)
 • Pressionar Ctrl+Enter novamente
@@ -674,6 +747,7 @@ Interface:
 ```
 
 ### Pergunta não consolida
+
 ```
 • Verificar modo (deve estar em "Entrevista")
 • Confirmar que VoiceMeeter/speaker está capturando áudio
@@ -683,6 +757,7 @@ Interface:
 ```
 
 ### Resposta aparece incompleta
+
 ```
 • Aguardar mais tempo (streaming pode ser lento)
 • Verificar conexão com internet

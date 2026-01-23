@@ -9,6 +9,7 @@
 ## ✅ O Que Foi Feito
 
 ### 1. Testes Modulares (77 testes em 5 arquivos)
+
 - ✅ Dividir `test_guide.md` (1554 linhas) em 5 arquivos
 - ✅ **TEST_HOME.md** - 20 testes (transcrição, Q&A, interface)
 - ✅ **TEST_API_MODELS.md** - 16 testes (OpenAI, Google, OpenRouter)
@@ -17,21 +18,25 @@
 - ✅ **TEST_PRIVACY.md** - 13 testes (privacidade, segurança)
 
 ### 2. Documentação de Navegação
+
 - ✅ **DOCS_GUIDE.md** - Guia completo organizado por papel (Tester, Developer, Manager)
 - ✅ **TESTING_INDEX.md** - Índice central com 77 testes, teste rápido (5 min), checklist completa
 - ✅ **START_HERE.md** - Guia de 30 segundos para novas pessoas
 
 ### 3. Padrão de Nomenclatura
+
 - ✅ **features.md** → **FEATURES.md** (padrão maiúsculo consistente)
 - ✅ Todos os arquivos principais seguem padrão MAIÚSCULO
 
 ### 4. Organização de Arquivos
+
 - ✅ **ARCHITECTURE.md** movido para `docs/`
 - ✅ **PLANO_REFATORACAO_CHECKLIST.md** movido para `docs/`
 - ✅ **Raiz limpa:** Somente `README.md` e `START_HERE.md`
 - ✅ **Documentação centralizada** em `docs/` (13 arquivos)
 
 ### 5. Atualização de Referências
+
 - ✅ Todas as referências a `features.md` → `FEATURES.md`
 - ✅ Todos os links atualizados em:
   - README.md
@@ -67,15 +72,15 @@ raiz/
 
 ## 📊 Métricas
 
-| Métrica | Valor |
-|---------|-------|
-| Testes documentados | 77 |
-| Arquivos de teste | 5 |
-| Arquivos na raiz | 2 |
-| Arquivos em docs/ | 13 |
-| Guias de navegação | 3 (DOCS_GUIDE, TESTING_INDEX, START_HERE) |
-| Commits de reorganização | 4 |
-| Referências atualizadas | 30+ |
+| Métrica                  | Valor                                     |
+| ------------------------ | ----------------------------------------- |
+| Testes documentados      | 77                                        |
+| Arquivos de teste        | 5                                         |
+| Arquivos na raiz         | 2                                         |
+| Arquivos em docs/        | 13                                        |
+| Guias de navegação       | 3 (DOCS_GUIDE, TESTING_INDEX, START_HERE) |
+| Commits de reorganização | 4                                         |
+| Referências atualizadas  | 30+                                       |
 
 ---
 
@@ -109,7 +114,7 @@ Nova pessoa chega
 ## 🔄 Commits Realizados
 
 1. **1b9275b** - docs: reorganizar testes em arquivos modulares por seção
-   - Criar 5 TEST_*.md files
+   - Criar 5 TEST\_\*.md files
    - Remover test_guide.md
    - Criar TESTING_INDEX.md
 
@@ -132,7 +137,7 @@ Nova pessoa chega
 
 - [ ] Testar aplicação usando [TESTING_INDEX.md](docs/TESTING_INDEX.md)
 - [ ] Desenvolver novas features consultando [ARCHITECTURE.md](docs/ARCHITECTURE.md)
-- [ ] Adicionar novos testes quando necessário (seguir padrão dos TEST_*.md)
+- [ ] Adicionar novos testes quando necessário (seguir padrão dos TEST\_\*.md)
 - [ ] Manter links atualizados quando mover arquivos
 
 ---
@@ -143,7 +148,6 @@ Nova pessoa chega
   - GitHub web interface
   - VS Code
   - Terminal (com markdown viewer)
-  
 - FEATURES.md foi verificado e está:
   - Atualizado com refatoração
   - Consistente com arquivo ARCHITECTURE.md

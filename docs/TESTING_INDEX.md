@@ -7,13 +7,13 @@
 
 ## 📋 Resumo por Seção
 
-| Seção | Arquivo | Testes | Foco |
-|-------|---------|--------|------|
-| 🏠 **Home** | [TEST_HOME.md](TEST_HOME.md) | 20 | Transcrição, perguntas, respostas, interface |
-| 🔧 **API & Modelos** | [TEST_API_MODELS.md](TEST_API_MODELS.md) | 16 | Configuração de providers (OpenAI, Google, OpenRouter) |
-| 🎤 **Áudio & Tela** | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md) | 13 | Dispositivos de áudio, VU meters, screenshots |
-| ⚙️ **Outros** | [TEST_OTHER.md](TEST_OTHER.md) | 15 | Tema, modo, idioma, logs, reset |
-| 🔒 **Privacidade** | [TEST_PRIVACY.md](TEST_PRIVACY.md) | 13 | Segurança, telemetria, limpeza de dados |
+| Seção                | Arquivo                                      | Testes | Foco                                                   |
+| -------------------- | -------------------------------------------- | ------ | ------------------------------------------------------ |
+| 🏠 **Home**          | [TEST_HOME.md](TEST_HOME.md)                 | 20     | Transcrição, perguntas, respostas, interface           |
+| 🔧 **API & Modelos** | [TEST_API_MODELS.md](TEST_API_MODELS.md)     | 16     | Configuração de providers (OpenAI, Google, OpenRouter) |
+| 🎤 **Áudio & Tela**  | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md) | 13     | Dispositivos de áudio, VU meters, screenshots          |
+| ⚙️ **Outros**        | [TEST_OTHER.md](TEST_OTHER.md)               | 15     | Tema, modo, idioma, logs, reset                        |
+| 🔒 **Privacidade**   | [TEST_PRIVACY.md](TEST_PRIVACY.md)           | 13     | Segurança, telemetria, limpeza de dados                |
 
 ---
 
@@ -47,62 +47,62 @@ Para validar que o app está funcionando corretamente em 5 minutos:
 
 ### 🎙️ Testes de Áudio & Transcrição
 
-| Funcionalidade | Teste | Arquivo |
-|---|---|---|
-| Captura de áudio básica | 1.1 | [TEST_HOME.md](TEST_HOME.md#transcrição) |
-| Validação de modelo | 1.2 | [TEST_HOME.md](TEST_HOME.md#transcrição) |
-| Iniciar escuta | 1.3 | [TEST_HOME.md](TEST_HOME.md#transcrição) |
-| Detector de fala | 1.4 | [TEST_HOME.md](TEST_HOME.md#transcrição) |
-| Detecção de silêncio | 1.5 | [TEST_HOME.md](TEST_HOME.md#transcrição) |
-| Fala longa | 1.6 | [TEST_HOME.md](TEST_HOME.md#transcrição) |
-| Dispositivos de entrada | 3.1 | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#áudio) |
-| VU meter em tempo real | 3.2 | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#áudio) |
-| Trocar dispositivo | 3.3 | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#áudio) |
+| Funcionalidade          | Teste | Arquivo                                            |
+| ----------------------- | ----- | -------------------------------------------------- |
+| Captura de áudio básica | 1.1   | [TEST_HOME.md](TEST_HOME.md#transcrição)           |
+| Validação de modelo     | 1.2   | [TEST_HOME.md](TEST_HOME.md#transcrição)           |
+| Iniciar escuta          | 1.3   | [TEST_HOME.md](TEST_HOME.md#transcrição)           |
+| Detector de fala        | 1.4   | [TEST_HOME.md](TEST_HOME.md#transcrição)           |
+| Detecção de silêncio    | 1.5   | [TEST_HOME.md](TEST_HOME.md#transcrição)           |
+| Fala longa              | 1.6   | [TEST_HOME.md](TEST_HOME.md#transcrição)           |
+| Dispositivos de entrada | 3.1   | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#áudio) |
+| VU meter em tempo real  | 3.2   | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#áudio) |
+| Trocar dispositivo      | 3.3   | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#áudio) |
 
 ### 💬 Testes de Perguntas & Respostas
 
-| Funcionalidade | Teste | Arquivo |
-|---|---|---|
-| Consolidação de perguntas | 2.1 | [TEST_HOME.md](TEST_HOME.md#perguntas) |
-| Fechamento automático | 2.2 | [TEST_HOME.md](TEST_HOME.md#perguntas) |
-| Perguntas incompletas | 2.3 | [TEST_HOME.md](TEST_HOME.md#perguntas) |
-| Múltiplas perguntas | 2.4 | [TEST_HOME.md](TEST_HOME.md#perguntas) |
-| Respostas em streaming | 3.1 | [TEST_HOME.md](TEST_HOME.md#respostas) |
-| Promoção de resposta | 3.2 | [TEST_HOME.md](TEST_HOME.md#respostas) |
-| Modo normal | 3.3 | [TEST_HOME.md](TEST_HOME.md#respostas) |
-| Envio manual | 3.4 | [TEST_HOME.md](TEST_HOME.md#respostas) |
+| Funcionalidade            | Teste | Arquivo                                |
+| ------------------------- | ----- | -------------------------------------- |
+| Consolidação de perguntas | 2.1   | [TEST_HOME.md](TEST_HOME.md#perguntas) |
+| Fechamento automático     | 2.2   | [TEST_HOME.md](TEST_HOME.md#perguntas) |
+| Perguntas incompletas     | 2.3   | [TEST_HOME.md](TEST_HOME.md#perguntas) |
+| Múltiplas perguntas       | 2.4   | [TEST_HOME.md](TEST_HOME.md#perguntas) |
+| Respostas em streaming    | 3.1   | [TEST_HOME.md](TEST_HOME.md#respostas) |
+| Promoção de resposta      | 3.2   | [TEST_HOME.md](TEST_HOME.md#respostas) |
+| Modo normal               | 3.3   | [TEST_HOME.md](TEST_HOME.md#respostas) |
+| Envio manual              | 3.4   | [TEST_HOME.md](TEST_HOME.md#respostas) |
 
 ### 🔧 Testes de Configuração & Modelos
 
-| Funcionalidade | Teste | Arquivo |
-|---|---|---|
-| OpenAI salvar chave | 1.1 | [TEST_API_MODELS.md](TEST_API_MODELS.md#openai) |
-| OpenAI visibilidade | 1.2 | [TEST_API_MODELS.md](TEST_API_MODELS.md#openai) |
-| OpenAI ativar/desativar | 1.3, 1.4 | [TEST_API_MODELS.md](TEST_API_MODELS.md#openai) |
-| Google Gemini | 2.1-2.4 | [TEST_API_MODELS.md](TEST_API_MODELS.md#google--gemini) |
-| OpenRouter | 3.1-3.2 | [TEST_API_MODELS.md](TEST_API_MODELS.md#openrouter) |
-| Status de modelos | 4.1, 4.2 | [TEST_API_MODELS.md](TEST_API_MODELS.md#gerenciamento) |
+| Funcionalidade          | Teste    | Arquivo                                                 |
+| ----------------------- | -------- | ------------------------------------------------------- |
+| OpenAI salvar chave     | 1.1      | [TEST_API_MODELS.md](TEST_API_MODELS.md#openai)         |
+| OpenAI visibilidade     | 1.2      | [TEST_API_MODELS.md](TEST_API_MODELS.md#openai)         |
+| OpenAI ativar/desativar | 1.3, 1.4 | [TEST_API_MODELS.md](TEST_API_MODELS.md#openai)         |
+| Google Gemini           | 2.1-2.4  | [TEST_API_MODELS.md](TEST_API_MODELS.md#google--gemini) |
+| OpenRouter              | 3.1-3.2  | [TEST_API_MODELS.md](TEST_API_MODELS.md#openrouter)     |
+| Status de modelos       | 4.1, 4.2 | [TEST_API_MODELS.md](TEST_API_MODELS.md#gerenciamento)  |
 
 ### 🎨 Testes de UI & Aparência
 
-| Funcionalidade | Teste | Arquivo |
-|---|---|---|
-| Dark mode | 4.1 | [TEST_OTHER.md](TEST_OTHER.md#tema) |
-| Tema padrão | 4.2 | [TEST_OTHER.md](TEST_OTHER.md#tema) |
-| Cores | 4.3 | [TEST_OTHER.md](TEST_OTHER.md#tema) |
-| Modo padrão vs entrevista | 5.1-5.3 | [TEST_OTHER.md](TEST_OTHER.md#modo) |
-| Seleção de idioma | 6.1, 6.2 | [TEST_OTHER.md](TEST_OTHER.md#idioma) |
-| Captura de tela | 3.4-3.9 | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#captura-de-tela) |
+| Funcionalidade            | Teste    | Arquivo                                                      |
+| ------------------------- | -------- | ------------------------------------------------------------ |
+| Dark mode                 | 4.1      | [TEST_OTHER.md](TEST_OTHER.md#tema)                          |
+| Tema padrão               | 4.2      | [TEST_OTHER.md](TEST_OTHER.md#tema)                          |
+| Cores                     | 4.3      | [TEST_OTHER.md](TEST_OTHER.md#tema)                          |
+| Modo padrão vs entrevista | 5.1-5.3  | [TEST_OTHER.md](TEST_OTHER.md#modo)                          |
+| Seleção de idioma         | 6.1, 6.2 | [TEST_OTHER.md](TEST_OTHER.md#idioma)                        |
+| Captura de tela           | 3.4-3.9  | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md#captura-de-tela) |
 
 ### 🔒 Testes de Privacidade & Segurança
 
-| Funcionalidade | Teste | Arquivo |
-|---|---|---|
-| Visibilidade de capturas | 1.1, 1.2 | [TEST_PRIVACY.md](TEST_PRIVACY.md#visibilidade) |
-| Telemetria | 2.1-2.3 | [TEST_PRIVACY.md](TEST_PRIVACY.md#telemetria) |
-| Limpeza de dados | 3.1, 3.2 | [TEST_PRIVACY.md](TEST_PRIVACY.md#limpeza-de-dados) |
-| Retenção de histórico | 4.1-4.3 | [TEST_PRIVACY.md](TEST_PRIVACY.md#retenção-de-histórico) |
-| Segurança de API keys | 5.1-5.3 | [TEST_PRIVACY.md](TEST_PRIVACY.md#segurança) |
+| Funcionalidade           | Teste    | Arquivo                                                  |
+| ------------------------ | -------- | -------------------------------------------------------- |
+| Visibilidade de capturas | 1.1, 1.2 | [TEST_PRIVACY.md](TEST_PRIVACY.md#visibilidade)          |
+| Telemetria               | 2.1-2.3  | [TEST_PRIVACY.md](TEST_PRIVACY.md#telemetria)            |
+| Limpeza de dados         | 3.1, 3.2 | [TEST_PRIVACY.md](TEST_PRIVACY.md#limpeza-de-dados)      |
+| Retenção de histórico    | 4.1-4.3  | [TEST_PRIVACY.md](TEST_PRIVACY.md#retenção-de-histórico) |
+| Segurança de API keys    | 5.1-5.3  | [TEST_PRIVACY.md](TEST_PRIVACY.md#segurança)             |
 
 ---
 
@@ -112,7 +112,7 @@ Para validar que o app está funcionando corretamente em 5 minutos:
 
 1. Escolha a funcionalidade que quer testar
 2. Encontre na tabela acima
-3. Clique no arquivo TEST_*.md
+3. Clique no arquivo TEST\_\*.md
 4. Leia o teste específico (Objetivo → Passos → Resultado Esperado)
 5. Execute o teste e marque na checklist
 
@@ -143,7 +143,9 @@ Para validar que o app está funcionando corretamente em 5 minutos:
 
 **Console Esperado:**
 ```
+
 Logs relevantes
+
 ```
 
 **Troubleshooting:**
@@ -201,6 +203,7 @@ Use este checklist para validar uma versão completa:
 ## Release Checklist
 
 ### Home (20 testes)
+
 - [ ] 1.1 - Transcrição básica
 - [ ] 1.2 - Validação de modelo
 - [ ] 1.3 - Iniciar escuta
@@ -223,6 +226,7 @@ Use este checklist para validar uma versão completa:
 - [ ] 4.6 - Screenshot 3
 
 ### API & Modelos (16 testes)
+
 - [ ] 1.1 - OpenAI salvar chave
 - [ ] 1.2 - OpenAI visibilidade
 - [ ] 1.3 - OpenAI ativar
@@ -241,6 +245,7 @@ Use este checklist para validar uma versão completa:
 - [ ] 4.3 - Erro chave inválida
 
 ### Áudio & Tela (13 testes)
+
 - [ ] 3.1 - Seleção entrada
 - [ ] 3.2 - VU meter real-time
 - [ ] 3.3 - Trocar dispositivo
@@ -256,6 +261,7 @@ Use este checklist para validar uma versão completa:
 - [ ] 3.13 - Screenshot clear
 
 ### Outros (15 testes)
+
 - [ ] 4.1 - Dark mode
 - [ ] 4.2 - Tema padrão
 - [ ] 4.3 - Cores
@@ -273,6 +279,7 @@ Use este checklist para validar uma versão completa:
 - [ ] 9.2 - Modo mock
 
 ### Privacidade (13 testes)
+
 - [ ] 1.1 - Ocultar capturas
 - [ ] 1.2 - Persistência visibilidade
 - [ ] 2.1 - Desativar telemetria
@@ -292,14 +299,14 @@ Use este checklist para validar uma versão completa:
 
 ## 🔗 Links Rápidos
 
-| Recurso | Link |
-|---------|------|
-| 📖 Arquitetura | [ARCHITECTURE.md](ARCHITECTURE.md) |
-| 🏛️ Status Refatoração | [REFACTORING_FINAL_STATUS.md](REFACTORING_FINAL_STATUS.md) |
-| 📝 Features | [FEATURES.md](FEATURES.md) |
-| 🎤 Fluxo Áudio | [FLUXO_FALA_SILENCIO.md](FLUXO_FALA_SILENCIO.md) |
-| 🔊 Deepgram Flow | [transcription_flow_deepgram.md](transcription_flow_deepgram.md) |
-| 🎙️ Whisper Flow | [transcription_flow_other_models.md](transcription_flow_other_models.md) |
+| Recurso               | Link                                                                     |
+| --------------------- | ------------------------------------------------------------------------ |
+| 📖 Arquitetura        | [ARCHITECTURE.md](ARCHITECTURE.md)                                       |
+| 🏛️ Status Refatoração | [REFACTORING_FINAL_STATUS.md](REFACTORING_FINAL_STATUS.md)               |
+| 📝 Features           | [FEATURES.md](FEATURES.md)                                               |
+| 🎤 Fluxo Áudio        | [FLUXO_FALA_SILENCIO.md](FLUXO_FALA_SILENCIO.md)                         |
+| 🔊 Deepgram Flow      | [transcription_flow_deepgram.md](transcription_flow_deepgram.md)         |
+| 🎙️ Whisper Flow       | [transcription_flow_other_models.md](transcription_flow_other_models.md) |
 
 ---
 
@@ -316,7 +323,7 @@ Use este checklist para validar uma versão completa:
 ### 🔧 Para Adicionar Novos Testes
 
 1. Identifique a seção correta (HOME, API_MODELS, etc)
-2. Abra o arquivo TEST_[SEÇÃO].md correspondente
+2. Abra o arquivo TEST\_[SEÇÃO].md correspondente
 3. Adicione na numeração apropriada (ex: teste 5.7 na seção 5)
 4. Siga o padrão: Objetivo → Pré-condições → Passos → Resultado → Console → Troubleshooting
 5. Atualize este arquivo (TESTING_INDEX.md) com o novo teste

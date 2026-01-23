@@ -22,9 +22,11 @@
 **Objetivo:** Validar opção de invisibilidade
 
 **Pré-condições:**
+
 - Outro programa com captura de tela aberto
 
 **Passos:**
+
 1. ⚙️ Ir para **"Privacidade"**
 2. ☐ Observar checkbox **"Ocultar aplicativo de capturas de tela"**
 3. ☑️ Marcar checkbox
@@ -34,6 +36,7 @@
 7. 👀 Observar se AskMe aparece
 
 **Resultado Esperado:**
+
 ```
 Antes de marcar:
   ✅ AskMe aparece normalmente nas capturas
@@ -49,14 +52,17 @@ Depois de marcar:
 **Objetivo:** Validar que configuração é salva
 
 **Pré-condições:**
+
 - Checkbox marcado (Teste 1)
 
 **Passos:**
+
 1. 🔄 Fechar e reabrir aplicação
 2. ⚙️ Ir para **"Privacidade"**
 3. 👀 Verificar checkbox
 
 **Resultado Esperado:**
+
 ```
 ✅ Checkbox continua marcado
 ✅ Comportamento persiste
@@ -71,6 +77,7 @@ Depois de marcar:
 **Objetivo:** Validar opção de desativar coleta de dados
 
 **Passos:**
+
 1. ⚙️ Na aba **"Privacidade"**
 2. ☐ Observar checkbox **"Desativar telemetria anônima"**
 3. ☑️ Marcar checkbox
@@ -78,6 +85,7 @@ Depois de marcar:
 5. 👀 Observar mudança (não deve haver mudança visual, é interna)
 
 **Resultado Esperado:**
+
 ```
 ✅ Checkbox pode ser marcado
 ✅ Configuração é salva
@@ -91,12 +99,14 @@ Depois de marcar:
 **Objetivo:** Confirmar que telemetria é ativada por padrão
 
 **Passos:**
+
 1. 🗑️ Limpar localStorage
 2. 🚀 Reabrir aplicação
 3. ⚙️ Ir para **"Privacidade"**
 4. 👀 Observar checkbox
 
 **Resultado Esperado:**
+
 ```
 ✅ Checkbox está DESMARCADO (telemetria habilitada)
 ```
@@ -108,14 +118,17 @@ Depois de marcar:
 **Objetivo:** Validar que configuração de telemetria é persistida
 
 **Pré-condições:**
+
 - Telemetria desativada (Teste 3)
 
 **Passos:**
+
 1. 🔄 Fechar e reabrir
 2. ⚙️ Ir para **"Privacidade"**
 3. 👀 Verificar checkbox
 
 **Resultado Esperado:**
+
 ```
 ✅ Checkbox continua marcado
 ```
@@ -129,6 +142,7 @@ Depois de marcar:
 **Objetivo:** Validar limpeza automática de dados temporários
 
 **Passos:**
+
 1. ⚙️ Na aba **"Privacidade"**
 2. ☑️ Marcar **"Limpar dados automaticamente ao fechar"**
 3. 💾 Salvar
@@ -140,6 +154,7 @@ Depois de marcar:
 9. 👀 Observar se histórico foi limpo
 
 **Resultado Esperado:**
+
 ```
 ✅ Dados temporários são removidos ao fechar
 ✅ Histórico pode estar vazio (dependendo da implementação)
@@ -153,6 +168,7 @@ Depois de marcar:
 **Objetivo:** Validar que auto-limpeza pode ser desativada
 
 **Passos:**
+
 1. ⚙️ Na aba **"Privacidade"**
 2. ☐ Desmarcar **"Limpar dados automaticamente"**
 3. 💾 Salvar
@@ -163,6 +179,7 @@ Depois de marcar:
 8. 👀 Observar se histórico foi preservado
 
 **Resultado Esperado:**
+
 ```
 ✅ Dados são preservados
 ✅ Histórico continua visível
@@ -177,6 +194,7 @@ Depois de marcar:
 **Objetivo:** Validar opção de retenção
 
 **Passos:**
+
 1. ⚙️ Na aba **"Privacidade"**
 2. 📋 Observar **"Retenção de Dados"** combobox
 3. 👀 Verificar opções
@@ -184,6 +202,7 @@ Depois de marcar:
 5. 💾 Salvar
 
 **Resultado Esperado:**
+
 ```
 Opções disponíveis:
   ✅ 1 dia
@@ -203,14 +222,17 @@ Seleção:
 **Objetivo:** Confirmar que padrão é 7 dias
 
 **Pré-condições:**
+
 - localStorage limpo
 
 **Passos:**
+
 1. 🚀 Reabrir aplicação
 2. ⚙️ Ir para **"Privacidade"**
 3. 👀 Observar combobox
 
 **Resultado Esperado:**
+
 ```
 ✅ Opção "7 dias" está selecionada por padrão
 ```
@@ -222,6 +244,7 @@ Seleção:
 **Objetivo:** Validar opção de retenção infinita
 
 **Passos:**
+
 1. 📋 Selecionar **"Nunca excluir"**
 2. 💾 Salvar
 3. 🏠 Criar dados
@@ -229,6 +252,7 @@ Seleção:
 5. 👀 Observar se dados ainda existem
 
 **Resultado Esperado:**
+
 ```
 ✅ Dados nunca são excluídos automaticamente
 ✅ Retenção infinita ativada
@@ -243,6 +267,7 @@ Seleção:
 **Objetivo:** Validar que chaves são criptografadas
 
 **Passos:**
+
 1. ⚙️ Ir para **"API e Modelos"**
 2. 🔑 Salvar uma API key
 3. F12 Abrir DevTools → Application
@@ -250,6 +275,7 @@ Seleção:
 5. 👀 Procurar pela API key
 
 **Resultado Esperado:**
+
 ```
 ❌ API key completa NÃO aparece em localStorage
 ✅ Dados criptografados ou em secure storage
@@ -263,13 +289,16 @@ Seleção:
 **Objetivo:** Validar que chaves são mascaradas na UI
 
 **Pré-condições:**
+
 - API key salva
 
 **Passos:**
+
 1. ⚙️ Ir para **"API e Modelos"**
 2. 👀 Observar campo de API key
 
 **Resultado Esperado:**
+
 ```
 ✅ Campo exibe máscara: ••••••••••••••••
 ✅ Chave completa NÃO é visível
@@ -283,6 +312,7 @@ Seleção:
 **Objetivo:** Validar remoção segura de dados sensíveis
 
 **Passos:**
+
 1. ⚙️ Ir para **"API e Modelos"** → **"OpenAI"**
 2. 🗑️ Clicar botão de lixeira
 3. ⚠️ Confirmar diálogo
@@ -290,6 +320,7 @@ Seleção:
 5. 👀 Procurar pela chave
 
 **Resultado Esperado:**
+
 ```
 ✅ Chave é removida completamente
 ✅ Campo fica vazio
@@ -330,6 +361,7 @@ Segurança:
 ## 🐛 Troubleshooting
 
 ### Dados não são limpos ao fechar
+
 ```
 • Verificar se auto-limpeza está ativada
 • Confirmar que aplicação fechou completamente
@@ -338,6 +370,7 @@ Segurança:
 ```
 
 ### Chave aparece em localStorage
+
 ```
 • Confirmar que foi salva com sucesso
 • Verificar se está em electron-store (não localStorage)
@@ -346,6 +379,7 @@ Segurança:
 ```
 
 ### Ocultação não funciona
+
 ```
 • Confirmar que checkbox está marcado
 • Salvar configuração
@@ -355,6 +389,7 @@ Segurança:
 ```
 
 ### Auto-limpeza não funciona
+
 ```
 • Confirmar que checkbox está marcado
 • Fechar aplicação completamente (não minimize)
