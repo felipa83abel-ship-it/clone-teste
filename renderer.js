@@ -15,6 +15,27 @@ const {
 } = require('./volume-audio-monitor.js');
 
 /* ================================ */
+//	🎯 NOVAS CLASSES (Refatoração Fase 2)
+/* ================================ */
+const AppState = require('./state/AppState.js');
+const EventBus = require('./events/EventBus.js');
+const Logger = require('./utils/Logger.js');
+const STTStrategy = require('./strategies/STTStrategy.js');
+const LLMManager = require('./llm/LLMManager.js');
+const openaiHandler = require('./llm/handlers/openai-handler.js');
+
+// 🎯 INSTANCIAR
+const appState = new AppState();
+const eventBus = new EventBus();
+const sttStrategy = new STTStrategy();
+const llmManager = new LLMManager();
+
+// 🎯 REGISTRAR LLMs
+llmManager.register('openai', openaiHandler);
+// Futuro: llmManager.register('gemini', geminiHandler);
+// Futuro: llmManager.register('anthropic', anthropicHandler);
+
+/* ================================ */
 //	PROTEÇÃO CONTRA CAPTURA DE TELA
 /* ================================ */
 
@@ -262,58 +283,30 @@ function registerUIElements(elements) {
  * Escuta evento de mudança de dispositivo
  * Emitido pelo config-manager
  */
-onUIChange('onAudioDeviceChanged', async data => {
+eventBus.on('audioDeviceChanged', async data => {
 	try {
-		console.log('🔔 [onAudioDeviceChanged] Evento disparado:', { type: data?.type, deviceId: data?.deviceId });
+		const sttModel = getConfiguredSTTModel();
+		Logger.info('audioDeviceChanged', { model: sttModel, type: data.type });  // antigo onAudioDeviceChanged
 
-		// 🔥 CRÍTICO: deviceId pode ser "" (vazio) para DESATIVAR o STT
-		// Validar apenas type, não deviceId
 		if (!data || !data.type) {
-			console.warn('⚠️ [onAudioDeviceChanged] Dados inválidos (falta type):', data);
-		}
-
-		// ✅ Se STT não está rodando, ignora mudança de dispositivo
-		if (!isRunning) {
-			console.log('⏸️ [onAudioDeviceChanged] STT não está ativo, ignorando mudança de dispositivo');
+			Logger.warn('Dados inválidos para mudança de dispositivo', data);
 			return;
 		}
 
-		// 🔥 ORQUESTRADOR: Roteia por modelo STT
-		const sttModel = getConfiguredSTTModel();
-
-		if (sttModel === 'deepgram') {
-			console.log('🔄 [onAudioDeviceChanged] Deepgram está ativo, chamando switchDeviceDeepgram...');
-			if (typeof switchDeviceDeepgram === 'function') {
-				console.log('✅ [onAudioDeviceChanged] switchDeviceDeepgram é função, executando...');
-				await switchDeviceDeepgram(data.type, data.deviceId);
-				console.log('✅ [onAudioDeviceChanged] switchDeviceDeepgram executada');
-			} else {
-				console.error('❌ [onAudioDeviceChanged] switchDeviceDeepgram NÃO é função!', typeof switchDeviceDeepgram);
-			}
-		} else if (sttModel === 'vosk') {
-			console.log('🔄 [onAudioDeviceChanged] Vosk está ativo, chamando switchDeviceVosk...');
-			if (typeof switchDeviceVosk === 'function') {
-				console.log('✅ [onAudioDeviceChanged] switchDeviceVosk é função, executando...');
-				await switchDeviceVosk(data.type, data.deviceId);
-				console.log('✅ [onAudioDeviceChanged] switchDeviceVosk executada');
-			} else {
-				console.error('❌ [onAudioDeviceChanged] switchDeviceVosk NÃO é função!', typeof switchDeviceVosk);
-			}
-		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			console.log('🔄 [onAudioDeviceChanged] Whisper está ativo, chamando switchDeviceWhisper...');
-			if (typeof switchDeviceWhisper === 'function') {
-				console.log('✅ [onAudioDeviceChanged] switchDeviceWhisper é função, executando...');
-				await switchDeviceWhisper(UIElements);
-				console.log('✅ [onAudioDeviceChanged] switchDeviceWhisper executada');
-			} else {
-				console.error('❌ [onAudioDeviceChanged] switchDeviceWhisper NÃO é função!', typeof switchDeviceWhisper);
-			}
-		} else {
-			console.warn(`⚠️ [onAudioDeviceChanged] Modelo STT não reconhecido: ${sttModel}`);
+		if (!isRunning) {
+			Logger.warn('STT não está ativo, ignorando mudança de dispositivo');
+			return;
 		}
-	} catch (err) {
-		console.error('❌ Erro ao processar onAudioDeviceChanged:', err);
+
+		await sttStrategy.switchDevice(sttModel, data.type, data.deviceId);
+	} catch (error) {
+		Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });  // antigo console.error
 	}
+});
+
+/* Compatibilidade: antigo onUIChange também suporta audioDeviceChanged */
+onUIChange('onAudioDeviceChanged', async data => {
+	eventBus.emit('audioDeviceChanged', data);
 });
 
 /* ================================ */
@@ -587,6 +580,35 @@ function getNavigableQuestionIds() {
 }
 
 /* ================================ */
+//	🎯 REGISTRAR STTs (Refatoração Fase 2)
+/* ================================ */
+
+// Registrar STTs no sttStrategy
+sttStrategy.register('deepgram', {
+	start: startAudioDeepgram,
+	stop: stopAudioDeepgram,
+	switchDevice: switchDeviceDeepgram,
+});
+
+sttStrategy.register('vosk', {
+	start: startAudioVosk,
+	stop: stopAudioVosk,
+	switchDevice: switchDeviceVosk,
+});
+
+sttStrategy.register('whisper-cpp-local', {
+	start: startAudioWhisper,
+	stop: stopAudioWhisper,
+	switchDevice: switchDeviceWhisper,
+});
+
+sttStrategy.register('whisper-1', {
+	start: startAudioWhisper,
+	stop: stopAudioWhisper,
+	switchDevice: switchDeviceWhisper,
+});
+
+/* ================================ */
 //	CONTROLE DE ÁUDIO
 /* ================================ */
 
@@ -594,65 +616,32 @@ function getNavigableQuestionIds() {
  * Inicia captura de áudio
  */
 async function startAudio() {
-	debugLogRenderer('Início da função: "startAudio"');
-
-	// 🔥 [NOVO ORQUESTRADOR] Detecta modelo STT e roteia
 	const sttModel = getConfiguredSTTModel();
-	console.log(`🎤 startAudio: Modelo STT = ${sttModel}`);
+	Logger.info('startAudio', { model: sttModel });  // antigo debugLogRenderer
 
 	try {
-		// 🔥 ROTEAMENTO: Por modelo STT
-		if (sttModel === 'deepgram') {
-			await startAudioDeepgram(UIElements);
-		} else if (sttModel === 'vosk') {
-			await startAudioVosk(UIElements);
-		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			const logLabel = sttModel === 'whisper-cpp-local' ? 'local' : 'API OpenAI';
-			console.log(`🎤 Roteando para Whisper (${logLabel})`);
-			await startAudioWhisper(UIElements);
-		} else {
-			// Modelo não suportado
-			console.error('❌ Erro ao obter modelo STT configurado');
-			return;
-		}
+		await sttStrategy.start(sttModel, UIElements);
 	} catch (error) {
-		console.error('❌ Erro em startAudio:', error);
+		Logger.error('Erro ao iniciar áudio', { error: error.message });  // antigo console.error
 		throw error;
 	}
-
-	debugLogRenderer('Fim da função: "startAudio"');
 }
 
 /**
  * Para captura de áudio
  */
 async function stopAudio() {
-	debugLogRenderer('Início da função: "stopAudio"');
-
 	// Fecha pergunta atual se estava aberta
 	if (currentQuestion.text) closeCurrentQuestionForced();
 
 	const sttModel = getConfiguredSTTModel();
-	console.log(`🛑 stopAudio: Modelo STT = ${sttModel}`);
+	Logger.info('stopAudio', { model: sttModel });  // antigo debugLogRenderer
 
 	try {
-		// 🔥 ROTEAMENTO: Por modelo STT
-		if (sttModel === 'deepgram') {
-			stopAudioDeepgram();
-		} else if (sttModel === 'vosk') {
-			stopAudioVosk();
-		} else if (sttModel === 'whisper-cpp-local' || sttModel === 'whisper-1') {
-			stopAudioWhisper();
-		} else {
-			// Modelo não suportado
-			console.error('❌ Erro ao obter modelo STT configurado');
-			return;
-		}
+		await sttStrategy.stop(sttModel);
 	} catch (error) {
-		console.error('❌ Erro em stopAudio:', error);
+		Logger.error('Erro ao parar áudio', { error: error.message });  // antigo console.error
 	}
-
-	debugLogRenderer('Fim da função: "stopAudio"');
 }
 
 /**
