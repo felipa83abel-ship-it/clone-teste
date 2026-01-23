@@ -161,16 +161,16 @@ eventBus.emit('answerStreamChunk', ...)
 
 #### 1.1 Remover `debugLogRenderer()` Completamente
 
-- [ ] Estender `Logger.js` com suporte a flag show/hide (3º parâmetro)
+- [x] Estender `Logger.js` com suporte a flag show/hide (3º parâmetro)
   ```javascript
   static debug(message, data = {}, show = false) {
       if (!show) return; // Não loga se show === false
       this.log(this.levels.DEBUG, message, data);
   }
   ```
-- [ ] Substituir todas as ~200 chamadas `debugLogRenderer(...)` por `Logger.debug(...)`
-- [ ] Deletar função `debugLogRenderer()` (~30 linhas)
-- [ ] Manter compatibilidade: parâmetro `true/false` no final para controlar exibição
+- [x] Substituir todas as ~200 chamadas `debugLogRenderer(...)` por `Logger.debug(...)`
+- [x] Deletar função `debugLogRenderer()` (~30 linhas)
+- [x] Manter compatibilidade: parâmetro `true/false` no final para controlar exibição
 
 **Regra:**
 
@@ -187,52 +187,51 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Benefício:** Mesma interface que `debugLogRenderer`, centralizada em `Logger`
 
-**Commit:** `git commit -m "refactor(phase-1.1): remove debugLogRenderer and centralize logging in Logger"`
+**Commit:** ✅ `f158749` - refactor(phase-1.1): remover debugLogRenderer e centralizar logging em Logger
 
-- [ ] Verificar: `time npm start`
+- [x] Verificar: `time npm start` (43 segundos)
 
 #### 1.2 Remover `releaseThread()` Duplicada
 
-- [ ] Manter apenas 1 definição de `releaseThread()` (linha 1409)
-- [ ] Remover a 2ª definição (linha 1544)
-- [ ] Linhas a remover: ~4
+- [x] Manter apenas 1 definição de `releaseThread()` (linha 1409)
+- [x] Remover a 2ª definição (linha 1544)
+- [x] Linhas a remover: ~4
 
-**Commit:** `git commit -m "refactor(phase-1.2): remove duplicate releaseThread function"`
+**Commit:** ✅ `b1c5737` - refactor(phase-1.2): remover releaseThread duplicada
 
-- [ ] Verificar: `time npm start`
+- [x] Verificar: `time npm start`
 
 #### 1.3 Isolar MOCK em Arquivo Separado
 
-- [ ] Criar `mock-runner.js` novo
-- [ ] Mover `MOCK_RESPONSES` object
-- [ ] Mover `MOCK_SCENARIOS` array
-- [ ] Mover `getMockResponse(question)` function
-- [ ] Mover `runMockAutoPlay()` function (~400 linhas)
-- [ ] Mover `ipcRenderer.invoke` interceptor
-- [ ] Deletar tudo do renderer.js
-- [ ] Linhas removidas do renderer: ~500
-- [ ] Arquivo novo: `mock-runner.js` (~500 linhas)
+- [x] Criar `mock-runner.js` novo
+- [x] Mover `MOCK_RESPONSES` object
+- [x] Mover `MOCK_SCENARIOS` array
+- [x] Mover `getMockResponse(question)` function
+- [x] Mover `runMockAutoPlay()` function (~400 linhas)
+- [x] Mover `ipcRenderer.invoke` interceptor
+- [x] Deletar tudo do renderer.js
+- [x] Linhas removidas do renderer: ~500
+- [x] Arquivo novo: `mock-runner.js` (~500 linhas)
 
-**Commit:** `git commit -m "refactor(phase-1.3): isolate mock code to separate mock-runner.js file"`
+**Commit:** ✅ `8a4578b` - refactor(phase-1.3): isolar código mock em mock-runner.js
 
-- [ ] Verificar: `time npm start`
-
-#### 1.4 Remover Funções Mortas
+- [x] Verificar: `time npm start` (24 segundos)
 
 #### 1.4 Remover Funções Mortas
 
-- [ ] Remover `promoteCurrentToHistory(text)` - já tem lógica inline
+- [x] Remover `promoteCurrentToHistory(text)` - já tem lógica inline
   - Linhas a remover: ~80
-- [ ] Remover `getNavigableQuestionIds()` - nunca chamada
+- [x] Remover `getNavigableQuestionIds()` - nunca chamada
   - Linhas a remover: ~10
-- [ ] Remover `restartAudioPipeline()` - incompleta
+- [x] Remover `restartAudioPipeline()` - incompleta
   - Linhas a remover: ~10
-- [ ] Remover compatibilidade obsoleta: `onUIChange('onAudioDeviceChanged', ...)`
+- [x] Remover compatibilidade obsoleta: `onUIChange('onAudioDeviceChanged', ...)`
   - Linhas a remover: ~5
 
-**Commit:** `git commit -m "refactor(phase-1.4): remove dead and incomplete functions"`
+**Commit:** ✅ `6e53f1c` - refactor(phase-1.4): remover funções mortas e compatibilidade obsoleta
 
-- [ ] Verificar: `time npm start`
+- [x] Verificar: `time npm start` (11 segundos)
+- [x] ✅ Revisar ARCHITECTURE.md e DOCS_GUIDE.md se mencionam essas funções (não mencionam)
 
 **Total Fase 1:** ~400-450 linhas removidas
 
