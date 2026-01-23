@@ -33,8 +33,8 @@ const llmManager = new LLMManager();
 
 // 🎯 REGISTRAR LLMs
 llmManager.register('openai', openaiHandler);
-// Futuro: llmManager.register('gemini', geminiHandler);
-// Futuro: llmManager.register('anthropic', anthropicHandler);
+// Futuro: llmManager.register('gemini', require('./llm/handlers/gemini-handler.js'));
+// Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
 eventBus.on('answerStreamChunk', data => {
