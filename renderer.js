@@ -36,6 +36,33 @@ llmManager.register('openai', openaiHandler);
 // Futuro: llmManager.register('gemini', geminiHandler);
 // Futuro: llmManager.register('anthropic', anthropicHandler);
 
+// 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
+eventBus.on('answerStreamChunk', data => {
+	emitUIChange('onAnswerStreamChunk', {
+		questionId: data.questionId,
+		token: data.token,
+		accum: data.accum,
+	});
+});
+
+eventBus.on('llmStreamEnd', data => {
+	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
+	emitUIChange('onAnswerStreamEnd', {});
+});
+
+eventBus.on('llmBatchEnd', data => {
+	Logger.info('LLM Batch finalizado', { questionId: data.questionId, responseLength: data.response?.length || 0 });
+	emitUIChange('onAnswerBatchEnd', {
+		questionId: data.questionId,
+		response: data.response,
+	});
+});
+
+eventBus.on('error', error => {
+	Logger.error('Erro na eventBus', { error });
+	updateStatusMessage(`❌ ${error}`);
+});
+
 /* ================================ */
 //	PROTEÇÃO CONTRA CAPTURA DE TELA
 /* ================================ */
