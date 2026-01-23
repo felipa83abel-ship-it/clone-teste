@@ -1176,12 +1176,12 @@ async function captureScreenshot() {
  */
 async function analyzeScreenshots() {
 	if (isAnalyzing) {
-		console.log('⏳ Análise já em andamento...');
+		Logger.info('Análise já em andamento');
 		return;
 	}
 
 	if (capturedScreenshots.length === 0) {
-		console.warn('⚠️ Nenhum screenshot para analisar');
+		Logger.warn('Nenhum screenshot para analisar');
 		updateStatusMessage('⚠️ Nenhum screenshot para analisar (capture com Ctrl+Shift+F)');
 		return;
 	}
@@ -1193,20 +1193,19 @@ async function analyzeScreenshots() {
 		// Extrai caminhos dos arquivos
 		const filepaths = capturedScreenshots.map(s => s.filepath);
 
-		console.log('🚀 Enviando para análise:', filepaths);
+		Logger.info('Enviando para análise', { count: filepaths.length });
 
 		// Envia para main.js
 		const result = await ipcRenderer.invoke('ANALYZE_SCREENSHOTS', filepaths);
 
 		if (!result.success) {
-			console.error('❌ Falha na análise:', result.error);
+			Logger.error('Falha na análise', { error: result.error });
 			updateStatusMessage(`❌ ${result.error}`);
 			return;
 		}
 
 		// ✅ Renderiza resposta do GPT
 		const questionText = `📸 Análise de ${capturedScreenshots.length} screenshot(s)`;
-		// 🔢 USA ID SEQUENCIAL COMO AS PERGUNTAS NORMAIS (não UUID)
 		const questionId = String(questionsHistory.length + 1);
 
 		// Adiciona "pergunta" ao histórico ANTES de renderizar respostas
@@ -1223,20 +1222,19 @@ async function analyzeScreenshots() {
 
 		renderQuestionsHistory();
 
-		// ✅ RENDERIZA VIA STREAMING (fluxo real) - usa onAnswerStreamChunk como GPT normal
+		// ✅ RENDERIZA VIA EVENTBUS (consistente com LLM)
 		// Divide análise em tokens e emite como se fosse stream
 		const analysisText = result.analysis;
 		const tokens = analysisText.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
 
-		console.log(`📸 [ANÁLISE] Simulando stream: ${tokens.length} tokens`);
+		Logger.info('Simulando stream', { tokenCount: tokens.length });
 
-		// Emite tokens assim como o GPT faz (permite UI renderizar em tempo real)
+		// Emite tokens via eventBus (consistente com askLLM)
 		let accumulated = '';
 		for (const token of tokens) {
 			accumulated += token;
 
-			// ✅ USA O MESMO EVENTO onAnswerStreamChunk (fluxo real)
-			emitUIChange('onAnswerStreamChunk', {
+			eventBus.emit('answerStreamChunk', {
 				questionId: questionId,
 				token: token,
 				accum: accumulated,
@@ -1246,11 +1244,11 @@ async function analyzeScreenshots() {
 			await new Promise(resolve => setTimeout(resolve, 2));
 		}
 
-		console.log('✅ Análise concluída e renderizada');
+		Logger.info('Análise concluída');
 		updateStatusMessage('✅ Análise concluída');
 
 		// 🗑️ Limpa screenshots após análise
-		console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s) da memória...`);
+		Logger.info('Limpando screenshots', { count: capturedScreenshots.length });
 		capturedScreenshots = [];
 
 		// Atualiza badge
@@ -1262,7 +1260,7 @@ async function analyzeScreenshots() {
 		// Força limpeza no sistema
 		await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
 	} catch (error) {
-		console.error('❌ Erro ao analisar screenshots:', error);
+		Logger.error('Erro ao analisar screenshots', { error: error.message });
 		updateStatusMessage('❌ Erro na análise');
 	} finally {
 		isAnalyzing = false;
