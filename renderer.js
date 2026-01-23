@@ -5,9 +5,9 @@
 const { ipcRenderer } = require('electron');
 const { marked } = require('marked');
 const hljs = require('highlight.js');
-const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt/stt-deepgram.js');  // reorganizado em pasta stt/
-const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt/stt-vosk.js');  // reorganizado em pasta stt/
-const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./stt/stt-whisper.js');  // reorganizado em pasta stt/
+const { startAudioDeepgram, stopAudioDeepgram, switchDeviceDeepgram } = require('./stt/stt-deepgram.js'); // reorganizado em pasta stt/
+const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt/stt-vosk.js'); // reorganizado em pasta stt/
+const { startAudioWhisper, stopAudioWhisper, switchDeviceWhisper } = require('./stt/stt-whisper.js'); // reorganizado em pasta stt/
 const {
 	startAudioVolumeMonitor,
 	stopAudioVolumeMonitor,
@@ -1055,11 +1055,7 @@ async function askLLM() {
 		const CURRENT_QUESTION_ID = 'CURRENT';
 
 		// 1. Validar (antigo validateAskGptRequest)
-		const { questionId, text, isCurrent } = validateLLMRequest(
-			appState,
-			selectedQuestionId,
-			getSelectedQuestionText,
-		);
+		const { questionId, text, isCurrent } = validateLLMRequest(appState, selectedQuestionId, getSelectedQuestionText);
 		Logger.info('Pergunta válida', { questionId, textLength: text.length });
 
 		// Rastreamento antigo (compatibilidade)

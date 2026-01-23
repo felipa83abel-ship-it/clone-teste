@@ -1,9 +1,9 @@
 /**
  * gemini-handler - Interface para Google Gemini
- * 
+ *
  * ✅ TEMPLATE para integração com Gemini AI
  * Segue o mesmo padrão de openai-handler para garantir compatibilidade
- * 
+ *
  * Pasos para usar:
  * 1. Instalar SDK: npm install @google/generative-ai
  * 2. Obter API key em https://ai.google.dev/

@@ -59,7 +59,7 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 	appState.interview.gptRequestedQuestionId = questionId;
 
 	// Obter handler LLM e invocar stream
-	const currentLLM = 'openai';  // TODO: fazer isso dinâmico (pegar de config)
+	const currentLLM = 'openai'; // TODO: fazer isso dinâmico (pegar de config)
 	const handler = llmManager.getHandler(currentLLM);
 
 	try {
@@ -108,7 +108,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 	appState.metrics.gptStartTime = Date.now();
 
 	// Obter handler LLM e invocar complete
-	const currentLLM = 'openai';  // TODO: fazer isso dinâmico (pegar de config)
+	const currentLLM = 'openai'; // TODO: fazer isso dinâmico (pegar de config)
 	const handler = llmManager.getHandler(currentLLM);
 
 	try {
