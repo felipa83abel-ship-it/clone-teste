@@ -45,7 +45,7 @@
  * 2. const Anthropic = require('@anthropic-ai/sdk');
  * 3. class AnthropicHandler {
  *      async initialize(apiKey) { this.client = new Anthropic({ apiKey }); }
- *      async complete(messages) { 
+ *      async complete(messages) {
  *        return this.client.messages.create({ model: 'claude-3-sonnet', messages });
  *      }
  *      async *stream(messages) {
