@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 	<head>
 		<meta charset="UTF-8" />
@@ -211,10 +211,10 @@
 									<div class="form-group">
 										<label for="openai-stt-model">Modelo de Transcrição (STT):</label>
 										<select id="openai-stt-model" class="interactive-zone">
-											<option value="vosk-local">Vosk (Local/Offline, Rápido)</option>
+											<option value="deepgram">Deepgram (Nuvem, Tempo Real)</option>
+											<option value="vosk">Vosk (Local/Offline, Rápido)</option>
 											<option value="whisper-cpp-local">Whisper.cpp (Local/Offline, Alta Precisão)</option>
 											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
-											<option value="deepgram">Deepgram (Nuvem, Tempo Real)</option>
 										</select>
 										<small>Selecione o modelo para converter áudio em texto (Speech-to-Text).</small>
 									</div>
@@ -275,10 +275,10 @@
 									<div class="form-group">
 										<label for="google-stt-model">Modelo de Transcrição (STT):</label>
 										<select id="google-stt-model" class="interactive-zone">
-											<option value="vosk-local">Vosk (Rápido)</option>
+											<option value="deepgram">Deepgram (Nuvem, Tempo Real)</option>
+											<option value="vosk">Vosk (Rápido)</option>
 											<option value="whisper-cpp-local">Whisper.cpp (Alta Precisão)</option>
 											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
-											<option value="deepgram">Deepgram (Nuvem, Tempo Real)</option>
 										</select>
 										<small>Escolha entre transcrição rápida (Vosk), offline (Whisper.cpp) ou nuvem (Whisper-1).</small>
 									</div>
@@ -339,7 +339,9 @@
 									<div class="form-group">
 										<label for="openrouter-stt-model">Modelo de Transcrição (STT):</label>
 										<select id="openrouter-stt-model" class="interactive-zone">
-											<option value="vosk-loccpp-local">Whisper.cpp (Alta Precisão)</option>
+											<option value="deepgram">Deepgram (Nuvem, Tempo Real)</option>
+											<option value="vosk">Vosk (Rápido)</option>
+											<option value="whisper-cpp-local">Whisper.cpp (Alta Precisão)</option>
 											<option value="whisper-1">Whisper-1 (OpenAI/Nuvem)</option>
 										</select>
 										<small>Escolha entre transcrição rápida (Vosk) ou nuvem (Whisper-1)</small>

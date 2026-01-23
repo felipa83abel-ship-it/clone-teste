@@ -1,17 +1,40 @@
-/* ================================
-   IMPORTS E CONFIGURAÇÕES INICIAIS
-=============================== */
+/**
+ *	🚀 Inicio do APP - main.js
+ *
+ *	Responsável por:
+ *	- Inicializar a aplicação Electron
+ *	- Criar a janela overlay principal
+ *	- Gerenciar IPC handlers para comunicação com o renderer
+ *	- Integrar com OpenAI API para GPT e visão computacional
+ *	- Capturar screenshots discretamente
+ *	- Controlar comportamento da janela (click-through, drag, etc)
+ *
+ *	Como Usar no Futuro:
+ *
+ *	1. Precisa adicionar um novo handler?
+ *		- Veja qual categoria ele pertence
+ *		- Crie a função `handle[NomeHandler]()`
+ *		- Adicione na função `register[Categoria]Handlers()`
+ *		- Adicione a chamada em `registerIPCHandlers()`
+ *
+ *	2. Precisa entender um handler?
+ *		- Procure pela função `handle[Nome]`
+ *		- Leia o JSDoc
+ *		- Veja a seção de registro para entender qual evento ativa
+ *
+ */
 
-// 🔥 DEEPGRAM: Carrega variáveis de ambiente do .env
+/* ================================ */
+//	IMPORTS E CONFIGURAÇÕES INICIAIS
+/* ================================ */
+
+// Carrega variáveis de ambiente do .env
 require('dotenv').config();
 
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const OpenAI = require('openai');
 const fs = require('node:fs');
 const path = require('node:path');
-const { execFile } = require('node:child_process');
-const { promisify } = require('node:util');
-const execFileAsync = promisify(execFile);
 
 // Habilita reload automático em desenvolvimento
 if (process.env.NODE_ENV === 'development') {
@@ -37,39 +60,25 @@ try {
 	ElectronStore = null;
 }
 
-/* ================================
-   CONSTANTES
-=============================== */
+/* ================================ */
+//	CONSTANTES
+/* ================================ */
 
-const USE_FAKE_STREAM_GPT = false; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
+const USE_FAKE_STREAM_GPT = true; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
 
-// Configuração de modelo Vosk (local)
-const VOSK_CONFIG = {
-	// MODEL: 'vosk-models/vosk-model-small-pt-0.3' ( Modelo pequeno, rápido, menos preciso)
-	MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3',
-};
+/* ================================ */
+//	ESTADO GLOBAL
+/* ================================ */
 
-// Configuração do modelo Whisper.cpp (local)
-const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
-// Modelo ggml-tiny (Modelo menor, rápido, menos preciso)
-const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
-
-/* ================================
-   ESTADO GLOBAL
-=============================== */
 let mainWindow = null;
 let openaiClient = null;
 let secureStore = null;
 let clickThroughEnabled = false;
 
-// 🔥 NOVO: Gerenciamento do Whisper.cpp como servidor persistente
-let whisperServerProcess = null;
-let whisperServerReady = false;
-const { spawn } = require('node:child_process');
+/* ================================ */
+//	INICIALIZAÇÃO DO SECURE STORE
+/* ================================ */
 
-/* ================================
-   INICIALIZAÇÃO DO SECURE STORE
-=============================== */
 if (ElectronStore) {
 	try {
 		secureStore = new ElectronStore({
@@ -89,13 +98,11 @@ if (ElectronStore) {
 	}
 }
 
-/* ================================
-   FUNÇÕES AUXILIARES
-=============================== */
+/* ================================ */
+//	FUNÇÕES AUXILIARES
+/* ================================ */
 
-/**
- * Inicializa o cliente OpenAI
- */
+// Inicializa o cliente OpenAI
 function initializeOpenAIClient(apiKey = null) {
 	try {
 		const key = apiKey || (secureStore ? secureStore.get('apiKeys.openai') : null);
@@ -122,191 +129,92 @@ function initializeOpenAIClient(apiKey = null) {
 	}
 }
 
-/**
- * Verifica se os arquivos do Whisper.cpp local existem
- */
-function checkWhisperFiles() {
-	const exeExists = fs.existsSync(WHISPER_CLI_EXE);
-	const modelExists = fs.existsSync(WHISPER_MODEL);
+/* ================================ */
+//	REGISTRO DE IPC HANDLERS
+/* ================================ */
 
-	console.log('🔍 Verificando arquivos Whisper:');
-	console.log(`   Executável: ${exeExists ? '✅' : '❌'} ${WHISPER_CLI_EXE}`);
-	console.log(`   Modelo: ${modelExists ? '✅' : '❌'} ${WHISPER_MODEL}`);
+function registerIPCHandlers() {
+	// Gerais
+	registerGeneralHandlers();
 
-	return exeExists && modelExists;
+	// API Keys
+	registerApiKeyHandlers();
+
+	// GPT
+	registerGPTHandlers();
+
+	// Controle de Janela
+	registerWindowControlHandlers();
+
+	// Screenshots
+	registerScreenshotHandlers();
+
+	// Fechamento
+	registerAppCloseHandler();
+
+	console.log('✅ Todos os handlers IPC registrados');
+}
+
+/* ================================ */
+//	HANDLERS GERAIS
+/* ================================ */
+
+function registerGeneralHandlers() {
+	// Reporta erros do renderer
+	ipcMain.on('RENDERER_ERROR', handleRendererError);
+
+	// Retorna status da inicialização do cliente OpenAI
+	ipcMain.handle('GET_OPENAI_API_STATUS', handleGetOpenAIApiStatus);
 }
 
 /**
- * 🔥 NOVO: Inicia Whisper.cpp como servidor persistente
- * Mantém o processo rodando enquanto o usuário está em modo de escuta
- * Isso evita overhead de inicialização e problemas com WebM corrompido
+ * Log de erros reportados pelo renderer
+ * @param {Event} _ - Evento IPC
+ * @param {Object} info - Informações do erro
  */
-async function startWhisperServer() {
-	if (whisperServerProcess) {
-		console.log('⚠️ Servidor Whisper já rodando');
-		return true;
-	}
-
-	if (!checkWhisperFiles()) {
-		console.error('❌ Arquivos do Whisper não encontrados!');
-		return false;
-	}
-
-	console.log('🚀 Iniciando Whisper.cpp como servidor persistente...');
-
-	try {
-		// Inicia Whisper.cpp em modo de espera por stdin
-		whisperServerProcess = spawn(WHISPER_CLI_EXE, ['-m', WHISPER_MODEL, '-l', 'pt', '--print-progress'], {
-			stdio: ['pipe', 'pipe', 'pipe'],
-			detached: false,
-		});
-
-		whisperServerProcess.on('close', code => {
-			console.log(`📌 Processo Whisper encerrado com código: ${code}`);
-			whisperServerProcess = null;
-			whisperServerReady = false;
-		});
-
-		whisperServerProcess.on('error', err => {
-			console.error(`❌ Erro no processo Whisper: ${err.message}`);
-			whisperServerProcess = null;
-			whisperServerReady = false;
-		});
-
-		whisperServerReady = true;
-		console.log('✅ Servidor Whisper iniciado com sucesso');
-		return true;
-	} catch (error) {
-		console.error(`❌ Erro ao iniciar servidor Whisper: ${error.message}`);
-		whisperServerProcess = null;
-		whisperServerReady = false;
-		return false;
-	}
-}
-
-/**
- * Encerra o servidor Whisper.cpp persistente
- */
-function stopWhisperServer() {
-	if (!whisperServerProcess) {
-		console.log('⚠️ Servidor Whisper não está rodando');
-		return;
-	}
-
-	console.log('🛑 Encerrando servidor Whisper...');
-	try {
-		whisperServerProcess.kill();
-		whisperServerProcess = null;
-		whisperServerReady = false;
-		console.log('✅ Servidor Whisper encerrado');
-	} catch (error) {
-		console.error(`❌ Erro ao encerrar servidor: ${error.message}`);
-	}
-}
-
-/**
- * Converte WebM para WAV usando ffmpeg (para Whisper.cpp)
- * Trabalha com caminhos de arquivo (não buffers)
- * Origem: commit 9545a76
- */
-function convertWebMToWAVFile(inputPath, outputPath) {
-	return new Promise((resolve, reject) => {
-		// Usa ffmpeg estático se disponível
-		const ffmpeg = require('fluent-ffmpeg');
-		const ffmpegPath = require('ffmpeg-static');
-		ffmpeg(inputPath)
-			.setFfmpegPath(ffmpegPath)
-			.audioCodec('pcm_s16le')
-			.audioFrequency(16000) // Whisper usa 16kHz
-			.audioChannels(1) // Mono
-			.format('wav')
-			.on('end', () => {
-				console.log('✅ Conversão WebM → WAV concluída');
-				resolve();
-			})
-			.on('error', err => {
-				console.error('❌ Erro na conversão WebM → WAV:', err);
-				reject(err);
-			})
-			.save(outputPath);
-	});
-}
-
-/**
- * Converte WebM/Ogg para PCM 16-bit 16kHz (formato que Vosk espera)
- * Usa ffmpeg para decodificação
- */
-async function convertWebMToWAV(webmBuffer) {
-	try {
-		const ffmpegPath = require('ffmpeg-static');
-		const inputFile = path.join(app.getPath('temp'), `input-${Date.now()}.webm`);
-		const outputFile = path.join(app.getPath('temp'), `output-${Date.now()}.wav`);
-
-		try {
-			// Escreve WebM temporário
-			fs.writeFileSync(inputFile, webmBuffer);
-
-			// Converte com ffmpeg: WebM → WAV 16-bit 16kHz mono (MESMA FORMA DE ANTES)
-			await execFileAsync(
-				ffmpegPath,
-				[
-					'-i',
-					inputFile,
-					'-acodec',
-					'pcm_s16le', // PCM 16-bit signed
-					'-ar',
-					'16000', // 16kHz sample rate
-					'-ac',
-					'1', // Mono
-					'-f',
-					'wav', // WAV container (melhor preservação de qualidade)
-					outputFile,
-				],
-				{ maxBuffer: 10 * 1024 * 1024 },
-			);
-
-			// Lê arquivo WAV convertido
-			const wavBuffer = fs.readFileSync(outputFile);
-
-			// Limpa arquivos temporários
-			fs.unlinkSync(inputFile);
-			fs.unlinkSync(outputFile);
-
-			console.log(`✅ Convertido WebM (${webmBuffer.length} bytes) → WAV (${wavBuffer.length} bytes)`);
-			return wavBuffer;
-		} catch (error) {
-			// Limpa se houver erro
-			if (fs.existsSync(inputFile)) fs.unlinkSync(inputFile);
-			if (fs.existsSync(outputFile)) fs.unlinkSync(outputFile);
-			throw error;
-		}
-	} catch (error) {
-		console.error('❌ Erro ao converter WebM para WAV:', error.message);
-		throw error;
-	}
-}
-
-/* ================================
-   HANDLERS IPC - GERAIS
-=============================== */
-
-// Erros do renderer
-ipcMain.on('RENDERER_ERROR', (_, info) => {
+function handleRendererError(_, info) {
 	console.error('Renderer reported error:', info && (info.message || info));
 	if (info?.stack) console.error(info.stack);
-});
+}
 
-// Status do cliente OpenAI
-ipcMain.handle('GET_OPENAI_API_STATUS', () => ({
-	initialized: !!openaiClient,
-}));
+/**
+ * Retorna se o cliente OpenAI está inicializado
+ * @returns {Object} Status do cliente
+ */
+function handleGetOpenAIApiStatus() {
+	return {
+		initialized: !!openaiClient,
+	};
+}
 
-/* ================================
-   HANDLERS IPC - API KEYS
-=============================== */
+/* ================================ */
+//	HANDLERS DE API KEYS
+/* ================================ */
 
-// Verifica se há API key
-ipcMain.handle('HAS_API_KEY', async (_, provider) => {
+function registerApiKeyHandlers() {
+	// Verifica se há API key salva
+	ipcMain.handle('HAS_API_KEY', handleHasApiKey);
+
+	// Recupera API key (sem revelar valor completo)
+	ipcMain.handle('GET_API_KEY', handleGetApiKey);
+
+	// Salva API key no secure store
+	ipcMain.handle('SAVE_API_KEY', handleSaveApiKey);
+
+	// Remove API key do secure store
+	ipcMain.handle('DELETE_API_KEY', handleDeleteApiKey);
+
+	// Inicializa cliente OpenAI com chave fornecida
+	ipcMain.handle('initialize-api-client', handleInitializeApiClient);
+}
+
+/**
+ * Verifica se existe API key para um provedor
+ * @param {Event} _ - Evento IPC
+ * @param {string} provider - Provedor (ex: 'openai')
+ * @returns {Object} {hasKey: boolean, provider: string}
+ */
+async function handleHasApiKey(_, provider) {
 	try {
 		const key = secureStore.get(`apiKeys.${provider}`);
 		return {
@@ -317,10 +225,15 @@ ipcMain.handle('HAS_API_KEY', async (_, provider) => {
 		console.error('❌ Erro ao verificar API key:', error);
 		return { hasKey: false, provider };
 	}
-});
+}
 
-// Recupera API key
-ipcMain.handle('GET_API_KEY', async (_, provider) => {
+/**
+ * Recupera a API key para um provedor
+ * @param {Event} _ - Evento IPC
+ * @param {string} provider - Provedor (ex: 'openai')
+ * @returns {string|null} A chave da API ou null
+ */
+async function handleGetApiKey(_, provider) {
 	try {
 		const key = secureStore.get(`apiKeys.${provider}`);
 		return key || null;
@@ -328,10 +241,15 @@ ipcMain.handle('GET_API_KEY', async (_, provider) => {
 		console.error(`❌ Erro ao recuperar chave de ${provider}:`, error);
 		return null;
 	}
-});
+}
 
-// Salva API key
-ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
+/**
+ * Salva a API key no secure store e inicializa cliente se necessário
+ * @param {Event} _ - Evento IPC
+ * @param {Object} data - {provider: string, apiKey: string}
+ * @returns {Object} {success: boolean, provider: string, error?: string}
+ */
+async function handleSaveApiKey(_, { provider, apiKey }) {
 	try {
 		if (!apiKey || apiKey.trim().length < 2) {
 			return { success: false, error: 'API key inválida' };
@@ -340,7 +258,7 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 		const trimmedKey = apiKey.trim();
 		secureStore.set(`apiKeys.${provider}`, trimmedKey);
 
-		// Se for OpenAI, inicializa cliente
+		// Se for OpenAI, inicializa cliente imediatamente
 		if (provider === 'openai') {
 			const success = initializeOpenAIClient(trimmedKey);
 			if (mainWindow?.webContents) {
@@ -354,13 +272,19 @@ ipcMain.handle('SAVE_API_KEY', async (_, { provider, apiKey }) => {
 		console.error('Erro ao salvar API key:', error);
 		return { success: false, error: error.message };
 	}
-});
+}
 
-// Remove API key
-ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
+/**
+ * Remove a API key do secure store
+ * @param {Event} _ - Evento IPC
+ * @param {string} provider - Provedor (ex: 'openai')
+ * @returns {Object} {success: boolean, provider: string, error?: string}
+ */
+async function handleDeleteApiKey(_, provider) {
 	try {
 		secureStore.delete(`apiKeys.${provider}`);
 
+		// Se for OpenAI, desconecta cliente
 		if (provider === 'openai') {
 			openaiClient = null;
 		}
@@ -370,297 +294,38 @@ ipcMain.handle('DELETE_API_KEY', async (_, provider) => {
 		console.error('❌ Erro ao deletar API key:', error);
 		return { success: false, error: error.message };
 	}
-});
+}
 
-// Inicializa cliente OpenAI com chave fornecida
-ipcMain.handle('initialize-api-client', async (_, apiKey) => {
+/**
+ * Inicializa cliente OpenAI com API key fornecida
+ * @param {Event} _ - Evento IPC
+ * @param {string} apiKey - Chave da API OpenAI
+ * @returns {Object} {initialized: boolean}
+ */
+async function handleInitializeApiClient(_, apiKey) {
 	const initialized = initializeOpenAIClient(apiKey);
-	if (mainWindow?.webContents) mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
+	if (mainWindow?.webContents) {
+		mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
+	}
 	return { initialized };
-});
+}
 
-/* ================================
-   HANDLERS IPC - TRANSCRIÇÃO ONLINE (OpenAI)
-=============================== */
+/* ================================ */
+//	HANDLERS DE GPT
+/* ================================ */
 
-/**
- * Transcrição com OpenAI Whisper-1 (online)
- * Chamado por: renderer.js → transcribeAudio() quando sttModel === 'whisper-1'
- * Referência: handlers IPC 'transcribe-audio' e 'transcribe-audio-partial'
- */
-async function transcribeAudioCommon(audioBuffer, isPartial = false) {
-	console.log('\n--------------------------------------------------------');
-	console.log('📋 STT HANDLER ATIVO: WHISPER-1 OPENAI (Cloud, Versátil)');
-	console.log('--------------------------------------------------------');
-	// Verifica se o cliente está inicializado
-	if (!openaiClient) {
-		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
-		const initialized = initializeOpenAIClient();
-		if (!initialized) {
-			throw new Error('OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
-		}
-	}
+function registerGPTHandlers() {
+	// Completions simples
+	ipcMain.handle('ask-gpt', handleAskGPT);
 
-	// Proteção para buffers muito pequenos
-	const size = audioBuffer?.byteLength || audioBuffer?.length || 0;
-	if (isPartial && size < 800) {
-		console.log('STT main (partial): buffer demasiado pequeno, ignorando');
-		return '';
-	}
-
-	// Salva arquivo temporário
-	const tempFileName = isPartial ? 'temp-audio-partial.webm' : 'temp-audio.webm';
-	const tempFilePath = path.join(app.getPath('temp'), tempFileName);
-
-	try {
-		fs.writeFileSync(tempFilePath, Buffer.from(audioBuffer));
-
-		const transcription = await openaiClient.audio.transcriptions.create({
-			file: fs.createReadStream(tempFilePath),
-			model: 'whisper-1',
-			language: 'pt',
-		});
-
-		return transcription.text;
-	} catch (error) {
-		console.error(`❌ Erro na transcrição ${isPartial ? 'parcial' : ''}:`, error.message);
-
-		if (error.status === 401 || error.message.includes('authentication')) {
-			openaiClient = null;
-			throw new Error('Chave da API inválida ou expirada. Verifique suas configurações.');
-		}
-
-		if (isPartial && error.status === 400 && error.error?.message?.includes('Invalid file format')) {
-			return '';
-		}
-
-		throw error;
-	} finally {
-		if (fs.existsSync(tempFilePath)) {
-			fs.unlinkSync(tempFilePath);
-		}
-	}
+	// Completions com stream
+	ipcMain.handle('ask-gpt-stream', handleAskGPTStream);
 }
 
 /**
- * Transcrição local com Whisper.cpp
- * Origem: commit 9545a76
- * Processa WebM → WAV → Whisper.cpp
+ * Garante que o cliente OpenAI está inicializado
+ * @throws {Error} Se a chave não estiver configurada
  */
-/**
- * Transcrição com Whisper.cpp local (alta precisão, offline)
- * Chamado por: renderer.js → transcribeAudio() quando sttModel === 'whisper-cpp-local'
- * Referência: handlers IPC 'transcribe-local' e 'transcribe-local-partial'
- * Processo: WebM → WAV → Whisper.cpp → Texto
- */
-// Helper function para processar arquivo WAV no Whisper
-async function processWhisperFile(whisperModelPath, tempWavPath, isPartial = false) {
-	const whisperStart = Date.now();
-
-	const args = ['-m', whisperModelPath, '-f', tempWavPath, '-l', 'pt', '-otxt', '-t', '4', '-np', '-nt'];
-
-	if (isPartial) {
-		args.push('-d', '3000', '-ml', '50');
-	}
-
-	console.log(`🚀 4. Executando Whisper: ${WHISPER_CLI_EXE} ${args.join(' ')}`);
-
-	const { stdout } = await execFileAsync(WHISPER_CLI_EXE, args, {
-		timeout: isPartial ? 1500 : 10000, // 🔥 OTIMIZADO: Parcial 1.5s (era 3s), Final 10s
-		maxBuffer: 1024 * 1024 * 5,
-	});
-
-	const whisperTime = Date.now() - whisperStart;
-	console.log(`✅ 5. Whisper executado em ${whisperTime}ms`);
-
-	if (stdout?.trim()) {
-		console.log(`📝 STDOUT (primeiros 200 chars):`, stdout.substring(0, 200));
-	} else {
-		console.log(`📝 STDOUT: vazio ou nulo`);
-	}
-
-	return (stdout || '').trim();
-}
-
-// Helper para log de erro durante execução do Whisper
-function logWhisperError(execError, tempWavPath) {
-	console.error(`❌ ERRO NA EXECUÇÃO DO WHISPER:`);
-	console.error(`   Código: ${execError.code}`);
-	console.error(`   Sinal: ${execError.signal}`);
-	console.error(`   Mensagem: ${execError.message}`);
-	if (execError.stderr) {
-		console.error(`   STDERR do processo: ${execError.stderr}`);
-	}
-	if (execError.stdout) {
-		console.error(`   STDOUT do processo: ${execError.stdout}`);
-	}
-
-	if (fs.existsSync(tempWavPath)) {
-		const stats = fs.statSync(tempWavPath);
-		console.error(`   📝 WAV file existe: ${stats.size} bytes`);
-	} else {
-		console.error(`   ❌ WAV file NÃO EXISTE!`);
-	}
-}
-
-// Helper para validar e preparar arquivo WAV
-async function prepareWavFile(audioBuffer, tempWebmPath, tempWavPath, isPartial) {
-	fs.writeFileSync(tempWebmPath, Buffer.from(audioBuffer));
-	console.log(`📁 Áudio WebM salvo: ${tempWebmPath} (${audioBuffer.length} bytes)`);
-
-	const convertStart = Date.now();
-	await convertWebMToWAVFile(tempWebmPath, tempWavPath);
-	const convertTime = Date.now() - convertStart;
-	console.log(`🔄 2. Convertido para WAV em ${convertTime}ms: ${tempWavPath}`);
-
-	if (!fs.existsSync(tempWavPath)) {
-		throw new Error('Arquivo WAV não foi criado');
-	}
-
-	const wavStats = fs.statSync(tempWavPath);
-	console.log(`📊 3. WAV stats: ${wavStats.size} bytes`);
-
-	if (wavStats.size < 1000) {
-		console.warn('⚠️ Arquivo WAV muito pequeno, pode estar corrompido');
-	}
-}
-
-async function transcribeLocalCommon(audioBuffer, isPartial = false) {
-	console.log('\n--------------------------------------------------------');
-	console.log('📋 STT HANDLER ATIVO: WHISPER.CPP LOCAL (Offline, Alta Precisão)');
-	console.log('--------------------------------------------------------');
-	const startTime = Date.now();
-	console.log(`🎤 [WHISPER LOCAL${isPartial ? ' PARTIAL' : ''}] Iniciando...`);
-	console.log(`⏱️ Recebido buffer: ${audioBuffer.length} bytes`);
-
-	if (!checkWhisperFiles()) {
-		if (isPartial) return '';
-		throw new Error('Arquivos do Whisper.cpp não encontrados!');
-	}
-
-	const tempDir = app.getPath('temp');
-	const tempWebmPath = path.join(tempDir, `whisper-${isPartial ? 'partial' : 'temp'}-${Date.now()}.webm`);
-	const tempWavPath = tempWebmPath.replace('.webm', '.wav');
-
-	try {
-		await prepareWavFile(audioBuffer, tempWebmPath, tempWavPath, isPartial);
-
-		let result = '';
-		try {
-			result = await processWhisperFile(WHISPER_MODEL, tempWavPath, isPartial);
-		} catch (execError) {
-			logWhisperError(execError, tempWavPath);
-			// 🔥 [NOVO] Ao invés de relançar silenciosamente, log claro
-			const timeoutMs = isPartial ? 3000 : 10000;
-			const errorMsg =
-				execError.signal === 'SIGTERM'
-					? `⏱️ Whisper timeout (${timeoutMs}ms) - arquivo grande demais ou modelo carregando`
-					: `❌ Whisper erro: ${execError.message}`;
-			console.error(`🚨 TRANSCRIBE-LOCAL FALHOU: ${errorMsg}`);
-			throw new Error(errorMsg); // Propaga para renderer saber que falhou
-		}
-
-		const elapsedTotal = Date.now() - startTime;
-		console.log(`📊 Tempo total: ${elapsedTotal}ms`);
-		console.log(
-			`✨ Resultado (${result.length} chars): "${result.substring(0, 80)}${result.length > 80 ? '...' : ''}"`,
-		);
-
-		return result;
-	} finally {
-		try {
-			if (fs.existsSync(tempWebmPath)) {
-				fs.unlinkSync(tempWebmPath);
-				console.log(`🗑️ Deletado WebM temp`);
-			}
-			if (fs.existsSync(tempWavPath)) {
-				fs.unlinkSync(tempWavPath);
-				console.log(`🗑️ Deletado WAV temp`);
-			}
-		} catch (cleanupError) {
-			console.warn('⚠️ Erro ao limpar arquivos temp:', cleanupError.message);
-		}
-	}
-}
-
-// ==========================================
-// HANDLERS IPC - STT (Speech-to-Text)
-// ==========================================
-// Referências de quem chama:
-//   - OpenAI Whisper-1: renderer.js → transcribeAudio() com sttModel === 'whisper-1'
-//   - Whisper.cpp Local: renderer.js → transcribeAudio() com sttModel === 'whisper-cpp-local'
-//   - Vosk Local: renderer.js → transcribeAudio() com sttModel === 'vosk-local'
-
-// Handler: Transcrição OpenAI Whisper-1 (online)
-ipcMain.handle('transcribe-audio', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, false));
-ipcMain.handle('transcribe-audio-partial', (_, audioBuffer) => transcribeAudioCommon(audioBuffer, true));
-
-// Handlers para Whisper.cpp (local, alta precisão)
-ipcMain.handle('transcribe-local', (_, audioBuffer) => transcribeLocalCommon(audioBuffer, false));
-// 🔥 [DESABILITADO] transcribe-local-partial foi desabilitado
-// Motivo: WebM chunks incompletos causam erro ffmpeg constantemente (código 3199971767)
-// Transcrição completa funciona perfeitamente - confiar apenas nela
-ipcMain.handle('transcribe-local-partial', (_, audioBuffer) => {
-	return ''; // Retorna vazio silenciosamente - transcrição parcial desabilitada
-});
-
-// 🔥 NOVO: Handlers para gerenciar servidor Whisper persistente
-ipcMain.handle('start-whisper-server', async () => {
-	console.log('📡 Solicitação para iniciar servidor Whisper');
-	return await startWhisperServer();
-});
-
-ipcMain.handle('stop-whisper-server', () => {
-	console.log('📡 Solicitação para parar servidor Whisper');
-	stopWhisperServer();
-	return true;
-});
-
-/* ================================
-   HANDLERS IPC - DEEPGRAM (STT)
-=============================== */
-
-// 🔥 DEEPGRAM: Transcrição via SDK com suporte a chunks
-ipcMain.handle('transcribe-audio-deepgram', async (_, audioDataBase64) => {
-	try {
-		const deepgramApiKey = process.env.DEEPGRAM_API_KEY;
-		if (!deepgramApiKey) {
-			throw new Error('DEEPGRAM_API_KEY não configurada no .env');
-		}
-
-		// Converte base64 (string) de volta para Buffer
-		const buffer = Buffer.from(audioDataBase64, 'base64');
-		console.log('🎤 Enviando chunk para Deepgram | size:', buffer.length);
-
-		// Usa Deepgram SDK com prerecorded (para chunks isolados)
-		const { createClient } = require('@deepgram/sdk');
-		const deepgram = createClient(deepgramApiKey);
-
-		const { result, error } = await deepgram.listen.prerecorded.transcribeFile(buffer, {
-			model: 'nova-2',
-			language: 'pt-BR',
-			smart_format: true,
-			container: 'webm',
-		});
-
-		if (error) {
-			console.error('❌ Erro Deepgram SDK:', error);
-			throw new Error(`Deepgram error: ${error.message}`);
-		}
-
-		const transcript = result?.results?.channels[0]?.alternatives[0]?.transcript || '';
-		console.log('✅ Transcrição Deepgram:', transcript || '(vazio)');
-		return transcript;
-	} catch (err) {
-		console.error('❌ Erro ao transcrever com Deepgram:', err.message);
-		throw err;
-	}
-});
-
-/* ================================
-   HANDLERS IPC - GPT
-=============================== */
-
 async function ensureOpenAIClient() {
 	if (!openaiClient) {
 		console.log('⚠️ Cliente OpenAI não inicializado, tentando recuperar...');
@@ -671,17 +336,21 @@ async function ensureOpenAIClient() {
 	}
 }
 
-ipcMain.handle('ask-gpt', async (_, messages) => {
+/**
+ * Obtém resposta do GPT para uma lista de mensagens
+ * @param {Event} _ - Evento IPC
+ * @param {Array} messages - Histórico de mensagens
+ * @returns {string} Resposta do modelo
+ */
+async function handleAskGPT(_, messages) {
 	await ensureOpenAIClient();
 
 	try {
 		let response;
 
 		if (USE_FAKE_STREAM_GPT) {
-			// usa o mock
 			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
 		} else {
-			// usa o OpenAI real
 			response = await openaiClient.chat.completions.create({
 				model: 'gpt-4o-mini',
 				messages,
@@ -698,9 +367,15 @@ ipcMain.handle('ask-gpt', async (_, messages) => {
 		}
 		throw error;
 	}
-});
+}
 
-ipcMain.handle('ask-gpt-stream', async (event, messages) => {
+/**
+ * Obtém resposta do GPT com streaming de tokens
+ * Envia eventos 'GPT_STREAM_CHUNK' e 'GPT_STREAM_END' ao renderer
+ * @param {Event} event - Evento IPC com referência à janela
+ * @param {Array} messages - Histórico de mensagens
+ */
+async function handleAskGPTStream(event, messages) {
 	const win = BrowserWindow.fromWebContents(event.sender);
 
 	try {
@@ -714,10 +389,8 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 		let stream;
 
 		if (USE_FAKE_STREAM_GPT) {
-			// usa o mock
 			stream = fakeStreamGPT();
 		} else {
-			// usa o OpenAI real
 			stream = await openaiClient.chat.completions.create({
 				model: 'gpt-4o-mini',
 				messages,
@@ -743,66 +416,90 @@ ipcMain.handle('ask-gpt-stream', async (event, messages) => {
 			win.webContents.send('GPT_STREAM_ERROR', error.message);
 		}
 	}
-});
+}
 
-// ✅ Mock simples para simular stream
+/**
+ * Simula um stream de resposta do GPT (para testes)
+ * @returns {AsyncGenerator} Gerador de chunks simulados
+ */
 async function* fakeStreamGPT() {
 	const response = 'Olá Thiago! Isso é um mock de resposta simulando o GPT 🚀';
-
-	// Quebra em pedaços variáveis (como se fossem tokens/chunks)
-	const chunks = response.match(/.{1,8}/g); // pedaços de até 8 caracteres
+	const chunks = response.match(/.{1,8}/g);
 
 	for (const chunk of chunks) {
-		// Delay aleatório entre 50ms e 200ms
 		const delay = 50 + Math.random() * 150;
 		await new Promise(r => setTimeout(r, delay));
-
 		yield { choices: [{ delta: { content: chunk } }] };
 	}
 }
 
-/* ================================
-   HANDLERS IPC - CONTROLE DA JANELA
-=============================== */
+/* ================================ */
+//	HANDLERS DE CONTROLE DE JANELA
+/* ================================ */
 
-// Click-through
-ipcMain.on('SET_CLICK_THROUGH', (_, enabled) => {
+function registerWindowControlHandlers() {
+	// Ativa/desativa click-through
+	ipcMain.on('SET_CLICK_THROUGH', handleSetClickThrough);
+	ipcMain.handle('GET_CLICK_THROUGH', handleGetClickThrough);
+
+	// Ativa/desativa zona interativa
+	ipcMain.on('SET_INTERACTIVE_ZONE', handleSetInteractiveZone);
+
+	// Controla movimento e drag da janela
+	ipcMain.on('START_WINDOW_DRAG', handleStartWindowDrag);
+	ipcMain.on('MOVE_WINDOW_TO', handleMoveWindowTo);
+
+	// Retorna informações da janela
+	ipcMain.handle('GET_WINDOW_BOUNDS', handleGetWindowBounds);
+	ipcMain.handle('GET_CURSOR_SCREEN_POINT', handleGetCursorScreenPoint);
+}
+
+/**
+ * Ativa ou desativa click-through (permite cliques passarem pela janela)
+ * @param {Event} _ - Evento IPC
+ * @param {boolean} enabled - true para ativar, false para desativar
+ */
+function handleSetClickThrough(_, enabled) {
 	clickThroughEnabled = enabled;
 	mainWindow.setIgnoreMouseEvents(enabled, { forward: true });
 	console.log('🖱️ Click-through:', enabled ? 'ATIVADO' : 'DESATIVADO');
-});
+}
 
-ipcMain.handle('GET_CLICK_THROUGH', () => clickThroughEnabled);
+/**
+ * Retorna o estado atual do click-through
+ * @returns {boolean} true se click-through está ativado
+ */
+function handleGetClickThrough() {
+	return clickThroughEnabled;
+}
 
-// Zonas interativas
-ipcMain.on('SET_INTERACTIVE_ZONE', (_, isInteractive) => {
+/**
+ * Ativa ou desativa zona interativa (com base no click-through)
+ * @param {Event} _ - Evento IPC
+ * @param {boolean} isInteractive - true para ativar interatividade
+ */
+function handleSetInteractiveZone(_, isInteractive) {
 	if (clickThroughEnabled) {
 		mainWindow.setIgnoreMouseEvents(!isInteractive, { forward: true });
 	}
-});
+}
 
-// Drag and drop da janela
-ipcMain.on('START_WINDOW_DRAG', () => {
+/**
+ * Inicia o arraste (drag) da janela
+ * @param {Event} _ - Evento IPC
+ */
+function handleStartWindowDrag() {
 	if (!mainWindow) return;
 	mainWindow.moveTop();
 	mainWindow.startDrag?.();
-});
+}
 
-ipcMain.handle('GET_WINDOW_BOUNDS', () => {
-	return mainWindow ? mainWindow.getBounds() : null;
-});
-
-ipcMain.handle('GET_CURSOR_SCREEN_POINT', () => {
-	try {
-		const { screen } = require('electron');
-		return screen.getCursorScreenPoint();
-	} catch (err) {
-		console.error('Erro ao obter posição do cursor:', err);
-		return { x: 0, y: 0 };
-	}
-});
-
-ipcMain.on('MOVE_WINDOW_TO', (_, { x, y }) => {
+/**
+ * Move a janela para uma posição específica
+ * @param {Event} _ - Evento IPC
+ * @param {Object} data - {x: number, y: number}
+ */
+function handleMoveWindowTo(_, { x, y }) {
 	if (!mainWindow) return;
 	try {
 		const b = mainWindow.getBounds();
@@ -815,230 +512,33 @@ ipcMain.on('MOVE_WINDOW_TO', (_, { x, y }) => {
 	} catch (err) {
 		console.warn('MOVE_WINDOW_TO falhou:', err);
 	}
-});
-
-/* ================================
-   HANDLERS IPC - VOSK (VIA PYTHON SUBPROCESS)
-=============================== */
-
-let voskProcess = null;
-let voskReady = false;
-
-/**
- * Inicia servidor Vosk em Python (subprocess)
- * Comunica via stdin/stdout JSON
- */
-function startVoskServer() {
-	return new Promise((resolve, reject) => {
-		try {
-			console.log(`🚀 Iniciando servidor Vosk (Python) com modelo: ${VOSK_CONFIG.MODEL}...`);
-
-			voskProcess = spawn('python', ['vosk-server.py', VOSK_CONFIG.MODEL], {
-				cwd: __dirname,
-				stdio: ['pipe', 'pipe', 'pipe'],
-			});
-
-			// Aumenta limite de listeners para múltiplas requisições
-			voskProcess.stdout.setMaxListeners(50);
-
-			let readyCheck = false;
-
-			voskProcess.stdout.on('data', data => {
-				const line = data.toString().trim();
-				console.log(`[Vosk] ${line}`);
-
-				// Aguarda sinal VOSK_READY
-				if (line === 'VOSK_READY' && !readyCheck) {
-					readyCheck = true;
-					voskReady = true;
-					console.log('✅ Servidor Vosk pronto!');
-					resolve(true);
-				}
-			});
-
-			voskProcess.stderr.on('data', data => {
-				console.log(`[Vosk stderr] ${data.toString().trim()}`);
-			});
-
-			voskProcess.on('error', error => {
-				console.error('❌ Erro ao iniciar Vosk:', error.message);
-				voskReady = false;
-				reject(error);
-			});
-
-			voskProcess.on('close', code => {
-				console.log(`⏹️ Vosk processo encerrado (código ${code})`);
-				voskReady = false;
-				voskProcess = null;
-			});
-
-			// Timeout de 5s para inicializar
-			setTimeout(() => {
-				if (!readyCheck) {
-					console.error('⏱️ Timeout ao inicializar Vosk');
-					reject(new Error('Vosk não respondeu (timeout)'));
-				}
-			}, 5000);
-		} catch (error) {
-			console.error('❌ Erro ao criar processo Vosk:', error);
-			reject(error);
-		}
-	});
 }
 
 /**
- * Handler IPC para transcrição Vosk em streaming
- * Envia comando JSON para servidor Python
+ * Retorna os limites (posição e tamanho) da janela
+ * @returns {Object|null} Bounds da janela ou null
  */
-ipcMain.handle('vosk-transcribe', async (_, audioBuffer) => {
-	console.log('\n--------------------------------------------------------');
-	console.log('📋 STT HANDLER ATIVO: VOSK LOCAL (Python Server)');
-	console.log('--------------------------------------------------------');
-	try {
-		// Inicia servidor se não estiver rodando
-		if (!voskReady || !voskProcess) {
-			console.log('🔄 Inicializando Vosk...');
-			await startVoskServer();
-		}
-
-		// Converte para Buffer se necessário (IPC pode enviar Uint8Array ou objeto)
-		let buffer = audioBuffer;
-		if (!Buffer.isBuffer(buffer)) {
-			if (buffer?.data && Array.isArray(buffer.data)) {
-				// Se for objeto com array 'data' (serializado)
-				buffer = Buffer.from(buffer.data);
-			} else if (ArrayBuffer.isView(buffer)) {
-				// Se for Uint8Array ou similar
-				buffer = Buffer.from(buffer);
-			} else if (typeof buffer === 'object' && buffer !== null) {
-				// Se for object genérico com propriedades numéricas
-				const arr = Object.values(buffer);
-				buffer = Buffer.from(arr);
-			} else {
-				throw new Error('audioBuffer formato inválido');
-			}
-		}
-
-		console.log(`🎤 Recebido WebM: ${buffer.length} bytes`);
-
-		// Converte WebM para WAV 16-bit 16kHz (MESMO FORMATO QUE ERA ANTES)
-		let wavBuffer;
-		try {
-			wavBuffer = await convertWebMToWAV(buffer);
-		} catch (error) {
-			console.error('❌ Erro na conversão WebM→WAV:', error.message);
-			throw new Error(`Falha ao converter áudio: ${error.message}`);
-		}
-
-		// Codifica WAV em base64 (JSON-safe)
-		const audioBase64 = wavBuffer.toString('base64');
-
-		// Cria comando JSON
-		const command = {
-			type: 'transcribe',
-			audio: audioBase64,
-		};
-
-		// Envia comando para servidor Python
-		const commandJson = JSON.stringify(command) + '\n';
-
-		// Aguarda resposta
-		return new Promise((resolve, reject) => {
-			const timeout = setTimeout(() => {
-				voskProcess.stdout.removeListener('data', responseHandler);
-				reject(new Error('Timeout ao aguardar resposta do Vosk'));
-			}, 5000);
-
-			// Listener para resposta - filtra apenas JSON válido
-			const responseHandler = data => {
-				const lines = data.toString().split('\n');
-
-				for (const line of lines) {
-					const trimmed = line.trim();
-
-					// Ignora linhas vazias ou que não parecem ser JSON
-					if (!trimmed || trimmed.startsWith('[VOSK]') || trimmed === 'VOSK_READY') {
-						continue;
-					}
-
-					// Tenta parsear como JSON
-					try {
-						const response = JSON.parse(trimmed);
-						clearTimeout(timeout);
-						voskProcess.stdout.removeListener('data', responseHandler);
-						console.log('📝 Resposta Vosk:', response);
-						resolve(response);
-						return;
-					} catch (e) {
-						// Ignorar: Não é JSON válido, aguardar próxima linha
-						// O loop continuará por 'data' e 'end' listeners
-						console.warn(`⚠️ Linha Vosk não é JSON válido, aguardando próxima linha... ${e}`);
-					}
-				}
-			};
-
-			// Aguarda próxima linha de resposta
-			voskProcess.stdout.on('data', responseHandler);
-
-			// Envia comando
-			voskProcess.stdin.write(commandJson);
-		});
-	} catch (error) {
-		console.error('❌ Erro em vosk-transcribe:', error.message);
-		return {
-			final: '',
-			partial: '',
-			isFinal: false,
-			error: error.message,
-		};
-	}
-});
+function handleGetWindowBounds() {
+	return mainWindow ? mainWindow.getBounds() : null;
+}
 
 /**
- * Handler para finalizar Vosk e obter resultado final
+ * Retorna a posição atual do cursor na tela
+ * @returns {Object} {x: number, y: number}
  */
-ipcMain.handle('vosk-finalize', async () => {
+function handleGetCursorScreenPoint() {
 	try {
-		if (!voskReady || !voskProcess) {
-			return { final: '' };
-		}
-
-		console.log('🔄 Finalizando Vosk e obtendo resultado final...');
-
-		const command = { type: 'finalize' };
-		const commandJson = JSON.stringify(command) + '\n';
-
-		return new Promise(resolve => {
-			const timeout = setTimeout(() => {
-				resolve({ final: '' });
-			}, 2000);
-
-			const responseHandler = data => {
-				clearTimeout(timeout);
-				voskProcess.stdout.removeListener('data', responseHandler);
-
-				try {
-					const response = JSON.parse(data.toString().trim());
-					console.log('✅ Vosk finalized:', response);
-					resolve(response);
-				} catch (error) {
-					console.error('Erro ao fazer parse da resposta final do Vosk:', error);
-					resolve({ final: '' });
-				}
-			};
-
-			voskProcess.stdout.once('data', responseHandler);
-			voskProcess.stdin.write(commandJson);
-		});
-	} catch (error) {
-		console.error('❌ Erro em vosk-finalize:', error.message);
-		return { final: '' };
+		const { screen } = require('electron');
+		return screen.getCursorScreenPoint();
+	} catch (err) {
+		console.error('Erro ao obter posição do cursor:', err);
+		return { x: 0, y: 0 };
 	}
-});
+}
 
-/* ===============================
-   SCREENSHOT CAPTURE - DISCRETO E INDETECTÁVEL
-=============================== */
+/* ================================ */
+//	HANDLERS DE SCREENSHOTS
+/* ================================ */
 
 const { desktopCapturer } = require('electron');
 
@@ -1046,14 +546,26 @@ let lastCaptureTime = 0;
 const CAPTURE_COOLDOWN = 2000; // 2 segundos
 const SCREENSHOT_RETENTION = 5 * 60 * 1000; // 5 minutos
 
+function registerScreenshotHandlers() {
+	// Captura screenshot da tela
+	ipcMain.handle('CAPTURE_SCREENSHOT', handleCaptureScreenshot);
+
+	// Analisa screenshot com visão computacional
+	ipcMain.handle('ANALYZE_SCREENSHOTS', handleAnalyzeScreenshots);
+
+	// Limpeza manual de screenshots antigos
+	ipcMain.handle('CLEANUP_SCREENSHOTS', handleCleanupScreenshots);
+}
+
 /**
- * Captura screenshot da tela sem indicadores visíveis
- * Exclui a própria janela do App da captura
+ * Captura screenshot da tela mantendo a janela invisível
+ * Implementa cooldown para evitar abuso
+ * @returns {Object} {success: boolean, filepath?: string, filename?: string, error?: string}
  */
-ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
+async function handleCaptureScreenshot() {
 	const now = Date.now();
 
-	// 🛡️ Cooldown check
+	// Verifica cooldown
 	if (now - lastCaptureTime < CAPTURE_COOLDOWN) {
 		const waitTime = Math.ceil((CAPTURE_COOLDOWN - (now - lastCaptureTime)) / 1000);
 		return {
@@ -1062,26 +574,22 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 		};
 	}
 
-	// 🛡️ Salva opacidade original COM FALLBACK seguro
-	let originalOpacity = mainWindow?.getOpacity() ?? 1; // Fallback: 1 (totalmente opaco)
+	let originalOpacity = mainWindow?.getOpacity() ?? 1;
 
 	try {
 		console.log('📸 Iniciando captura de tela discreta...');
 
-		// 1️⃣ Torna janela COMPLETAMENTE invisível
+		// Torna a janela invisível durante a captura
 		if (mainWindow) {
-			// ✅ HARDENING INVISIBILIDADE: Usa MÚLTIPLOS métodos simultâneos
-			// Garante que nenhuma ferramenta de captura (Zoom, Teams, OBS, etc) detecte a janela
-			mainWindow.setOpacity(0); // Invisível opticamente
-			mainWindow.setIgnoreMouseEvents(true, { forward: true }); // Não interfere com mouse
+			mainWindow.setOpacity(0);
+			mainWindow.setIgnoreMouseEvents(true, { forward: true });
 			console.log('👻 Janela invisível (opacity=0 + ignoreMouseEvents)');
 		}
 
-		// Aguarda múltiplos frames do compositor (50ms = ~3 frames a 60fps)
-		// Garante que a invisibilidade foi propagada ao sistema de composição
+		// Aguarda sincronização com o compositor
 		await new Promise(resolve => setTimeout(resolve, 50));
 
-		// 2️⃣ Captura a tela usando desktopCapturer
+		// Captura a tela usando desktopCapturer
 		const sources = await desktopCapturer.getSources({
 			types: ['screen'],
 			thumbnailSize: { width: 1920, height: 1080 },
@@ -1092,10 +600,10 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 			return { success: false, error: 'Nenhuma tela encontrada' };
 		}
 
-		// Pega a primeira tela (tela principal)
+		// Obtém o PNG da tela principal
 		const screenshot = sources[0].thumbnail.toPNG();
 
-		// 3️⃣ Salva no diretório temp
+		// Salva no diretório temp
 		const tempDir = app.getPath('temp');
 		const timestamp = Date.now();
 		const filename = `my-screenshot-${timestamp}.png`;
@@ -1104,7 +612,6 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 		fs.writeFileSync(filepath, screenshot);
 		console.log(`✅ Screenshot salvo: ${filepath} (${Math.round(screenshot.length / 1024)}KB)`);
 
-		// Atualiza timestamp
 		lastCaptureTime = now;
 
 		return {
@@ -1121,20 +628,23 @@ ipcMain.handle('CAPTURE_SCREENSHOT', async () => {
 			error: error.message,
 		};
 	} finally {
-		// 🛡️ CRÍTICO: Garante restauração SEMPRE (sucesso ou erro)
-		// originalOpacity tem fallback (1), então sempre terá um valor válido
+		// Restaura janela sempre
 		if (mainWindow) {
 			mainWindow.setOpacity(originalOpacity);
-			mainWindow.setIgnoreMouseEvents(false); // IMPORTANTE: Restaura eventos de mouse
+			mainWindow.setIgnoreMouseEvents(false);
 			console.log(`👀 Janela restaurada (opacity=${originalOpacity})`);
 		}
 	}
-});
+}
 
 /**
- * Analisa screenshots com OpenAI Vision API (gpt-4o)
+ * Analisa screenshots usando OpenAI Vision (gpt-4o-mini)
+ * Extrai código e gera comentários explicativos em português
+ * @param {Event} _ - Evento IPC
+ * @param {Array<string>} screenshotPaths - Caminhos dos screenshots para analisar
+ * @returns {Object} {success: boolean, analysis?: string, error?: string}
  */
-ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
+async function handleAnalyzeScreenshots(_, screenshotPaths) {
 	try {
 		await ensureOpenAIClient();
 
@@ -1147,7 +657,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 
 		console.log(`🔍 Analisando ${screenshotPaths.length} screenshot(s)...`);
 
-		// 📸 Converte screenshots para base64
+		// Converte screenshots para base64
 		const images = screenshotPaths
 			.map(filepath => {
 				if (!fs.existsSync(filepath)) {
@@ -1166,7 +676,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 					},
 				};
 			})
-			.filter(Boolean); // Remove nulls
+			.filter(Boolean);
 
 		if (images.length === 0) {
 			return {
@@ -1175,7 +685,7 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 			};
 		}
 
-		// 🤖 Monta mensagens para a API
+		// Monta prompt para análise
 		const messages = [
 			{
 				role: 'user',
@@ -1192,12 +702,10 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 		let response;
 
 		if (USE_FAKE_STREAM_GPT) {
-			// usa o mock
 			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
 		} else {
-			// usa o OpenAI real
 			response = await openaiClient.chat.completions.create({
-				model: 'gpt-4o-mini', // Modelo com suporte a visão (gpt-4o)
+				model: 'gpt-4o-mini',
 				messages,
 				max_tokens: 2000,
 				temperature: 0.3,
@@ -1206,8 +714,8 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 
 		const analysis = response.choices[0].message.content;
 
-		// 🔄 Limpeza de imagens antigas maior que 5 minutos
-		cleanupScreenshots();
+		// Limpa screenshots antigos
+		handleCleanupScreenshots();
 
 		return {
 			success: true,
@@ -1228,12 +736,13 @@ ipcMain.handle('ANALYZE_SCREENSHOTS', async (_, screenshotPaths) => {
 			error: error.message,
 		};
 	}
-});
+}
 
 /**
- * Limpa screenshots antigos do diretório temp
+ * Remove screenshots antigos (> 5 minutos) do diretório temp
+ * @returns {Object} {success: boolean, cleaned: number, error?: string}
  */
-async function cleanupScreenshots() {
+async function handleCleanupScreenshots() {
 	try {
 		const tempDir = app.getPath('temp');
 
@@ -1253,7 +762,7 @@ async function cleanupScreenshots() {
 					const stats = fs.statSync(filepath);
 					const age = now - stats.mtimeMs;
 
-					// Remove se for mais antigo que 5 minutos
+					// Remove se mais antigo que 5 minutos
 					if (age > SCREENSHOT_RETENTION) {
 						fs.unlinkSync(filepath);
 						cleaned++;
@@ -1276,20 +785,28 @@ async function cleanupScreenshots() {
 	}
 }
 
-// Handler IPC para limpeza manual de screenshots
-ipcMain.handle('CLEANUP_SCREENSHOTS', cleanupScreenshots);
+/* ================================ */
+//	HANDLER DE FECHAMENTO
+/* ================================ */
 
-/* ================================
-// FECHAMENTO DA APLICAÇÃO
-=============================== */
-ipcMain.on('APP_CLOSE', () => {
+function registerAppCloseHandler() {
+	// Encerra a aplicação via IPC
+	ipcMain.on('APP_CLOSE', handleAppClose);
+}
+
+/**
+ * Encerra a aplicação
+ * @param {Event} _ - Evento IPC
+ */
+function handleAppClose() {
 	console.log('❌ APP_CLOSE recebido — encerrando aplicação');
 	app.quit();
-});
+}
 
-/* ================================
-   CRIAÇÃO DA JANELA
-=============================== */
+/* ================================ */
+//	CRIAÇÃO DA JANELA
+/* ================================ */
+
 function createWindow() {
 	console.log('🪟 Criando janela principal (frameless)');
 
@@ -1347,16 +864,30 @@ function createWindow() {
 	});
 }
 
-/* ================================
-   INICIALIZAÇÃO DO APP
-=============================== */
+/* ================================ */
+//	INICIALIZAÇÃO DO APP
+/* ================================ */
+
+// NOSONAR javascript:S7785
+// eslint-disable-next-line prefer-top-level-await
 app.whenReady().then(() => {
+	// Registra todos os handlers IPC
+	registerIPCHandlers();
+
 	// Cria a janela principal
 	createWindow();
 
-	// Atalhos globais
+	// Registra atalhos globais
+	registerGlobalShortcuts();
 
-	// �️ DevTools em desenvolvimento (focusable: false bloqueia before-input-event)
+	console.log('✅ Aplicação inicializada com sucesso');
+});
+
+/**
+ * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)
+ */
+function registerGlobalShortcuts() {
+	// 🛠️ DevTools em desenvolvimento
 	if (!app.isPackaged) {
 		globalShortcut.register('Control+Shift+I', () => {
 			mainWindow.webContents.toggleDevTools();
@@ -1364,7 +895,7 @@ app.whenReady().then(() => {
 		});
 	}
 
-	// Começar a ouvir / Parar de ouvir (Ctrl+D)
+	// Começar/parar de ouvir (Ctrl+D)
 	globalShortcut.register('Control+D', () => {
 		mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
 	});
@@ -1374,34 +905,34 @@ app.whenReady().then(() => {
 		mainWindow.webContents.send('CMD_ASK_GPT');
 	});
 
-	// Navegacao de perguntas (Ctrl+Shift+ArrowUp)
+	// Navegação de histórico de perguntas (Ctrl+Shift+ArrowUp)
 	globalShortcut.register('Control+Shift+Up', () => {
 		mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'up');
 	});
 
-	// Navegacao de perguntas (Ctrl+Shift+ArrowDown)
+	// Navegação de histórico de perguntas (Ctrl+Shift+ArrowDown)
 	globalShortcut.register('Control+Shift+Down', () => {
 		mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'down');
 	});
 
-	// 📸 Atalhos para screenshots
+	// 📸 Capturar screenshot (Ctrl+Shift+F)
 	globalShortcut.register('Control+Shift+F', () => {
 		mainWindow.webContents.send('CMD_CAPTURE_SCREENSHOT');
 	});
 
-	// 🔍 Atalho para analisar screenshots
+	// 🔍 Analisar screenshots (Ctrl+Shift+G)
 	globalShortcut.register('Control+Shift+G', () => {
 		mainWindow.webContents.send('CMD_ANALYZE_SCREENSHOTS');
 	});
 
-	console.log('✅ Atalhos de screenshot registrados');
-});
+	console.log('✅ Atalhos globais registrados');
+}
 
-/* ================================
-   FINALIZAÇÃO DO APP
-=============================== */
+/* ================================ */
+//	FINALIZAÇÃO DO APP
+/* ================================ */
+
 app.on('will-quit', () => {
 	globalShortcut.unregisterAll();
-	// 🔥 NOVO: Encerra servidor Whisper ao fechar app
-	stopWhisperServer();
+	console.log('👋 Aplicação encerrada');
 });
