@@ -23,7 +23,7 @@ const Logger = require('./utils/Logger.js');
 const STTStrategy = require('./strategies/STTStrategy.js');
 const LLMManager = require('./llm/LLMManager.js');
 const openaiHandler = require('./llm/handlers/openai-handler.js');
-const { validateLLMRequest, handleLLMStream, handleLLMBatch } = require('./handlers/llmHandlers.js');  // antigo validateAskGptRequest, handleAskGptStream, handleAskGptBatch
+const { validateLLMRequest, handleLLMStream, handleLLMBatch } = require('./handlers/llmHandlers.js');
 
 // 🎯 INSTANCIAR
 const appState = new AppState();
@@ -314,7 +314,7 @@ function registerUIElements(elements) {
 eventBus.on('audioDeviceChanged', async data => {
 	try {
 		const sttModel = getConfiguredSTTModel();
-		Logger.info('audioDeviceChanged', { model: sttModel, type: data.type });  // antigo onAudioDeviceChanged
+		Logger.info('audioDeviceChanged', { model: sttModel, type: data.type });
 
 		if (!data || !data.type) {
 			Logger.warn('Dados inválidos para mudança de dispositivo', data);
@@ -328,7 +328,7 @@ eventBus.on('audioDeviceChanged', async data => {
 
 		await sttStrategy.switchDevice(sttModel, data.type, data.deviceId);
 	} catch (error) {
-		Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });  // antigo console.error
+		Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });
 	}
 });
 
@@ -645,12 +645,12 @@ sttStrategy.register('whisper-1', {
  */
 async function startAudio() {
 	const sttModel = getConfiguredSTTModel();
-	Logger.info('startAudio', { model: sttModel });  // antigo debugLogRenderer
+	Logger.info('startAudio', { model: sttModel });
 
 	try {
 		await sttStrategy.start(sttModel, UIElements);
 	} catch (error) {
-		Logger.error('Erro ao iniciar áudio', { error: error.message });  // antigo console.error
+		Logger.error('Erro ao iniciar áudio', { error: error.message });
 		throw error;
 	}
 }
@@ -663,12 +663,12 @@ async function stopAudio() {
 	if (currentQuestion.text) closeCurrentQuestionForced();
 
 	const sttModel = getConfiguredSTTModel();
-	Logger.info('stopAudio', { model: sttModel });  // antigo debugLogRenderer
+	Logger.info('stopAudio', { model: sttModel });
 
 	try {
 		await sttStrategy.stop(sttModel);
 	} catch (error) {
-		Logger.error('Erro ao parar áudio', { error: error.message });  // antigo console.error
+		Logger.error('Erro ao parar áudio', { error: error.message });
 	}
 }
 
@@ -1050,7 +1050,7 @@ function closeCurrentQuestionForced() {
  * ✅ CENTRALIZADA: Uma única função para todos os LLMs
  * ✅ Não há duplicação de askLLM() por LLM
  */
-async function askLLM() {  // antigo askGpt()
+async function askLLM() {
 	try {
 		const CURRENT_QUESTION_ID = 'CURRENT';
 
@@ -1076,9 +1076,9 @@ async function askLLM() {  // antigo askGpt()
 		const isInterviewMode = ModeController.isInterviewMode();
 
 		if (isInterviewMode) {
-			await handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);  // antigo handleAskGptStream
+			await handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);
 		} else {
-			await handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);  // antigo handleAskGptBatch
+			await handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);
 		}
 		// O llmManager sabe qual LLM usar (OpenAI, Gemini, etc)
 		// Sem duplicação de código!

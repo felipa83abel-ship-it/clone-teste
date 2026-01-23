@@ -18,7 +18,7 @@ const Logger = require('../utils/Logger.js');
  * @throws {Error} Se validação falhar
  * @returns {Object} {questionId, text, isCurrent}
  */
-function validateLLMRequest(appState, questionId, getSelectedQuestionText) {  // antigo validateAskGptRequest
+function validateLLMRequest(appState, questionId, getSelectedQuestionText) {
 	const CURRENT_QUESTION_ID = 'CURRENT';
 	const text = getSelectedQuestionText();
 	const isCurrent = questionId === CURRENT_QUESTION_ID;
@@ -50,7 +50,7 @@ function validateLLMRequest(appState, questionId, getSelectedQuestionText) {  //
 /**
  * Manipula resposta em modo streaming (entrevista)
  */
-async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {  // antigo handleAskGptStream
+async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
 	Logger.info('Iniciando stream LLM', { questionId, textLength: text.length });
 
 	let streamedText = '';
@@ -102,7 +102,7 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 /**
  * Manipula resposta em modo batch (normal)
  */
-async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {  // antigo handleAskGptBatch
+async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
 	Logger.info('Iniciando batch LLM', { questionId, textLength: text.length });
 
 	appState.metrics.gptStartTime = Date.now();
@@ -135,7 +135,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 }
 
 module.exports = {
-	validateLLMRequest,  // antigo validateAskGptRequest
-	handleLLMStream,  // antigo handleAskGptStream
-	handleLLMBatch,  // antigo handleAskGptBatch
+	validateLLMRequest,
+	handleLLMStream,
+	handleLLMBatch,
 };
