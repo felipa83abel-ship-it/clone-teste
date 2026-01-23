@@ -20,7 +20,7 @@
 
 const { spawn } = require('node:child_process');
 const path = require('node:path');
-const { getVADEngine } = require('../vad-engine');
+const { getVADEngine } = require('./vad-engine');
 
 /* ================================ */
 //	CONSTANTES
@@ -230,7 +230,7 @@ function initVoskProcess(source) {
 	debugLogVosk(`🚀 Iniciando Vosk (${source}) com modelo: ${VOSK_CONFIG.MODEL}...`, true);
 
 	vars._voskProcess = spawn('python', ['server-vosk.py', VOSK_CONFIG.MODEL], {
-		cwd: path.join(__dirname, '..'),  // server-vosk.py está na raiz, não em stt/
+		cwd: __dirname, // server-vosk.py agora está em stt/
 		stdio: ['pipe', 'pipe', 'pipe'],
 	});
 
