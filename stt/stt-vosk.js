@@ -42,7 +42,7 @@ const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
 const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 // Configuração Vosk
-const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || 'vosk-models/vosk-model-small-pt-0.3' };
+const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || '../vosk-models/vosk-model-small-pt-0.3' };
 
 /* ================================ */
 //	ESTADO GLOBAL DO VOSK
@@ -472,14 +472,14 @@ async function onAudioChunkVosk(source, data, vars) {
 			audio: audioBase64,
 		};
 
-	// Envia direto ao Vosk via stdin (não IPC!)
-	// ⚠️ Verifica se o processo ainda está vivo
-	if (!vars._voskProcess || !vars._voskProcess.stdin) {
-		console.warn(`⚠️ Processo Vosk não está disponível, ignorando chunk`);
-		return;
-	}
+		// Envia direto ao Vosk via stdin (não IPC!)
+		// ⚠️ Verifica se o processo ainda está vivo
+		if (!vars._voskProcess || !vars._voskProcess.stdin) {
+			console.warn(`⚠️ Processo Vosk não está disponível, ignorando chunk`);
+			return;
+		}
 
-	vars._voskProcess.stdin.write(JSON.stringify(msg) + '\n');
+		vars._voskProcess.stdin.write(JSON.stringify(msg) + '\n');
 	} catch (error) {
 		console.error(`❌ Erro ao enviar chunk ao Vosk:`, error);
 	}
