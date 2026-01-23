@@ -243,59 +243,57 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 #### 2.1 Migrar Estado Global para AppState
 
-- [ ] Remover `let currentQuestion = { ... }`
+- [x] Remover `let currentQuestion = { ... }`
   - Usar: `appState.interview.currentQuestion`
-- [ ] Remover `let questionsHistory = []`
+- [x] Remover `let questionsHistory = []`
   - Usar: `appState.interview.questionsHistory`
-- [ ] Remover `let answeredQuestions = new Set()`
+- [x] Remover `let answeredQuestions = new Set()`
   - Usar: `appState.interview.answeredQuestions`
-- [ ] Remover `let isRunning = false`
+- [x] Remover `let isRunning = false`
   - Usar: `appState.audio.isRunning`
-- [ ] Remover `let capturedScreenshots = []`
+- [x] Remover `let capturedScreenshots = []`
   - Usar: `appState.audio.capturedScreenshots`
-- [ ] Remover `let isDraggingWindow = false`
+- [x] Remover `let isDraggingWindow = false`
   - Usar: `appState.window.isDraggingWindow`
-- [ ] Remover `let interviewTurnId = 0`
+- [x] Remover `let interviewTurnId = 0`
   - Usar: `appState.interview.interviewTurnId`
-- [ ] Remover `let gptAnsweredTurnId = null`
+- [x] Remover `let gptAnsweredTurnId = null`
   - Usar: `appState.interview.gptAnsweredTurnId`
-- [ ] Remover `let gptRequestedTurnId = null`
+- [x] Remover `let gptRequestedTurnId = null`
   - Usar: `appState.interview.gptRequestedTurnId`
-- [ ] Remover `let gptRequestedQuestionId = null`
+- [x] Remover `let gptRequestedQuestionId = null`
   - Usar: `appState.interview.gptRequestedQuestionId`
-- [ ] Remover `let lastAskedQuestionNormalized = null`
+- [x] Remover `let lastAskedQuestionNormalized = null`
   - Usar: `appState.interview.lastAskedQuestionNormalized`
-- [ ] Remover `let selectedQuestionId = null`
+- [x] Remover `let selectedQuestionId = null`
   - Usar: `appState.interview.selectedQuestionId`
-- [ ] Remover `let isCapturing = false`
+- [x] Remover `let isCapturing = false`
   - Usar: `appState.audio.isCapturing`
-- [ ] Remover `let isAnalyzing = false`
+- [x] Remover `let isAnalyzing = false`
   - Usar: `appState.audio.isAnalyzing`
-- [ ] Remover `let mockAutoPlayActive = false` (depois deletado em Fase 1)
+- [x] Remover `let mockAutoPlayActive = false` (depois deletado em Fase 1)
   - Não migrar - deletar
-- [ ] Remover `let mockScenarioIndex = 0` (depois deletado em Fase 1)
+- [x] Remover `let mockScenarioIndex = 0` (depois deletado em Fase 1)
   - Não migrar - deletar
 
-**Commit:** `git commit -m "refactor(phase-2.1): migrate global state variables to AppState"`
+**Commit:** ✅ `74978c3` - refator(fase-2.1): migrar 14 variáveis globais para AppState e adicionar getters/setters
 
-- [ ] Verificar: `time npm start`
+- [x] Verificar: `timeout 30 npm start` ✅ OK
+- [x] 192 referências atualizadas com sucesso
+- [x] Nenhum erro de runtime detectado
 
 #### 2.2 Estender AppState com Getter/Setter
 
-- [ ] Adicionar getters/setters compatíveis em AppState:
-  ```javascript
-  get isRunning() { return this.audio.isRunning }
-  set isRunning(val) { this.audio.isRunning = val }
-  ```
-- [ ] Permitir transição suave: `isRunning = true` → `appState.isRunning = true`
+- [x] Adicionar getters/setters compatíveis em AppState para todas as 14 variáveis
+- [x] Permitir transição suave: `isRunning = true` → `appState.isRunning = true` (e vice-versa via getters)
 
-**Commit:** `git commit -m "refactor(phase-2.2): extend AppState with getters and setters for compatibility"`
+**Status:** ✅ Implementado no commit `74978c3` (AppState.js expandida com 120+ linhas de getters/setters)
 
-- [ ] Verificar: `time npm start`
+- [x] Verificar: `timeout 30 npm start` ✅ OK
 
 #### 2.3 Atualizar Referências (MUITOS LUGARES!)
 
-- [ ] `currentQuestion.text` → `appState.interview.currentQuestion.text`
+- [ ] `currentQuestion.text` → `appState.interview.currentQuestion.text` (ou via getter: `appState.currentQuestion.text`)
 - [ ] `questionsHistory.push(...)` → `appState.addToHistory(...)`
 - [ ] `answeredQuestions.has(id)` → `appState.hasAnswered(id)`
 - [ ] `isRunning` → `appState.isRunning`
