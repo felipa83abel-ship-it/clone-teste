@@ -50,8 +50,8 @@ function validateLLMRequest(appState, questionId, getSelectedQuestionText) {
 /**
  * Manipula resposta em modo streaming (entrevista)
  */
-async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
-	Logger.info('Iniciando stream LLM', { questionId, textLength: text.length });
+async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager, turnId = null) {
+	Logger.info('Iniciando stream LLM', { questionId, textLength: text.length, turnId });
 
 	let streamedText = '';
 	appState.metrics.gptStartTime = Date.now();
@@ -76,6 +76,7 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 
 			eventBus.emit('answerStreamChunk', {
 				questionId,
+				turnId, // 🔥 Incluir turnId para UI
 				token,
 				accum: streamedText,
 			});

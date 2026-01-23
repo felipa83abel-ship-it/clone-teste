@@ -1,10 +1,13 @@
 # Teste Modo Entrevista - Fix isBeingAnswered
 
 ## Objetivo
+
 Validar que o modo entrevista funciona corretamente com múltiplas perguntas, evitando que áudio simultâneo corrompa o CURRENT durante a resposta do GPT.
 
 ## Cenário Teste 1: Pergunta Simples
+
 **Passos:**
+
 1. Iniciar app em modo entrevista (botão ou atalho)
 2. Falar: "Qual é o seu nome?"
 3. Detectar silêncio (VAD)
@@ -18,7 +21,9 @@ Validar que o modo entrevista funciona corretamente com múltiplas perguntas, ev
    - ✓ CURRENT é limpo para próxima pergunta
 
 ## Cenário Teste 2: Duas Perguntas Consecutivas
+
 **Passos:**
+
 1. Completar Teste 1
 2. Falar: "Qual é a sua idade?"
 3. Detectar silêncio
@@ -32,7 +37,9 @@ Validar que o modo entrevista funciona corretamente com múltiplas perguntas, ev
    - ✓ Sem erro "pergunta já finalizada"
 
 ## Cenário Teste 3: Múltiplas Perguntas (3+)
+
 **Passos:**
+
 1. Completar Teste 1 e 2
 2. Falar: "Qual é o seu hobby?"
 3. Detectar silêncio
@@ -45,7 +52,9 @@ Validar que o modo entrevista funciona corretamente com múltiplas perguntas, ev
    - ✓ Sem erros nos logs
 
 ## Cenário Teste 4: Ruído/Áudio Simultâneo
+
 **Passos:**
+
 1. Em entrevista, falar pergunta 1: "Teste um"
 2. VAD detecta silêncio, GPT começa responder
 3. **ENQUANTO GPT responde**, gerar áudio extra:
@@ -61,6 +70,7 @@ Validar que o modo entrevista funciona corretamente com múltiplas perguntas, ev
    - ✓ Promoção ocorre com texto correto
 
 ## Logs Esperados (Sequência Teste 2)
+
 ```
 🟢 ********  Está em silêncio                           [pergunta 1]
 ⏳ Iniciando stream LLM
@@ -78,6 +88,7 @@ Validar que o modo entrevista funciona corretamente com múltiplas perguntas, ev
 ```
 
 ## Status: EM TESTE
+
 Data Início: 2025-01-23
 Flag: isBeingAnswered adicionado a todas as 4 inicializações de currentQuestion
 Commit: a59182f

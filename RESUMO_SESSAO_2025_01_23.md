@@ -3,6 +3,7 @@
 ## Data: 2025-01-23
 
 ### Sumário Executivo
+
 - ✅ **Refatoração 100% funcional** (12 commits iniciais validados)
 - ✅ **Bugs críticos corrigidos** (7 commits de bug fix)
 - ✅ **Arquivos reorganizados** (stt/, audio/ - 4 commits)
@@ -15,7 +16,9 @@
 ## Progressão Detalhada
 
 ### Fase 1: Validação de Refatoração ✅
+
 **Status**: Completado - 12 commits de refatoração confirmados
+
 - Conversão CommonJS completa
 - Estrutura AppState + Classes implementada
 - Handlers IPC reorganizados
@@ -26,24 +29,27 @@
 ---
 
 ### Fase 2: Correção de Bugs Críticos de Startup ✅
+
 **Total de 7 commits:**
 
-| Commit | Fix | Status |
-|--------|-----|--------|
-| fbea6da | vad-engine imports → `./vad-engine` | ✅ |
-| 377ef67 | askGpt → askLLM referências | ✅ |
-| 95fb7e9 | Vosk server path corrigido | ✅ |
-| fc1cd67 | Whisper.cpp paths relativo | ✅ |
-| 4e96357 | AudioWorklet paths relativo | ✅ |
-| 36a70fb | Vosk stdin protegido | ✅ |
-| 7f32ab4 | Vosk model path ../vosk-models | ✅ |
+| Commit  | Fix                                 | Status |
+| ------- | ----------------------------------- | ------ |
+| fbea6da | vad-engine imports → `./vad-engine` | ✅     |
+| 377ef67 | askGpt → askLLM referências         | ✅     |
+| 95fb7e9 | Vosk server path corrigido          | ✅     |
+| fc1cd67 | Whisper.cpp paths relativo          | ✅     |
+| 4e96357 | AudioWorklet paths relativo         | ✅     |
+| 36a70fb | Vosk stdin protegido                | ✅     |
+| 7f32ab4 | Vosk model path ../vosk-models      | ✅     |
 
 **Resultado**: ✅ App starts, Vosk carrega modelo, áudio capturado
 
 ---
 
 ### Fase 3: Reorganização de Arquivos ✅
+
 **Estrutura antes:**
+
 ```
 . (raiz)
 ├── stt-vosk.js
@@ -56,6 +62,7 @@
 ```
 
 **Estrutura depois:**
+
 ```
 . (raiz)
 ├── stt/
@@ -72,6 +79,7 @@
 ```
 
 **Commits:**
+
 - 17c7af9: Updates imports após reorganização
 - 4e96357: Fix AudioWorklet paths
 - 36a70fb: Protect Vosk stdin
@@ -82,7 +90,9 @@
 ---
 
 ### Fase 4: Testes e Modo Normal ✅
+
 **Teste de Silence Detection:**
+
 ```
 [VAD rodando]
 ➜ Silêncio detectado (>700ms)
@@ -94,6 +104,7 @@
 ```
 
 **Commit d910045**: Fix CURRENT cleanup em modo normal
+
 - Adicionado `renderCurrentQuestion()` após promoção
 - CURRENT mostra vazio após resposta
 
@@ -104,6 +115,7 @@
 ### Fase 5: Modo Entrevista - Issue Discovery ❌ → Fix ✅
 
 #### Problema Identificado
+
 ```
 Pergunta 1: ✅ Finalized → GPT responde → Promovida ao histórico
 Pergunta 2: ❌ "pergunta já finalizada"
@@ -112,9 +124,11 @@ Pergunta 2: ❌ "pergunta já finalizada"
 ```
 
 #### Root Cause Analysis
+
 Enquanto GPT responde a pergunta 1:
+
 1. Áudio simultâneo chega (pergunta 2 iniciando)
-2. `handleCurrentQuestion()` atualiza `currentQuestion.text` 
+2. `handleCurrentQuestion()` atualiza `currentQuestion.text`
 3. `llmStreamEnd` tenta promover, mas texto agora é da pergunta 2
 4. Promoção acontece com texto misturado/incorreto
 5. Próxima pergunta tenta finalizar mas `finalized = true` ainda está ativo
@@ -122,6 +136,7 @@ Enquanto GPT responde a pergunta 1:
 #### Solução Implementada
 
 **Commit a59182f**: Flag `isBeingAnswered` para pausar updates
+
 ```javascript
 // 1. Inicializar flag
 let currentQuestion = {
@@ -142,10 +157,12 @@ currentQuestion.isBeingAnswered = false;  // RESUME
 ```
 
 **Commits:**
+
 - a59182f: Adicionar flag isBeingAnswered
 - 034165d: Docs com testes e análise
 
 **Fluxo resultante (esperado):**
+
 ```
 Pergunta 1 → Finalize (isBeingAnswered=true)
            → GPT responde
@@ -181,6 +198,7 @@ d910045 fix: garantir renderCurrentQuestion ao promover no modo normal para limp
 ## Status Atual
 
 ### ✅ Completo
+
 - App inicia sem erros
 - Vosk carrega modelo e captura áudio
 - Whisper funciona
@@ -189,11 +207,13 @@ d910045 fix: garantir renderCurrentQuestion ao promover no modo normal para limp
 - Documentação de código
 
 ### ⏳ Pendente Teste
+
 - Modo entrevista com flag isBeingAnswered (4+ perguntas)
 - Teste de ruído simultâneo
 - Teste de múltiplos STT
 
 ### 🔮 Próximos Passos (FASE 4-5)
+
 - [ ] TESTE ENTREVISTA COMPLETO
 - [ ] FASE 4: Template Gemini (se não implementado)
 - [ ] FASE 5: Cleanup final e documentação
@@ -202,6 +222,7 @@ d910045 fix: garantir renderCurrentQuestion ao promover no modo normal para limp
 ---
 
 ## Dependências Verificadas
+
 ```json
 {
   "electron": "^39.2.7",       ✅
@@ -219,32 +240,35 @@ d910045 fix: garantir renderCurrentQuestion ao promover no modo normal para limp
 
 ## Métricas
 
-| Métrica | Valor |
-|---------|-------|
-| Total Commits | 13 |
-| Bugs Corrigidos | 7 |
-| Arquivos Reorganizados | 5 |
-| Imports Atualizados | 20+ |
-| Inicializações de Objects | 4 |
-| Linhas de Código (fixes) | ~50 |
-| Arquivos Documentação | 3 |
+| Métrica                   | Valor |
+| ------------------------- | ----- |
+| Total Commits             | 13    |
+| Bugs Corrigidos           | 7     |
+| Arquivos Reorganizados    | 5     |
+| Imports Atualizados       | 20+   |
+| Inicializações de Objects | 4     |
+| Linhas de Código (fixes)  | ~50   |
+| Arquivos Documentação     | 3     |
 
 ---
 
 ## Notas Técnicas
 
 ### Padrões Utilizados
+
 - **IPC Communication**: main ↔ renderer via invoke/handle
 - **EventBus**: Comunicação entre componentes (Observer pattern)
 - **State Management**: AppState + currentQuestion object
 - **Async Handling**: async/await, Promises, streaming
 
 ### Segurança
+
 - API Keys: Armazenadas encriptadas via electron-store
 - Sandbox: contextIsolation=false (considerar migrar para contextBridge)
 - Validação: Input sanitization em transcrição
 
 ### Performance
+
 - Streaming: GPT respostas em tempo real
 - AudioWorklets: Processamento de áudio off-thread
 - VAD: Detecção local de voz/silêncio (não requer server)
