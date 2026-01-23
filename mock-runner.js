@@ -1,9 +1,9 @@
 /**
  * MOCK RUNNER - Sistema de testes automatizados
- * 
+ *
  * Isolado de renderer.js para facilitar remoção em produção
  * Ativado apenas quando APP_CONFIG.MODE_DEBUG === true
- * 
+ *
  * Responsabilidades:
  * - Simular perguntas e respostas de IA
  * - Interceptar IPC para ANALYZE_SCREENSHOTS e ask-gpt-stream
@@ -93,7 +93,7 @@ async function runMockAutoPlay() {
 	}
 
 	const { emitUIChange, captureScreenshot, analyzeScreenshots, APP_CONFIG } = rendererContext;
-	
+
 	mockAutoPlayActive = true;
 
 	while (mockScenarioIndex < MOCK_SCENARIOS.length && APP_CONFIG.MODE_DEBUG && mockAutoPlayActive) {
@@ -234,9 +234,9 @@ async function runMockAutoPlay() {
 function initMockInterceptor(context) {
 	// Define o contexto do renderer
 	setRendererContext(context);
-	
+
 	const { ipcRenderer } = require('electron');
-	
+
 	const originalInvoke = ipcRenderer.invoke;
 	ipcRenderer.invoke = function (channel, ...args) {
 		// Intercepta análise de screenshots quando MODE_DEBUG

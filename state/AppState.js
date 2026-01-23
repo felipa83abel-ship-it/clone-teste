@@ -45,7 +45,11 @@ class AppState {
 		};
 	}
 
-	// Getters para compatibilidade
+	// ============================================
+	// GETTERS / SETTERS PARA COMPATIBILIDADE
+	// ============================================
+	
+	// Audio state getters/setters
 	get isRunning() {
 		return this.audio.isRunning;
 	}
@@ -54,7 +58,116 @@ class AppState {
 		this.audio.isRunning = value;
 	}
 
-	// Helpers comuns
+	get capturedScreenshots() {
+		return this.audio.capturedScreenshots;
+	}
+
+	set capturedScreenshots(value) {
+		this.audio.capturedScreenshots = value;
+	}
+
+	get isCapturing() {
+		return this.audio.isCapturing;
+	}
+
+	set isCapturing(value) {
+		this.audio.isCapturing = value;
+	}
+
+	get isAnalyzing() {
+		return this.audio.isAnalyzing;
+	}
+
+	set isAnalyzing(value) {
+		this.audio.isAnalyzing = value;
+	}
+
+	// Window state getters/setters
+	get isDraggingWindow() {
+		return this.window.isDraggingWindow;
+	}
+
+	set isDraggingWindow(value) {
+		this.window.isDraggingWindow = value;
+	}
+
+	// Interview state getters/setters
+	get currentQuestion() {
+		return this.interview.currentQuestion;
+	}
+
+	set currentQuestion(value) {
+		this.interview.currentQuestion = value;
+	}
+
+	get questionsHistory() {
+		return this.interview.questionsHistory;
+	}
+
+	set questionsHistory(value) {
+		this.interview.questionsHistory = value;
+	}
+
+	get selectedQuestionId() {
+		return this.interview.selectedQuestionId;
+	}
+
+	set selectedQuestionId(value) {
+		this.interview.selectedQuestionId = value;
+	}
+
+	get interviewTurnId() {
+		return this.interview.interviewTurnId;
+	}
+
+	set interviewTurnId(value) {
+		this.interview.interviewTurnId = value;
+	}
+
+	get gptAnsweredTurnId() {
+		return this.interview.gptAnsweredTurnId;
+	}
+
+	set gptAnsweredTurnId(value) {
+		this.interview.gptAnsweredTurnId = value;
+	}
+
+	get gptRequestedTurnId() {
+		return this.interview.gptRequestedTurnId;
+	}
+
+	set gptRequestedTurnId(value) {
+		this.interview.gptRequestedTurnId = value;
+	}
+
+	get gptRequestedQuestionId() {
+		return this.interview.gptRequestedQuestionId;
+	}
+
+	set gptRequestedQuestionId(value) {
+		this.interview.gptRequestedQuestionId = value;
+	}
+
+	get lastAskedQuestionNormalized() {
+		return this.interview.lastAskedQuestionNormalized;
+	}
+
+	set lastAskedQuestionNormalized(value) {
+		this.interview.lastAskedQuestionNormalized = value;
+	}
+
+	// Metrics getter/setter
+	get transcriptionMetrics() {
+		return this.metrics;
+	}
+
+	set transcriptionMetrics(value) {
+		this.metrics = value;
+	}
+
+	// ============================================
+	// MÉTODOS AUXILIARES
+	// ============================================
 	getCurrentQuestion() {
 		return this.interview.currentQuestion;
 	}

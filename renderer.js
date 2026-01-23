@@ -57,7 +57,7 @@ eventBus.on('llmStreamEnd', data => {
 	// 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
 	// Aqui só limpamos o CURRENT para próxima pergunta
 	if (ModeController.isInterviewMode()) {
-		gptAnsweredTurnId = interviewTurnId;
+		appState.interview.gptAnsweredTurnId = appState.interview.interviewTurnId;
 		resetCurrentQuestion();
 		renderCurrentQuestion();
 	}
@@ -179,18 +179,18 @@ let APP_CONFIG = {
 };
 
 // Estado de execução do STT
-let isRunning = false;
+let appState.audio.isRunning = false;
 
 // Screenshots capturados
-let capturedScreenshots = []; // Array de { filepath, filename, timestamp }
-let isCapturing = false;
-let isAnalyzing = false;
+let appState.audio.capturedScreenshots = []; // Array de { filepath, filename, timestamp }
+let appState.audio.isCapturing = false;
+let appState.audio.isAnalyzing = false;
 
 // Drag and Drop da janela
-let isDraggingWindow = false;
+let appState.window.isDraggingWindow = false;
 
 // 🔥 MODIFICADO: STT model vem da config agora (removido USE_LOCAL_WHISPER)
-let transcriptionMetrics = {
+let appState.metrics = {
 	audioStartTime: null,
 	gptStartTime: null,
 	gptFirstTokenTime: null,
@@ -204,7 +204,7 @@ let transcriptionMetrics = {
 // quando usuário está na seção "Áudio e Tela" (sem transcrição ativa)
 
 /* 🧠 PERGUNTAS */
-let currentQuestion = {
+let appState.interview.currentQuestion = {
 	text: '',
 	lastUpdate: 0,
 	finalized: false,
@@ -215,14 +215,14 @@ let currentQuestion = {
 	finalText: '',
 	interimText: '',
 };
-let questionsHistory = [];
+let appState.interview.questionsHistory = [];
 const answeredQuestions = new Set(); // 🔒 Armazena respostas já geradas (questionId -> true)
-let selectedQuestionId = null;
-let interviewTurnId = 0;
-let gptAnsweredTurnId = null;
-let gptRequestedTurnId = null;
-let gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta foi realmente solicitada ao GPT
-let lastAskedQuestionNormalized = null;
+let appState.interview.selectedQuestionId = null;
+let appState.interview.interviewTurnId = 0;
+let appState.interview.gptAnsweredTurnId = null;
+let appState.interview.gptRequestedTurnId = null;
+let appState.interview.gptRequestedQuestionId = null; // 🔥 [IMPORTANTE] Rastreia QUAL pergunta foi realmente solicitada ao GPT
+let appState.interview.lastAskedQuestionNormalized = null;
 
 /* ================================ */
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
@@ -342,7 +342,7 @@ eventBus.on('audioDeviceChanged', async data => {
 			return;
 		}
 
-		if (!isRunning) {
+		if (!appState.audio.isRunning) {
 			Logger.warn('STT não está ativo, ignorando mudança de dispositivo');
 			return;
 		}
@@ -403,7 +403,7 @@ function finalizeQuestion(t) {
 function resetCurrentQuestion() {
 	Logger.debug('Início da função: "resetCurrentQuestion"');
 
-	currentQuestion = {
+	appState.interview.currentQuestion = {
 		text: '',
 		lastUpdate: 0,
 		finalized: false,
@@ -425,7 +425,7 @@ function renderQuestionsHistory() {
 	Logger.debug('Início da função: "renderQuestionsHistory"');
 
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
-	const historyData = [...questionsHistory].reverse().map(q => {
+	const historyData = [...appState.interview.questionsHistory].reverse().map(q => {
 		let label = q.text;
 		if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && q.lastUpdateTime) {
 			const time = new Date(q.lastUpdateTime).toLocaleTimeString();
@@ -438,7 +438,7 @@ function renderQuestionsHistory() {
 			text: label,
 			isIncomplete: q.incomplete,
 			isAnswered: q.answered,
-			isSelected: q.id === selectedQuestionId,
+			isSelected: q.id === appState.interview.selectedQuestionId,
 		};
 	});
 
@@ -458,18 +458,18 @@ function getSelectedQuestionText() {
 	Logger.debug('Fim da função: "getSelectedQuestionText"');
 
 	// 1️⃣ Se existe seleção explícita
-	if (selectedQuestionId === CURRENT_QUESTION_ID) {
-		return currentQuestion.text;
+	if (appState.interview.selectedQuestionId === CURRENT_QUESTION_ID) {
+		return appState.interview.currentQuestion.text;
 	}
 
-	if (selectedQuestionId) {
-		const q = questionsHistory.find(q => q.id === selectedQuestionId);
+	if (appState.interview.selectedQuestionId) {
+		const q = appState.interview.questionsHistory.find(q => q.id === appState.interview.selectedQuestionId);
 		if (q?.text) return q.text;
 	}
 
 	// 2️⃣ Fallback: CURRENT (se tiver texto)
-	if (currentQuestion.text && currentQuestion.text.trim().length > 0) {
-		return currentQuestion.text;
+	if (appState.interview.currentQuestion.text && appState.interview.currentQuestion.text.trim().length > 0) {
+		return appState.interview.currentQuestion.text;
 	}
 
 	return '';
@@ -593,7 +593,7 @@ async function startAudio() {
  */
 async function stopAudio() {
 	// Fecha pergunta atual se estava aberta
-	if (currentQuestion.text) closeCurrentQuestionForced();
+	if (appState.interview.currentQuestion.text) closeCurrentQuestionForced();
 
 	const sttModel = getConfiguredSTTModel();
 	Logger.info('stopAudio', { model: sttModel });
@@ -615,7 +615,7 @@ async function stopAudio() {
 async function listenToggleBtn() {
 	Logger.debug('Início da função: "listenToggleBtn"');
 
-	if (!isRunning) {
+	if (!appState.audio.isRunning) {
 		console.log('🎤 listenToggleBtn: Tentando INICIAR escuta...');
 
 		// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
@@ -642,21 +642,21 @@ async function listenToggleBtn() {
 		}
 	}
 
-	// Inverte o estado de isRunning
-	isRunning = !isRunning;
-	const buttonText = isRunning ? 'Parar a Escuta... (Ctrl+d)' : 'Começar a Ouvir... (Ctrl+d)';
-	const statusMsg = isRunning ? 'Status: ouvindo...' : 'Status: parado';
+	// Inverte o estado de appState.audio.isRunning
+	appState.audio.isRunning = !appState.audio.isRunning;
+	const buttonText = appState.audio.isRunning ? 'Parar a Escuta... (Ctrl+d)' : 'Começar a Ouvir... (Ctrl+d)';
+	const statusMsg = appState.audio.isRunning ? 'Status: ouvindo...' : 'Status: parado';
 
 	// Emite o evento 'onListenButtonToggle' para atualizar o botão de escuta
 	emitUIChange('onListenButtonToggle', {
-		isRunning,
+		appState.audio.isRunning,
 		buttonText,
 	});
 
 	// Atualiza o status da escuta na tela
 	updateStatusMessage(statusMsg);
 
-	await (isRunning ? startAudio() : stopAudio());
+	await (appState.audio.isRunning ? startAudio() : stopAudio());
 
 	Logger.debug('Fim da função: "listenToggleBtn"');
 }
@@ -704,26 +704,26 @@ function renderCurrentQuestion() {
 	Logger.debug('Início da função: "renderCurrentQuestion"');
 
 	// Se não há texto, emite vazio
-	if (!currentQuestion.text) {
+	if (!appState.interview.currentQuestion.text) {
 		emitUIChange('onCurrentQuestionUpdate', { text: '', isSelected: false });
 		return;
 	}
 
-	let label = currentQuestion.text;
+	let label = appState.interview.currentQuestion.text;
 
 	// Adiciona timestamp se modo debug métricas ativo
-	if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && currentQuestion.lastUpdateTime) {
-		const time = new Date(currentQuestion.lastUpdateTime).toLocaleTimeString();
+	if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && appState.interview.currentQuestion.lastUpdateTime) {
+		const time = new Date(appState.interview.currentQuestion.lastUpdateTime).toLocaleTimeString();
 		label = `⏱️ ${time} — ${label}`;
 	}
 
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const questionData = {
 		text: label,
-		isSelected: selectedQuestionId === CURRENT_QUESTION_ID,
-		rawText: currentQuestion.text,
-		createdAt: currentQuestion.createdAt,
-		lastUpdateTime: currentQuestion.lastUpdateTime,
+		isSelected: appState.interview.selectedQuestionId === CURRENT_QUESTION_ID,
+		rawText: appState.interview.currentQuestion.text,
+		createdAt: appState.interview.currentQuestion.createdAt,
+		lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime,
 	};
 
 	// Emite evento para o config-manager renderizar no DOM
@@ -738,7 +738,7 @@ function renderCurrentQuestion() {
  */
 function handleQuestionClick(questionId) {
 	Logger.debug('Início da função: "handleQuestionClick"');
-	selectedQuestionId = questionId;
+	appState.interview.selectedQuestionId = questionId;
 	clearAllSelections();
 	renderQuestionsHistory();
 	renderCurrentQuestion();
@@ -761,7 +761,7 @@ function handleQuestionClick(questionId) {
 
 	// Se for uma pergunta do histórico marcada como incompleta, não enviar automaticamente ao GPT
 	if (questionId !== CURRENT_QUESTION_ID) {
-		const q = questionsHistory.find(q => q.id === questionId);
+		const q = appState.interview.questionsHistory.find(q => q.id === questionId);
 		if (q && q.incomplete) {
 			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
@@ -772,8 +772,8 @@ function handleQuestionClick(questionId) {
 
 	if (
 		ModeController.isInterviewMode() &&
-		selectedQuestionId === CURRENT_QUESTION_ID &&
-		gptAnsweredTurnId === interviewTurnId
+		appState.interview.selectedQuestionId === CURRENT_QUESTION_ID &&
+		appState.interview.gptAnsweredTurnId === appState.interview.interviewTurnId
 	) {
 		updateStatusMessage('⛔ GPT já respondeu esse turno');
 		console.log('⛔ GPT já respondeu esse turno');
@@ -784,34 +784,34 @@ function handleQuestionClick(questionId) {
 	// ❓ Ainda não respondida → promover CURRENT se necessário e chamar GPT
 	// 🔥 Se for CURRENT, promover para histórico ANTES de chamar askLLM
 	if (questionId === CURRENT_QUESTION_ID) {
-		if (!currentQuestion.text || !currentQuestion.text.trim()) {
+		if (!appState.interview.currentQuestion.text || !appState.interview.currentQuestion.text.trim()) {
 			updateStatusMessage('⚠️ Pergunta vazia - nada a responder');
 			Logger.debug('Fim da função: "handleQuestionClick" (pergunta vazia)');
 			return;
 		}
 
 		// Promover CURRENT para histórico se ainda não foi promovido
-		if (!currentQuestion.finalized) {
-			currentQuestion.text = finalizeQuestion(currentQuestion.text);
-			currentQuestion.lastUpdateTime = Date.now();
-			currentQuestion.finalized = true;
+		if (!appState.interview.currentQuestion.finalized) {
+			appState.interview.currentQuestion.text = finalizeQuestion(appState.interview.currentQuestion.text);
+			appState.interview.currentQuestion.lastUpdateTime = Date.now();
+			appState.interview.currentQuestion.finalized = true;
 
 			// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
-			interviewTurnId++;
-			currentQuestion.turnId = interviewTurnId;
+			appState.interview.interviewTurnId++;
+			appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
 
-			const newId = String(questionsHistory.length + 1);
-			questionsHistory.push({
+			const newId = String(appState.interview.questionsHistory.length + 1);
+			appState.interview.questionsHistory.push({
 				id: newId,
-				text: currentQuestion.text,
-				turnId: currentQuestion.turnId,
-				createdAt: currentQuestion.createdAt || Date.now(),
-				lastUpdateTime: currentQuestion.lastUpdateTime || Date.now(),
+				text: appState.interview.currentQuestion.text,
+				turnId: appState.interview.currentQuestion.turnId,
+				createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
+				lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || Date.now(),
 			});
 
-			currentQuestion.promotedToHistory = true;
+			appState.interview.currentQuestion.promotedToHistory = true;
 			resetCurrentQuestion();
-			selectedQuestionId = newId;
+			appState.interview.selectedQuestionId = newId;
 			renderQuestionsHistory();
 			renderCurrentQuestion();
 
@@ -841,7 +841,7 @@ function handleQuestionClick(questionId) {
  */
 function scrollToSelectedQuestion() {
 	emitUIChange('onScrollToQuestion', {
-		questionId: selectedQuestionId,
+		questionId: appState.interview.selectedQuestionId,
 	});
 }
 
@@ -882,37 +882,37 @@ function handleCurrentQuestion(author, text, options = {}) {
 	// Apenas consolida falas no CURRENT do OTHER
 	if (author === OTHER) {
 		// Se não existe texto ainda, marca tempo de criação
-		if (!currentQuestion.text) {
-			currentQuestion.createdAt = now;
+		if (!appState.interview.currentQuestion.text) {
+			appState.interview.currentQuestion.createdAt = now;
 			// 🔥 NÃO incrementa turnId aqui - será feito ao promover para histórico
 		}
 
-		currentQuestion.lastUpdateTime = now;
-		currentQuestion.lastUpdate = now;
+		appState.interview.currentQuestion.lastUpdateTime = now;
+		appState.interview.currentQuestion.lastUpdate = now;
 
-		Logger.debug('currentQuestion antes: ', { ...currentQuestion }, false);
+		Logger.debug('appState.interview.currentQuestion antes: ', { ...appState.interview.currentQuestion }, false);
 
 		// Lógica de consolidação para evitar duplicações
 		if (options.isInterim) {
 			// Para interims: substituir o interim atual (Deepgram envia versões progressivas)
-			currentQuestion.interimText = cleaned;
+			appState.interview.currentQuestion.interimText = cleaned;
 		} else {
 			// Para finais: limpar interim e ACUMULAR no finalText
-			currentQuestion.interimText = '';
-			currentQuestion.finalText = (currentQuestion.finalText ? currentQuestion.finalText + ' ' : '') + cleaned;
+			appState.interview.currentQuestion.interimText = '';
+			appState.interview.currentQuestion.finalText = (appState.interview.currentQuestion.finalText ? appState.interview.currentQuestion.finalText + ' ' : '') + cleaned;
 		}
 
-		Logger.debug('currentQuestion durante: ', { ...currentQuestion }, false);
+		Logger.debug('appState.interview.currentQuestion durante: ', { ...appState.interview.currentQuestion }, false);
 
 		// Atualizar o texto total
-		currentQuestion.text =
-			currentQuestion.finalText.trim() + (currentQuestion.interimText ? ' ' + currentQuestion.interimText : '');
+		appState.interview.currentQuestion.text =
+			appState.interview.currentQuestion.finalText.trim() + (appState.interview.currentQuestion.interimText ? ' ' + appState.interview.currentQuestion.interimText : '');
 
-		Logger.debug('currentQuestion depois: ', { ...currentQuestion }, false);
+		Logger.debug('appState.interview.currentQuestion depois: ', { ...appState.interview.currentQuestion }, false);
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
-		if (!selectedQuestionId) {
-			selectedQuestionId = CURRENT_QUESTION_ID;
+		if (!appState.interview.selectedQuestionId) {
+			appState.interview.selectedQuestionId = CURRENT_QUESTION_ID;
 			clearAllSelections();
 		}
 
@@ -938,53 +938,53 @@ function finalizeCurrentQuestion() {
 	Logger.debug('Início da função: "finalizeCurrentQuestion"');
 
 	// Se não há texto, ignorar
-	if (!currentQuestion.text || !currentQuestion.text.trim()) {
+	if (!appState.interview.currentQuestion.text || !appState.interview.currentQuestion.text.trim()) {
 		console.log('⚠️ finalizeCurrentQuestion: Sem texto para finalizar');
 		return;
 	}
 
 	// 🔒 GUARDA ABSOLUTA: Se a pergunta já foi finalizada, NÃO faça nada.
-	if (currentQuestion.finalized) {
+	if (appState.interview.currentQuestion.finalized) {
 		console.log('⛔ finalizeCurrentQuestion ignorado — pergunta já finalizada');
 		return;
 	}
 
 	// ⚠️ No modo entrevista: PROMOVER ANTES de chamar LLM
 	if (ModeController.isInterviewMode()) {
-		currentQuestion.text = finalizeQuestion(currentQuestion.text);
-		currentQuestion.lastUpdateTime = Date.now();
-		currentQuestion.finalized = true;
+		appState.interview.currentQuestion.text = finalizeQuestion(appState.interview.currentQuestion.text);
+		appState.interview.currentQuestion.lastUpdateTime = Date.now();
+		appState.interview.currentQuestion.finalized = true;
 
 		// 🔥 [NOVO] PROMOVER PARA HISTÓRICO ANTES DE CHAMAR LLM
 		// Isso garante que o texto está seguro e imutável durante resposta do GPT
-		const newId = String(questionsHistory.length + 1);
+		const newId = String(appState.interview.questionsHistory.length + 1);
 
 		// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
-		interviewTurnId++;
-		currentQuestion.turnId = interviewTurnId;
+		appState.interview.interviewTurnId++;
+		appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
 
-		questionsHistory.push({
+		appState.interview.questionsHistory.push({
 			id: newId,
-			text: currentQuestion.text,
-			turnId: currentQuestion.turnId, // 🔥 Incluir turnId na entrada do histórico
-			createdAt: currentQuestion.createdAt || Date.now(),
-			lastUpdateTime: currentQuestion.lastUpdateTime || Date.now(),
+			text: appState.interview.currentQuestion.text,
+			turnId: appState.interview.currentQuestion.turnId, // 🔥 Incluir turnId na entrada do histórico
+			createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
+			lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || Date.now(),
 		});
 
-		currentQuestion.promotedToHistory = true;
+		appState.interview.currentQuestion.promotedToHistory = true;
 
 		// 🔥 [CRÍTICO] LIMPAR CURRENT LOGO APÓS PROMOVER
 		// Não espera nem o render nem o LLM
 		resetCurrentQuestion();
 
 		// garante seleção lógica
-		selectedQuestionId = newId;
+		appState.interview.selectedQuestionId = newId;
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
 		// 🔥 [NOVO] Chamar GPT DEPOIS que pergunta foi promovida e salva
 		// chama GPT automaticamente se ainda não respondeu este turno
-		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
+		if (appState.interview.gptRequestedTurnId !== appState.interview.interviewTurnId && appState.interview.gptAnsweredTurnId !== appState.interview.interviewTurnId) {
 			askLLM(newId); // Passar ID promovido para LLM
 		}
 
@@ -994,19 +994,19 @@ function finalizeCurrentQuestion() {
 
 	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
 	if (!ModeController.isInterviewMode()) {
-		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', currentQuestion.text);
+		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', appState.interview.currentQuestion.text);
 
-		// promoteCurrentToHistory(currentQuestion.text);
-		const newId = String(questionsHistory.length + 1);
-		questionsHistory.push({
+		// promoteCurrentToHistory(appState.interview.currentQuestion.text);
+		const newId = String(appState.interview.questionsHistory.length + 1);
+		appState.interview.questionsHistory.push({
 			id: newId,
-			text: currentQuestion.text,
-			turnId: currentQuestion.turnId,
-			createdAt: currentQuestion.createdAt || Date.now(),
-			lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
+			text: appState.interview.currentQuestion.text,
+			turnId: appState.interview.currentQuestion.turnId,
+			createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
+			lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || appState.interview.currentQuestion.createdAt || Date.now(),
 		});
 
-		selectedQuestionId = newId;
+		appState.interview.selectedQuestionId = newId;
 		resetCurrentQuestion();
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
@@ -1023,18 +1023,18 @@ function closeCurrentQuestionForced() {
 	Logger.debug('Início da função: "closeCurrentQuestionForced"');
 
 	// log temporario para testar a aplicação só remover depois
-	console.log('🚪 Fechando pergunta:', currentQuestion.text);
+	console.log('🚪 Fechando pergunta:', appState.interview.currentQuestion.text);
 
-	if (!currentQuestion.text) return;
+	if (!appState.interview.currentQuestion.text) return;
 
-	questionsHistory.push({
+	appState.interview.questionsHistory.push({
 		id: crypto.randomUUID(),
-		text: finalizeQuestion(currentQuestion.text),
-		createdAt: currentQuestion.createdAt || Date.now(),
+		text: finalizeQuestion(appState.interview.currentQuestion.text),
+		createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
 	});
 
-	currentQuestion.text = '';
-	selectedQuestionId = null; // 👈 libera seleção
+	appState.interview.currentQuestion.text = '';
+	appState.interview.selectedQuestionId = null; // 👈 libera seleção
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
@@ -1050,12 +1050,12 @@ function closeCurrentQuestionForced() {
  * ✅ REFATORADA: agora é simples e legível!
  * ✅ CENTRALIZADA: Uma única função para todos os LLMs
  * ✅ Não há duplicação de askLLM() por LLM
- * @param {string} questionId - ID da pergunta a responder (padrão: selectedQuestionId)
+ * @param {string} questionId - ID da pergunta a responder (padrão: appState.interview.selectedQuestionId)
  */
 async function askLLM(questionId = null) {
 	try {
 		const CURRENT_QUESTION_ID = 'CURRENT';
-		const targetQuestionId = questionId || selectedQuestionId;
+		const targetQuestionId = questionId || appState.interview.selectedQuestionId;
 
 		// 1. Validar (antigo validateAskGptRequest)
 		const {
@@ -1067,19 +1067,19 @@ async function askLLM(questionId = null) {
 
 		// Rastreamento antigo (compatibilidade)
 		const normalizedText = normalizeForCompare(text);
-		transcriptionMetrics.gptStartTime = Date.now();
+		appState.metrics.gptStartTime = Date.now();
 
 		if (isCurrent) {
-			gptRequestedTurnId = interviewTurnId;
-			gptRequestedQuestionId = CURRENT_QUESTION_ID;
-			lastAskedQuestionNormalized = normalizedText;
+			appState.interview.gptRequestedTurnId = appState.interview.interviewTurnId;
+			appState.interview.gptRequestedQuestionId = CURRENT_QUESTION_ID;
+			appState.interview.lastAskedQuestionNormalized = normalizedText;
 		}
 
 		// 2. Rotear por modo (não por LLM!)
 		const isInterviewMode = ModeController.isInterviewMode();
 
 		// Obter turnId da pergunta para passar ao LLM
-		const questionEntry = questionsHistory.find(q => q.id === targetQuestionId);
+		const questionEntry = appState.interview.questionsHistory.find(q => q.id === targetQuestionId);
 		const turnId = questionEntry?.turnId || null;
 
 		if (isInterviewMode) {
@@ -1100,22 +1100,22 @@ async function askLLM(questionId = null) {
  * Log detalhado das métricas de tempo da transcrição
  */
 function logTranscriptionMetrics() {
-	if (!transcriptionMetrics.audioStartTime) return;
+	if (!appState.metrics.audioStartTime) return;
 
-	const gptTime = transcriptionMetrics.gptEndTime - transcriptionMetrics.gptStartTime;
-	const totalTime = transcriptionMetrics.totalTime;
+	const gptTime = appState.metrics.gptEndTime - appState.metrics.gptStartTime;
+	const totalTime = appState.metrics.totalTime;
 
 	console.log(`📊 ================================`);
 	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
 	console.log(`📊 ================================`);
-	console.log(`📊 TAMANHO ÁUDIO: ${transcriptionMetrics.audioSize} bytes`);
+	console.log(`📊 TAMANHO ÁUDIO: ${appState.metrics.audioSize} bytes`);
 	console.log(`📊 GPT: ${gptTime}ms`);
 	console.log(`📊 TOTAL: ${totalTime}ms`);
 	console.log(`📊 GPT % DO TOTAL: ${Math.round((gptTime / totalTime) * 100)}%`);
 	console.log(`📊 ================================`);
 
 	// Reset para próxima medição
-	transcriptionMetrics = {
+	appState.metrics = {
 		audioStartTime: null,
 		gptStartTime: null,
 		gptEndTime: null,
@@ -1132,12 +1132,12 @@ function logTranscriptionMetrics() {
  * Captura screenshot discretamente e armazena em memória
  */
 async function captureScreenshot() {
-	if (isCapturing) {
+	if (appState.audio.isCapturing) {
 		console.log('⏳ Captura já em andamento...');
 		return;
 	}
 
-	isCapturing = true;
+	appState.audio.isCapturing = true;
 	updateStatusMessage('📸 Capturando tela...');
 
 	try {
@@ -1147,14 +1147,14 @@ async function captureScreenshot() {
 			console.warn('⚠️ Falha na captura:', result.error);
 			updateStatusMessage(`❌ ${result.error}`);
 			emitUIChange('onScreenshotBadgeUpdate', {
-				count: capturedScreenshots.length,
-				visible: capturedScreenshots.length > 0,
+				count: appState.audio.capturedScreenshots.length,
+				visible: appState.audio.capturedScreenshots.length > 0,
 			});
 			return;
 		}
 
 		// ✅ Armazena referência do screenshot
-		capturedScreenshots.push({
+		appState.audio.capturedScreenshots.push({
 			filepath: result.filepath,
 			filename: result.filename,
 			timestamp: result.timestamp,
@@ -1162,19 +1162,19 @@ async function captureScreenshot() {
 		});
 
 		console.log(`✅ Screenshot capturado: ${result.filename}`);
-		console.log(`📦 Total em memória: ${capturedScreenshots.length}`);
+		console.log(`📦 Total em memória: ${appState.audio.capturedScreenshots.length}`);
 
 		// Atualiza UI
-		updateStatusMessage(`✅ ${capturedScreenshots.length} screenshot(s) capturado(s)`);
+		updateStatusMessage(`✅ ${appState.audio.capturedScreenshots.length} screenshot(s) capturado(s)`);
 		emitUIChange('onScreenshotBadgeUpdate', {
-			count: capturedScreenshots.length,
+			count: appState.audio.capturedScreenshots.length,
 			visible: true,
 		});
 	} catch (error) {
 		console.error('❌ Erro ao capturar screenshot:', error);
 		updateStatusMessage('❌ Erro na captura');
 	} finally {
-		isCapturing = false;
+		appState.audio.isCapturing = false;
 	}
 }
 
@@ -1182,23 +1182,23 @@ async function captureScreenshot() {
  * Envia screenshots para análise com OpenAI Vision
  */
 async function analyzeScreenshots() {
-	if (isAnalyzing) {
+	if (appState.audio.isAnalyzing) {
 		Logger.info('Análise já em andamento');
 		return;
 	}
 
-	if (capturedScreenshots.length === 0) {
+	if (appState.audio.capturedScreenshots.length === 0) {
 		Logger.warn('Nenhum screenshot para analisar');
 		updateStatusMessage('⚠️ Nenhum screenshot para analisar (capture com Ctrl+Shift+F)');
 		return;
 	}
 
-	isAnalyzing = true;
-	updateStatusMessage(`🔍 Analisando ${capturedScreenshots.length} screenshot(s)...`);
+	appState.audio.isAnalyzing = true;
+	updateStatusMessage(`🔍 Analisando ${appState.audio.capturedScreenshots.length} screenshot(s)...`);
 
 	try {
 		// Extrai caminhos dos arquivos
-		const filepaths = capturedScreenshots.map(s => s.filepath);
+		const filepaths = appState.audio.capturedScreenshots.map(s => s.filepath);
 
 		Logger.info('Enviando para análise', { count: filepaths.length });
 
@@ -1212,11 +1212,11 @@ async function analyzeScreenshots() {
 		}
 
 		// ✅ Renderiza resposta do GPT
-		const questionText = `📸 Análise de ${capturedScreenshots.length} screenshot(s)`;
-		const questionId = String(questionsHistory.length + 1);
+		const questionText = `📸 Análise de ${appState.audio.capturedScreenshots.length} screenshot(s)`;
+		const questionId = String(appState.interview.questionsHistory.length + 1);
 
 		// Adiciona "pergunta" ao histórico ANTES de renderizar respostas
-		questionsHistory.push({
+		appState.interview.questionsHistory.push({
 			id: questionId,
 			text: questionText,
 			createdAt: Date.now(),
@@ -1255,8 +1255,8 @@ async function analyzeScreenshots() {
 		updateStatusMessage('✅ Análise concluída');
 
 		// 🗑️ Limpa screenshots após análise
-		Logger.info('Limpando screenshots', { count: capturedScreenshots.length });
-		capturedScreenshots = [];
+		Logger.info('Limpando screenshots', { count: appState.audio.capturedScreenshots.length });
+		appState.audio.capturedScreenshots = [];
 
 		// Atualiza badge
 		emitUIChange('onScreenshotBadgeUpdate', {
@@ -1270,7 +1270,7 @@ async function analyzeScreenshots() {
 		Logger.error('Erro ao analisar screenshots', { error: error.message });
 		updateStatusMessage('❌ Erro na análise');
 	} finally {
-		isAnalyzing = false;
+		appState.audio.isAnalyzing = false;
 	}
 }
 
@@ -1278,10 +1278,10 @@ async function analyzeScreenshots() {
  * Limpa todos os screenshots armazenados
  */
 function clearScreenshots() {
-	if (capturedScreenshots.length === 0) return;
+	if (appState.audio.capturedScreenshots.length === 0) return;
 
-	console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
-	capturedScreenshots = [];
+	console.log(`🗑️ Limpando ${appState.audio.capturedScreenshots.length} screenshot(s)...`);
+	appState.audio.capturedScreenshots = [];
 
 	updateStatusMessage('✅ Screenshots limpos');
 	emitUIChange('onScreenshotBadgeUpdate', {
@@ -1320,15 +1320,15 @@ async function resetAppState() {
 		// 1️⃣ CHUNK 1: Parar autoplay e áudio
 		mockAutoPlayActive = false;
 		mockScenarioIndex = 0;
-		if (isRunning) {
+		if (appState.audio.isRunning) {
 			console.log('🎤 Parando captura de áudio...');
-			isRunning = false;
+			appState.audio.isRunning = false;
 		}
 		console.log('✅ Autoplay do mock parado');
 		await releaseThread();
 
 		// 2️⃣ CHUNK 2: Limpar perguntas e respostas
-		currentQuestion = {
+		appState.interview.currentQuestion = {
 			text: '',
 			lastUpdate: 0,
 			finalized: false,
@@ -1339,19 +1339,19 @@ async function resetAppState() {
 			finalText: '',
 			interimText: '',
 		};
-		questionsHistory = [];
+		appState.interview.questionsHistory = [];
 		answeredQuestions.clear();
-		selectedQuestionId = null;
-		lastAskedQuestionNormalized = null;
+		appState.interview.selectedQuestionId = null;
+		appState.interview.lastAskedQuestionNormalized = null;
 		console.log('✅ Perguntas e respostas limpas');
 		await releaseThread();
 
 		// 3️⃣ CHUNK 3: Limpar estado GPT e métricas
-		interviewTurnId = 0;
-		gptAnsweredTurnId = null;
-		gptRequestedTurnId = null;
-		gptRequestedQuestionId = null;
-		transcriptionMetrics = {
+		appState.interview.interviewTurnId = 0;
+		appState.interview.gptAnsweredTurnId = null;
+		appState.interview.gptRequestedTurnId = null;
+		appState.interview.gptRequestedQuestionId = null;
+		appState.metrics = {
 			audioStartTime: null,
 			gptStartTime: null,
 			gptEndTime: null,
@@ -1363,9 +1363,9 @@ async function resetAppState() {
 		await releaseThread();
 
 		// 4️⃣ CHUNK 4: Limpar screenshots
-		if (capturedScreenshots.length > 0) {
-			console.log(`🗑️ Limpando ${capturedScreenshots.length} screenshot(s)...`);
-			capturedScreenshots = [];
+		if (appState.audio.capturedScreenshots.length > 0) {
+			console.log(`🗑️ Limpando ${appState.audio.capturedScreenshots.length} screenshot(s)...`);
+			appState.audio.capturedScreenshots = [];
 			emitUIChange('onScreenshotBadgeUpdate', {
 				count: 0,
 				visible: false,
@@ -1381,8 +1381,8 @@ async function resetAppState() {
 		await releaseThread();
 
 		// 5️⃣ CHUNK 5: Limpar flags
-		isCapturing = false;
-		isAnalyzing = false;
+		appState.audio.isCapturing = false;
+		appState.audio.isAnalyzing = false;
 		console.log('✅ Flags resetadas');
 		await releaseThread();
 
@@ -1403,7 +1403,7 @@ async function resetAppState() {
 
 		// 8️⃣ CHUNK 8: Atualizar UI - Botão Listen
 		emitUIChange('onListenButtonToggle', {
-			isRunning: false,
+			appState.audio.isRunning: false,
 			buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
 		});
 		console.log('✅ Botão listen resetado');
@@ -1459,10 +1459,10 @@ async function resetAppState() {
 const RendererAPI = {
 	// Áudio - Gravação
 	listenToggleBtn,
-	askLLM
+	askLLM,
 	// 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
-	get isRunning() {
-		return isRunning;
+	get appState.audio.isRunning() {
+		return appState.audio.isRunning;
 	},
 
 	// Áudio - Monitoramento de volume
@@ -1483,9 +1483,9 @@ const RendererAPI = {
 	handleCurrentQuestion,
 	handleQuestionClick,
 
-	// 🔥 NOVO: Expor selectedQuestionId para atalhos em config-manager.js
-	get selectedQuestionId() {
-		return selectedQuestionId;
+	// 🔥 NOVO: Expor appState.interview.selectedQuestionId para atalhos em config-manager.js
+	get appState.interview.selectedQuestionId() {
+		return appState.interview.selectedQuestionId;
 	},
 
 	// UI
@@ -1561,7 +1561,7 @@ const RendererAPI = {
 		const all = getNavigableQuestionIds();
 		if (all.length === 0) return;
 
-		let index = all.indexOf(selectedQuestionId);
+		let index = all.indexOf(appState.interview.selectedQuestionId);
 		if (index === -1) {
 			// Nenhuma seleção: começa do começo ou do fim
 			index = direction === 'up' ? all.length - 1 : 0;
@@ -1573,7 +1573,7 @@ const RendererAPI = {
 			index = Math.max(0, Math.min(index, all.length - 1));
 		}
 
-		selectedQuestionId = all[index];
+		appState.interview.selectedQuestionId = all[index];
 		clearAllSelections();
 		renderQuestionsHistory();
 		renderCurrentQuestion();
@@ -1581,7 +1581,7 @@ const RendererAPI = {
 		if (APP_CONFIG.MODE_DEBUG) {
 			const msg = direction === 'up' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
 			updateStatusMessage(msg);
-			console.log('📌 Atalho Selecionou:', selectedQuestionId);
+			console.log('📌 Atalho Selecionou:', appState.interview.selectedQuestionId);
 		}
 	},
 
@@ -1622,7 +1622,7 @@ const RendererAPI = {
 	captureScreenshot,
 	analyzeScreenshots,
 	clearScreenshots,
-	getScreenshotCount: () => capturedScreenshots.length,
+	getScreenshotCount: () => appState.audio.capturedScreenshots.length,
 
 	// 📸 NOVO: Screenshot shortcuts
 	onCaptureScreenshot: callback => {
