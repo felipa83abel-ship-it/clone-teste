@@ -79,10 +79,10 @@ class ConfigManager {
 				},
 				other: {
 					language: 'pt-BR',
-					theme: 'auto',
+					theme: 'dark',
 					autoUpdate: true,
 					logLevel: 'info',
-					darkMode: false,
+					darkMode: true,
 					interviewMode: 'INTERVIEW',
 					overlayOpacity: 0.75,
 				},
@@ -1257,12 +1257,30 @@ class ConfigManager {
 	}
 
 	// Restaura configurações padrão
-	resetConfig() {
+	async resetConfig() {
 		debugLogConfig('Início da função: "resetConfig"');
-		if (confirm('Tem certeza que deseja restaurar todas as configurações para os valores padrão?')) {
-			this.config = this.getDefaultConfig();
-			localStorage.removeItem('appConfig');
-			location.reload();
+		if (
+			confirm(
+				'Tem certeza que deseja restaurar TODAS as configurações para os valores padrão?\n\nIsso vai limpar: configurações, API keys, histórico de dados e tudo mais.',
+			)
+		) {
+			try {
+				// 🔥 Limpar todas as API keys dos providers
+				const providers = ['openai', 'google', 'openrouter'];
+				for (const provider of providers) {
+					await _ipc?.invoke('DELETE_API_KEY', provider);
+				}
+
+				// 🔥 Resetar config padrão
+				this.config = this.getDefaultConfig();
+				localStorage.clear(); // Limpa tudo do localStorage
+
+				console.log('✅ Configurações resetadas para padrão');
+				location.reload();
+			} catch (error) {
+				console.error('❌ Erro ao resetar configurações:', error);
+				alert('Erro ao resetar: ' + error.message);
+			}
 		}
 
 		debugLogConfig('Fim da função: "resetConfig"');
@@ -1317,6 +1335,7 @@ class ConfigManager {
 			other: {
 				language: 'pt-BR',
 				theme: 'dark',
+				darkMode: true,
 				autoUpdate: true,
 				logLevel: 'info',
 			},
