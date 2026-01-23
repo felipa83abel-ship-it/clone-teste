@@ -83,6 +83,93 @@ function getMockResponse(question) {
 }
 
 /**
+ * Simula FASE 1: Captura de áudio da pergunta
+ */
+async function simulateAudioCapture(eventBus, scenario, placeholderId) {
+	console.log(`🎤 [FASE-1] Capturando áudio da pergunta...`);
+	const audioStartTime = Date.now();
+
+	eventBus.emit('transcriptAdd', {
+		author: 'Outros',
+		text: '...',
+		timeStr: new Date().toLocaleTimeString(),
+		elementId: 'conversation',
+		placeholderId: placeholderId,
+	});
+
+	await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
+	const audioEndTime = Date.now();
+
+	const latencyMs = Math.round(800 + Math.random() * 400);
+	const totalMs = audioEndTime - audioStartTime + latencyMs;
+
+	eventBus.emit('placeholderFulfill', {
+		speaker: 'Outros',
+		text: scenario.question,
+		startStr: new Date(audioStartTime).toLocaleTimeString(),
+		stopStr: new Date(audioEndTime).toLocaleTimeString(),
+		recordingDuration: audioEndTime - audioStartTime,
+		latency: latencyMs,
+		total: totalMs,
+		placeholderId: placeholderId,
+	});
+
+	console.log(`✅ [FASE-1] Áudio capturado`);
+	return true;
+}
+
+/**
+ * Simula FASE 2-3: Processa pergunta e aguarda resposta
+ */
+async function simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive) {
+	console.log(`📝 [FASE-2] Processando pergunta...`);
+	await new Promise(resolve => setTimeout(resolve, 800));
+
+	if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+		console.log('🛑 [PARADA] Modo debug desativado - parando mock autoplay');
+		return false;
+	}
+
+	console.log(`🔇 [FASE-2] Silêncio detectado, fechando pergunta...`);
+	console.log(`🤖 [FASE-3] askGpt acionado - mock stream será emitido pelo interceptor`);
+
+	return true;
+}
+
+/**
+ * Aguarda resposta do mock stream
+ */
+async function waitForMockResponse(scenario) {
+	const mockResponse = getMockResponse(scenario.question);
+	const estimatedTime = mockResponse.length * 30;
+	await new Promise(resolve => setTimeout(resolve, estimatedTime + 1000));
+	return mockResponse;
+}
+
+/**
+ * Captura múltiplos screenshots da resposta
+ */
+async function captureScenarioScreenshots(scenario, APP_CONFIG, mockAutoPlayActive, captureScreenshot) {
+	if (!scenario.screenshotsCount || scenario.screenshotsCount <= 0) return true;
+
+	for (let i = 1; i <= scenario.screenshotsCount; i++) {
+		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+			console.log(`🛑 [PARADA] Captura de screenshot ${i}/${scenario.screenshotsCount} cancelada`);
+			return false;
+		}
+
+		console.log(`📸 [FASE-4A] Capturando screenshot ${i}/${scenario.screenshotsCount}...`);
+		await captureScreenshot();
+
+		if (i < scenario.screenshotsCount) {
+			await new Promise(resolve => setTimeout(resolve, 2200)); // Cooldown entre capturas
+		}
+	}
+
+	return true;
+}
+
+/**
  * Função de autoplay automático para mockar perguntas e respostas
  */
 async function runMockAutoPlay() {
@@ -104,72 +191,17 @@ async function runMockAutoPlay() {
 			}\n🎬 ════════════════════════════════════════════════════════`,
 		);
 
-		// FASE 1: Simula captura de áudio (2-4s)
-		console.log(`🎤 [FASE-1] Capturando áudio da pergunta...`);
-		const audioStartTime = Date.now();
-		const placeholderId = `placeholder-${audioStartTime}-${Math.random()}`;
+		// Simula FASE 1: Captura de áudio
+		const placeholderId = `placeholder-${Date.now()}-${Math.random()}`;
+		await simulateAudioCapture(eventBus, scenario, placeholderId);
 
-		// Emite placeholder
-		eventBus.emit('transcriptAdd', {
-			author: 'Outros',
-			text: '...',
-			timeStr: new Date().toLocaleTimeString(),
-			elementId: 'conversation',
-			placeholderId: placeholderId,
-		});
-
-		// Aguarda captura
-		await new Promise(resolve => setTimeout(resolve, 2000 + Math.random() * 2000));
-
-		// 🔥 CHECK: Se modo debug foi desativado, para imediatamente
-		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
-			console.log('🛑 [PARADA] Modo debug desativado - parando mock autoplay');
+		// 🔥 CHECK: Continua se debug ainda está ativo
+		if (!await simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive)) {
 			break;
 		}
 
-		const audioEndTime = Date.now();
-		console.log(`✅ [FASE-1] Áudio capturado`);
-
-		// Calcula latência (arredonda para inteiro - sem casas decimais)
-		const latencyMs = Math.round(800 + Math.random() * 400);
-		const totalMs = audioEndTime - audioStartTime + latencyMs;
-
-		// Atualiza placeholder com texto real
-		eventBus.emit('placeholderFulfill', {
-			speaker: 'Outros',
-			text: scenario.question,
-			startStr: new Date(audioStartTime).toLocaleTimeString(),
-			stopStr: new Date(audioEndTime).toLocaleTimeString(),
-			recordingDuration: audioEndTime - audioStartTime,
-			latency: latencyMs,
-			total: totalMs,
-			placeholderId: placeholderId,
-		});
-
-		// FASE 2: Processa pergunta (handleSpeech + closeCurrentQuestion)
-		console.log(`📝 [FASE-2] Processando pergunta...`);
-		//handleSpeech(OTHER, scenario.question, { skipAddToUI: true });
-
-		// Aguarda consolidação (800ms para garantir que pergunta saia do CURRENT)
-		await new Promise(resolve => setTimeout(resolve, 800));
-
-		// 🔥 CHECK: Se modo debug foi desativado, para imediatamente
-		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
-			console.log('🛑 [PARADA] Modo debug desativado - parando mock autoplay');
-			break;
-		}
-
-		// Simula silêncio e fecha pergunta
-		console.log(`🔇 [FASE-2] Silêncio detectado, fechando pergunta...`);
-		//closeCurrentQuestion();
-
-		// FASE 3: askGpt será acionado automaticamente, o interceptor (ask-gpt-stream) que irá mockar
-		console.log(`🤖 [FASE-3] askGpt acionado - mock stream será emitido pelo interceptor`);
-
-		// Aguarda stream terminar (~30ms por token)
-		const mockResponse = getMockResponse(scenario.question);
-		const estimatedTime = mockResponse.length * 30;
-		await new Promise(resolve => setTimeout(resolve, estimatedTime + 1000));
+		// Aguarda resposta do mock stream
+		await waitForMockResponse(scenario);
 
 		// 🔥 CHECK: Se modo debug foi desativado, para imediatamente SEM TIRAR SCREENSHOT
 		if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
@@ -178,39 +210,11 @@ async function runMockAutoPlay() {
 		}
 
 		// FASE 4 (Opcional): Captura N screenshots REAIS e depois aciona análise
+		const screenshotsOk = await captureScenarioScreenshots(scenario, APP_CONFIG, mockAutoPlayActive, captureScreenshot);
+		if (!screenshotsOk) break;
+
+		// FASE 4B: Análise dos screenshots capturados
 		if (scenario.screenshotsCount && scenario.screenshotsCount > 0) {
-			// FASE 4A: Captura múltiplos screenshots
-			for (let i = 1; i <= scenario.screenshotsCount; i++) {
-				// 🔥 CHECK: Verifica antes de cada screenshot
-				if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
-					console.log(
-						`🛑 [PARADA] Modo debug desativado - cancelando captura de screenshot ${i}/${scenario.screenshotsCount}`,
-					);
-					break;
-				}
-
-				console.log(`📸 [FASE-4A] Capturando screenshot ${i}/${scenario.screenshotsCount} REAL da resposta...`);
-				await captureScreenshot();
-
-				// Delay entre múltiplas capturas para respeitar cooldown de 2s do main.js
-				if (i < scenario.screenshotsCount) {
-					console.log(`   ⏳ Aguardando 2200ms antes da próxima captura (cooldown CAPTURE_COOLDOWN)...`);
-					await new Promise(resolve => setTimeout(resolve, 2200));
-				}
-			}
-
-			// 🔥 CHECK: Verifica antes de análise
-			if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
-				console.log('🛑 [PARADA] Modo debug desativado - cancelando análise de screenshots');
-				break;
-			}
-
-			// Log de validação: quantas fotos tem antes de analisar
-			console.log(
-				`📸 [PRÉ-ANÁLISE] Total de screenshots em memória: ${capturedScreenshots.length}/${scenario.screenshotsCount}`,
-			);
-
-			// FASE 4B: Análise dos screenshots capturados
 			console.log(`📸 [FASE-4B] Analisando ${scenario.screenshotsCount} screenshot(s)...`);
 			await analyzeScreenshots();
 		}
@@ -311,48 +315,17 @@ function initMockInterceptor(context) {
 			// Busca resposta mockada
 			const mockResponse = getMockResponse(questionText);
 
-			// Divide em tokens (remove vazios)
-			const tokens = mockResponse.split(/(\s+|[.,!?;:\-\(\)\[\]{}\n])/g).filter(t => t.length > 0);
+		// Emite tokens com delays
+		emitTokensFromResponse(mockResponse).catch(err => {
+			console.error('❌ Erro ao emitir tokens mock:', err);
+		});
 
-			console.log(`🎭 [MOCK] Emitindo ${tokens.length} tokens para pergunta: "${questionText.substring(0, 50)}..."`);
+		// Retorna promise resolvida imediatamente (esperado pela API)
+		return Promise.resolve({ success: true });
+	}
 
-			// Função para emitir tokens com pequeno delay entre eles
-			async function emitTokens() {
-				let accumulated = '';
-				for (let i = 0; i < tokens.length; i++) {
-					const token = tokens[i];
-					accumulated += token;
-
-					// Emite o evento com delay mínimo
-					await new Promise(resolve => {
-						setTimeout(() => {
-							// ✅ CORRETO: Emite apenas o token como 2º argumento
-							ipcRenderer.emit('GPT_STREAM_CHUNK', null, token);
-							resolve();
-						}, 5); // 5ms entre tokens
-					});
-				}
-
-				// Sinaliza fim do stream após todos os tokens
-				await new Promise(resolve => {
-					setTimeout(() => {
-						ipcRenderer.emit('GPT_STREAM_END');
-						resolve();
-					}, 10);
-				});
-			}
-
-			// Inicia emissão de tokens de forma assíncrona
-			emitTokens().catch(err => {
-				console.error('❌ Erro ao emitir tokens mock:', err);
-			});
-
-			// Retorna promise resolvida imediatamente (esperado pela API)
-			return Promise.resolve({ success: true });
-		}
-
-		// Todas as outras chamadas passam para o invoke real
-		return originalInvoke.call(this, channel, ...args);
+	// Todas as outras chamadas passam para o invoke real
+	return originalInvoke.call(this, channel, ...args);
 	};
 }
 

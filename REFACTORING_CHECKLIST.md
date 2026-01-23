@@ -18,7 +18,7 @@
 ## 📋 DIRETRIZES DE EXECUÇÃO
 
 - ✅ **Cada fase/tópico terá seu próprio commit** - facilita rastreamento e rollback
-- ✅ **Cada `npm start` será acompanhado de `time npm start`** - monitora impacto de performance
+- ✅ **Cada `npm start` será acompanhado de `timeout 30 npm start`** - monitora impacto de performance
 - ✅ **Nenhum arquivo .md será criado sem solicitação** - evitar documentação desnecessária
 - ✅ **Revisar documentação existente se precisa atualização** - manter docs sincronizadas
 
@@ -189,7 +189,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** ✅ `f158749` - refactor(phase-1.1): remover debugLogRenderer e centralizar logging em Logger
 
-- [x] Verificar: `time npm start` (43 segundos)
+- [x] Verificar: `timeout 30 npm start` (43 segundos)
 
 #### 1.2 Remover `releaseThread()` Duplicada
 
@@ -199,7 +199,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** ✅ `b1c5737` - refactor(phase-1.2): remover releaseThread duplicada
 
-- [x] Verificar: `time npm start`
+- [x] Verificar: `timeout 30 npm start`
 
 #### 1.3 Isolar MOCK em Arquivo Separado
 
@@ -215,7 +215,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** ✅ `8a4578b` - refactor(phase-1.3): isolar código mock em mock-runner.js
 
-- [x] Verificar: `time npm start` (24 segundos)
+- [x] Verificar: `timeout 30 npm start` (24 segundos)
 
 #### 1.4 Remover Funções Mortas
 
@@ -230,7 +230,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** ✅ `6e53f1c` - refactor(phase-1.4): remover funções mortas e compatibilidade obsoleta
 
-- [x] Verificar: `time npm start` (11 segundos)
+- [x] Verificar: `timeout 30 npm start` (11 segundos)
 - [x] ✅ Revisar ARCHITECTURE.md e DOCS_GUIDE.md se mencionam essas funções (não mencionam)
 
 **Total Fase 1:** ~400-450 linhas removidas
@@ -411,12 +411,12 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 - [x] Verificar erros de sintaxe com `get_errors` ✅ OK (zero erros)
 
 **Total Fase 4:** ✅ CONCLUÍDA - 3 commits (4.1, 4.2, 4.3)
+
 - ModeManager criado e integrado
 - CURRENT_MODE removido
 - emitUIChange completamente migrado para eventBus
 - 201 linhas de código novo (mode-manager.js)
 - renderer.js: 1542 linhas (target atingido: -564 linhas, -27%)
-
 
 - [ ] Remover `if (ModeController.isInterviewMode())` ... `else` gigante
 - [ ] Delegar para `ModeManager.onQuestionFinalize()`
@@ -424,7 +424,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** `git commit -m "refactor(phase-4.4): refactor finalizeCurrentQuestion to use ModeManager delegation"`
 
-- [ ] Verificar: `time npm start`
+- [ ] Verificar: `timeout 30 npm start`
 
 #### 4.5 Refatorar handleCurrentQuestion()
 
@@ -432,7 +432,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** `git commit -m "refactor(phase-4.5): refactor handleCurrentQuestion if needed"`
 
-- [ ] Verificar: `time npm start`
+- [ ] Verificar: `timeout 30 npm start`
 
 #### 4.6 Remover ModeController
 
@@ -441,7 +441,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** `git commit -m "refactor(phase-4.6): remove old ModeController and finalize ModeManager integration"`
 
-- [ ] Verificar: `time npm start`
+- [ ] Verificar: `timeout 30 npm start`
 
 **Total Fase 4:** 3 funções refatoradas, ~100 linhas removidas, novo arquivo `mode-manager.js`
 
@@ -465,7 +465,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** `git commit -m "refactor(phase-5.1): validation - verify all basic functionality works"`
 
-- [ ] Verificar: `time npm start`
+- [ ] Verificar: `timeout 30 npm start`
 
 #### 5.2 Testes em Mock Mode
 
@@ -475,7 +475,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** `git commit -m "refactor(phase-5.2): testing - verify mock mode functionality"`
 
-- [ ] Verificar: `time npm start`
+- [ ] Verificar: `timeout 30 npm start`
 
 #### 5.3 Lint / Code Quality
 
@@ -484,7 +484,7 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 **Commit:** `git commit -m "refactor(phase-5.3): code quality - lint and fix remaining issues"`
 
-- [ ] Verificar: `time npm start`
+- [ ] Verificar: `timeout 30 npm start`
 
 #### 5.4 Atualização Final de Documentação
 
@@ -538,17 +538,17 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 ## 📈 RESUMO FINAL DAS MUDANÇAS
 
-| Métrica                  | Antes      | Depois      | Mudança  |
-| ------------------------ | ---------- | ----------- | -------- |
-| **Linhas (renderer.js)** | 2106       | 1542        | **-564** |
-| **Variáveis globais**    | 16         | 1           | **-94%** |
-| **Sistemas de estado**   | 2          | 1           | **-50%** |
-| **Sistemas de eventos**  | 2          | 1           | **-50%** |
-| **Funções mortas**       | 5          | 0           | **-100%**|
-| **Mock inline**          | 500 linhas | 0           | **-100%**|
-| **Logger systems**       | 2          | 1           | **-50%** |
-| **Arquivos novos**       | 0          | 2           | **+2**   |
-| **Redução Total %**      | -          | -26.8%      | **ALVO** |
+| Métrica                  | Antes      | Depois | Mudança   |
+| ------------------------ | ---------- | ------ | --------- |
+| **Linhas (renderer.js)** | 2106       | 1542   | **-564**  |
+| **Variáveis globais**    | 16         | 1      | **-94%**  |
+| **Sistemas de estado**   | 2          | 1      | **-50%**  |
+| **Sistemas de eventos**  | 2          | 1      | **-50%**  |
+| **Funções mortas**       | 5          | 0      | **-100%** |
+| **Mock inline**          | 500 linhas | 0      | **-100%** |
+| **Logger systems**       | 2          | 1      | **-50%**  |
+| **Arquivos novos**       | 0          | 2      | **+2**    |
+| **Redução Total %**      | -          | -26.8% | **ALVO**  |
 
 **Arquivos criados:** `mock-runner.js` (369 linhas), `mode-manager.js` (201 linhas)
 
@@ -563,6 +563,7 @@ adf1e87 refator(fase-4.2): remover CURRENT_MODE global
 ```
 
 **Status Geral:**
+
 - ✅ Fase 1: Limpeza Rápida (CONCLUÍDA - 4 commits)
 - ✅ Fase 2: Consolidação de Estado (CONCLUÍDA - 4 commits)
 - ✅ Fase 3: Consolidação de Eventos (CONCLUÍDA - 3 commits)
@@ -570,12 +571,12 @@ adf1e87 refator(fase-4.2): remover CURRENT_MODE global
 - ⏳ Fase 5: Revisão e Testes (PRÓXIMA)
 
 **Validação Final:**
+
 - ✅ `npm start` inicia sem erros
 - ✅ Zero erros de sintaxe (verificado com `get_errors`)
 - ✅ Aplicação funciona corretamente
 - ✅ Mock-runner integrado com eventBus
 - ✅ Mode-manager centraliza lógica de modo
-
 
 ---
 
@@ -666,7 +667,7 @@ Este checklist é o **plano de batalha** da refatoração. Antes de começar:
 ### Diretrizes Confirmadas para Execução:
 
 ✅ **Cada commit reflete uma unidade de trabalho clara** - Facilita rastreamento de mudanças e possibilita rollback granular  
-✅ **Performance será monitorada com `time npm start`** - Após cada fase/tópico para garantir sem degradação  
+✅ **Performance será monitorada com `timeout 30 npm start`** - Após cada fase/tópico para garantir sem degradação  
 ✅ **Documentação atualizada de forma estruturada** - Seção 5.4 dedicada à atualização final  
 ✅ **Sem criação de arquivo .md desnecessário** - Apenas documentação solicitada será criada
 
