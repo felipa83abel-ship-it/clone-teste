@@ -1,9 +1,9 @@
 /**
  * anthropic-handler - Interface para Anthropic Claude
- * 
+ *
  * ✅ TEMPLATE para integração com Anthropic Claude
  * Segue o mesmo padrão de openai-handler para garantir compatibilidade
- * 
+ *
  * Pasos para usar:
  * 1. Instalar SDK: npm install @anthropic-ai/sdk
  * 2. Obter API key em https://console.anthropic.com/
