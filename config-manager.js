@@ -1316,7 +1316,7 @@ class ConfigManager {
 			},
 			other: {
 				language: 'pt-BR',
-				theme: 'auto',
+				theme: 'dark',
 				autoUpdate: true,
 				logLevel: 'info',
 			},
