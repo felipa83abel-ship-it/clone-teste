@@ -33,8 +33,8 @@ const llmManager = new LLMManager();
 
 // 🎯 REGISTRAR LLMs
 llmManager.register('openai', openaiHandler);
-// Futuro: llmManager.register('gemini', require('./llm/handlers/gemini-handler.js')); // NOSONAR
-// Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
+// NOSONAR // Futuro: llmManager.register('gemini', require('./llm/handlers/gemini-handler.js'));
+// NOSONAR // Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
 eventBus.on('answerStreamChunk', data => {
@@ -898,6 +898,10 @@ function handleQuestionClick(questionId) {
 			currentQuestion.lastUpdateTime = Date.now();
 			currentQuestion.finalized = true;
 
+			// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
+			interviewTurnId++;
+			currentQuestion.turnId = interviewTurnId;
+
 			const newId = String(questionsHistory.length + 1);
 			questionsHistory.push({
 				id: newId,
@@ -979,11 +983,10 @@ function handleCurrentQuestion(author, text, options = {}) {
 
 	// Apenas consolida falas no CURRENT do OTHER
 	if (author === OTHER) {
-		// Se não existe texto ainda, marca tempo de criação, incrementa turno e define turnId
+		// Se não existe texto ainda, marca tempo de criação
 		if (!currentQuestion.text) {
 			currentQuestion.createdAt = now;
-			interviewTurnId++;
-			currentQuestion.turnId = interviewTurnId; // 🔥 Associar ID da pergunta ao turno
+			// 🔥 NÃO incrementa turnId aqui - será feito ao promover para histórico
 		}
 
 		currentQuestion.lastUpdateTime = now;
@@ -1057,6 +1060,11 @@ function finalizeCurrentQuestion() {
 		// 🔥 [NOVO] PROMOVER PARA HISTÓRICO ANTES DE CHAMAR LLM
 		// Isso garante que o texto está seguro e imutável durante resposta do GPT
 		const newId = String(questionsHistory.length + 1);
+
+		// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
+		interviewTurnId++;
+		currentQuestion.turnId = interviewTurnId;
+
 		questionsHistory.push({
 			id: newId,
 			text: currentQuestion.text,
