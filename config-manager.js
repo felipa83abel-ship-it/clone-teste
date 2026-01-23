@@ -302,7 +302,12 @@ class ConfigManager {
 		// 🔥 EXCLUDENDO: opacityRange (gerenciado separadamente em initEventListeners)
 		// 🔥 EXCLUDENDO: mockToggle (estado temporário de DEBUG - não deve ser persistido)
 		document.querySelectorAll('input, select, textarea').forEach(input => {
-			if (input.id && !input.classList.contains('api-key-input') && input.id !== 'mockToggle') {
+			if (
+				input.id &&
+				!input.classList.contains('api-key-input') &&
+				input.id !== 'mockToggle' &&
+				input.id !== 'opacityRange'
+			) {
 				input.addEventListener('change', async () => {
 					// 🔥 CORRIGIDO: Para checkboxes, usar .checked em vez de .value
 					const value = input.type === 'checkbox' ? input.checked : input.value;
@@ -346,6 +351,7 @@ class ConfigManager {
 			opacityRange.addEventListener('input', e => {
 				this.saveField('opacityRange', e.target.value);
 				this.applyOpacity(e.target.value);
+				this.saveConfig(false); // 🔥 Salva sem mostrar mensagem (mudança frequente)
 			});
 		}
 
@@ -547,16 +553,15 @@ class ConfigManager {
 	}
 
 	// Salva configurações
-	saveConfig() {
+	saveConfig(showFeedback = true) {
 		debugLogConfig('Início da função: "saveConfig"');
 		try {
 			const configStr = JSON.stringify(this.config);
 			localStorage.setItem('appConfig', configStr);
 			console.log('💾 Configurações salvas com sucesso');
-			console.log('   OpenAI STT:', this.config.api.openai.selectedSTTModel);
-			console.log('   Google STT:', this.config.api.google.selectedSTTModel);
-			console.log('   OpenRouter STT:', this.config.api.openrouter.selectedSTTModel);
-			this.showSaveFeedback();
+			if (showFeedback) {
+				this.showSaveFeedback();
+			}
 		} catch (error) {
 			console.error('❌ Erro ao salvar configurações:', error);
 			this.showError('Erro ao salvar configurações');
