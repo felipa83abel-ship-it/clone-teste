@@ -9,13 +9,11 @@ const Logger = require('../../utils/Logger.js');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class GeminiHandler {
-	initialzed = false;
-	client = null;
-	logger = null;
-	model = 'gemini-1.5-flash';
-
 	constructor() {
+		this.initialized = false;
+		this.client = null;
 		this.logger = Logger;
+		this.model = 'gemini-1.5-flash';
 	}
 
 	/**

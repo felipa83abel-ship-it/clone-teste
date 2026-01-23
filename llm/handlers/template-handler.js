@@ -64,11 +64,11 @@
 const Logger = require('../../utils/Logger.js');
 
 class AnthropicHandler {
-	initialzed = false;
-	client = null;
-	logger = Logger;
-
-	constructor() {}
+	constructor() {
+		this.initialized = false;
+		this.client = null;
+		this.logger = Logger;
+	}
 
 	/**
 	 * Inicializar cliente Anthropic
@@ -119,7 +119,7 @@ class AnthropicHandler {
 
 		try {
 			// NOSONAR TODO: Implementar streaming real ao Claude
-			/*
+			/* 
 			const stream = await this.client.messages.stream({
 				model: 'claude-3-sonnet-20240229',
 				max_tokens: 2048,

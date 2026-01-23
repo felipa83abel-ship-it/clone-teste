@@ -12,11 +12,9 @@ const Logger = require('../../utils/Logger.js');
 const { ipcRenderer } = require('electron');
 
 class OpenAIHandler {
-	logger = null;
-	model = 'gpt-4o-mini';
-
 	constructor() {
 		this.logger = Logger;
+		this.model = 'gpt-4o-mini';
 	}
 
 	/**
