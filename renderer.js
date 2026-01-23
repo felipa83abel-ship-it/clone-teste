@@ -227,55 +227,12 @@ let appState.interview.lastAskedQuestionNormalized = null;
 /* ================================ */
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
 /* ================================ */
+// ✅ DEPRECATED: UICallbacks migrado para EventBus (Fase 3)
+// Anteriormente: const UICallbacks = { ... } com 25+ callbacks
+// Agora: eventBus.emit('eventName', data) centralizado
 
 /**
- * Callbacks/Observers registrados pela UI (config-manager.js)
- * renderer.js é "cego" para DOM - config-manager se inscreve em mudanças
- */
-const UICallbacks = {
-	onError: null, // 🔥 NOVO: Para mostrar erros de validação
-	onTranscriptAdd: null,
-	onCurrentQuestionUpdate: null,
-	onQuestionsHistoryUpdate: null,
-	onStatusUpdate: null,
-	onInputVolumeUpdate: null,
-	onOutputVolumeUpdate: null,
-	onMockBadgeUpdate: null,
-	onDOMElementsReady: null, // callback para pedir elementos ao config-manager
-	onListenButtonToggle: null,
-	onAnswerSelected: null,
-	onClearAllSelections: null,
-	onScrollToQuestion: null,
-	onTranscriptionCleared: null,
-	onAnswersCleared: null,
-	onAnswerStreamChunk: null,
-	onAnswerIdUpdate: null,
-	onModeSelectUpdate: null,
-	onAnswerStreamEnd: null,
-	onPlaceholderFulfill: null,
-	onPlaceholderUpdate: null,
-	onUpdateInterim: null,
-	onClearInterim: null,
-	onScreenshotBadgeUpdate: null,
-	onAudioDeviceChanged: null,
-};
-
-/**
- * Registra callback para evento de UI
- * @param {string} eventName - Nome do evento
- * @param {function} callback - Função a ser chamada quando evento ocorre
- */
-function onUIChange(eventName, callback) {
-	if (UICallbacks.hasOwnProperty(eventName)) {
-		UICallbacks[eventName] = callback;
-		console.log(`📡 UI callback registrado em renderer.js: ${eventName}`);
-	}
-}
-
-/**
- * Emite evento de UI para config-manager
- * @param {string} eventName - Nome do evento
- * @param {any} data - Dados do evento
+ * DEPRECATED: Registra elementos de UI (migrado para EventBus em Fase 3)
  */
 function registerUIElements(elements) {
 	UIElements = { ...UIElements, ...elements };
@@ -1487,9 +1444,6 @@ const RendererAPI = {
 	// UI Registration
 	registerUIElements: elements => {
 		registerUIElements(elements);
-	},
-	onUIChange: (eventName, callback) => {
-		onUIChange(eventName, callback);
 	},
 	// Emit UI changes (para config-manager enviar eventos para renderer)
 	emitUIChange,
