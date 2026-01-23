@@ -33,6 +33,7 @@ require('dotenv').config();
 
 const { app, BrowserWindow, globalShortcut, ipcMain } = require('electron');
 const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -72,6 +73,7 @@ const USE_FAKE_STREAM_GPT = false; // 🤖 Mude para true para ativar os testes 
 
 let mainWindow = null;
 let openaiClient = null;
+let geminiClient = null;
 let secureStore = null;
 let clickThroughEnabled = false;
 
@@ -88,10 +90,17 @@ if (ElectronStore) {
 		console.log('✅ SecureStore inicializado com sucesso');
 
 		// Inicializa cliente OpenAI se houver chave salva
-		const savedKey = secureStore.get('apiKeys.openai');
-		if (savedKey && savedKey.length > 10) {
+		const savedOpenAIKey = secureStore.get('apiKeys.openai');
+		if (savedOpenAIKey && savedOpenAIKey.length > 10) {
 			console.log('🔑 Chave OpenAI encontrada - inicializando cliente...');
-			initializeOpenAIClient(savedKey);
+			initializeOpenAIClient(savedOpenAIKey);
+		}
+
+		// Inicializa cliente Gemini se houver chave salva
+		const savedGeminiKey = secureStore.get('apiKeys.google');
+		if (savedGeminiKey && savedGeminiKey.length > 10) {
+			console.log('🔑 Chave Gemini encontrada - inicializando cliente...');
+			initializeGeminiClient(savedGeminiKey);
 		}
 	} catch (error) {
 		console.error('❌ Erro ao criar secureStore:', error);
@@ -125,6 +134,35 @@ function initializeOpenAIClient(apiKey = null) {
 	} catch (error) {
 		console.error('❌ Erro ao inicializar cliente OpenAI:', error.message);
 		openaiClient = null;
+		return false;
+	}
+}
+
+/**
+ * Inicializa cliente Gemini (Google)
+ * @param {string} apiKey - API key do Gemini (opcional, usa secureStore se não fornecido)
+ * @returns {boolean} true se inicializado com sucesso
+ */
+function initializeGeminiClient(apiKey = null) {
+	try {
+		const key = apiKey || (secureStore ? secureStore.get('apiKeys.google') : null);
+
+		if (!key || typeof key !== 'string' || key.trim().length < 10) {
+			console.warn('⚠️ Chave Gemini inválida ou muito curta');
+			geminiClient = null;
+			return false;
+		}
+
+		const maskedKey = key.substring(0, 8) + '...';
+		console.log(`---> Inicializando cliente Gemini com chave: ${maskedKey}`);
+
+		geminiClient = new GoogleGenerativeAI(key.trim());
+
+		console.log('✅ Cliente Gemini inicializado com sucesso');
+		return true;
+	} catch (error) {
+		console.error('❌ Erro ao inicializar cliente Gemini:', error.message);
+		geminiClient = null;
 		return false;
 	}
 }
@@ -267,6 +305,15 @@ async function handleSaveApiKey(_, { provider, apiKey }) {
 			return { success, provider };
 		}
 
+		// Se for Google/Gemini, inicializa cliente imediatamente
+		if (provider === 'google') {
+			const success = initializeGeminiClient(trimmedKey);
+			if (mainWindow?.webContents) {
+				mainWindow.webContents.send('API_KEY_UPDATED', !!success);
+			}
+			return { success, provider };
+		}
+
 		return { success: true, provider };
 	} catch (error) {
 		console.error('Erro ao salvar API key:', error);
@@ -287,6 +334,11 @@ async function handleDeleteApiKey(_, provider) {
 		// Se for OpenAI, desconecta cliente
 		if (provider === 'openai') {
 			openaiClient = null;
+		}
+
+		// Se for Google/Gemini, desconecta cliente
+		if (provider === 'google') {
+			geminiClient = null;
 		}
 
 		return { success: true, provider };
