@@ -296,7 +296,7 @@ Use este checklist para validar uma versão completa:
 |---------|------|
 | 📖 Arquitetura | [ARCHITECTURE.md](ARCHITECTURE.md) |
 | 🏛️ Status Refatoração | [REFACTORING_FINAL_STATUS.md](REFACTORING_FINAL_STATUS.md) |
-| 📝 Features | [features.md](features.md) |
+| 📝 Features | [FEATURES.md](FEATURES.md) |
 | 🎤 Fluxo Áudio | [FLUXO_FALA_SILENCIO.md](FLUXO_FALA_SILENCIO.md) |
 | 🔊 Deepgram Flow | [transcription_flow_deepgram.md](transcription_flow_deepgram.md) |
 | 🎙️ Whisper Flow | [transcription_flow_other_models.md](transcription_flow_other_models.md) |

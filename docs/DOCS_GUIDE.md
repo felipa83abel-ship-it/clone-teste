@@ -45,7 +45,7 @@ Escolha sua seção:
 | 🎙️ Whisper | [transcription_flow_other_models.md](transcription_flow_other_models.md) | Integração OpenAI Whisper |
 
 ### "Quero lista de features" ➡️
-👉 [**features.md**](features.md) - Lista completa de funcionalidades
+👉 [**FEATURES.md**](FEATURES.md) - Lista completa de funcionalidades
 
 ### "Quero status da refatoração" ➡️
 👉 [**REFACTORING_FINAL_STATUS.md**](REFACTORING_FINAL_STATUS.md) - O que foi refatorado
@@ -108,7 +108,7 @@ docs/
 ├── 🎙️ transcription_flow_other_models.md
 │   └─ Integração OpenAI Whisper
 │
-├── ✨ features.md
+├── ✨ FEATURES.md
 │   └─ Lista de funcionalidades
 │
 └── 📋 REFACTORING_FINAL_STATUS.md
@@ -239,7 +239,7 @@ Logs específicos esperados
 | Testar Áudio | [TEST_AUDIO_SCREEN.md](TEST_AUDIO_SCREEN.md) |
 | Testar Configurações | [TEST_OTHER.md](TEST_OTHER.md) |
 | Testar Privacidade | [TEST_PRIVACY.md](TEST_PRIVACY.md) |
-| Ver Features | [features.md](features.md) |
+| Ver Features | [FEATURES.md](FEATURES.md) |
 | Status Refator | [REFACTORING_FINAL_STATUS.md](REFACTORING_FINAL_STATUS.md) |
 
 ---
