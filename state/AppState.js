@@ -43,6 +43,10 @@ class AppState {
 			totalTime: null,
 			audioSize: 0,
 		};
+
+		this.llm = {
+			selectedProvider: 'openai', // Provider padrão
+		};
 	}
 
 	// ============================================
@@ -165,6 +169,15 @@ class AppState {
 		this.metrics = value;
 	}
 
+	// LLM state getters/setters
+	get selectedProvider() {
+		return this.llm.selectedProvider;
+	}
+
+	set selectedProvider(value) {
+		this.llm.selectedProvider = value;
+	}
+
 	// ============================================
 	// MÉTODOS AUXILIARES
 	// ============================================
@@ -252,6 +265,10 @@ class AppState {
 			gptEndTime: null,
 			totalTime: null,
 			audioSize: 0,
+		};
+
+		this.llm = {
+			selectedProvider: 'openai',
 		};
 	}
 }
