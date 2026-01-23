@@ -26,12 +26,18 @@ const LLMManager = require('./llm/LLMManager.js');
 const openaiHandler = require('./llm/handlers/openai-handler.js');
 const geminiHandler = require('./llm/handlers/gemini-handler.js');
 const { validateLLMRequest, handleLLMStream, handleLLMBatch } = require('./handlers/llmHandlers.js');
+const { ModeManager, MODES, InterviewModeHandlers, NormalModeHandlers } = require('./mode-manager.js');
 
 // 🎯 INSTANCIAR
 const appState = new AppState();
 const eventBus = new EventBus();
 const sttStrategy = new STTStrategy();
 const llmManager = new LLMManager();
+const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
+
+// 🎯 REGISTRAR MODOS
+modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
+modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
 
 // 🎯 REGISTRAR LLMs
 llmManager.register('openai', openaiHandler);
@@ -56,7 +62,7 @@ eventBus.on('llmStreamEnd', data => {
 
 	// 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
 	// Aqui só limpamos o CURRENT para próxima pergunta
-	if (ModeController.isInterviewMode()) {
+	if (modeManager.is(MODES.INTERVIEW)) {
 		appState.interview.gptAnsweredTurnId = appState.interview.interviewTurnId;
 		resetCurrentQuestion();
 		renderCurrentQuestion();
@@ -146,16 +152,9 @@ const MODES = {
 // 🔄 modo atual (default = comportamento atual)
 let CURRENT_MODE = MODES.NORMAL;
 
-// Controlador de modo
-const ModeController = {
-	/**
-	 * Verifica se está em modo entrevista
-	 * @returns {boolean} true se modo entrevista
-	 */
-	isInterviewMode() {
-		return CURRENT_MODE === MODES.INTERVIEW;
-	},
-};
+// ✅ DEPRECATED: ModeController substituído por modeManager (Fase 4)
+// Antes: modeManager.is(MODES.INTERVIEW)
+// Agora: modeManager.is(MODES.INTERVIEW) ou modeManager.is(MODES.NORMAL)
 
 const ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
@@ -649,7 +648,7 @@ function handleQuestionClick(questionId) {
 	}
 
 	if (
-		ModeController.isInterviewMode() &&
+		modeManager.is(MODES.INTERVIEW) &&
 		appState.selectedId === CURRENT_QUESTION_ID &&
 		appState.interview.gptAnsweredTurnId === appState.interview.interviewTurnId
 	) {
@@ -828,7 +827,7 @@ function finalizeCurrentQuestion() {
 	}
 
 	// ⚠️ No modo entrevista: PROMOVER ANTES de chamar LLM
-	if (ModeController.isInterviewMode()) {
+	if (modeManager.is(MODES.INTERVIEW)) {
 		appState.interview.currentQuestion.text = finalizeQuestion(appState.interview.currentQuestion.text);
 		appState.interview.currentQuestion.lastUpdateTime = Date.now();
 		appState.interview.currentQuestion.finalized = true;
@@ -871,7 +870,7 @@ function finalizeCurrentQuestion() {
 	}
 
 	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
-	if (!ModeController.isInterviewMode()) {
+	if (!modeManager.is(MODES.INTERVIEW)) {
 		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', appState.interview.currentQuestion.text);
 
 		// promoteCurrentToHistory(appState.interview.currentQuestion.text);
@@ -954,7 +953,7 @@ async function askLLM(questionId = null) {
 		}
 
 		// 2. Rotear por modo (não por LLM!)
-		const isInterviewMode = ModeController.isInterviewMode();
+		const isInterviewMode = modeManager.is(MODES.INTERVIEW);
 
 		// Obter turnId da pergunta para passar ao LLM
 		const questionEntry = appState.history.find(q => q.id === targetQuestionId);
