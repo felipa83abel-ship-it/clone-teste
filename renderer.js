@@ -215,9 +215,9 @@ let appState.interview.currentQuestion = {
 	finalText: '',
 	interimText: '',
 };
-let appState.interview.questionsHistory = [];
+let appState.history = [];
 const answeredQuestions = new Set(); // 🔒 Armazena respostas já geradas (questionId -> true)
-let appState.interview.selectedQuestionId = null;
+let appState.selectedId = null;
 let appState.interview.interviewTurnId = 0;
 let appState.interview.gptAnsweredTurnId = null;
 let appState.interview.gptRequestedTurnId = null;
@@ -425,7 +425,7 @@ function renderQuestionsHistory() {
 	Logger.debug('Início da função: "renderQuestionsHistory"');
 
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
-	const historyData = [...appState.interview.questionsHistory].reverse().map(q => {
+	const historyData = [...appState.history].reverse().map(q => {
 		let label = q.text;
 		if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && q.lastUpdateTime) {
 			const time = new Date(q.lastUpdateTime).toLocaleTimeString();
@@ -438,7 +438,7 @@ function renderQuestionsHistory() {
 			text: label,
 			isIncomplete: q.incomplete,
 			isAnswered: q.answered,
-			isSelected: q.id === appState.interview.selectedQuestionId,
+			isSelected: q.id === appState.selectedId,
 		};
 	});
 
@@ -458,12 +458,12 @@ function getSelectedQuestionText() {
 	Logger.debug('Fim da função: "getSelectedQuestionText"');
 
 	// 1️⃣ Se existe seleção explícita
-	if (appState.interview.selectedQuestionId === CURRENT_QUESTION_ID) {
+	if (appState.selectedId === CURRENT_QUESTION_ID) {
 		return appState.interview.currentQuestion.text;
 	}
 
-	if (appState.interview.selectedQuestionId) {
-		const q = appState.interview.questionsHistory.find(q => q.id === appState.interview.selectedQuestionId);
+	if (appState.selectedId) {
+		const q = appState.history.find(q => q.id === appState.selectedId);
 		if (q?.text) return q.text;
 	}
 
@@ -720,7 +720,7 @@ function renderCurrentQuestion() {
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const questionData = {
 		text: label,
-		isSelected: appState.interview.selectedQuestionId === CURRENT_QUESTION_ID,
+		isSelected: appState.selectedId === CURRENT_QUESTION_ID,
 		rawText: appState.interview.currentQuestion.text,
 		createdAt: appState.interview.currentQuestion.createdAt,
 		lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime,
@@ -738,7 +738,7 @@ function renderCurrentQuestion() {
  */
 function handleQuestionClick(questionId) {
 	Logger.debug('Início da função: "handleQuestionClick"');
-	appState.interview.selectedQuestionId = questionId;
+	appState.selectedId = questionId;
 	clearAllSelections();
 	renderQuestionsHistory();
 	renderCurrentQuestion();
@@ -761,7 +761,7 @@ function handleQuestionClick(questionId) {
 
 	// Se for uma pergunta do histórico marcada como incompleta, não enviar automaticamente ao GPT
 	if (questionId !== CURRENT_QUESTION_ID) {
-		const q = appState.interview.questionsHistory.find(q => q.id === questionId);
+		const q = appState.history.find(q => q.id === questionId);
 		if (q && q.incomplete) {
 			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
@@ -772,7 +772,7 @@ function handleQuestionClick(questionId) {
 
 	if (
 		ModeController.isInterviewMode() &&
-		appState.interview.selectedQuestionId === CURRENT_QUESTION_ID &&
+		appState.selectedId === CURRENT_QUESTION_ID &&
 		appState.interview.gptAnsweredTurnId === appState.interview.interviewTurnId
 	) {
 		updateStatusMessage('⛔ GPT já respondeu esse turno');
@@ -800,8 +800,8 @@ function handleQuestionClick(questionId) {
 			appState.interview.interviewTurnId++;
 			appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
 
-			const newId = String(appState.interview.questionsHistory.length + 1);
-			appState.interview.questionsHistory.push({
+			const newId = String(appState.history.length + 1);
+			appState.history.push({
 				id: newId,
 				text: appState.interview.currentQuestion.text,
 				turnId: appState.interview.currentQuestion.turnId,
@@ -811,7 +811,7 @@ function handleQuestionClick(questionId) {
 
 			appState.interview.currentQuestion.promotedToHistory = true;
 			resetCurrentQuestion();
-			appState.interview.selectedQuestionId = newId;
+			appState.selectedId = newId;
 			renderQuestionsHistory();
 			renderCurrentQuestion();
 
@@ -841,7 +841,7 @@ function handleQuestionClick(questionId) {
  */
 function scrollToSelectedQuestion() {
 	emitUIChange('onScrollToQuestion', {
-		questionId: appState.interview.selectedQuestionId,
+		questionId: appState.selectedId,
 	});
 }
 
@@ -911,8 +911,8 @@ function handleCurrentQuestion(author, text, options = {}) {
 		Logger.debug('appState.interview.currentQuestion depois: ', { ...appState.interview.currentQuestion }, false);
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
-		if (!appState.interview.selectedQuestionId) {
-			appState.interview.selectedQuestionId = CURRENT_QUESTION_ID;
+		if (!appState.selectedId) {
+			appState.selectedId = CURRENT_QUESTION_ID;
 			clearAllSelections();
 		}
 
@@ -957,13 +957,13 @@ function finalizeCurrentQuestion() {
 
 		// 🔥 [NOVO] PROMOVER PARA HISTÓRICO ANTES DE CHAMAR LLM
 		// Isso garante que o texto está seguro e imutável durante resposta do GPT
-		const newId = String(appState.interview.questionsHistory.length + 1);
+		const newId = String(appState.history.length + 1);
 
 		// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
 		appState.interview.interviewTurnId++;
 		appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
 
-		appState.interview.questionsHistory.push({
+		appState.history.push({
 			id: newId,
 			text: appState.interview.currentQuestion.text,
 			turnId: appState.interview.currentQuestion.turnId, // 🔥 Incluir turnId na entrada do histórico
@@ -978,7 +978,7 @@ function finalizeCurrentQuestion() {
 		resetCurrentQuestion();
 
 		// garante seleção lógica
-		appState.interview.selectedQuestionId = newId;
+		appState.selectedId = newId;
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
@@ -997,8 +997,8 @@ function finalizeCurrentQuestion() {
 		console.log('⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:', appState.interview.currentQuestion.text);
 
 		// promoteCurrentToHistory(appState.interview.currentQuestion.text);
-		const newId = String(appState.interview.questionsHistory.length + 1);
-		appState.interview.questionsHistory.push({
+		const newId = String(appState.history.length + 1);
+		appState.history.push({
 			id: newId,
 			text: appState.interview.currentQuestion.text,
 			turnId: appState.interview.currentQuestion.turnId,
@@ -1006,7 +1006,7 @@ function finalizeCurrentQuestion() {
 			lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || appState.interview.currentQuestion.createdAt || Date.now(),
 		});
 
-		appState.interview.selectedQuestionId = newId;
+		appState.selectedId = newId;
 		resetCurrentQuestion();
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
@@ -1027,14 +1027,14 @@ function closeCurrentQuestionForced() {
 
 	if (!appState.interview.currentQuestion.text) return;
 
-	appState.interview.questionsHistory.push({
+	appState.history.push({
 		id: crypto.randomUUID(),
 		text: finalizeQuestion(appState.interview.currentQuestion.text),
 		createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
 	});
 
 	appState.interview.currentQuestion.text = '';
-	appState.interview.selectedQuestionId = null; // 👈 libera seleção
+	appState.selectedId = null; // 👈 libera seleção
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
@@ -1050,12 +1050,12 @@ function closeCurrentQuestionForced() {
  * ✅ REFATORADA: agora é simples e legível!
  * ✅ CENTRALIZADA: Uma única função para todos os LLMs
  * ✅ Não há duplicação de askLLM() por LLM
- * @param {string} questionId - ID da pergunta a responder (padrão: appState.interview.selectedQuestionId)
+ * @param {string} questionId - ID da pergunta a responder (padrão: appState.selectedId)
  */
 async function askLLM(questionId = null) {
 	try {
 		const CURRENT_QUESTION_ID = 'CURRENT';
-		const targetQuestionId = questionId || appState.interview.selectedQuestionId;
+		const targetQuestionId = questionId || appState.selectedId;
 
 		// 1. Validar (antigo validateAskGptRequest)
 		const {
@@ -1079,7 +1079,7 @@ async function askLLM(questionId = null) {
 		const isInterviewMode = ModeController.isInterviewMode();
 
 		// Obter turnId da pergunta para passar ao LLM
-		const questionEntry = appState.interview.questionsHistory.find(q => q.id === targetQuestionId);
+		const questionEntry = appState.history.find(q => q.id === targetQuestionId);
 		const turnId = questionEntry?.turnId || null;
 
 		if (isInterviewMode) {
@@ -1213,10 +1213,10 @@ async function analyzeScreenshots() {
 
 		// ✅ Renderiza resposta do GPT
 		const questionText = `📸 Análise de ${appState.audio.capturedScreenshots.length} screenshot(s)`;
-		const questionId = String(appState.interview.questionsHistory.length + 1);
+		const questionId = String(appState.history.length + 1);
 
 		// Adiciona "pergunta" ao histórico ANTES de renderizar respostas
-		appState.interview.questionsHistory.push({
+		appState.history.push({
 			id: questionId,
 			text: questionText,
 			createdAt: Date.now(),
@@ -1339,9 +1339,9 @@ async function resetAppState() {
 			finalText: '',
 			interimText: '',
 		};
-		appState.interview.questionsHistory = [];
+		appState.history = [];
 		answeredQuestions.clear();
-		appState.interview.selectedQuestionId = null;
+		appState.selectedId = null;
 		appState.interview.lastAskedQuestionNormalized = null;
 		console.log('✅ Perguntas e respostas limpas');
 		await releaseThread();
@@ -1484,8 +1484,8 @@ const RendererAPI = {
 	handleQuestionClick,
 
 	// 🔥 NOVO: Expor appState.interview.selectedQuestionId para atalhos em config-manager.js
-	get appState.interview.selectedQuestionId() {
-		return appState.interview.selectedQuestionId;
+	get appState.selectedId() {
+		return appState.selectedId;
 	},
 
 	// UI
@@ -1561,7 +1561,7 @@ const RendererAPI = {
 		const all = getNavigableQuestionIds();
 		if (all.length === 0) return;
 
-		let index = all.indexOf(appState.interview.selectedQuestionId);
+		let index = all.indexOf(appState.selectedId);
 		if (index === -1) {
 			// Nenhuma seleção: começa do começo ou do fim
 			index = direction === 'up' ? all.length - 1 : 0;
@@ -1573,7 +1573,7 @@ const RendererAPI = {
 			index = Math.max(0, Math.min(index, all.length - 1));
 		}
 
-		appState.interview.selectedQuestionId = all[index];
+		appState.selectedId = all[index];
 		clearAllSelections();
 		renderQuestionsHistory();
 		renderCurrentQuestion();
@@ -1581,7 +1581,7 @@ const RendererAPI = {
 		if (APP_CONFIG.MODE_DEBUG) {
 			const msg = direction === 'up' ? '🧪 Ctrl+ArrowUp detectado (teste)' : '🧪 Ctrl+ArrowDown detectado (teste)';
 			updateStatusMessage(msg);
-			console.log('📌 Atalho Selecionou:', appState.interview.selectedQuestionId);
+			console.log('📌 Atalho Selecionou:', appState.selectedId);
 		}
 	},
 

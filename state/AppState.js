@@ -168,6 +168,26 @@ class AppState {
 	// ============================================
 	// MÉTODOS AUXILIARES
 	// ============================================
+	
+	// Helper para acesso rápido a currentQuestion (usado 72+ vezes)
+	get q() {
+		return this.interview.currentQuestion;
+	}
+
+	// Helper para acesso rápido a questionsHistory (usado 15+ vezes)
+	get history() {
+		return this.interview.questionsHistory;
+	}
+
+	// Helper para acesso rápido a selectedQuestionId (usado 24+ vezes)
+	get selectedId() {
+		return this.interview.selectedQuestionId;
+	}
+
+	set selectedId(value) {
+		this.interview.selectedQuestionId = value;
+	}
+
 	getCurrentQuestion() {
 		return this.interview.currentQuestion;
 	}
