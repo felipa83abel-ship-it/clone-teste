@@ -394,8 +394,8 @@ function getConfiguredSTTModel() {
  * @returns {string} Pergunta finalizada
  */
 function finalizeQuestion(t) {
-	debugLogRenderer('Início da função: "finalizeQuestion"');
-	debugLogRenderer('Fim da função: "finalizeQuestion"');
+	Logger.debug('Início da função: "finalizeQuestion"');
+	Logger.debug('Fim da função: "finalizeQuestion"');
 	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
 }
 
@@ -403,7 +403,7 @@ function finalizeQuestion(t) {
  * Reseta o estado da pergunta atual (CURRENT)
  */
 function resetCurrentQuestion() {
-	debugLogRenderer('Início da função: "resetCurrentQuestion"');
+	Logger.debug('Início da função: "resetCurrentQuestion"');
 
 	currentQuestion = {
 		text: '',
@@ -417,14 +417,14 @@ function resetCurrentQuestion() {
 		interimText: '',
 	};
 
-	debugLogRenderer('Fim da função: "resetCurrentQuestion"');
+	Logger.debug('Fim da função: "resetCurrentQuestion"');
 }
 
 /**
  * Renderiza o histórico de perguntas
  */
 function renderQuestionsHistory() {
-	debugLogRenderer('Início da função: "renderQuestionsHistory"');
+	Logger.debug('Início da função: "renderQuestionsHistory"');
 
 	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
 	const historyData = [...questionsHistory].reverse().map(q => {
@@ -448,7 +448,7 @@ function renderQuestionsHistory() {
 
 	scrollToSelectedQuestion();
 
-	debugLogRenderer('Fim da função: "renderQuestionsHistory"');
+	Logger.debug('Fim da função: "renderQuestionsHistory"');
 }
 
 /**
@@ -456,8 +456,8 @@ function renderQuestionsHistory() {
  * @returns {string} Texto da pergunta selecionada
  */
 function getSelectedQuestionText() {
-	debugLogRenderer('Início da função: "getSelectedQuestionText"');
-	debugLogRenderer('Fim da função: "getSelectedQuestionText"');
+	Logger.debug('Início da função: "getSelectedQuestionText"');
+	Logger.debug('Fim da função: "getSelectedQuestionText"');
 
 	// 1️⃣ Se existe seleção explícita
 	if (selectedQuestionId === CURRENT_QUESTION_ID) {
@@ -484,8 +484,8 @@ function getSelectedQuestionText() {
  * @returns {string} Texto normalizado
  */
 function normalizeForCompare(t) {
-	debugLogRenderer('Início da função: "normalizeForCompare"');
-	debugLogRenderer('Fim da função: "normalizeForCompare"');
+	Logger.debug('Início da função: "normalizeForCompare"');
+	Logger.debug('Fim da função: "normalizeForCompare"');
 	return (t || '')
 		.toLowerCase()
 		.replace(/[?!.\n\r]/g, '')
@@ -498,9 +498,9 @@ function normalizeForCompare(t) {
  * @param {string} message - Mensagem de status
  */
 function updateStatusMessage(message) {
-	debugLogRenderer('Início da função: "updateStatusMessage"');
+	Logger.debug('Início da função: "updateStatusMessage"');
 	emitUIChange('onStatusUpdate', { message });
-	debugLogRenderer('Fim da função: "updateStatusMessage"');
+	Logger.debug('Fim da função: "updateStatusMessage"');
 }
 
 /**
@@ -509,15 +509,15 @@ function updateStatusMessage(message) {
  * @returns {boolean} true se pergunta já foi respondida
  */
 function findAnswerByQuestionId(questionId) {
-	debugLogRenderer('Início da função: "findAnswerByQuestionId"');
+	Logger.debug('Início da função: "findAnswerByQuestionId"');
 
 	if (!questionId) {
 		// ID inválido
-		debugLogRenderer('Fim da função: "findAnswerByQuestionId"');
+		Logger.debug('Fim da função: "findAnswerByQuestionId"');
 		return false;
 	}
 
-	debugLogRenderer('Fim da função: "findAnswerByQuestionId"');
+	Logger.debug('Fim da função: "findAnswerByQuestionId"');
 	return answeredQuestions.has(questionId);
 }
 
@@ -526,14 +526,14 @@ function findAnswerByQuestionId(questionId) {
  * @param {string} text - Texto da pergunta
  */
 function promoteCurrentToHistory(text) {
-	debugLogRenderer('Início da função: "promoteCurrentToHistory"');
+	Logger.debug('Início da função: "promoteCurrentToHistory"');
 
-	debugLogRenderer('📚 promovendo pergunta para histórico:', text, false);
+	Logger.debug('📚 promovendo pergunta para histórico:', text, false);
 
 	// evita duplicação no histórico: se a última entrada é igual (normalizada), não adiciona
 	const last = questionsHistory.length ? questionsHistory[questionsHistory.length - 1] : null;
 	if (last && normalizeForCompare(last.text) === normalizeForCompare(text)) {
-		debugLogRenderer('🔕 pergunta igual já presente no histórico — pulando promoção', false);
+		Logger.debug('🔕 pergunta igual já presente no histórico — pulando promoção', false);
 
 		// limpa CURRENT mas preserva seleção conforme antes
 		const prevSelected = selectedQuestionId;
@@ -573,11 +573,11 @@ function promoteCurrentToHistory(text) {
 	if (answeredQuestions.has(CURRENT_QUESTION_ID)) {
 		answeredQuestions.delete(CURRENT_QUESTION_ID);
 		answeredQuestions.add(newId);
-		debugLogRenderer('🔄 [IMPORTANTE] Migrada resposta de CURRENT para newId:', newId, false);
+		Logger.debug('🔄 [IMPORTANTE] Migrada resposta de CURRENT para newId:', newId, false);
 	}
 
 	// 🔥 [CRÍTICO] Atualizar o ID do bloco de resposta no DOM se ele foi criado com CURRENT
-	debugLogRenderer(
+	Logger.debug(
 		'🔄 [IMPORTANTE] Emitindo onAnswerIdUpdate para atualizar bloco de resposta: CURRENT → ',
 		newId,
 		false,
@@ -591,7 +591,7 @@ function promoteCurrentToHistory(text) {
 	// atualizar o rastreamento para apontar para o novo ID promovido
 	if (gptRequestedQuestionId === CURRENT_QUESTION_ID) {
 		gptRequestedQuestionId = newId;
-		debugLogRenderer('🔄 [IMPORTANTE] gptRequestedQuestionId atualizado de CURRENT para newId:', newId, false);
+		Logger.debug('🔄 [IMPORTANTE] gptRequestedQuestionId atualizado de CURRENT para newId:', newId, false);
 	}
 
 	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
@@ -610,7 +610,7 @@ function promoteCurrentToHistory(text) {
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
-	debugLogRenderer('Fim da função: "promoteCurrentToHistory"');
+	Logger.debug('Fim da função: "promoteCurrentToHistory"');
 }
 
 /**
@@ -705,25 +705,25 @@ async function stopAudio() {
  * Reinicia pipeline de áudio
  */
 async function restartAudioPipeline() {
-	debugLogRenderer('Início da função: "restartAudioPipeline"');
+	Logger.debug('Início da função: "restartAudioPipeline"');
 
 	stopAudio();
 
-	debugLogRenderer('Fim da função: "restartAudioPipeline"');
+	Logger.debug('Fim da função: "restartAudioPipeline"');
 }
 
 /**
  * Toggle do botão de iniciar/parar escuta (Ctrl+D)
  */
 async function listenToggleBtn() {
-	debugLogRenderer('Início da função: "listenToggleBtn"');
+	Logger.debug('Início da função: "listenToggleBtn"');
 
 	if (!isRunning) {
 		console.log('🎤 listenToggleBtn: Tentando INICIAR escuta...');
 
 		// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
 		const { active: hasModel, model: activeModel } = hasActiveModel();
-		debugLogRenderer(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`, false);
+		Logger.debug(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`, false);
 
 		if (!hasModel) {
 			const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
@@ -734,7 +734,7 @@ async function listenToggleBtn() {
 
 		// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
 		const hasOutputDevice = UIElements.outputSelect?.value;
-		debugLogRenderer(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
+		Logger.debug(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
 
 		if (!hasOutputDevice) {
 			const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
@@ -761,7 +761,7 @@ async function listenToggleBtn() {
 
 	await (isRunning ? startAudio() : stopAudio());
 
-	debugLogRenderer('Fim da função: "listenToggleBtn"');
+	Logger.debug('Fim da função: "listenToggleBtn"');
 }
 
 /**
@@ -769,7 +769,7 @@ async function listenToggleBtn() {
  * @returns {object} { active: boolean, model: string|null }
  */
 function hasActiveModel() {
-	debugLogRenderer('Início da função: "hasActiveModel"');
+	Logger.debug('Início da função: "hasActiveModel"');
 	if (!window.configManager) {
 		console.warn('⚠️ ConfigManager não inicializado ainda');
 		return { active: false, model: null };
@@ -792,7 +792,7 @@ function hasActiveModel() {
 
 	console.warn('⚠️ Nenhum modelo ativo encontrado');
 
-	debugLogRenderer('Fim da função: "hasActiveModel"');
+	Logger.debug('Fim da função: "hasActiveModel"');
 	return { active: false, model: null };
 }
 
@@ -804,7 +804,7 @@ function hasActiveModel() {
  * Renderiza a pergunta atual (CURRENT)
  */
 function renderCurrentQuestion() {
-	debugLogRenderer('Início da função: "renderCurrentQuestion"');
+	Logger.debug('Início da função: "renderCurrentQuestion"');
 
 	// Se não há texto, emite vazio
 	if (!currentQuestion.text) {
@@ -832,7 +832,7 @@ function renderCurrentQuestion() {
 	// Emite evento para o config-manager renderizar no DOM
 	emitUIChange('onCurrentQuestionUpdate', questionData);
 
-	debugLogRenderer('Fim da função: "renderCurrentQuestion"');
+	Logger.debug('Fim da função: "renderCurrentQuestion"');
 }
 
 /**
@@ -840,7 +840,7 @@ function renderCurrentQuestion() {
  * @param {string} questionId - ID da pergunta selecionada
  */
 function handleQuestionClick(questionId) {
-	debugLogRenderer('Início da função: "handleQuestionClick"');
+	Logger.debug('Início da função: "handleQuestionClick"');
 	selectedQuestionId = questionId;
 	clearAllSelections();
 	renderQuestionsHistory();
@@ -857,7 +857,7 @@ function handleQuestionClick(questionId) {
 			});
 
 			updateStatusMessage('📌 Essa pergunta já foi respondida');
-			debugLogRenderer('Fim da função: "handleQuestionClick" (pergunta já respondida, sem re-perguntar)');
+			Logger.debug('Fim da função: "handleQuestionClick" (pergunta já respondida, sem re-perguntar)');
 			return; // 🔥 CRÍTICO: Retornar aqui, não chamar askLLM()
 		}
 	}
@@ -868,7 +868,7 @@ function handleQuestionClick(questionId) {
 		if (q && q.incomplete) {
 			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
-			debugLogRenderer('Fim da função: "handleQuestionClick" (pergunta incompleta)');
+			Logger.debug('Fim da função: "handleQuestionClick" (pergunta incompleta)');
 			return; // 🔥 CRÍTICO: Retornar aqui também
 		}
 	}
@@ -880,7 +880,7 @@ function handleQuestionClick(questionId) {
 	) {
 		updateStatusMessage('⛔ GPT já respondeu esse turno');
 		console.log('⛔ GPT já respondeu esse turno');
-		debugLogRenderer('Fim da função: "handleQuestionClick" (GPT já respondeu)');
+		Logger.debug('Fim da função: "handleQuestionClick" (GPT já respondeu)');
 		return; // 🔥 CRÍTICO: Retornar aqui
 	}
 
@@ -889,7 +889,7 @@ function handleQuestionClick(questionId) {
 	if (questionId === CURRENT_QUESTION_ID) {
 		if (!currentQuestion.text || !currentQuestion.text.trim()) {
 			updateStatusMessage('⚠️ Pergunta vazia - nada a responder');
-			debugLogRenderer('Fim da função: "handleQuestionClick" (pergunta vazia)');
+			Logger.debug('Fim da função: "handleQuestionClick" (pergunta vazia)');
 			return;
 		}
 
@@ -918,11 +918,11 @@ function handleQuestionClick(questionId) {
 			renderQuestionsHistory();
 			renderCurrentQuestion();
 
-			debugLogRenderer('🔥 CURRENT promovido para histórico via handleQuestionClick', { newId }, false);
+			Logger.debug('🔥 CURRENT promovido para histórico via handleQuestionClick', { newId }, false);
 
 			// Chamar askLLM com o novo ID promovido
 			askLLM(newId);
-			debugLogRenderer('Fim da função: "handleQuestionClick" (CURRENT promovido e askLLM chamado)');
+			Logger.debug('Fim da função: "handleQuestionClick" (CURRENT promovido e askLLM chamado)');
 			return;
 		}
 	}
@@ -930,7 +930,7 @@ function handleQuestionClick(questionId) {
 	// ❓ Ainda não respondida → chama GPT (click ou atalho)
 	askLLM();
 
-	debugLogRenderer('Fim da função: "handleQuestionClick"');
+	Logger.debug('Fim da função: "handleQuestionClick"');
 }
 
 /**
@@ -975,7 +975,7 @@ marked.setOptions({
  * @param {object} options - Opções (isInterim, shouldFinalizeAskCurrent)
  */
 function handleCurrentQuestion(author, text, options = {}) {
-	debugLogRenderer('Início da função: "handleCurrentQuestion"');
+	Logger.debug('Início da função: "handleCurrentQuestion"');
 
 	const cleaned = text.replace(/Ê+|hum|ahn/gi, '').trim();
 
@@ -993,7 +993,7 @@ function handleCurrentQuestion(author, text, options = {}) {
 		currentQuestion.lastUpdateTime = now;
 		currentQuestion.lastUpdate = now;
 
-		debugLogRenderer('currentQuestion antes: ', { ...currentQuestion }, false);
+		Logger.debug('currentQuestion antes: ', { ...currentQuestion }, false);
 
 		// Lógica de consolidação para evitar duplicações
 		if (options.isInterim) {
@@ -1005,13 +1005,13 @@ function handleCurrentQuestion(author, text, options = {}) {
 			currentQuestion.finalText = (currentQuestion.finalText ? currentQuestion.finalText + ' ' : '') + cleaned;
 		}
 
-		debugLogRenderer('currentQuestion durante: ', { ...currentQuestion }, false);
+		Logger.debug('currentQuestion durante: ', { ...currentQuestion }, false);
 
 		// Atualizar o texto total
 		currentQuestion.text =
 			currentQuestion.finalText.trim() + (currentQuestion.interimText ? ' ' + currentQuestion.interimText : '');
 
-		debugLogRenderer('currentQuestion depois: ', { ...currentQuestion }, false);
+		Logger.debug('currentQuestion depois: ', { ...currentQuestion }, false);
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
 		if (!selectedQuestionId) {
@@ -1024,21 +1024,21 @@ function handleCurrentQuestion(author, text, options = {}) {
 
 		// Só finaliza se estivermos em silêncio e NÃO for um interim
 		if (options.shouldFinalizeAskCurrent && !options.isInterim) {
-			debugLogRenderer('🟢 ********  Está em silêncio, feche a pergunta e chame o GPT 🤖 ******** 🟢', true);
+			Logger.debug('🟢 ********  Está em silêncio, feche a pergunta e chame o GPT 🤖 ******** 🟢', true);
 
 			// fecha/finaliza a pergunta atual
 			finalizeCurrentQuestion();
 		}
 	}
 
-	debugLogRenderer('Fim da função: "handleCurrentQuestion"');
+	Logger.debug('Fim da função: "handleCurrentQuestion"');
 }
 
 /**
  * Finaliza a pergunta atual para histórico
  */
 function finalizeCurrentQuestion() {
-	debugLogRenderer('Início da função: "finalizeCurrentQuestion"');
+	Logger.debug('Início da função: "finalizeCurrentQuestion"');
 
 	// Se não há texto, ignorar
 	if (!currentQuestion.text || !currentQuestion.text.trim()) {
@@ -1091,7 +1091,7 @@ function finalizeCurrentQuestion() {
 			askLLM(newId); // Passar ID promovido para LLM
 		}
 
-		debugLogRenderer('Fim da função: "finalizeCurrentQuestion"');
+		Logger.debug('Fim da função: "finalizeCurrentQuestion"');
 		return;
 	}
 
@@ -1114,7 +1114,7 @@ function finalizeCurrentQuestion() {
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
-		debugLogRenderer('Fim da função: "finalizeCurrentQuestion"');
+		Logger.debug('Fim da função: "finalizeCurrentQuestion"');
 		return;
 	}
 }
@@ -1123,7 +1123,7 @@ function finalizeCurrentQuestion() {
  * Força o fechamento da pergunta atual, promovendo-a ao histórico
  */
 function closeCurrentQuestionForced() {
-	debugLogRenderer('Início da função: "closeCurrentQuestionForced"');
+	Logger.debug('Início da função: "closeCurrentQuestionForced"');
 
 	// log temporario para testar a aplicação só remover depois
 	console.log('🚪 Fechando pergunta:', currentQuestion.text);
@@ -1141,7 +1141,7 @@ function closeCurrentQuestionForced() {
 	renderQuestionsHistory();
 	renderCurrentQuestion();
 
-	debugLogRenderer('Fim da função: "closeCurrentQuestionForced"');
+	Logger.debug('Fim da função: "closeCurrentQuestionForced"');
 }
 
 /* ================================ */
@@ -1874,27 +1874,6 @@ async function runMockAutoPlay() {
  * Último argumento opcional é booleano para mostrar ou não o log
  * @param {...any} args - Argumentos a logar
  */
-function debugLogRenderer(...args) {
-	const maybeFlag = args.at(-1);
-	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
-
-	const nowLog = new Date();
-	const timeStr =
-		`${nowLog.getHours().toString().padStart(2, '0')}:` +
-		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
-		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
-		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
-
-	if (showLog) {
-		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
-		// prettier-ignore
-		console.log(
-			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em renderer.js:`,
-			'color: brown; font-weight: bold;', 
-			...cleanArgs
-		);
-	}
-}
 
 /* ================================ */
 //	EXPORTAÇÃO PUBLIC API (RendererAPI)
