@@ -1101,7 +1101,11 @@ async function askLLM(questionId = null) {
 		const targetQuestionId = questionId || selectedQuestionId;
 
 		// 1. Validar (antigo validateAskGptRequest)
-		const { questionId: validatedId, text, isCurrent } = validateLLMRequest(appState, targetQuestionId, getSelectedQuestionText);
+		const {
+			questionId: validatedId,
+			text,
+			isCurrent,
+		} = validateLLMRequest(appState, targetQuestionId, getSelectedQuestionText);
 		Logger.info('Pergunta válida', { questionId: validatedId, textLength: text.length });
 
 		// Rastreamento antigo (compatibilidade)
