@@ -853,7 +853,7 @@ function handleQuestionClick(questionId) {
 	}
 
 	// ❓ Ainda não respondida → chama GPT (click ou atalho)
-	askGpt();
+	askLLM();
 
 	debugLogRenderer('Fim da função: "handleQuestionClick"');
 }
@@ -988,7 +988,7 @@ function finalizeCurrentQuestion() {
 
 		// chama GPT automaticamente se ainda não respondeu este turno
 		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
-			askGpt();
+			askLLM();
 		}
 
 		return;
@@ -1791,7 +1791,7 @@ function debugLogRenderer(...args) {
 const RendererAPI = {
 	// Áudio - Gravação
 	listenToggleBtn,
-	askGpt,
+	askLLM,
 	restartAudioPipeline,
 
 	// 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
