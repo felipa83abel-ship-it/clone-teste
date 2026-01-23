@@ -271,8 +271,9 @@ function initVoskProcess(source) {
 
 	vars._voskProcess.stderr.on('data', data => {
 		const line = data.toString().trim();
-		if (line && !line.includes('[VOSK]')) {
-			debugLogVosk(`[Vosk stderr] ${line}`, false);
+		if (line) {
+			// Exibe todos os erros de stderr do servidor Vosk
+			console.error(`[Vosk stderr] ${line}`);
 		}
 	});
 
@@ -471,8 +472,14 @@ async function onAudioChunkVosk(source, data, vars) {
 			audio: audioBase64,
 		};
 
-		// Envia direto ao Vosk via stdin (não IPC!)
-		vars._voskProcess.stdin.write(JSON.stringify(msg) + '\n');
+	// Envia direto ao Vosk via stdin (não IPC!)
+	// ⚠️ Verifica se o processo ainda está vivo
+	if (!vars._voskProcess || !vars._voskProcess.stdin) {
+		console.warn(`⚠️ Processo Vosk não está disponível, ignorando chunk`);
+		return;
+	}
+
+	vars._voskProcess.stdin.write(JSON.stringify(msg) + '\n');
 	} catch (error) {
 		console.error(`❌ Erro ao enviar chunk ao Vosk:`, error);
 	}
