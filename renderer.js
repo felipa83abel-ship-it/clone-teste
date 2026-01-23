@@ -40,6 +40,7 @@ llmManager.register('openai', openaiHandler);
 eventBus.on('answerStreamChunk', data => {
 	emitUIChange('onAnswerStreamChunk', {
 		questionId: data.questionId,
+		turnId: data.turnId, // 🔥 Passar turnId para UI
 		token: data.token,
 		accum: data.accum,
 	});
@@ -48,19 +49,12 @@ eventBus.on('answerStreamChunk', data => {
 eventBus.on('llmStreamEnd', data => {
 	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
 
-	// 🔥 [MODO ENTREVISTA] Após GPT responder, promover CURRENT para histórico e limpar
+	// 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
+	// Aqui só limpamos o CURRENT para próxima pergunta
 	if (ModeController.isInterviewMode()) {
 		gptAnsweredTurnId = interviewTurnId;
-
-		// Promove CURRENT para histórico se ainda não foi promovido
-		if (currentQuestion.text && !currentQuestion.promotedToHistory) {
-			debugLogRenderer(`🔥 [ENTREVISTA] Promovendo CURRENT para histórico após resposta do GPT`, true);
-			promoteCurrentToHistory(currentQuestion.text);
-			currentQuestion.promotedToHistory = true;
-		}
-
-		// 🔥 RESETA flag para permitir próxima pergunta
-		currentQuestion.isBeingAnswered = false;
+		resetCurrentQuestion();
+		renderCurrentQuestion();
 	}
 
 	emitUIChange('onAnswerStreamEnd', {});
@@ -206,7 +200,7 @@ let currentQuestion = {
 	lastUpdate: 0,
 	finalized: false,
 	promotedToHistory: false,
-	isBeingAnswered: false, // 🔥 Flag para pausar atualizações enquanto GPT responde
+	turnId: null, // 🔥 ID único para cada pergunta (incrementa quando nova fala chega)
 	lastUpdateTime: null,
 	createdAt: null,
 	finalText: '',
@@ -434,6 +428,7 @@ function renderQuestionsHistory() {
 
 		return {
 			id: q.id,
+			turnId: q.turnId, // 🔥 Incluir turnId para exibição visual
 			text: label,
 			isIncomplete: q.incomplete,
 			isAnswered: q.answered,
@@ -539,7 +534,7 @@ function promoteCurrentToHistory(text) {
 			lastUpdate: 0,
 			finalized: false,
 			promotedToHistory: false,
-			isBeingAnswered: false,
+			turnId: null,
 			lastUpdateTime: null,
 			createdAt: null,
 			finalText: '',
@@ -931,16 +926,11 @@ function handleCurrentQuestion(author, text, options = {}) {
 
 	// Apenas consolida falas no CURRENT do OTHER
 	if (author === OTHER) {
-		// 🔥 [CRÍTICO] Se pergunta está sendo respondida, IGNORA novas atualizações
-		if (currentQuestion.isBeingAnswered) {
-			debugLogRenderer(`⏸️ IGNORANDO atualização do CURRENT (pergunta sendo respondida pelo GPT)`, true);
-			return;
-		}
-
-		// Se não existe texto ainda, marca tempo de criação e incrementa turno
+		// Se não existe texto ainda, marca tempo de criação, incrementa turno e define turnId
 		if (!currentQuestion.text) {
 			currentQuestion.createdAt = now;
 			interviewTurnId++;
+			currentQuestion.turnId = interviewTurnId; // 🔥 Associar ID da pergunta ao turno
 		}
 
 		currentQuestion.lastUpdateTime = now;
@@ -1005,21 +995,43 @@ function finalizeCurrentQuestion() {
 		return;
 	}
 
-	// ⚠️ No modo entrevista, NÃO abortar o fechamento
+	// ⚠️ No modo entrevista: PROMOVER ANTES de chamar LLM
 	if (ModeController.isInterviewMode()) {
 		currentQuestion.text = finalizeQuestion(currentQuestion.text);
 		currentQuestion.lastUpdateTime = Date.now();
 		currentQuestion.finalized = true;
-		currentQuestion.isBeingAnswered = true; // 🔥 Pausa atualizações enquanto GPT responde
+
+		// 🔥 [NOVO] PROMOVER PARA HISTÓRICO ANTES DE CHAMAR LLM
+		// Isso garante que o texto está seguro e imutável durante resposta do GPT
+		const newId = String(questionsHistory.length + 1);
+		questionsHistory.push({
+			id: newId,
+			text: currentQuestion.text,
+			turnId: currentQuestion.turnId, // 🔥 Incluir turnId na entrada do histórico
+			createdAt: currentQuestion.createdAt || Date.now(),
+			lastUpdateTime: currentQuestion.lastUpdateTime || Date.now(),
+		});
+
+		currentQuestion.promotedToHistory = true;
+
+		// Emitir para UI atualizar visual do ID na pergunta
+		emitUIChange('onQuestionPromoted', {
+			newId: newId,
+			turnId: currentQuestion.turnId,
+		});
 
 		// garante seleção lógica
-		selectedQuestionId = CURRENT_QUESTION_ID;
+		selectedQuestionId = newId;
+		renderQuestionsHistory();
+		renderCurrentQuestion();
 
+		// 🔥 [NOVO] Chamar GPT DEPOIS que pergunta foi promovida e salva
 		// chama GPT automaticamente se ainda não respondeu este turno
 		if (gptRequestedTurnId !== interviewTurnId && gptAnsweredTurnId !== interviewTurnId) {
-			askLLM();
+			askLLM(newId); // Passar ID promovido para LLM
 		}
 
+		debugLogRenderer('Fim da função: "finalizeCurrentQuestion"');
 		return;
 	}
 
@@ -1032,6 +1044,7 @@ function finalizeCurrentQuestion() {
 		questionsHistory.push({
 			id: newId,
 			text: currentQuestion.text,
+			turnId: currentQuestion.turnId,
 			createdAt: currentQuestion.createdAt || Date.now(),
 			lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
 		});
@@ -1041,6 +1054,7 @@ function finalizeCurrentQuestion() {
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
+		debugLogRenderer('Fim da função: "finalizeCurrentQuestion"');
 		return;
 	}
 }
@@ -1079,14 +1093,16 @@ function closeCurrentQuestionForced() {
  * ✅ REFATORADA: agora é simples e legível!
  * ✅ CENTRALIZADA: Uma única função para todos os LLMs
  * ✅ Não há duplicação de askLLM() por LLM
+ * @param {string} questionId - ID da pergunta a responder (padrão: selectedQuestionId)
  */
-async function askLLM() {
+async function askLLM(questionId = null) {
 	try {
 		const CURRENT_QUESTION_ID = 'CURRENT';
+		const targetQuestionId = questionId || selectedQuestionId;
 
 		// 1. Validar (antigo validateAskGptRequest)
-		const { questionId, text, isCurrent } = validateLLMRequest(appState, selectedQuestionId, getSelectedQuestionText);
-		Logger.info('Pergunta válida', { questionId, textLength: text.length });
+		const { questionId: validatedId, text, isCurrent } = validateLLMRequest(appState, targetQuestionId, getSelectedQuestionText);
+		Logger.info('Pergunta válida', { questionId: validatedId, textLength: text.length });
 
 		// Rastreamento antigo (compatibilidade)
 		const normalizedText = normalizeForCompare(text);
@@ -1101,10 +1117,14 @@ async function askLLM() {
 		// 2. Rotear por modo (não por LLM!)
 		const isInterviewMode = ModeController.isInterviewMode();
 
+		// Obter turnId da pergunta para passar ao LLM
+		const questionEntry = questionsHistory.find(q => q.id === targetQuestionId);
+		const turnId = questionEntry?.turnId || null;
+
 		if (isInterviewMode) {
-			await handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);
+			await handleLLMStream(appState, validatedId, text, SYSTEM_PROMPT, eventBus, llmManager, turnId);
 		} else {
-			await handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager);
+			await handleLLMBatch(appState, validatedId, text, SYSTEM_PROMPT, eventBus, llmManager);
 		}
 		// O llmManager sabe qual LLM usar (OpenAI, Gemini, etc)
 		// Sem duplicação de código!
@@ -1352,7 +1372,7 @@ async function resetAppState() {
 			lastUpdate: 0,
 			finalized: false,
 			promotedToHistory: false,
-			isBeingAnswered: false,
+			turnId: null,
 			lastUpdateTime: null,
 			createdAt: null,
 			finalText: '',

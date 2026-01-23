@@ -1641,7 +1641,11 @@ class ConfigManager {
 				if (q.isSelected) div.classList.add('selected-question');
 				if (q.isAnswered) div.classList.add('answered');
 				if (q.isIncomplete) div.classList.add('incomplete');
-				div.innerHTML = `<span>${q.text}</span>`;
+				
+				// 🔥 Adicionar badge de turnId se disponível
+				const turnIdBadge = q.turnId ? `<span class="turn-id-badge">${q.turnId}</span>` : '';
+				div.innerHTML = `${turnIdBadge}<span>${q.text}</span>`;
+				
 				questionsHistoryBox.appendChild(div);
 			});
 		});
@@ -1694,13 +1698,14 @@ class ConfigManager {
 		// 📊 RASTREAMENTO SIMPLES - currentStreamingQuestionId é SUFICIENTE
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		let currentStreamingQuestionId = null; // Qual pergunta está sendo respondida AGORA
+		let currentStreamingTurnId = null; // TurnId da pergunta sendo respondida
 
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		// 📥 LISTENER: onAnswerStreamChunk
 		// Chamado para CADA token que chega do GPT
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		globalThis.RendererAPI.onUIChange('onAnswerStreamChunk', data => {
-			const { questionId, accum } = data;
+			const { questionId, turnId, accum } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
 
@@ -1715,7 +1720,10 @@ class ConfigManager {
 				wrapper = document.createElement('div');
 				wrapper.className = 'answer-block';
 				wrapper.dataset.questionId = questionId;
-				wrapper.innerHTML = `<div class="answer-content"></div>`;
+				
+				// 🔥 Adicionar badge de turnId se disponível
+				const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
+				wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
 
 				// Inserir NO TOPO
 				answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
@@ -1731,6 +1739,7 @@ class ConfigManager {
 
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
+				currentStreamingTurnId = turnId;
 
 				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, false);
 			}

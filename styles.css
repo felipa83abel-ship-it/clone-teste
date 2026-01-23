@@ -418,6 +418,9 @@ body {
 	padding: 10px 8px;
 	margin-bottom: 6px;
 	border-bottom: 1px dashed var(--border-muted);
+	display: flex; /* 🔥 Flexbox para acomodar badge */
+	align-items: center;
+	gap: 8px;
 }
 
 .question-block.answered {
@@ -450,6 +453,9 @@ body {
 	margin-bottom: 12px;
 	padding-bottom: 8px;
 	border-bottom: 2px dashed var(--border-muted);
+	display: flex; /* 🔥 Flexbox para acomodar badge */
+	align-items: flex-start;
+	gap: 8px;
 }
 
 .answer-block.active {
@@ -1178,6 +1184,39 @@ input:checked + .slider:before {
 	cursor: pointer;
 	font-size: 11px;
 	transition: all 0.2s;
+}
+
+/* 🔴 TURN ID BADGE - Círculo vermelho com número branco */
+.turn-id-badge {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 24px;
+	height: 24px;
+	min-width: 24px;
+	background: rgba(220, 53, 69, 0.95); /* Vermelho */
+	color: white;
+	border-radius: 50%;
+	font-size: 11px;
+	font-weight: bold;
+	box-shadow: 0 2px 6px rgba(220, 53, 69, 0.4);
+	margin-right: 8px;
+	flex-shrink: 0;
+	user-select: none;
+}
+
+/* Variação para resposta (azul) */
+.turn-id-badge.answer {
+	background: rgba(13, 110, 253, 0.95); /* Azul */
+	box-shadow: 0 2px 6px rgba(13, 110, 253, 0.4);
+}
+
+/* Variação hover para melhor visual */
+.turn-id-badge:hover {
+	background: rgba(220, 53, 69, 1);
+	box-shadow: 0 3px 10px rgba(220, 53, 69, 0.6);
+	transform: scale(1.05);
+}
 }
 
 .btn-clear-screenshots:hover {
