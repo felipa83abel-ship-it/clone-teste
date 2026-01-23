@@ -1541,9 +1541,6 @@ async function resetAppState() {
  * Função auxiliar para liberar a thread do navegador
  * Usada em resetAppState() para quebrar operações longas em chunks
  */
-function releaseThread(ms = 0) {
-	return new Promise(resolve => setTimeout(resolve, ms));
-}
 
 /* ================================ */
 //	MOCK / DEBUG
