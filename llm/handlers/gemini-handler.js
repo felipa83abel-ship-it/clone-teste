@@ -1,23 +1,19 @@
 /**
  * gemini-handler - Interface para Google Gemini
  *
- * ✅ TEMPLATE para integração com Gemini AI
+ * ✅ Implementação completa para integração com Gemini AI
  * Segue o mesmo padrão de openai-handler para garantir compatibilidade
- *
- * Pasos para usar:
- * 1. Instalar SDK: npm install @google/generative-ai
- * 2. Obter API key em https://ai.google.dev/
- * 3. Descomentar código abaixo
- * 4. Registrar no renderer.js: llmManager.register('gemini', geminiHandler);
  */
 
 const Logger = require('../../utils/Logger.js');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class GeminiHandler {
 	constructor() {
 		this.initialized = false;
 		this.client = null;
 		this.logger = Logger;
+		this.model = 'gemini-1.5-flash'; // Modelo padrão (mais rápido)
 	}
 
 	/**
@@ -26,15 +22,15 @@ class GeminiHandler {
 	 */
 	async initialize(apiKey) {
 		try {
-			// TODO: Descomementar quando @google/generative-ai estiver instalado
-			// const { GoogleGenerativeAI } = require('@google/generative-ai');
-			// this.client = new GoogleGenerativeAI(apiKey);
-			// this.initialized = true;
-			// this.logger.info('Gemini handler inicializado', { model: 'gemini-pro' });
+			if (!apiKey) {
+				throw new Error('API key do Gemini não fornecida');
+			}
 
-			Logger.warn('Gemini handler: ainda não implementado - use OpenAI por enquanto');
+			this.client = new GoogleGenerativeAI(apiKey);
+			this.initialized = true;
+			this.logger.info('✅ Gemini handler inicializado', { model: this.model });
 		} catch (error) {
-			Logger.error('Erro ao inicializar Gemini', { error: error.message });
+			this.logger.error('❌ Erro ao inicializar Gemini', { error: error.message });
 			throw error;
 		}
 	}
@@ -45,16 +41,14 @@ class GeminiHandler {
 	 * @returns {Promise<string>} Resposta do modelo
 	 */
 	async complete(messages) {
-		if (!this.initialized) {
+		if (!this.initialized || !this.client) {
 			throw new Error('Gemini handler não inicializado');
 		}
 
 		try {
-			// TODO: Implementar chamada real ao Gemini
-			/*
-			const model = this.client.getGenerativeModel({ model: 'gemini-pro' });
-			
-			// Formata mensagens para Gemini
+			const model = this.client.getGenerativeModel({ model: this.model });
+
+			// Formata mensagens para Gemini (converte user/assistant para user/model)
 			const contents = messages.map(msg => ({
 				role: msg.role === 'user' ? 'user' : 'model',
 				parts: [{ text: msg.content }],
@@ -65,16 +59,14 @@ class GeminiHandler {
 				generationConfig: {
 					maxOutputTokens: 2048,
 					temperature: 0.7,
+					topP: 0.95,
 				},
 			});
 
 			const response = await result.response;
 			return response.text();
-			*/
-
-			throw new Error('Gemini handler: complete() ainda não implementado');
 		} catch (error) {
-			Logger.error('Erro em Gemini.complete()', { error: error.message });
+			this.logger.error('❌ Erro em Gemini.complete()', { error: error.message });
 			throw error;
 		}
 	}
@@ -85,15 +77,13 @@ class GeminiHandler {
 	 * @returns {AsyncGenerator<string>} Async generator que emite tokens
 	 */
 	async *stream(messages) {
-		if (!this.initialized) {
+		if (!this.initialized || !this.client) {
 			throw new Error('Gemini handler não inicializado');
 		}
 
 		try {
-			// TODO: Implementar streaming real ao Gemini
-			/*
-			const model = this.client.getGenerativeModel({ model: 'gemini-pro' });
-			
+			const model = this.client.getGenerativeModel({ model: this.model });
+
 			// Formata mensagens para Gemini
 			const contents = messages.map(msg => ({
 				role: msg.role === 'user' ? 'user' : 'model',
@@ -105,20 +95,19 @@ class GeminiHandler {
 				generationConfig: {
 					maxOutputTokens: 2048,
 					temperature: 0.7,
+					topP: 0.95,
 				},
 			});
 
+			// Emite tokens conforme chegam
 			for await (const chunk of result.stream) {
 				const text = chunk.text();
 				if (text) {
 					yield text;
 				}
 			}
-			*/
-
-			throw new Error('Gemini handler: stream() ainda não implementado');
 		} catch (error) {
-			Logger.error('Erro em Gemini.stream()', { error: error.message });
+			this.logger.error('❌ Erro em Gemini.stream()', { error: error.message });
 			throw error;
 		}
 	}

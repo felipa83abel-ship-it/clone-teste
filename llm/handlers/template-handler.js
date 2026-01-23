@@ -1,14 +1,64 @@
 /**
- * anthropic-handler - Interface para Anthropic Claude
+ * TEMPLATE HANDLER - Interface genérica para LLM providers
  *
- * ✅ TEMPLATE para integração com Anthropic Claude
- * Segue o mesmo padrão de openai-handler para garantir compatibilidade
+ * ✅ TEMPLATE para integração com novos LLM providers (ex: Anthropic Claude, Groq, etc)
+ * Segue o mesmo padrão de openai-handler.js e gemini-handler.js para garantir compatibilidade
  *
- * Pasos para usar:
- * 1. Instalar SDK: npm install @anthropic-ai/sdk
- * 2. Obter API key em https://console.anthropic.com/
- * 3. Descomentar código abaixo
- * 4. Registrar no renderer.js: llmManager.register('anthropic', anthropicHandler);
+ * COMO CRIAR UM NOVO HANDLER:
+ * =============================
+ *
+ * 1. **Renomear arquivo**:
+ *    mv template-handler.js seu-provider-handler.js
+ *    Exemplo: mv template-handler.js anthropic-handler.js
+ *
+ * 2. **Implementar 3 métodos obrigatórios**:
+ *    - initialize(apiKey): Inicializa cliente com API key
+ *    - complete(messages): Retorna resposta completa (Promise<string>)
+ *    - stream(messages): Retorna AsyncGenerator para streaming
+ *
+ * 3. **Formato de mensagens** (padrão OpenAI):
+ *    messages = [
+ *      { role: 'user', content: 'Olá' },
+ *      { role: 'assistant', content: 'Oi, tudo bem?' },
+ *      { role: 'user', content: 'Como você está?' }
+ *    ]
+ *
+ *    Se seu provider usa formato diferente (como Gemini),
+ *    converta em initialize() ou nos métodos complete/stream.
+ *
+ * 4. **Registrar no renderer.js** (após implementação):
+ *    const myHandler = require('./llm/handlers/seu-provider-handler.js');
+ *    llmManager.register('seu-provider', myHandler);
+ *
+ *    E adicionar na UI config-manager.js com input para API key
+ *
+ * 5. **Adicionar suporte no main.js**:
+ *    - Importar SDK: const MyProvider = require('@org/sdk');
+ *    - Criar variável: let meuCliente = null;
+ *    - Criar initMyProvider(apiKey): Inicializa cliente
+ *    - Atualizar handleSaveApiKey(): Detectar provider e inicializar
+ *    - Atualizar handleDeleteApiKey(): Desconectar cliente
+ *
+ * EXEMPLO PRÁTICO (Anthropic Claude):
+ * ====================================
+ * 1. npm install @anthropic-ai/sdk
+ * 2. const Anthropic = require('@anthropic-ai/sdk');
+ * 3. class AnthropicHandler {
+ *      async initialize(apiKey) { this.client = new Anthropic({ apiKey }); }
+ *      async complete(messages) { 
+ *        return this.client.messages.create({ model: 'claude-3-sonnet', messages });
+ *      }
+ *      async *stream(messages) {
+ *        const stream = await this.client.messages.stream({ model: '...', messages });
+ *        for await (const event of stream) { yield event.delta?.text; }
+ *      }
+ *    }
+ *
+ * REFERÊNCIA DE PROVIDERS JÁ IMPLEMENTADOS:
+ * ============================================
+ * - openai-handler.js: GPT-4, GPT-3.5 (completo e testado)
+ * - gemini-handler.js: Google Gemini (completo, pendente crédito para testes)
+ * - template-handler.js: Este arquivo (use como referência)
  */
 
 const Logger = require('../../utils/Logger.js');

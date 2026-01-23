@@ -23,6 +23,7 @@ const Logger = require('./utils/Logger.js');
 const STTStrategy = require('./strategies/STTStrategy.js');
 const LLMManager = require('./llm/LLMManager.js');
 const openaiHandler = require('./llm/handlers/openai-handler.js');
+const geminiHandler = require('./llm/handlers/gemini-handler.js');
 const { validateLLMRequest, handleLLMStream, handleLLMBatch } = require('./handlers/llmHandlers.js');
 
 // 🎯 INSTANCIAR
@@ -33,7 +34,7 @@ const llmManager = new LLMManager();
 
 // 🎯 REGISTRAR LLMs
 llmManager.register('openai', openaiHandler);
-// NOSONAR // Futuro: llmManager.register('gemini', require('./llm/handlers/gemini-handler.js'));
+llmManager.register('gemini', geminiHandler);
 // NOSONAR // Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
