@@ -47,19 +47,22 @@ eventBus.on('answerStreamChunk', data => {
 
 eventBus.on('llmStreamEnd', data => {
 	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
-	
+
 	// 🔥 [MODO ENTREVISTA] Após GPT responder, promover CURRENT para histórico e limpar
 	if (ModeController.isInterviewMode()) {
 		gptAnsweredTurnId = interviewTurnId;
-		
+
 		// Promove CURRENT para histórico se ainda não foi promovido
 		if (currentQuestion.text && !currentQuestion.promotedToHistory) {
 			debugLogRenderer(`🔥 [ENTREVISTA] Promovendo CURRENT para histórico após resposta do GPT`, true);
 			promoteCurrentToHistory(currentQuestion.text);
 			currentQuestion.promotedToHistory = true;
 		}
+
+		// 🔥 RESETA flag para permitir próxima pergunta
+		currentQuestion.isBeingAnswered = false;
 	}
-	
+
 	emitUIChange('onAnswerStreamEnd', {});
 });
 
@@ -203,6 +206,7 @@ let currentQuestion = {
 	lastUpdate: 0,
 	finalized: false,
 	promotedToHistory: false,
+	isBeingAnswered: false, // 🔥 Flag para pausar atualizações enquanto GPT responde
 	lastUpdateTime: null,
 	createdAt: null,
 	finalText: '',
@@ -404,6 +408,7 @@ function resetCurrentQuestion() {
 		lastUpdate: 0,
 		finalized: false,
 		promotedToHistory: false,
+		isBeingAnswered: false,
 		lastUpdateTime: null,
 		createdAt: null,
 		finalText: '',
@@ -534,6 +539,7 @@ function promoteCurrentToHistory(text) {
 			lastUpdate: 0,
 			finalized: false,
 			promotedToHistory: false,
+			isBeingAnswered: false,
 			lastUpdateTime: null,
 			createdAt: null,
 			finalText: '',
@@ -925,6 +931,12 @@ function handleCurrentQuestion(author, text, options = {}) {
 
 	// Apenas consolida falas no CURRENT do OTHER
 	if (author === OTHER) {
+		// 🔥 [CRÍTICO] Se pergunta está sendo respondida, IGNORA novas atualizações
+		if (currentQuestion.isBeingAnswered) {
+			debugLogRenderer(`⏸️ IGNORANDO atualização do CURRENT (pergunta sendo respondida pelo GPT)`, true);
+			return;
+		}
+
 		// Se não existe texto ainda, marca tempo de criação e incrementa turno
 		if (!currentQuestion.text) {
 			currentQuestion.createdAt = now;
@@ -998,6 +1010,7 @@ function finalizeCurrentQuestion() {
 		currentQuestion.text = finalizeQuestion(currentQuestion.text);
 		currentQuestion.lastUpdateTime = Date.now();
 		currentQuestion.finalized = true;
+		currentQuestion.isBeingAnswered = true; // 🔥 Pausa atualizações enquanto GPT responde
 
 		// garante seleção lógica
 		selectedQuestionId = CURRENT_QUESTION_ID;
@@ -1339,6 +1352,7 @@ async function resetAppState() {
 			lastUpdate: 0,
 			finalized: false,
 			promotedToHistory: false,
+			isBeingAnswered: false,
 			lastUpdateTime: null,
 			createdAt: null,
 			finalText: '',
