@@ -49,6 +49,9 @@ eventBus.on('answerStreamChunk', data => {
 eventBus.on('llmStreamEnd', data => {
 	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
 
+	// 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
+	answeredQuestions.add(data.questionId);
+
 	// 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
 	// Aqui só limpamos o CURRENT para próxima pergunta
 	if (ModeController.isInterviewMode()) {
@@ -62,6 +65,10 @@ eventBus.on('llmStreamEnd', data => {
 
 eventBus.on('llmBatchEnd', data => {
 	Logger.info('LLM Batch finalizado', { questionId: data.questionId, responseLength: data.response?.length || 0 });
+
+	// 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
+	answeredQuestions.add(data.questionId);
+
 	emitUIChange('onAnswerBatchEnd', {
 		questionId: data.questionId,
 		response: data.response,
@@ -845,7 +852,8 @@ function handleQuestionClick(questionId) {
 			});
 
 			updateStatusMessage('📌 Essa pergunta já foi respondida');
-			return;
+			debugLogRenderer('Fim da função: "handleQuestionClick" (pergunta já respondida, sem re-perguntar)');
+			return; // 🔥 CRÍTICO: Retornar aqui, não chamar askLLM()
 		}
 	}
 
@@ -855,7 +863,8 @@ function handleQuestionClick(questionId) {
 		if (q && q.incomplete) {
 			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
-			return;
+			debugLogRenderer('Fim da função: "handleQuestionClick" (pergunta incompleta)');
+			return; // 🔥 CRÍTICO: Retornar aqui também
 		}
 	}
 
@@ -866,7 +875,8 @@ function handleQuestionClick(questionId) {
 	) {
 		updateStatusMessage('⛔ GPT já respondeu esse turno');
 		console.log('⛔ GPT já respondeu esse turno');
-		return;
+		debugLogRenderer('Fim da função: "handleQuestionClick" (GPT já respondeu)');
+		return; // 🔥 CRÍTICO: Retornar aqui
 	}
 
 	// ❓ Ainda não respondida → chama GPT (click ou atalho)
@@ -1014,16 +1024,14 @@ function finalizeCurrentQuestion() {
 
 		currentQuestion.promotedToHistory = true;
 
-		// Emitir para UI atualizar visual do ID na pergunta
-		emitUIChange('onQuestionPromoted', {
-			newId: newId,
-			turnId: currentQuestion.turnId,
-		});
+		// 🔥 [CRÍTICO] LIMPAR CURRENT LOGO APÓS PROMOVER
+		// Não espera nem o render nem o LLM
+		resetCurrentQuestion();
 
 		// garante seleção lógica
 		selectedQuestionId = newId;
 		renderQuestionsHistory();
-		renderCurrentQuestion();
+		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
 		// 🔥 [NOVO] Chamar GPT DEPOIS que pergunta foi promovida e salva
 		// chama GPT automaticamente se ainda não respondeu este turno
