@@ -57,8 +57,8 @@ const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 const MINIMUM_CAPTURE_BYTES = 2048; // evita WebMs minúsculos que quebram o ffmpeg
 
 // Configuração Whisper Local
-const WHISPER_CLI_EXE = path.join(__dirname, 'whisper-local', 'bin', 'whisper-cli.exe');
-const WHISPER_MODEL = path.join(__dirname, 'whisper-local', 'models', 'ggml-tiny.bin');
+const WHISPER_CLI_EXE = path.join(__dirname, '..', 'whisper-local', 'bin', 'whisper-cli.exe');
+const WHISPER_MODEL = path.join(__dirname, '..', 'whisper-local', 'models', 'ggml-tiny.bin');
 const WHISPER_LOCAL_TIMEOUT_MS = 10000;
 const WHISPER_LOCAL_PARTIAL_TIMEOUT_MS = 1500;
 const WHISPER_WARMUP_FILENAME = 'whisper-warmup.wav';
