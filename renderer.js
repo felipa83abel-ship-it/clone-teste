@@ -354,9 +354,6 @@ eventBus.on('audioDeviceChanged', async data => {
 });
 
 /* Compatibilidade: antigo onUIChange também suporta audioDeviceChanged */
-onUIChange('onAudioDeviceChanged', async data => {
-	eventBus.emit('audioDeviceChanged', data);
-});
 
 /* ================================ */
 //	FUNÇÕES UTILITÁRIAS (HELPERS)
@@ -526,93 +523,6 @@ function findAnswerByQuestionId(questionId) {
  * Promove pergunta atual para histórico
  * @param {string} text - Texto da pergunta
  */
-function promoteCurrentToHistory(text) {
-	Logger.debug('Início da função: "promoteCurrentToHistory"');
-
-	Logger.debug('📚 promovendo pergunta para histórico:', text, false);
-
-	// evita duplicação no histórico: se a última entrada é igual (normalizada), não adiciona
-	const last = questionsHistory.length ? questionsHistory[questionsHistory.length - 1] : null;
-	if (last && normalizeForCompare(last.text) === normalizeForCompare(text)) {
-		Logger.debug('🔕 pergunta igual já presente no histórico — pulando promoção', false);
-
-		// limpa CURRENT mas preserva seleção conforme antes
-		const prevSelected = selectedQuestionId;
-		currentQuestion = {
-			text: '',
-			lastUpdate: 0,
-			finalized: false,
-			promotedToHistory: false,
-			turnId: null,
-			lastUpdateTime: null,
-			createdAt: null,
-			finalText: '',
-			interimText: '',
-		};
-
-		if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
-			selectedQuestionId = CURRENT_QUESTION_ID;
-		} else {
-			selectedQuestionId = prevSelected;
-		}
-
-		renderQuestionsHistory();
-		renderCurrentQuestion();
-		return;
-	}
-
-	const newId = String(questionsHistory.length + 1);
-
-	questionsHistory.push({
-		id: newId,
-		text,
-		createdAt: currentQuestion.createdAt || Date.now(),
-		lastUpdateTime: currentQuestion.lastUpdateTime || currentQuestion.createdAt || Date.now(),
-	});
-
-	// 🔥 [IMPORTANTE] Migrar resposta de CURRENT para o novo ID no history
-	if (answeredQuestions.has(CURRENT_QUESTION_ID)) {
-		answeredQuestions.delete(CURRENT_QUESTION_ID);
-		answeredQuestions.add(newId);
-		Logger.debug('🔄 [IMPORTANTE] Migrada resposta de CURRENT para newId:', newId, false);
-	}
-
-	// 🔥 [CRÍTICO] Atualizar o ID do bloco de resposta no DOM se ele foi criado com CURRENT
-	Logger.debug(
-		'🔄 [IMPORTANTE] Emitindo onAnswerIdUpdate para atualizar bloco de resposta: CURRENT → ',
-		newId,
-		false,
-	);
-	emitUIChange('onAnswerIdUpdate', {
-		oldId: CURRENT_QUESTION_ID,
-		newId: newId,
-	});
-
-	// 🔥 [IMPORTANTE] Se uma pergunta CURRENT foi solicitada ao GPT,
-	// atualizar o rastreamento para apontar para o novo ID promovido
-	if (gptRequestedQuestionId === CURRENT_QUESTION_ID) {
-		gptRequestedQuestionId = newId;
-		Logger.debug('🔄 [IMPORTANTE] gptRequestedQuestionId atualizado de CURRENT para newId:', newId, false);
-	}
-
-	// preserva seleção do usuário: se não havia seleção explícita ou estava no CURRENT,
-	// mantém a seleção no CURRENT para que o novo CURRENT seja principal.
-	const prevSelected = selectedQuestionId;
-
-	resetCurrentQuestion();
-
-	if (prevSelected === null || prevSelected === CURRENT_QUESTION_ID) {
-		selectedQuestionId = CURRENT_QUESTION_ID;
-	} else {
-		// usuário tinha selecionado algo no histórico — preserva essa seleção
-		selectedQuestionId = prevSelected;
-	}
-
-	renderQuestionsHistory();
-	renderCurrentQuestion();
-
-	Logger.debug('Fim da função: "promoteCurrentToHistory"');
-}
 
 /**
  * Limpa todas as seleções visuais
@@ -629,13 +539,6 @@ function clearAllSelections() {
  * [CURRENT, ID_último, ID_penúltimo, ..., ID_primeiro]
  * @returns {array} Array de IDs navegáveis
  */
-function getNavigableQuestionIds() {
-	const ids = [];
-	if (currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
-	// 🔥 CORRIGIDO: Reverter histórico para ficar coerente com ordem visual renderizada
-	[...questionsHistory].reverse().forEach(q => ids.push(q.id));
-	return ids;
-}
 
 /* ================================ */
 //	🎯 REGISTRAR STTs (Refatoração Fase 2)
@@ -705,13 +608,6 @@ async function stopAudio() {
 /**
  * Reinicia pipeline de áudio
  */
-async function restartAudioPipeline() {
-	Logger.debug('Início da função: "restartAudioPipeline"');
-
-	stopAudio();
-
-	Logger.debug('Fim da função: "restartAudioPipeline"');
-}
 
 /**
  * Toggle do botão de iniciar/parar escuta (Ctrl+D)
@@ -1563,9 +1459,7 @@ async function resetAppState() {
 const RendererAPI = {
 	// Áudio - Gravação
 	listenToggleBtn,
-	askLLM,
-	restartAudioPipeline,
-
+	askLLM
 	// 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
 	get isRunning() {
 		return isRunning;
