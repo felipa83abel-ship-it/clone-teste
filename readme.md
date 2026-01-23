@@ -16,8 +16,8 @@
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
 - [Execução](#execução)
+- [Documentação](#documentação)
 - [Estrutura do Projeto](#estrutura-do-projeto)
-- [Documentação Adicional](#documentação-adicional)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -298,26 +298,72 @@ askme/
 
 ---
 
-## 📚 Documentação Adicional
+## 📚 Documentação
 
-- 📋 **[Funcionalidades Detalhadas →](FEATURES.md)**
+A documentação completa está organizada na pasta **`docs/`**.
 
-  - Lista completa de recursos por seção
-  - Capturas de tela (futuro)
-  - Exemplos de uso
+### 🎯 Onde Começar?
 
-- 🧪 **[Guia de Testes →](TEST_GUIDE.md)**
+- **[DOCS_GUIDE.md](docs/DOCS_GUIDE.md)** - Guia de navegação (comece aqui! 👈)
+  - Ajuda a encontrar exatamente o que você procura
+  - Organizado por papel (Tester, Developer, Manager)
+  - Links rápidos para cada seção
 
-  - Testes manuais passo a passo
-  - Cenários de validação
-  - Checklist de funcionalidades
-  - Troubleshooting específico
+### 🧪 Centro de Testes
 
-- 🎤 **[Setup Vosk (Novo!) →](VOSK_SETUP.md)**
-  - Instalação e configuração do Vosk
-  - Transcrição em tempo real (modo entrevista)
-  - Comparação Vosk vs Whisper
-  - Troubleshooting de compilação
+- **[TESTING_INDEX.md](docs/TESTING_INDEX.md)** - Índice central de testes com 77 testes documentados
+  - Índice por funcionalidade
+  - Teste rápido (5 minutos)
+  - Estatísticas de cobertura
+  - Checklist de validação completa
+
+### 📖 Referência Técnica
+
+- 🏛️ **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** - Arquitetura técnica do projeto
+  - Diagrama de componentes
+  - Fluxos de IPC
+  - Padrões e convenções
+  - Stack tecnológico
+
+### 🧪 Testes & Validação
+
+Testes organizados por seção da aplicação (77 testes total):
+
+- **[TEST_HOME.md](docs/TEST_HOME.md)** - Testes da tela principal
+  - ✓ 6 testes de transcrição
+  - ✓ 4 testes de perguntas
+  - ✓ 4 testes de respostas
+  - ✓ 6 testes de interface
+
+- **[TEST_API_MODELS.md](docs/TEST_API_MODELS.md)** - Testes de configuração de modelos
+  - ✓ 7 testes OpenAI
+  - ✓ 4 testes Google/Gemini
+  - ✓ 2 testes OpenRouter
+  - ✓ 3 testes de gerenciamento
+
+- **[TEST_AUDIO_SCREEN.md](docs/TEST_AUDIO_SCREEN.md)** - Testes de áudio e captura de tela
+  - ✓ 7 testes de áudio
+  - ✓ 6 testes de captura de tela
+
+- **[TEST_OTHER.md](docs/TEST_OTHER.md)** - Testes de configurações gerais
+  - ✓ 3 testes de tema
+  - ✓ 3 testes de modo
+  - ✓ 2 testes de idioma
+  - ✓ 2 testes de log level
+  - ✓ 3 testes de reset
+  - ✓ 2 testes adicionais
+
+- **[TEST_PRIVACY.md](docs/TEST_PRIVACY.md)** - Testes de privacidade e segurança
+  - ✓ 2 testes de visibilidade
+  - ✓ 3 testes de telemetria
+  - ✓ 2 testes de limpeza de dados
+  - ✓ 3 testes de retenção
+  - ✓ 3 testes de segurança
+
+### 📋 Guias Adicionais
+
+- 📖 **[REFACTORING_FINAL_STATUS.md](docs/REFACTORING_FINAL_STATUS.md)** - Status da refatoração
+- 🎤 **[Documentação de Fluxos](docs/)** - Fluxos técnicos específicos (áudio, transcrição, streaming)
 
 ---
 
