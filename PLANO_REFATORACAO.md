@@ -459,6 +459,73 @@ Melhorias:
 
 ---
 
+### 4.2 Consolidar Debug Logging STT em Logger.js
+
+**Status:** ✅ COMPLETO  
+**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 30min ✓
+
+**Problemas RESOLVIDOS:**
+
+- ✅ Consolidar debug logging de STT em Logger.js (centralizado)
+- ✅ Remover getConfiguredSTTModel() obsoleto de stt-whisper.js
+- ✅ Todos 3 providers (Whisper, Vosk, Deepgram) integram com Logger
+- ✅ Histórico permanente de debug via Logger.debug()
+- ✅ Mantém console.log para visual feedback em tempo real
+
+**Alterações realizadas:**
+
+- ✅ stt-whisper.js: Adiciona Logger.js import + registra em Logger.debug()
+- ✅ stt-vosk.js: Adiciona Logger.js import + registra em Logger.debug()
+- ✅ stt-deepgram.js: Adiciona Logger.js import + registra em Logger.debug()
+- ✅ stt-whisper.js: Remove getConfiguredSTTModel() (função obsoleta)
+- ✅ npm test: 74/74 testes passando
+- ✅ npm start: App iniciando corretamente
+- ✅ Commit: ✓ 38ac887 "Fase 4.2: Consolidar debug logging STT em Logger.js"
+
+**Consolidação Final:**
+
+- ✅ Debug logging STT centralizado em Logger.js
+- ✅ Histórico permanente de debug para troubleshooting
+- ✅ Visual feedback em tempo real via console.log
+- ✅ Sem arquivo separado (stt-debug-utils.js não criado)
+
+---
+
+## 🎯 FASE 4 - RESUMO COMPLETO
+
+**Status:** ✅ COMPLETO
+
+**Commits Realizados:**
+
+1. **Commit e13ec4b** - Remove whisper-1 (OpenAI/Cloud)
+   - ✅ Removido whisper-1 de todos os 5 arquivos
+   - ✅ Default alterado para whisper-cpp-local
+   - ✅ UI (index.html) atualizada
+   - Result: Tests 74/74 passing ✓, App starting ✓
+
+2. **Commit 38ac887** - Consolidar debug logging em Logger.js
+   - ✅ Integração Logger.js em todos 3 providers STT
+   - ✅ Remove getConfiguredSTTModel() obsoleto
+   - ✅ Histórico permanente de debug
+   - Result: Tests 74/74 passing ✓, App starting ✓
+
+**Métrica de Qualidade Fase 4:**
+
+- stt-whisper.js: Removidas ~40 linhas (whisper-1 + função obsoleta)
+- stt-vosk.js: Consolidado debug com Logger
+- stt-deepgram.js: Consolidado debug com Logger
+- **Total Fase 4:** -40 linhas de código morto + consolidação de logging
+
+**Validações:**
+
+- ✅ npm test: 74/74 tests passing
+- ✅ npm start: App initializing successfully
+- ✅ Whisper-1 completamente removido
+- ✅ Debug logging centralizado em Logger.js
+- ✅ 3 providers STT funcionais (Deepgram, Vosk, Whisper-Local)
+
+---
+
 ### 4.2 Remover Código Morto em STT (se houver)
 
 **Status:** ❓ Requer verificação  
@@ -477,6 +544,9 @@ Melhorias:
 ## 🎯 FASE 5: VALIDAÇÃO E TESTES (ALTA PRIORIDADE)
 
 ### 5.1 Implementar Testes Unitários Básicos
+
+**Status:** ✅ COMPLETO  
+**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 2h ✓
 
 **Status:** ✅ COMPLETO  
 **Impacto:** Alto | **Complexidade:** Alta | **Tempo:** 3h+ ✓
