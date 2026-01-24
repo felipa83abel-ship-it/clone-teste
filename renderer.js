@@ -300,7 +300,16 @@ function resetCurrentQuestion() {
 /**
  * Funções de pergunta (delegadas ao question-controller)
  */
-const { renderQuestionsHistory, renderCurrentQuestion, handleQuestionClick, scrollToSelectedQuestion, consolidateQuestionText, handleCurrentQuestion, finalizeCurrentQuestion, closeCurrentQuestionForced } = questionController;
+const {
+	renderQuestionsHistory,
+	renderCurrentQuestion,
+	handleQuestionClick,
+	scrollToSelectedQuestion,
+	consolidateQuestionText,
+	handleCurrentQuestion,
+	finalizeCurrentQuestion,
+	closeCurrentQuestionForced,
+} = questionController;
 
 /**
  * Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
