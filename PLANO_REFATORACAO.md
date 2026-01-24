@@ -526,21 +526,6 @@ Melhorias:
 
 ---
 
-### 4.2 Remover Código Morto em STT (se houver)
-
-**Status:** ❓ Requer verificação  
-**Impacto:** Baixo | **Complexidade:** Baixa | **Tempo:** 20min
-
-**Checklist:**
-
-- [ ] Verificar se há funções não usadas em cada STT handler
-- [ ] Verificar se `stt-audio-worklet-processor.js` é usado por todos
-- [ ] Remover código morto
-- [ ] Verificar com `grep_search` por imports órfãos
-- [ ] Commit: "refactor: remover código morto em STT"
-
----
-
 ## 🎯 FASE 5: VALIDAÇÃO E TESTES (ALTA PRIORIDADE)
 
 ### 5.1 Implementar Testes Unitários Básicos
