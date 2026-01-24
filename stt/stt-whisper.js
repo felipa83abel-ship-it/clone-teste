@@ -826,36 +826,39 @@ function handleVolumeUpdate(source, percent) {
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
 	eventBus.emit('transcriptAdd', {
-			author,
-			text: '...',
-			timeStr,
-			elementId: 'conversation',
-			placeholderId,
-		})
+		author,
+		text: '...',
+		timeStr,
+		elementId: 'conversation',
+		placeholderId,
+	});
 }
 
 // Preenche placeholder com transcrição final
-function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {eventBus.emit('placeholderFulfill', {
-			speaker: author,
-			text: transcript,
-			placeholderId,
-			...metrics,
-			showMeta: false,
-		})
+function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
+	eventBus.emit('placeholderFulfill', {
+		speaker: author,
+		text: transcript,
+		placeholderId,
+		...metrics,
+		showMeta: false,
+	});
 }
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
-	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';eventBus.emit('clearInterim', { id: interimId })
+	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
+	eventBus.emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
-	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';eventBus.emit('updateInterim', {
-			id: interimId,
-			speaker: author,
-			text: transcript,
-		})
+	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
+	eventBus.emit('updateInterim', {
+		id: interimId,
+		speaker: author,
+		text: transcript,
+	});
 }
 
 // Atualiza CURRENT question (apenas para output)
