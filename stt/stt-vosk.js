@@ -20,7 +20,11 @@
 
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const EventBus = require('../events/EventBus.js');
 const { getVADEngine } = require('./vad-engine');
+
+// 🔥 INSTÂNCIA DE EVENTBUS LOCAL
+const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda nao carregou
 
 /* ================================ */
 //	CONSTANTES
@@ -42,7 +46,7 @@ const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
 const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 // Configuração Vosk
-const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || '../vosk-models/vosk-model-small-pt-0.3' };
+const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || '../stt/models-stt/vosk/vosk-model-small-pt-0.3' };
 
 /* ================================ */
 //	ESTADO GLOBAL DO VOSK
@@ -473,7 +477,7 @@ async function onAudioChunkVosk(source, data, vars) {
 
 		// Envia direto ao Vosk via stdin (não IPC!)
 		// ⚠️ Verifica se o processo ainda está vivo
-		if (!vars._voskProcess || !vars._voskProcess.stdin) {
+		if (!vars._voskProcess?.stdin) {
 			console.warn(`⚠️ Processo Vosk não está disponível, ignorando chunk`);
 			return;
 		}
@@ -595,56 +599,46 @@ function handleFinalVoskMessage(source, transcript) {
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
-	if (globalThis.RendererAPI?.emitUIChange) {
-		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent });
-	}
+	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+	getEventBus().emit(ev, { percent });
 }
 
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
-			author,
-			text: '...',
-			timeStr,
-			elementId: 'conversation',
-			placeholderId,
-		});
-	}
+	getEventBus().emit('transcriptAdd', {
+		author,
+		text: '...',
+		timeStr,
+		elementId: 'conversation',
+		placeholderId,
+	});
 }
 
 // Preenche placeholder com transcrição final
 function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
-			speaker: author,
-			text: transcript,
-			placeholderId,
-			...metrics,
-			showMeta: false,
-		});
-	}
+	getEventBus().emit('placeholderFulfill', {
+		speaker: author,
+		text: transcript,
+		placeholderId,
+		...metrics,
+		showMeta: false,
+	});
 }
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
 	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
-	}
+	getEventBus().emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
 	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onUpdateInterim', {
-			id: interimId,
-			speaker: author,
-			text: transcript,
-		});
-	}
+	getEventBus().emit('updateInterim', {
+		id: interimId,
+		speaker: author,
+		text: transcript,
+	});
 }
 
 // Atualiza CURRENT question (apenas para output)

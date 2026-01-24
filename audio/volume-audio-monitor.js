@@ -7,7 +7,7 @@
  * Usa mesmo padrão dos STT modules:
  * - AudioWorklet para captura de áudio
  * - RMS → dB → percentual para volume
- * - Emite via globalThis.RendererAPI.emitUIChange('onInputVolumeUpdate' / 'onOutputVolumeUpdate')
+ * - Emite via eventBus.emit('inputVolumeUpdate' / 'outputVolumeUpdate')
  *
  * ⚠️ NÃO inicia se já há transcrição ativa (isRunning = true)
  *
@@ -16,6 +16,16 @@
  * - stopAudioVolumeMonitor(source)
  * - switchAudioVolumeDevice(source, newDeviceId)
  */
+
+/* ================================ */
+//	IMPORTS
+/* ================================ */
+
+const EventBus = require('../events/EventBus.js');
+
+// 🔥 USA INSTÂNCIA GLOBAL CRIADA EM RENDERER.JS
+// Não criar nova instância, usar a que já existe em globalThis.eventBus
+const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda não carregou
 
 /* ================================ */
 //	CONSTANTES
@@ -210,9 +220,9 @@ async function startAudioVolumeMonitor(source, deviceId) {
 		// 2️⃣ Registra worklet
 		try {
 			await registerVolumeMonitorWorklet(audioContext);
-		} catch (workletErr) {
-			console.error(`❌ Não consegui registrar worklet:`, workletErr.message);
-			throw new Error(`AudioWorklet registration failed: ${workletErr.message}`);
+		} catch (error_) {
+			console.error(`❌ Não consegui registrar worklet:`, error_.message);
+			throw new Error(`AudioWorklet registration failed: ${error_.message}`);
 		}
 
 		// 3️⃣ Captura stream de áudio do dispositivo
@@ -318,10 +328,8 @@ function stopAudioVolumeMonitor(source) {
 		}
 
 		// 4️⃣ Emite volume zerado para UI
-		if (globalThis.RendererAPI?.emitUIChange) {
-			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-			globalThis.RendererAPI.emitUIChange(ev, { percent: 0 });
-		}
+		const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+		getEventBus().emit(ev, { percent: 0 });
 
 		vars.setActive(false);
 		console.log(`✅ Monitor de volume (${source}) parado`);
@@ -362,18 +370,19 @@ async function switchAudioVolumeDevice(source, newDeviceId) {
 	}
 
 	// Se está ativo, verifica se realmente mudou
-	if (vars.deviceId() !== newDeviceId) {
-		console.log(`   → Monitor ativo, REINICIANDO com novo dispositivo...`);
-		stopAudioVolumeMonitor(source);
-
-		// Pequeno delay para garantir que tudo foi limpo
-		await new Promise(resolve => setTimeout(resolve, 100));
-
-		// Reinicia com novo dispositivo
-		await startAudioVolumeMonitor(source, newDeviceId);
-	} else {
+	if (vars.deviceId() === newDeviceId) {
 		console.log(`   → Dispositivo é o mesmo, nenhuma mudança necessária`);
+		return;
 	}
+
+	console.log(`   → Monitor ativo, REINICIANDO com novo dispositivo...`);
+	stopAudioVolumeMonitor(source);
+
+	// Pequeno delay para garantir que tudo foi limpo
+	await new Promise(resolve => setTimeout(resolve, 100));
+
+	// Reinicia com novo dispositivo
+	await startAudioVolumeMonitor(source, newDeviceId);
 }
 
 /* ================================ */
@@ -386,11 +395,9 @@ async function switchAudioVolumeDevice(source, newDeviceId) {
  * @param {object} data - { percent: number }
  */
 function handleVolumeMonitorUpdate(source, data) {
-	// Emite para UI via RendererAPI
-	if (globalThis.RendererAPI?.emitUIChange) {
-		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
-	}
+	// Emite para UI via EventBus
+	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+	getEventBus().emit(ev, { percent: data.percent });
 }
 
 /* ================================ */

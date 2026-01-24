@@ -1,5 +1,5 @@
 /**
- * AppState - Centraliza todo o estado da aplicação
+ * AppState - Centraliza o estado de toda aplicação
  * Substitui: 15+ variáveis globais soltas no renderer.js
  */
 class AppState {
@@ -29,23 +29,31 @@ class AppState {
 			answeredQuestions: new Set(),
 			selectedQuestionId: null,
 			interviewTurnId: 0,
-			gptAnsweredTurnId: null,
-			gptRequestedTurnId: null,
-			gptRequestedQuestionId: null,
+			llmAnsweredTurnId: null,
+			llmRequestedTurnId: null,
+			llmRequestedQuestionId: null,
 			lastAskedQuestionNormalized: null,
 		};
 
 		this.metrics = {
 			audioStartTime: null,
-			gptStartTime: null,
-			gptFirstTokenTime: null,
-			gptEndTime: null,
+			llmStartTime: null,
+			llmFirstTokenTime: null,
+			llmEndTime: null,
 			totalTime: null,
 			audioSize: 0,
 		};
+
+		this.llm = {
+			selectedProvider: 'openai', // Provider padrão
+		};
 	}
 
-	// Getters para compatibilidade
+	// ============================================
+	// GETTERS / SETTERS PARA COMPATIBILIDADE
+	// ============================================
+
+	// Audio state getters/setters
 	get isRunning() {
 		return this.audio.isRunning;
 	}
@@ -54,7 +62,145 @@ class AppState {
 		this.audio.isRunning = value;
 	}
 
-	// Helpers comuns
+	get capturedScreenshots() {
+		return this.audio.capturedScreenshots;
+	}
+
+	set capturedScreenshots(value) {
+		this.audio.capturedScreenshots = value;
+	}
+
+	get isCapturing() {
+		return this.audio.isCapturing;
+	}
+
+	set isCapturing(value) {
+		this.audio.isCapturing = value;
+	}
+
+	get isAnalyzing() {
+		return this.audio.isAnalyzing;
+	}
+
+	set isAnalyzing(value) {
+		this.audio.isAnalyzing = value;
+	}
+
+	// Window state getters/setters
+	get isDraggingWindow() {
+		return this.window.isDraggingWindow;
+	}
+
+	set isDraggingWindow(value) {
+		this.window.isDraggingWindow = value;
+	}
+
+	// Interview state getters/setters
+	get currentQuestion() {
+		return this.interview.currentQuestion;
+	}
+
+	set currentQuestion(value) {
+		this.interview.currentQuestion = value;
+	}
+
+	get questionsHistory() {
+		return this.interview.questionsHistory;
+	}
+
+	set questionsHistory(value) {
+		this.interview.questionsHistory = value;
+	}
+
+	get selectedQuestionId() {
+		return this.interview.selectedQuestionId;
+	}
+
+	set selectedQuestionId(value) {
+		this.interview.selectedQuestionId = value;
+	}
+
+	get interviewTurnId() {
+		return this.interview.interviewTurnId;
+	}
+
+	set interviewTurnId(value) {
+		this.interview.interviewTurnId = value;
+	}
+
+	get llmAnsweredTurnId() {
+		return this.interview.llmAnsweredTurnId;
+	}
+
+	set llmAnsweredTurnId(value) {
+		this.interview.llmAnsweredTurnId = value;
+	}
+
+	get llmRequestedTurnId() {
+		return this.interview.llmRequestedTurnId;
+	}
+
+	set llmRequestedTurnId(value) {
+		this.interview.llmRequestedTurnId = value;
+	}
+
+	get llmRequestedQuestionId() {
+		return this.interview.llmRequestedQuestionId;
+	}
+
+	set llmRequestedQuestionId(value) {
+		this.interview.llmRequestedQuestionId = value;
+	}
+
+	get lastAskedQuestionNormalized() {
+		return this.interview.lastAskedQuestionNormalized;
+	}
+
+	set lastAskedQuestionNormalized(value) {
+		this.interview.lastAskedQuestionNormalized = value;
+	}
+
+	// Metrics getter/setter
+	get transcriptionMetrics() {
+		return this.metrics;
+	}
+
+	set transcriptionMetrics(value) {
+		this.metrics = value;
+	}
+
+	// LLM state getters/setters
+	get selectedProvider() {
+		return this.llm.selectedProvider;
+	}
+
+	set selectedProvider(value) {
+		this.llm.selectedProvider = value;
+	}
+
+	// ============================================
+	// MÉTODOS AUXILIARES
+	// ============================================
+
+	// Helper para acesso rápido a currentQuestion (usado 72+ vezes)
+	get q() {
+		return this.interview.currentQuestion;
+	}
+
+	// Helper para acesso rápido a questionsHistory (usado 15+ vezes)
+	get history() {
+		return this.interview.questionsHistory;
+	}
+
+	// Helper para acesso rápido a selectedQuestionId (usado 24+ vezes)
+	get selectedId() {
+		return this.interview.selectedQuestionId;
+	}
+
+	set selectedId(value) {
+		this.interview.selectedQuestionId = value;
+	}
+
 	getCurrentQuestion() {
 		return this.interview.currentQuestion;
 	}
@@ -106,19 +252,23 @@ class AppState {
 			answeredQuestions: new Set(),
 			selectedQuestionId: null,
 			interviewTurnId: 0,
-			gptAnsweredTurnId: null,
-			gptRequestedTurnId: null,
-			gptRequestedQuestionId: null,
+			llmAnsweredTurnId: null,
+			llmRequestedTurnId: null,
+			llmRequestedQuestionId: null,
 			lastAskedQuestionNormalized: null,
 		};
 
 		this.metrics = {
 			audioStartTime: null,
-			gptStartTime: null,
-			gptFirstTokenTime: null,
-			gptEndTime: null,
+			llmStartTime: null,
+			llmFirstTokenTime: null,
+			llmEndTime: null,
 			totalTime: null,
 			audioSize: 0,
+		};
+
+		this.llm = {
+			selectedProvider: 'openai',
 		};
 	}
 }

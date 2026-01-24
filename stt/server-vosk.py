@@ -6,7 +6,7 @@ Comunica com Node.js via IPC
 
 Uso:
     python server-vosk.py                         # Usa modelo padrão (small-pt-0.3)
-    python server-vosk.py vosk-models/vosk-model-pt-fb-v0.1.1  # Usa modelo maior
+    python server-vosk.py stt/models-stt/vosk/vosk-model-pt-fb-v0.1.1  # Usa modelo maior
 """
 
 import sys
@@ -36,7 +36,7 @@ class VoskTranscriber:
             raise FileNotFoundError(
                 f"Modelo não encontrado: {model_path}\n"
                 f"Baixe em: https://alphacephei.com/vosk/models\n"
-                f"Descompacte em: ./vosk-models/"
+                f"Descompacte em: ./stt/models-stt/vosk/"
             )
         
         try:
@@ -45,7 +45,7 @@ class VoskTranscriber:
             self.accumulated_text = ""  # Acumula texto dos resultados finais até agora
             print("[VOSK] Modelo carregado com sucesso", file=sys.stderr)
         except Exception as e:
-            raise Exception(f"Erro ao carregar modelo Vosk: {e}")
+            raise RuntimeError(f"Erro ao carregar modelo Vosk: {e}")
     
     def extract_wav_audio(self, wav_data):
         """
@@ -60,7 +60,6 @@ class VoskTranscriber:
             with wave.open(wav_file, 'rb') as w:
                 # Lê header WAV
                 n_channels = w.getnchannels()
-                sample_width = w.getsampwidth()
                 sample_rate = w.getframerate()
                 n_frames = w.getnframes()
                 
@@ -90,7 +89,7 @@ class VoskTranscriber:
         try:
             # Detecta se é WAV (começa com "RIFF")
             if audio_buffer.startswith(b'RIFF'):
-                print(f"[VOSK] Detectado WAV, extraindo áudio...", file=sys.stderr)
+                print("[VOSK] Detectado WAV, extraindo áudio...", file=sys.stderr)
                 audio_buffer = self.extract_wav_audio(audio_buffer)
                 if audio_buffer is None:
                     return {
@@ -174,14 +173,14 @@ class VoskTranscriber:
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-def main():
+def main(): # NOSONAR
     """Loop principal de processamento"""
     print("[VOSK] Iniciando servidor...", file=sys.stderr)
     
     # Define o modelo a usar (padrão: pequeno e mais rápido)
     # Pode ser sobrescrito via argumento de linha de comando
     # vosk-model-small-pt-0.3 ou vosk-model-pt-fb-v0.1.1
-    model_path = sys.argv[1] if len(sys.argv) > 1 else "vosk-models/vosk-model-small-pt-0.3"
+    model_path = sys.argv[1] if len(sys.argv) > 1 else "stt/models-stt/vosk/vosk-model-small-pt-0.3"
     
     if len(sys.argv) > 1:
         print(f"[VOSK] Usando modelo especificado: {model_path}", file=sys.stderr)

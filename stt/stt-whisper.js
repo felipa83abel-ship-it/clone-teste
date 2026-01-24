@@ -19,7 +19,12 @@
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
+const EventBus = require('../events/EventBus.js');
 const { getVADEngine } = require('./vad-engine');
+
+// 🔥 USA INSTÂNCIA GLOBAL CRIADA EM RENDERER.JS
+// Não criar nova instância, usar a que já existe em globalThis.eventBus
+const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda não carregou
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -57,8 +62,8 @@ const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 const MINIMUM_CAPTURE_BYTES = 2048; // evita WebMs minúsculos que quebram o ffmpeg
 
 // Configuração Whisper Local
-const WHISPER_CLI_EXE = path.join(__dirname, '..', 'whisper-local', 'bin', 'whisper-cli.exe');
-const WHISPER_MODEL = path.join(__dirname, '..', 'whisper-local', 'models', 'ggml-tiny.bin');
+const WHISPER_CLI_EXE = path.join(__dirname, '..', 'stt/models-stt/whisper', 'bin', 'whisper-cli.exe');
+const WHISPER_MODEL = path.join(__dirname, '..', 'stt/models-stt/whisper', 'models', 'ggml-tiny.bin');
 const WHISPER_LOCAL_TIMEOUT_MS = 10000;
 const WHISPER_LOCAL_PARTIAL_TIMEOUT_MS = 1500;
 const WHISPER_WARMUP_FILENAME = 'whisper-warmup.wav';
@@ -815,56 +820,46 @@ function getConfiguredSTTModel() {
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
-	if (globalThis.RendererAPI?.emitUIChange) {
-		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent });
-	}
+	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+	getEventBus().emit(ev, { percent });
 }
 
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
-			author,
-			text: '...',
-			timeStr,
-			elementId: 'conversation',
-			placeholderId,
-		});
-	}
+	getEventBus().emit('transcriptAdd', {
+		author,
+		text: '...',
+		timeStr,
+		elementId: 'conversation',
+		placeholderId,
+	});
 }
 
 // Preenche placeholder com transcrição final
 function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
-			speaker: author,
-			text: transcript,
-			placeholderId,
-			...metrics,
-			showMeta: false,
-		});
-	}
+	getEventBus().emit('placeholderFulfill', {
+		speaker: author,
+		text: transcript,
+		placeholderId,
+		...metrics,
+		showMeta: false,
+	});
 }
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
 	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
-	}
+	getEventBus().emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
 	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onUpdateInterim', {
-			id: interimId,
-			speaker: author,
-			text: transcript,
-		});
-	}
+	getEventBus().emit('updateInterim', {
+		id: interimId,
+		speaker: author,
+		text: transcript,
+	});
 }
 
 // Atualiza CURRENT question (apenas para output)

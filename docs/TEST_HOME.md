@@ -313,7 +313,7 @@ Aguarda GPT responder primeiro
 
 ```javascript
 ⏱️ Auto close question disparado
-➡️ closeCurrentQuestion chamou askGpt
+➡️ closeCurrentQuestion chamou askLlm
 ```
 
 ---
@@ -389,7 +389,7 @@ Outras ficam no histórico aguardando envio manual
 🎯 interviewTurnId: 1
 🎯 interviewTurnId: 2
 🎯 interviewTurnId: 3
-✅ gptAnsweredTurnId: 3 (apenas última)
+✅ llmAnsweredTurnId: 3 (apenas última)
 ```
 
 ---
@@ -429,11 +429,11 @@ Resposta aparece token por token:
 
 ```javascript
 ⏳ enviando para o GPT via stream...
-🟢 GPT_STREAM_CHUNK recebido (token parcial) Polim
-🟢 GPT_STREAM_CHUNK recebido (token parcial) orfismo
-🟢 GPT_STREAM_CHUNK recebido (token parcial)  é
+🟢 LLM_STREAM_CHUNK recebido (token parcial) Polim
+🟢 LLM_STREAM_CHUNK recebido (token parcial) orfismo
+🟢 LLM_STREAM_CHUNK recebido (token parcial)  é
 ...
-✅ GPT_STREAM_END recebido (stream finalizado)
+✅ LLM_STREAM_END recebido (stream finalizado)
 ```
 
 ---
@@ -466,7 +466,7 @@ Histórico contém:
 
 ```javascript
 📚 promovendo pergunta para histórico
-✅ gptAnsweredTurnId definido: 1
+✅ llmAnsweredTurnId definido: 1
 ```
 
 ---
@@ -531,7 +531,7 @@ Histórico contém:
 **Console esperado:**
 
 ```javascript
-🤖 askGpt chamado | questionId: uuid-123
+🤖 askLlm chamado | questionId: uuid-123
 ⏳ enviando para o GPT (batch)...
 ✅ resposta do GPT recebida (batch)
 ```

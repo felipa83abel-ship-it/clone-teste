@@ -21,7 +21,11 @@
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
+const EventBus = require('../events/EventBus.js');
 const { getVADEngine } = require('./vad-engine');
+
+// 🔥 INSTÂNCIA DE EVENTBUS LOCAL
+const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda nao carregou
 
 /* ================================ */
 //	CONSTANTES
@@ -748,56 +752,46 @@ function handleFinalDeepgramMessage(source, transcript) {
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
-	if (globalThis.RendererAPI?.emitUIChange) {
-		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent });
-	}
+	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+	getEventBus().emit(ev, { percent });
 }
 
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
-			author,
-			text: '...',
-			timeStr,
-			elementId: 'conversation',
-			placeholderId,
-		});
-	}
+	getEventBus().emit('transcriptAdd', {
+		author,
+		text: '...',
+		timeStr,
+		elementId: 'conversation',
+		placeholderId,
+	});
 }
 
 // Preenche placeholder com transcrição final
 function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
-			speaker: author,
-			text: transcript,
-			placeholderId,
-			...metrics,
-			showMeta: false,
-		});
-	}
+	getEventBus().emit('placeholderFulfill', {
+		speaker: author,
+		text: transcript,
+		placeholderId,
+		...metrics,
+		showMeta: false,
+	});
 }
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
 	const interimId = source === INPUT ? 'deepgram-interim-input' : 'deepgram-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
-	}
+	getEventBus().emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
 	const interimId = source === INPUT ? 'deepgram-interim-input' : 'deepgram-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onUpdateInterim', {
-			id: interimId,
-			speaker: author,
-			text: transcript,
-		});
-	}
+	getEventBus().emit('updateInterim', {
+		id: interimId,
+		speaker: author,
+		text: transcript,
+	});
 }
 
 // Atualiza CURRENT question (apenas para output)

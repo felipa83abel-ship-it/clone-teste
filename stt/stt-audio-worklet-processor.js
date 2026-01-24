@@ -79,12 +79,13 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
 		}
 
 		// Envia dados para o thread principal COM o volume/percent
+		// Nota: sampleRate está disponível no contexto global do AudioWorkletProcessor
 		this.port.postMessage(
 			{
 				type: 'audioData',
 				pcm16: pcm16.buffer,
 				percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
-				sampleRate: sampleRate, // placeholder (AudioWorkletProcessor global)
+				sampleRate: sampleRate || 16000, // Fallback para 16kHz se não disponível
 			},
 			[pcm16.buffer],
 		);

@@ -165,7 +165,7 @@ A transcrição é feita no processo main (Electron) para acessar APIs ou arquiv
 - **Descrição**:
   - Verifica se texto parece pergunta (`looksLikeQuestion()`).
   - Se modo normal: promove para histórico via `promoteCurrentToHistory()`.
-  - Se modo entrevista: prepara para GPT, chama `askGpt()` se turno correto.
+  - Se modo entrevista: prepara para GPT, chama `askLlm()` se turno correto.
 
 ## Pontos de Atenção e Possíveis Problemas
 

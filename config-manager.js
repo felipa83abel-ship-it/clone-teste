@@ -4,6 +4,8 @@
 ========================================================= */
 
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
+// ⚠️ EventBus é importado em renderer.js e disponível globalmente como 'globalThis.eventBus'
+
 const _getIpcRenderer = () => {
 	if (globalThis?.electron?.ipcRenderer) {
 		return globalThis.electron.ipcRenderer;
@@ -322,9 +324,7 @@ class ConfigManager {
 						await globalThis.RendererAPI?.switchAudioVolumeDevice('input', input.value);
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
-						if (globalThis.RendererAPI?.emitUIChange) {
-							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'input', deviceId: input.value });
-						}
+						globalThis.eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
 					} else if (input.id === 'audio-output-device') {
 						console.log('📝 Output device mudou para:', input.value || 'NENHUM');
 
@@ -332,9 +332,7 @@ class ConfigManager {
 						await globalThis.RendererAPI?.switchAudioVolumeDevice('output', input.value);
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
-						if (globalThis.RendererAPI?.emitUIChange) {
-							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
-						}
+						globalThis.eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 					} else if (input.id === 'darkModeToggle') {
 						// 🔥 NOVO: Aplica classe CSS quando darkModeToggle muda
 						const isDark = input.checked;
@@ -582,7 +580,7 @@ class ConfigManager {
 				if (statusText) statusText.innerText = 'Status: pronto';
 				await _ipc.invoke('initialize-api-client', openaiKey);
 			} else {
-				console.warn('⚠️ Nenhuma chave OpenAI configurada');
+				debugLogConfig('⚠️ Nenhuma chave OpenAI configurada', false);
 				if (statusText) statusText.innerText = 'Status: aguardando configuração de API';
 			}
 		} catch (error) {
@@ -1443,7 +1441,7 @@ class ConfigManager {
 			currentQuestionTextBox: document.getElementById('currentQuestionText'),
 			questionsHistoryBox: document.getElementById('questionsHistory'),
 			answersHistoryBox: document.getElementById('answersHistory'),
-			askBtn: document.getElementById('askGptBtn'),
+			askBtn: document.getElementById('askLlmBtn'),
 			inputVu: document.getElementById('inputVu'),
 			outputVu: document.getElementById('outputVu'),
 			inputVuHome: document.getElementById('inputVuHome'),
@@ -1468,20 +1466,14 @@ class ConfigManager {
 		debugLogConfig('Início da função: "registerRendererCallbacks"');
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
 
-		// VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
-		if (!globalThis.RendererAPI || typeof globalThis.RendererAPI.onUIChange !== 'function') {
-			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI.onUIChange não disponível!');
-			return;
-		}
-
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
-		globalThis.RendererAPI.onUIChange('onError', message => {
+		globalThis.eventBus.on('error', message => {
 			console.error(`❌ Erro renderizado: ${message}`);
 			this.showError(message);
 		});
 
 		// Transcrição
-		globalThis.RendererAPI.onUIChange('onTranscriptAdd', data => {
+		globalThis.eventBus.on('transcriptAdd', data => {
 			const { author, text, timeStr, elementId, placeholderId } = data;
 			const transcriptionBox = document.getElementById(elementId || 'conversation');
 			if (!transcriptionBox) {
@@ -1535,14 +1527,14 @@ class ConfigManager {
 		});
 
 		// Status
-		globalThis.RendererAPI.onUIChange('onStatusUpdate', data => {
+		globalThis.eventBus.on('statusUpdate', data => {
 			const { message } = data;
 			const statusText = document.getElementById('status');
 			if (statusText) statusText.innerText = message;
 		});
 
 		// Input Volume
-		globalThis.RendererAPI.onUIChange('onInputVolumeUpdate', data => {
+		globalThis.eventBus.on('inputVolumeUpdate', data => {
 			const { percent } = data;
 			const inputVu = document.getElementById('inputVu');
 			if (inputVu) inputVu.style.width = percent + '%';
@@ -1552,7 +1544,7 @@ class ConfigManager {
 		});
 
 		// Output Volume
-		globalThis.RendererAPI.onUIChange('onOutputVolumeUpdate', data => {
+		globalThis.eventBus.on('outputVolumeUpdate', data => {
 			const { percent } = data;
 			const outputVu = document.getElementById('outputVu');
 			if (outputVu) outputVu.style.width = percent + '%';
@@ -1562,7 +1554,7 @@ class ConfigManager {
 		});
 
 		// Mock Badge
-		globalThis.RendererAPI.onUIChange('onMockBadgeUpdate', data => {
+		globalThis.eventBus.on('mockBadgeUpdate', data => {
 			const { visible } = data;
 			const mockBadge = document.getElementById('mockBadge');
 			if (mockBadge) {
@@ -1571,7 +1563,7 @@ class ConfigManager {
 		});
 
 		// Listen Button Toggle (altera o texto do botão "Começar a Ouvir... (Ctrl+d)")
-		globalThis.RendererAPI.onUIChange('onListenButtonToggle', data => {
+		globalThis.eventBus.on('listenButtonToggle', data => {
 			const { isRunning, buttonText } = data;
 			const listenBtn = document.getElementById('listenBtn');
 			if (listenBtn) {
@@ -1593,7 +1585,7 @@ class ConfigManager {
 		});
 
 		// Clear All Selections
-		globalThis.RendererAPI.onUIChange('onClearAllSelections', () => {
+		globalThis.eventBus.on('clearAllSelections', () => {
 			const currentQuestionBox = document.getElementById('currentQuestion');
 			if (currentQuestionBox) currentQuestionBox.classList.remove('selected-question');
 
@@ -1606,7 +1598,7 @@ class ConfigManager {
 		});
 
 		// Scroll to Question
-		globalThis.RendererAPI.onUIChange('onScrollToQuestion', data => {
+		globalThis.eventBus.on('scrollToQuestion', data => {
 			const { questionId } = data;
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
@@ -1618,7 +1610,7 @@ class ConfigManager {
 		});
 
 		// Pergunta Atual - Elemento: currentQuestion
-		globalThis.RendererAPI.onUIChange('onCurrentQuestionUpdate', data => {
+		globalThis.eventBus.on('currentQuestionUpdate', data => {
 			// NOSONAR console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
 
 			const { text, isSelected } = data;
@@ -1653,7 +1645,7 @@ class ConfigManager {
 		});
 
 		// Histórico de Perguntas
-		globalThis.RendererAPI.onUIChange('onQuestionsHistoryUpdate', data => {
+		globalThis.eventBus.on('questionsHistoryUpdate', data => {
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
 
@@ -1675,7 +1667,7 @@ class ConfigManager {
 		});
 
 		// Answer Selected — exibe resposta existente e faz scroll
-		globalThis.RendererAPI.onUIChange('onAnswerSelected', payload => {
+		globalThis.eventBus.on('answerSelected', payload => {
 			debugLogConfig('📌 onAnswerSelected recebido:', payload, false);
 
 			if (!payload) return;
@@ -1686,7 +1678,6 @@ class ConfigManager {
 			const answersBox = document.getElementById('answersHistory');
 			if (!answersBox) return;
 
-			debugLogConfig('🎨 [onAnswerSelected] Removendo destaque anterior', false);
 			// remove seleção anterior
 			answersBox.querySelectorAll('.selected-answer').forEach(el => {
 				debugLogConfig('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId, false);
@@ -1722,13 +1713,12 @@ class ConfigManager {
 		// 📊 RASTREAMENTO SIMPLES - currentStreamingQuestionId é SUFICIENTE
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		let currentStreamingQuestionId = null; // Qual pergunta está sendo respondida AGORA
-		let currentStreamingTurnId = null; // TurnId da pergunta sendo respondida
 
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		// 📥 LISTENER: onAnswerStreamChunk
-		// Chamado para CADA token que chega do GPT
+		// Chamado para CADA token que chega da OpenAI (streaming)
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		globalThis.RendererAPI.onUIChange('onAnswerStreamChunk', data => {
+		globalThis.eventBus.on('answerStreamChunk', data => {
 			const { questionId, turnId, accum } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1763,7 +1753,6 @@ class ConfigManager {
 
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
-				currentStreamingTurnId = turnId;
 
 				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, false);
 			}
@@ -1771,7 +1760,7 @@ class ConfigManager {
 			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
 			const answerContent = wrapper.querySelector('.answer-content');
 			if (answerContent) {
-				// 🔥 Renderizar como markdown em tempo real (estilo GPT)
+				// 🔥 Renderizar como markdown em tempo real (estilo ChatGPT)
 				const htmlContent = marked.parse(accum);
 				answerContent.innerHTML = htmlContent;
 				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'auto' });
@@ -1782,7 +1771,7 @@ class ConfigManager {
 		// 🔄 LISTENER: onAnswerIdUpdate
 		// Chamado quando CURRENT → 1, 2, 3, etc
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		globalThis.RendererAPI.onUIChange('onAnswerIdUpdate', data => {
+		globalThis.eventBus.on('answerIdUpdate', data => {
 			const { oldId, newId } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1807,13 +1796,70 @@ class ConfigManager {
 		// ⏹️ LISTENER: onAnswerStreamEnd
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		globalThis.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
+		globalThis.eventBus.on('answerStreamEnd', data => {
 			debugLogConfig('✅ [STREAM_END] Limpando streamingQuestionId', false);
 			currentStreamingQuestionId = null;
 		});
 
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		// 📊 LISTENER: answerBatchEnd
+		// Chamado quando modo PADRÃO (não-streaming) completa a resposta
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		globalThis.eventBus.on('answerBatchEnd', data => {
+			const { questionId, response, turnId } = data;
+			debugLogConfig(
+				'📊 [BATCH_END] Renderizando resposta batch:',
+				{ questionId, responseLength: response?.length, turnId },
+				false,
+			);
+
+			if (!response) {
+				console.warn('⚠️ [BATCH_END] Resposta vazia para:', questionId);
+				return;
+			}
+
+			const answersHistoryBox = document.getElementById('answersHistory');
+			if (!answersHistoryBox) return;
+
+			// Procurar bloco de resposta existente
+			let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+
+			// Se não existe, criar novo bloco
+			if (!wrapper) {
+				debugLogConfig('📊 [BATCH_END] Criando novo bloco para:', questionId, false);
+				wrapper = document.createElement('div');
+				wrapper.className = 'answer-block';
+				wrapper.dataset.questionId = questionId;
+
+				// 🔥 Adicionar badge de turnId se disponível (igual ao streaming)
+				const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
+				wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
+
+				// Inserir no topo
+				answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
+
+				// Remover destaque de outros, adicionar neste
+				answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach(el => {
+					el.classList.remove('selected-answer');
+				});
+				wrapper.classList.add('selected-answer');
+
+				// Auto-scroll para topo
+				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
+			}
+
+			// Renderizar conteúdo (markdown)
+			const answerContent = wrapper.querySelector('.answer-content');
+			if (answerContent) {
+				const htmlContent = marked.parse(response);
+				answerContent.innerHTML = htmlContent;
+			}
+
+			debugLogConfig('✅ [BATCH_END] Resposta renderizada:', questionId, false);
+		});
+
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
-		globalThis.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
+		globalThis.eventBus.on('placeholderFulfill', data => {
 			debugLogConfig('🔔 onPlaceholderFulfill recebido:', data, false);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
@@ -1862,56 +1908,40 @@ class ConfigManager {
 			}
 		});
 
-		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
-		globalThis.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
+		// Helper: Cria novo placeholder
+		const createNewPlaceholder = data => {
 			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total, placeholderId } = data;
-
-			const transcriptionBox = document.getElementById('conversation');
-			if (!transcriptionBox) return;
-
-			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
-			// fallback: cria um novo placeholder se não existir
-			if (!placeholders || placeholders.length === 0) {
-				const div = document.createElement('div');
-				div.className = 'transcript-item';
-				div.dataset.isPlaceholder = 'true';
-				const ts = timeStr || new Date().toLocaleTimeString();
-				div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
-				// Se um placeholderId foi fornecido, atribui para evitar criação duplicada por race
-				if (placeholderId) {
-					div.id = placeholderId;
-					console.log('📍 Criando placeholder com ID (fallback):', placeholderId);
-				}
-				transcriptionBox.appendChild(div);
-
-				// cria meta provisório DENTRO do placeholder SOMENTE se houver texto visível
-				const hasVisibleText = text && String(text).trim().length > 0;
-				if (hasVisibleText && (startStr || stopStr || recordingDuration)) {
-					const meta = document.createElement('div');
-					meta.className = 'transcript-meta';
-					meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
-						latency || 0
-					}ms, total ${total || 0}ms)`;
-					div.appendChild(meta);
-				}
-
-				return;
-			}
-
-			// se placeholderId foi fornecido, preferir o elemento com esse id
-			let lastPlaceholder = null;
-			if (placeholderId) {
-				lastPlaceholder = document.getElementById(placeholderId);
-				if (lastPlaceholder) console.log('📍 Atualizando placeholder por ID:', placeholderId);
-			}
-			if (!lastPlaceholder) lastPlaceholder = placeholders[placeholders.length - 1];
-
+			const div = document.createElement('div');
+			div.className = 'transcript-item';
+			div.dataset.isPlaceholder = 'true';
 			const ts = timeStr || new Date().toLocaleTimeString();
-			lastPlaceholder.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+			div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
 
-			// Atualiza ou cria o elemento de meta DENTRO do placeholder
-			let meta = lastPlaceholder.querySelector('.transcript-meta');
+			if (placeholderId) {
+				div.id = placeholderId;
+				console.log('📍 Criando placeholder com ID (fallback):', placeholderId);
+			}
+
 			const hasVisibleText = text && String(text).trim().length > 0;
+			if (hasVisibleText && (startStr || stopStr || recordingDuration)) {
+				const meta = document.createElement('div');
+				meta.className = 'transcript-meta';
+				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${latency || 0}ms, total ${total || 0}ms)`;
+				div.appendChild(meta);
+			}
+
+			return div;
+		};
+
+		// Helper: Atualiza placeholder existente
+		const updatePlaceholder = (placeholder, data) => {
+			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total } = data;
+			const ts = timeStr || new Date().toLocaleTimeString();
+			placeholder.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+
+			let meta = placeholder.querySelector('.transcript-meta');
+			const hasVisibleText = text && String(text).trim().length > 0;
+
 			if (!meta && hasVisibleText && (startStr || stopStr || recordingDuration)) {
 				meta = document.createElement('div');
 				meta.className = 'transcript-meta';
@@ -1919,24 +1949,43 @@ class ConfigManager {
 				meta.style.color = '#888';
 				meta.style.marginTop = '2px';
 				meta.style.marginBottom = '2px';
-				lastPlaceholder.appendChild(meta);
+				placeholder.appendChild(meta);
 			}
 
-			// exibe métricas provisórias (se disponíveis e houver texto)
 			if (meta && hasVisibleText && (startStr || stopStr || recordingDuration)) {
-				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
-					latency || 0
-				}ms, total ${total || 0}ms)`;
+				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${latency || 0}ms, total ${total || 0}ms)`;
 			} else if (meta && !hasVisibleText) {
-				// limpa/remova metadados se não há texto visível
 				meta.remove();
 			}
+		};
 
-			// mantém data-is-placeholder até receber onPlaceholderFulfill
+		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
+		globalThis.eventBus.on('placeholderUpdate', data => {
+			const transcriptionBox = document.getElementById('conversation');
+			if (!transcriptionBox) return;
+
+			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+
+			// Criar novo placeholder se não existir
+			if (!placeholders || placeholders.length === 0) {
+				const newDiv = createNewPlaceholder(data);
+				transcriptionBox.appendChild(newDiv);
+				return;
+			}
+
+			// Obter placeholder para atualizar
+			let lastPlaceholder = null;
+			if (data.placeholderId) {
+				lastPlaceholder = document.getElementById(data.placeholderId);
+				if (lastPlaceholder) console.log('📍 Atualizando placeholder por ID:', data.placeholderId);
+			}
+			if (!lastPlaceholder) lastPlaceholder = placeholders[placeholders.length - 1];
+
+			updatePlaceholder(lastPlaceholder, data);
 		});
 
 		// Update Interim (atualização em tempo real para transcrições interims)
-		globalThis.RendererAPI.onUIChange('onUpdateInterim', data => {
+		globalThis.eventBus.on('updateInterim', data => {
 			const { id, speaker, text } = data;
 
 			let interimElement = document.getElementById(id);
@@ -1958,7 +2007,7 @@ class ConfigManager {
 		});
 
 		// Clear Interim (remove o elemento interim quando finalizado)
-		globalThis.RendererAPI.onUIChange('onClearInterim', data => {
+		globalThis.eventBus.on('clearInterim', data => {
 			const { id } = data;
 			const interimElement = document.getElementById(id);
 			if (interimElement) {
@@ -1967,26 +2016,26 @@ class ConfigManager {
 		});
 
 		// Clear Transcription
-		globalThis.RendererAPI.onUIChange('onTranscriptionCleared', () => {
+		globalThis.eventBus.on('transcriptionCleared', () => {
 			const transcriptionBox = document.getElementById('conversation');
 			if (transcriptionBox) transcriptionBox.innerHTML = '';
 		});
 
 		// Clear Answers
-		globalThis.RendererAPI.onUIChange('onAnswersCleared', () => {
+		globalThis.eventBus.on('answersCleared', () => {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (answersHistoryBox) answersHistoryBox.innerHTML = '';
 		});
 
 		// Mode Select Update
-		globalThis.RendererAPI.onUIChange('onModeSelectUpdate', data => {
+		globalThis.eventBus.on('modeSelectUpdate', data => {
 			const { mode } = data;
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			if (interviewModeSelect) interviewModeSelect.value = mode;
 		});
 
 		// 📸 NOVO: Screenshot badge
-		globalThis.RendererAPI.onUIChange('onScreenshotBadgeUpdate', data => {
+		globalThis.eventBus.on('screenshotBadgeUpdate', data => {
 			const { count, visible } = data;
 			const badge = document.getElementById('screenshotBadge');
 
@@ -2005,12 +2054,53 @@ class ConfigManager {
 		debugLogConfig('Fim da função: "registerRendererCallbacks"');
 	}
 
+	// Helper: registra listener em elemento
+	registerElementListener(elementId, eventType, callback) {
+		const element = document.getElementById(elementId);
+		if (element) {
+			element.addEventListener(eventType, callback);
+		}
+	}
+
+	// Helper: Handler para mock toggle
+	handleMockToggle(mockToggle) {
+		mockToggle.addEventListener('change', async () => {
+			if (!globalThis.RendererAPI) return;
+
+			const isEnabled = mockToggle.checked;
+			if (globalThis.RendererAPI?.setAppConfig) {
+				globalThis.RendererAPI.setAppConfig({
+					...globalThis.RendererAPI.getAppConfig(),
+					MODE_DEBUG: isEnabled,
+				});
+			}
+
+			if (isEnabled) {
+				globalThis.RendererAPI?.updateMockBadge(true);
+				if (globalThis.RendererAPI?.resetAppState) {
+					await globalThis.RendererAPI.resetAppState();
+				}
+				globalThis.mockScenarioIndex = 0;
+				globalThis.mockAutoPlayActive = false;
+				setTimeout(() => {
+					if (globalThis.runMockAutoPlay) {
+						globalThis.runMockAutoPlay();
+					}
+				}, 2000);
+			} else {
+				globalThis.RendererAPI?.updateMockBadge(false);
+				if (globalThis.RendererAPI?.resetAppState) {
+					await globalThis.RendererAPI.resetAppState();
+				}
+			}
+		});
+	}
+
 	registerDOMEventListeners() {
 		debugLogConfig('Início da função: "registerDOMEventListeners"');
 
 		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
 
-		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
 		if (!globalThis.RendererAPI) {
 			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI não disponível em registerDOMEventListeners!');
 			return;
@@ -2019,98 +2109,34 @@ class ConfigManager {
 		// Mock toggle
 		const mockToggle = document.getElementById('mockToggle');
 		if (mockToggle) {
-			mockToggle.addEventListener('change', async () => {
-				console.log('📝 Mock toggle mudou');
-				if (!globalThis.RendererAPI) return;
+			this.handleMockToggle(mockToggle);
 
-				const isEnabled = mockToggle.checked;
-				if (globalThis.RendererAPI?.setAppConfig) {
-					globalThis.RendererAPI.setAppConfig({
-						...globalThis.RendererAPI.getAppConfig(),
-						MODE_DEBUG: isEnabled,
-					});
-				}
-
-				if (isEnabled) {
-					globalThis.RendererAPI?.updateMockBadge(true);
-					// 🔥 Usa resetAppState() para limpar TUDO antes de iniciar mock
-					if (globalThis.RendererAPI?.resetAppState && typeof globalThis.RendererAPI.resetAppState === 'function') {
-						console.log('🧹 Disparando resetAppState() - limpeza antes do mock');
-						await globalThis.RendererAPI.resetAppState();
-					}
-					// 🎭 Resetar índice e iniciar autoplay com delay
-					globalThis.mockScenarioIndex = 0;
-					globalThis.mockAutoPlayActive = false;
-					console.log('🎭 Mock mode ATIVADO - autoplay iniciará em 2 segundos...');
-
-					// Chamar runMockAutoPlay() após delay para deixar UI resetar
-					setTimeout(() => {
-						if (globalThis.runMockAutoPlay && typeof globalThis.runMockAutoPlay === 'function') {
-							console.log('🎭 Disparando runMockAutoPlay() do config-manager');
-							globalThis.runMockAutoPlay();
-						} else {
-							console.warn('⚠️ runMockAutoPlay() não está disponível em window');
-						}
-					}, 2000);
-				} else {
-					globalThis.RendererAPI?.updateMockBadge(false);
-					// 🔥 NOVO: Usar resetAppState() para limpar TUDO completamente
-					if (globalThis.RendererAPI?.resetAppState && typeof globalThis.RendererAPI.resetAppState === 'function') {
-						console.log('🧹 Disparando resetAppState() - limpeza completa ao desativar mock');
-						await globalThis.RendererAPI.resetAppState();
-					} else {
-						console.warn('⚠️ resetAppState() não está disponível em globalThis.RendererAPI');
-					}
-				}
-			});
-
-			// 🔥 NOVO: Sincronizar toggle com APP_CONFIG inicial (MODE_DEBUG)
-			// Faz DEPOIS de registrar o listener para disparar o evento se necessário
+			// Sincronizar com config inicial
 			const currentConfig = globalThis.RendererAPI?.getAppConfig?.();
 			if (currentConfig?.MODE_DEBUG) {
 				mockToggle.checked = true;
-				// Dispara o evento change para REALMENTE ativar o modo debug
 				mockToggle.dispatchEvent(new Event('change', { bubbles: true }));
-				console.log('✅ Mock toggle inicializado como ATIVO e modo debug DISPARADO');
 			}
 		}
 
-		// Listen button click (Começar a Ouvir... (Ctrl+d))
-		const listenBtn = document.getElementById('listenBtn');
-		if (listenBtn) {
-			listenBtn.addEventListener('click', e => {
-				console.log('Botão listenBtn clicado!');
+		// Listen button
+		this.registerElementListener('listenBtn', 'click', () => {
+			if (globalThis.RendererAPI?.listenToggleBtn) {
+				globalThis.RendererAPI.listenToggleBtn();
+			}
+		});
 
-				if (globalThis.RendererAPI?.listenToggleBtn) {
-					globalThis.RendererAPI.listenToggleBtn();
-				} else {
-					console.error('❌ globalThis.RendererAPI.listenToggleBtn não está disponível!');
-				}
-			});
-		}
-
-		// Ask GPT button
-		const askBtn = document.getElementById('askGptBtn');
-		if (askBtn) {
-			askBtn.addEventListener('click', () => {
-				console.log('🔊 DEBUG: askGptBtn clicado!');
-				if (globalThis.RendererAPI?.askGpt) {
-					globalThis.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
-					// console.error(
-					// 	'registerDOMEventListeners: askGpt() 1759; 🔒 COMENTADA até transcrição em tempo real funcionar',
-					// );
-				}
-			});
-		}
+		// Ask LLM button
+		this.registerElementListener('askLlmBtn', 'click', () => {
+			if (globalThis.RendererAPI?.askLlm) {
+				globalThis.RendererAPI.askLlm();
+			}
+		});
 
 		// Close button
-		const btnClose = document.getElementById('btnClose');
-		if (btnClose) {
-			btnClose.addEventListener('click', () => {
-				console.log('❌ Botão Fechar clicado');
-				_ipc.send('APP_CLOSE');
-			});
-		}
+		this.registerElementListener('btnClose', 'click', () => {
+			_ipc.send('APP_CLOSE');
+		});
 
 		// Questions click handling
 		const questionsHistoryBox = document.getElementById('questionsHistory');
@@ -2230,31 +2256,31 @@ class ConfigManager {
 			});
 		}
 
-		// Ask GPT (global shortcut - Ctrl+Enter)
-		if (globalThis.RendererAPI?.onAskGpt) {
-			globalThis.RendererAPI.onAskGpt(() => {
+		// Ask LLM (global shortcut - Ctrl+Enter)
+		if (globalThis.RendererAPI?.onAskLlm) {
+			globalThis.RendererAPI.onAskLlm(() => {
 				// 🔥 CORRIGIDO: Chamar handleQuestionClick() em vez de askLLM()
 				// Isso garante que passa por todas as validações: pergunta já respondida, incompleta, etc
 				// Mesma regra que o clique do mouse
 				if (globalThis.RendererAPI?.handleQuestionClick) {
 					console.log('🔥 Atalho Ctrl+Enter detectado - chamando handleQuestionClick');
-					// Usar selectedQuestionId da API ou fallback para CURRENT
-					const selectedId = globalThis.RendererAPI?.selectedQuestionId || 'CURRENT';
+					// Usar selectedId da API (que sincroniza navegação) ou fallback para CURRENT
+					const selectedId = globalThis.RendererAPI?.selectedId || 'CURRENT';
 					globalThis.RendererAPI.handleQuestionClick(selectedId);
 				}
 			});
 		}
 
-		// GPT Stream chunks
-		if (globalThis.RendererAPI?.onGptStreamChunk) {
-			globalThis.RendererAPI.onGptStreamChunk((_, token) => {
+		// LLM Stream chunks
+		if (globalThis.RendererAPI?.onLlmStreamChunk) {
+			globalThis.RendererAPI.onLlmStreamChunk((_, token) => {
 				// Handled in renderer service
 			});
 		}
 
-		// GPT Stream end
-		if (globalThis.RendererAPI?.onGptStreamEnd) {
-			globalThis.RendererAPI.onGptStreamEnd(() => {
+		// LLM Stream end
+		if (globalThis.RendererAPI?.onLlmStreamEnd) {
+			globalThis.RendererAPI.onLlmStreamEnd(() => {
 				// Handled in renderer service
 			});
 		}
@@ -2299,7 +2325,7 @@ class ConfigManager {
 		debugLogConfig('Início da função: "registerErrorHandlers"');
 		globalThis.addEventListener('error', e => {
 			globalThis.RendererAPI.sendRendererError({
-				message: e.message ? e.message : String(e),
+				message: e.message || (e.error instanceof Error ? e.error.message : String(e.error)),
 				stack: e.error?.stack || null,
 			});
 		});
@@ -2408,7 +2434,7 @@ class ConfigManager {
 	 */
 	applyOpacity(value) {
 		debugLogConfig('Início da função: "applyOpacity"');
-		const appOpacity = parseFloat(value);
+		const appOpacity = Number.parseFloat(value);
 
 		// aplica opacidade no conteúdo geral
 		document.documentElement.style.setProperty('--app-opacity', appOpacity.toFixed(2));
@@ -2443,7 +2469,7 @@ class ConfigManager {
 
 			const _pid = event.pointerId;
 			try {
-				dragHandle.setPointerCapture && dragHandle.setPointerCapture(_pid);
+				dragHandle.setPointerCapture?.(_pid);
 			} catch (err) {
 				console.warn('setPointerCapture falhou:', err);
 			}
@@ -2475,15 +2501,19 @@ class ConfigManager {
 				try {
 					dragHandle.removeEventListener('pointermove', onPointerMove);
 					dragHandle.removeEventListener('pointerup', onPointerUp);
-				} catch (err) {}
+				} catch (err) {
+					console.warn('Erro ao remover event listeners:', err);
+				}
 
 				if (dragHandle.classList.contains('drag-active')) {
 					dragHandle.classList.remove('drag-active');
 				}
 
 				try {
-					dragHandle.releasePointerCapture && dragHandle.releasePointerCapture(_pid);
-				} catch (err) {}
+					dragHandle.releasePointerCapture?.(_pid);
+				} catch (err) {
+					console.warn('releasePointerCapture falhou:', err);
+				}
 			};
 
 			dragHandle.addEventListener('pointermove', onPointerMove);

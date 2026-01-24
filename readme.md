@@ -188,7 +188,7 @@ npm install vosk
 
 # Baixe o modelo em: https://alphacephei.com/vosk/models
 # Procure por: vosk-model-pt-0.3
-# Descompacte em: ./vosk-models/vosk-model-pt-0.3/
+# Descompacte em: ./stt/models-stt/vosk/vosk-model-pt-0.3/
 
 # Verifique o setup:
 node check-vosk-setup.js

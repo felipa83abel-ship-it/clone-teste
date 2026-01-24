@@ -144,9 +144,9 @@
 							<!-- RESPOSTAS (DIREITA) -->
 							<div id="answers">
 								<div class="answers-header">
-									<strong>🤖 Respostas GPT</strong>
+									<strong>🤖 Respostas LLM</strong>
 
-									<button id="askGptBtn" class="btn-ask-gpt">
+									<button id="askLlmBtn" class="btn-ask-llm">
 										<span class="material-icons">forward</span>
 										Gerar resposta (Ctrl+Enter)
 									</button>
@@ -200,8 +200,8 @@
 										</div>
 
 										<div>
-											<label>Status do Modelo:</label>
-											<div class="model-status">
+											<label for="openai-model-status">Status do Modelo:</label>
+											<div class="model-status" id="openai-model-status">
 												<span class="status-badge active">Ativo</span>
 												<button class="btn-activate" data-model="openai">Desativar</button>
 											</div>
@@ -263,8 +263,8 @@
 										</div>
 
 										<div>
-											<label>Status do Modelo:</label>
-											<div class="model-status">
+											<label for="custom-model-status">Status do Modelo:</label>
+											<div class="model-status" id="custom-model-status">
 												<span class="status-badge inactive">Inativo</span>
 												<button class="btn-activate" data-model="google">Ativar</button>
 											</div>
@@ -328,8 +328,8 @@
 										</div>
 
 										<div>
-											<label>Status do Modelo:</label>
-											<div class="model-status">
+											<label for="openrouter-model-status">Status do Modelo:</label>
+											<div class="model-status" id="openrouter-model-status">
 												<span class="status-badge inactive">Inativo</span>
 												<button class="btn-activate" data-model="openrouter">Ativar</button>
 											</div>
@@ -392,7 +392,7 @@
 
 									<!-- 📊 VU METER DE ENTRADA -->
 									<div class="form-group">
-										<label>Nível de Volume (Entrada):</label>
+										<label for="inputVu">Nível de Volume (Entrada):</label>
 										<div class="vu-meter">
 											<div id="inputVu" class="vu-fill"></div>
 										</div>
@@ -410,7 +410,7 @@
 
 									<!-- 📊 VU METER DE SAÍDA -->
 									<div class="form-group">
-										<label>Nível de Volume (Saída):</label>
+										<label for="outputVu">Nível de Volume (Saída):</label>
 										<div class="vu-meter">
 											<div id="outputVu" class="vu-fill"></div>
 										</div>
@@ -508,8 +508,8 @@
 						<div class="form-group form-group-flex">
 							<!-- 🌙 TOGGLE DARK MODE -->
 							<div class="controls-mock interactive-zone">
-								<label>Dark Mode</label>
 								<label class="switch">
+									Dark Mode
 									<input type="checkbox" id="darkModeToggle" />
 									<span class="slider"></span>
 								</label>
@@ -517,8 +517,8 @@
 
 							<!-- Modo Mock -->
 							<div class="controls-mock interactive-zone">
-								<label>Modo Mock</label>
 								<label class="switch">
+									Modo Mock
 									<input type="checkbox" id="mockToggle" />
 									<span class="slider"></span>
 								</label>
@@ -552,8 +552,12 @@
 						</div>
 
 						<div class="form-group danger-zone">
-							<label>⚠️ Restaure as configurações padrão (de fábrica) do APP.</label>
-							<button class="btn-reset-config danger" title="Restaurar todas as configurações ao padrão">
+							<label for="btn-reset-config">⚠️ Restaure as configurações padrão (de fábrica) do APP.</label>
+							<button
+								class="btn-reset-config danger"
+								id="btn-reset-config"
+								title="Restaurar todas as configurações ao padrão"
+							>
 								🔄 Restaurar Configurações de Fábrica
 							</button>
 						</div>

@@ -21,8 +21,31 @@ class Logger {
 		}
 	}
 
-	static debug(message, data = {}) {
-		this.log(this.levels.DEBUG, message, data);
+	static debug(message, data = {}, show = false) {
+		// Se 'data' é um booleano, é o flag 'show' (compatibilidade: Logger.debug(msg, true))
+		if (typeof data === 'boolean') {
+			show = data;
+			data = {};
+		}
+
+		// Mostra apenas se show === true
+		if (show) {
+			const nowLog = new Date();
+			const timeStr =
+				`${nowLog.getHours().toString().padStart(2, '0')}:` +
+				`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
+				`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
+				`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
+
+			const cleanMessage = typeof message === 'string' ? message : JSON.stringify(message);
+			// prettier-ignore
+			console.log(
+				`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug:`,
+				'color: brown; font-weight: bold;',
+				cleanMessage,
+				Object.keys(data).length > 0 ? data : ''
+			);
+		}
 	}
 
 	static info(message, data = {}) {

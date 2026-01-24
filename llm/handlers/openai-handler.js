@@ -8,10 +8,12 @@
  * Estrutura pronta para adicionar Gemini, Anthropic, etc.
  * Basta criar gemini-handler.js com mesmo padrão!
  */
+const Logger = require('../../utils/Logger.js');
 const { ipcRenderer } = require('electron');
 
 class OpenAIHandler {
 	constructor() {
+		this.logger = Logger;
 		this.model = 'gpt-4o-mini';
 	}
 
@@ -20,10 +22,10 @@ class OpenAIHandler {
 	 */
 	async complete(messages) {
 		try {
-			const response = await ipcRenderer.invoke('ask-gpt', messages);
+			const response = await ipcRenderer.invoke('ask-llm', messages);
 			return response;
 		} catch (error) {
-			console.error('❌ Erro OpenAI complete:', error);
+			this.logger.error('❌ Erro OpenAI complete:', error);
 			throw error;
 		}
 	}
@@ -37,40 +39,53 @@ class OpenAIHandler {
 	 * }
 	 */
 	async *stream(messages) {
+		const tokenQueue = [];
+		const state = { isEnd: false, error: null };
+
+		const onChunk = (_, token) => {
+			tokenQueue.push(token);
+		};
+
+		const onEnd = () => {
+			state.isEnd = true;
+		};
+
+		const onError = (_, error) => {
+			state.error = error;
+			state.isEnd = true;
+		};
+
+		ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
+		ipcRenderer.once('LLM_STREAM_END', onEnd);
+		ipcRenderer.once('LLM_STREAM_ERROR', onError);
+
 		try {
-			// Invocar stream
-			ipcRenderer.invoke('ask-gpt-stream', messages).catch(err => {
-				console.error('❌ Erro ao invocar ask-gpt-stream:', err);
+			// Invocar stream no main process
+			ipcRenderer.invoke('ask-llm-stream', messages).catch(err => {
+				this.logger.error('❌ Erro ao invocar ask-llm-stream:', err);
+				state.error = err;
+				state.isEnd = true;
 			});
 
-			// Criar generator que espera por tokens
-			let resolved = false;
-			let tokens = [];
-
-			const onChunk = (_, token) => {
-				tokens.push(token);
-			};
-
-			const onEnd = () => {
-				resolved = true;
-				ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
-				ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
-			};
-
-			ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
-			ipcRenderer.once('GPT_STREAM_END', onEnd);
-
-			// Emitir tokens conforme chegam
-			while (!resolved || tokens.length > 0) {
-				if (tokens.length > 0) {
-					yield tokens.shift();
+			// Loop de geração: yield tokens enquanto estiver rodando ou houver buffer
+			while (!state.isEnd || tokenQueue.length > 0) {
+				if (tokenQueue.length > 0) {
+					yield tokenQueue.shift();
 				} else {
+					// Espera pequena para evitar loop infinito de alta CPU
 					await new Promise(resolve => setTimeout(resolve, 10));
 				}
+
+				// Verifica erro assincronamente
+				if (state.error) {
+					throw new Error(state.error);
+				}
 			}
-		} catch (error) {
-			console.error('❌ Erro OpenAI stream:', error);
-			throw error;
+		} finally {
+			// Limpar listeners para evitar memory leaks
+			ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
+			ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
+			ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
 		}
 	}
 }
