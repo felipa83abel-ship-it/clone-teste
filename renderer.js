@@ -72,9 +72,14 @@ eventBus.on('llmBatchEnd', data => {
 	// 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
 	appState.interview.answeredQuestions.add(data.questionId);
 
+	// 🔥 Obter turnId da pergunta no histórico
+	const questionEntry = appState.history.find(q => q.id === data.questionId);
+	const turnId = questionEntry?.turnId || null;
+
 	eventBus.emit('answerBatchEnd', {
 		questionId: data.questionId,
 		response: data.response,
+		turnId, // 🔥 Incluir turnId para renderizar badge
 	});
 });
 
@@ -665,10 +670,17 @@ function handleQuestionClick(questionId) {
 			appState.interview.currentQuestion.finalized = true;
 
 			// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
-			appState.interview.interviewTurnId++;
-			appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
-
+			// 🔥 [MODO PADRÃO] usar newId como turnId
 			const newId = String(appState.history.length + 1);
+
+			if (modeManager.is(MODES.INTERVIEW)) {
+				appState.interview.interviewTurnId++;
+				appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
+			} else {
+				// Modo PADRÃO: usar newId como turnId
+				appState.interview.currentQuestion.turnId = Number.parseInt(newId);
+			}
+
 			appState.history.push({
 				id: newId,
 				text: appState.interview.currentQuestion.text,
@@ -868,7 +880,8 @@ function finalizeCurrentQuestion() {
 		appState.history.push({
 			id: newId,
 			text: appState.interview.currentQuestion.text,
-			turnId: appState.interview.currentQuestion.turnId,
+			// 🔥 No modo PADRÃO: usar newId como turnId para exibir badge
+			turnId: Number.parseInt(newId),
 			createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
 			lastUpdateTime:
 				appState.interview.currentQuestion.lastUpdateTime || appState.interview.currentQuestion.createdAt || Date.now(),

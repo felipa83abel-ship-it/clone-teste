@@ -1806,10 +1806,10 @@ class ConfigManager {
 		// Chamado quando modo PADRÃO (não-streaming) completa a resposta
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		globalThis.eventBus.on('answerBatchEnd', data => {
-			const { questionId, response } = data;
+			const { questionId, response, turnId } = data;
 			debugLogConfig(
 				'📊 [BATCH_END] Renderizando resposta batch:',
-				{ questionId, responseLength: response?.length },
+				{ questionId, responseLength: response?.length, turnId },
 				false,
 			);
 
@@ -1830,7 +1830,10 @@ class ConfigManager {
 				wrapper = document.createElement('div');
 				wrapper.className = 'answer-block';
 				wrapper.dataset.questionId = questionId;
-				wrapper.innerHTML = `<div class="answer-content"></div>`;
+
+				// 🔥 Adicionar badge de turnId se disponível (igual ao streaming)
+				const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
+				wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
 
 				// Inserir no topo
 				answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
