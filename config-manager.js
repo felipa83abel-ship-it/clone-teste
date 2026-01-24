@@ -6,6 +6,9 @@
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
 const EventBus = require('./events/EventBus.js');
 
+// 🔥 INSTÂNCIA GLOBAL DO EVENTBUS
+const eventBus = new EventBus();
+
 const _getIpcRenderer = () => {
 	if (globalThis?.electron?.ipcRenderer) {
 		return globalThis.electron.ipcRenderer;
@@ -1469,8 +1472,6 @@ class ConfigManager {
 	registerRendererCallbacks() {
 		debugLogConfig('Início da função: "registerRendererCallbacks"');
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
-
-		const eventBus = new EventBus();
 
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
 		eventBus.on('error', message => {
