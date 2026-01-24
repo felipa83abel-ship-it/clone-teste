@@ -49,15 +49,6 @@ llmManager.register('google', geminiHandler);
 // NOSONAR // Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
-eventBus.on('answerStreamChunk', data => {
-	eventBus.emit('answerStreamChunk', {
-		questionId: data.questionId,
-		turnId: data.turnId, // 🔥 Passar turnId para UI
-		token: data.token,
-		accum: data.accum,
-	});
-});
-
 eventBus.on('llmStreamEnd', data => {
 	Logger.info('LLM Stream finalizado', { questionId: data.questionId });
 
@@ -412,6 +403,13 @@ function clearAllSelections() {
  * [CURRENT, ID_último, ID_penúltimo, ..., ID_primeiro]
  * @returns {array} Array de IDs navegáveis
  */
+function getNavigableQuestionIds() {
+	const ids = [];
+	if (appState.currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
+	// 🔥 CORRIGIDO: Reverter histórico para ficar coerente com ordem visual renderizada
+	[...appState.history].reverse().forEach(q => ids.push(q.id));
+	return ids;
+}
 
 /* ================================ */
 //	🎯 REGISTRAR STTs (Refatoração Fase 2)

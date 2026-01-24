@@ -85,7 +85,7 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
 				type: 'audioData',
 				pcm16: pcm16.buffer,
 				percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
-				sampleRate: sampleRateContext || 16000, // Fallback para 16kHz se não disponível
+				sampleRate: sampleRate || 16000, // Fallback para 16kHz se não disponível
 			},
 			[pcm16.buffer],
 		);
