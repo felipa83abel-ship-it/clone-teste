@@ -38,13 +38,13 @@
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "dotenv": "^16.0.3",
+    "dotenv": "^16.6.1",
     "electron-store": "^11.0.2",
     "ffmpeg-static": "^5.2.0",
     "fluent-ffmpeg": "^2.1.2",
     "highlight.js": "^11.11.1",
     "marked": "^17.0.1",
-    "openai": "^6.10.0",
+    "openai": "^6.16.0",
     "webrtcvad": "^1.0.1"
   }
 }
