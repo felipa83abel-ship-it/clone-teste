@@ -298,35 +298,34 @@ function resetCurrentQuestion() {
 }
 
 /**
- * Renderiza o histórico de perguntas
+ * Funções de pergunta (delegadas ao question-controller)
  */
-function renderQuestionsHistory() {
-	Logger.debug('Início da função: "renderQuestionsHistory"');
+const { renderQuestionsHistory, renderCurrentQuestion, handleQuestionClick, scrollToSelectedQuestion, consolidateQuestionText, handleCurrentQuestion, finalizeCurrentQuestion, closeCurrentQuestionForced } = questionController;
 
-	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
-	const historyData = [...appState.history].reverse().map(q => {
-		let label = q.text;
-		if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && q.lastUpdateTime) {
-			const time = new Date(q.lastUpdateTime).toLocaleTimeString();
-			label = `⏱️ ${time} — ${label}`;
-		}
+/**
+ * Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
+ * @returns {string} Texto da pergunta selecionada
+ */
+function getSelectedQuestionText() {
+	Logger.debug('Início da função: "getSelectedQuestionText"');
+	Logger.debug('Fim da função: "getSelectedQuestionText"');
 
-		return {
-			id: q.id,
-			turnId: q.turnId, // 🔥 Incluir turnId para exibição visual
-			text: label,
-			isIncomplete: q.incomplete,
-			isAnswered: q.answered,
-			isSelected: q.id === appState.selectedId,
-		};
-	});
+	// 1️⃣ Se existe seleção explícita
+	if (appState.selectedId === CURRENT_QUESTION_ID) {
+		return appState.interview.currentQuestion.text;
+	}
 
-	eventBus.emit('questionsHistoryUpdate', historyData);
-	eventBus.emit('scrollToQuestion', {
-		questionId: appState.selectedId,
-	});
+	if (appState.selectedId) {
+		const q = appState.history.find(q => q.id === appState.selectedId);
+		if (q?.text) return q.text;
+	}
 
-	Logger.debug('Fim da função: "renderQuestionsHistory"');
+	// 2️⃣ Fallback: CURRENT (se tiver texto)
+	if (appState.interview.currentQuestion.text && appState.interview.currentQuestion.text.trim().length > 0) {
+		return appState.interview.currentQuestion.text;
+	}
+
+	return '';
 }
 
 /**
@@ -447,142 +446,13 @@ const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioContro
 /**
  * Renderiza a pergunta atual (CURRENT)
  */
-function renderCurrentQuestion() {
-	Logger.debug('Início da função: "renderCurrentQuestion"');
-
-	// Se não há texto, emite vazio
-	if (!appState.interview.currentQuestion.text) {
-		eventBus.emit('currentQuestionUpdate', { text: '', isSelected: false });
-		return;
-	}
-
-	let label = appState.interview.currentQuestion.text;
-
-	// Adiciona timestamp se modo debug métricas ativo
-	if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && appState.interview.currentQuestion.lastUpdateTime) {
-		const time = new Date(appState.interview.currentQuestion.lastUpdateTime).toLocaleTimeString();
-		label = `⏱️ ${time} — ${label}`;
-	}
-
-	// 🔥 Gera dados estruturados - config-manager renderiza no DOM
-	const questionData = {
-		text: label,
-		isSelected: appState.selectedId === CURRENT_QUESTION_ID,
-		rawText: appState.interview.currentQuestion.text,
-		createdAt: appState.interview.currentQuestion.createdAt,
-		lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime,
-	};
-
-	// Emite evento para o config-manager renderizar no DOM
-	eventBus.emit('currentQuestionUpdate', questionData);
-
-	Logger.debug('Fim da função: "renderCurrentQuestion"');
-}
+// ✅ DELEGADO para questionController
 
 /**
  * Manipula clique em pergunta
  * @param {string} questionId - ID da pergunta selecionada
  */
-function handleQuestionClick(questionId) {
-	Logger.debug('Início da função: "handleQuestionClick"');
-	appState.selectedId = questionId;
-	clearAllSelections();
-	renderQuestionsHistory();
-	renderCurrentQuestion();
-
-	// ⚠️ CURRENT nunca bloqueia resposta
-	if (questionId !== CURRENT_QUESTION_ID) {
-		const existingAnswer = findAnswerByQuestionId(questionId);
-
-		if (existingAnswer) {
-			eventBus.emit('answerSelected', {
-				questionId: questionId,
-				shouldScroll: true,
-			});
-
-			updateStatusMessage('📌 Essa pergunta já foi respondida');
-			Logger.debug('Fim da função: "handleQuestionClick" (pergunta já respondida, sem re-perguntar)');
-			return; // 🔥 CRÍTICO: Retornar aqui, não chamar askLLM()
-		}
-	}
-
-	// Se for uma pergunta do histórico marcada como incompleta, não enviar automaticamente ao LLM
-	if (questionId !== CURRENT_QUESTION_ID) {
-		const q = appState.history.find(q => q.id === questionId);
-		if (q?.incomplete) {
-			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao LLM');
-			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
-			Logger.debug('Fim da função: "handleQuestionClick" (pergunta incompleta)');
-			return; // 🔥 CRÍTICO: Retornar aqui também
-		}
-	}
-
-	if (
-		modeManager.is(MODES.INTERVIEW) &&
-		appState.selectedId === CURRENT_QUESTION_ID &&
-		appState.interview.llmAnsweredTurnId === appState.interview.interviewTurnId
-	) {
-		updateStatusMessage('⛔ LLM já respondeu esse turno');
-		console.log('⛔ LLM já respondeu esse turno');
-		Logger.debug('Fim da função: "handleQuestionClick" (LLM já respondeu)');
-		return; // 🔥 CRÍTICO: Retornar aqui
-	}
-
-	// ❓ Ainda não respondida → promover CURRENT se necessário e chamar LLM
-	// 🔥 Se for CURRENT, promover para histórico ANTES de chamar askLLM
-	if (questionId === CURRENT_QUESTION_ID) {
-		if (!appState.interview.currentQuestion.text?.trim()) {
-			updateStatusMessage('⚠️ Pergunta vazia - nada a responder');
-			Logger.debug('Fim da função: "handleQuestionClick" (pergunta vazia)');
-			return;
-		}
-
-		// Promover CURRENT para histórico se ainda não foi promovido
-		if (!appState.interview.currentQuestion.finalized) {
-			appState.interview.currentQuestion.text = finalizeQuestion(appState.interview.currentQuestion.text);
-			appState.interview.currentQuestion.lastUpdateTime = Date.now();
-			appState.interview.currentQuestion.finalized = true;
-
-			// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
-			// 🔥 [MODO PADRÃO] usar newId como turnId
-			const newId = String(appState.history.length + 1);
-
-			if (modeManager.is(MODES.INTERVIEW)) {
-				appState.interview.interviewTurnId++;
-				appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
-			} else {
-				// Modo PADRÃO: usar newId como turnId
-				appState.interview.currentQuestion.turnId = Number.parseInt(newId);
-			}
-
-			appState.history.push({
-				id: newId,
-				text: appState.interview.currentQuestion.text,
-				turnId: appState.interview.currentQuestion.turnId,
-				createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-				lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || Date.now(),
-			});
-
-			appState.interview.currentQuestion.promotedToHistory = true;
-			resetCurrentQuestion();
-			appState.selectedId = newId;
-			renderQuestionsHistory();
-			renderCurrentQuestion();
-
-			Logger.debug('🔥 CURRENT promovido para histórico via handleQuestionClick', { newId }, false);
-
-			// Chamar askLLM com o novo ID promovido
-			askLLM(newId);
-			Logger.debug('Fim da função: "handleQuestionClick" (CURRENT promovido e askLLM chamado)');
-			return;
-		}
-	}
-
-	// ❓ Ainda não respondida → chama LLM (click ou atalho)
-	askLLM();
-
-	Logger.debug('Fim da função: "handleQuestionClick"');
-}
+// ✅ DELEGADO para questionController
 
 /**
  * Aplica opacidade na interface
@@ -593,11 +463,7 @@ function handleQuestionClick(questionId) {
 /**
  * Rola a lista de perguntas para a pergunta selecionada
  */
-function scrollToSelectedQuestion() {
-	eventBus.emit('scrollToQuestion', {
-		questionId: appState.selectedId,
-	});
-}
+// ✅ DELEGADO para questionController
 
 /**
  * Configuração do Marked.js para renderização de Markdown
@@ -629,171 +495,13 @@ marked.setOptions({
  * Consolida texto de fala (interim vs final)
  * Reduz Cognitive Complexity de handleCurrentQuestion
  */
-function consolidateQuestionText(cleaned, isInterim) {
-	const q = appState.interview.currentQuestion;
+// ✅ DELEGADO para questionController
 
-	if (isInterim) {
-		q.interimText = cleaned;
-	} else {
-		q.interimText = '';
-		q.finalText = (q.finalText ? q.finalText + ' ' : '') + cleaned;
-	}
+// ✅ DELEGADO para questionController
 
-	q.text = q.finalText.trim() + (q.interimText ? ' ' + q.interimText : '');
-}
+// ✅ DELEGADO para questionController
 
-function handleCurrentQuestion(author, text, options = {}) {
-	Logger.debug('Início da função: "handleCurrentQuestion"');
-
-	const cleaned = text.replaceAll(/Ê+|hum|ahn/gi, '').trim();
-	const now = Date.now();
-
-	// Apenas consolida falas no CURRENT do OTHER
-	if (author === OTHER) {
-		// Se não existe texto ainda, marca tempo de criação
-		if (!appState.interview.currentQuestion.text) {
-			appState.interview.currentQuestion.createdAt = now;
-		}
-
-		appState.interview.currentQuestion.lastUpdateTime = now;
-		appState.interview.currentQuestion.lastUpdate = now;
-
-		// Consolidar texto
-		consolidateQuestionText(cleaned, options.isInterim);
-
-		// 🟦 CURRENT vira seleção padrão ao receber fala
-		if (!appState.selectedId) {
-			appState.selectedId = CURRENT_QUESTION_ID;
-			clearAllSelections();
-		}
-
-		// Renderizar pergunta
-		renderCurrentQuestion();
-
-		// Finalizar se em silêncio
-		if (options.shouldFinalizeAskCurrent && !options.isInterim) {
-			finalizeCurrentQuestion();
-		}
-	}
-
-	Logger.debug('Fim da função: "handleCurrentQuestion"');
-}
-
-/**
- * Finaliza a pergunta atual para histórico
- */
-function finalizeCurrentQuestion() {
-	Logger.debug('Início da função: "finalizeCurrentQuestion"');
-
-	// Se não há texto, ignorar
-	if (!appState.interview.currentQuestion.text?.trim()) {
-		console.log('⚠️ finalizeCurrentQuestion: Sem texto para finalizar');
-		return;
-	}
-
-	// 🔒 GUARDA ABSOLUTA: Se a pergunta já foi finalizada, NÃO faça nada.
-	if (appState.interview.currentQuestion.finalized) {
-		console.log('⛔ finalizeCurrentQuestion ignorado — pergunta já finalizada');
-		return;
-	}
-
-	// ⚠️ No modo entrevista: PROMOVER ANTES de chamar LLM
-	if (modeManager.is(MODES.INTERVIEW)) {
-		appState.interview.currentQuestion.text = finalizeQuestion(appState.interview.currentQuestion.text);
-		appState.interview.currentQuestion.lastUpdateTime = Date.now();
-		appState.interview.currentQuestion.finalized = true;
-
-		// 🔥 [NOVO] PROMOVER PARA HISTÓRICO ANTES DE CHAMAR LLM
-		// Isso garante que o texto está seguro e imutável durante resposta do LLM
-		const newId = String(appState.history.length + 1);
-
-		// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
-		appState.interview.interviewTurnId++;
-		appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
-
-		appState.history.push({
-			id: newId,
-			text: appState.interview.currentQuestion.text,
-			turnId: appState.interview.currentQuestion.turnId, // 🔥 Incluir turnId na entrada do histórico
-			createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-			lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || Date.now(),
-		});
-
-		appState.interview.currentQuestion.promotedToHistory = true;
-
-		// 🔥 [CRÍTICO] LIMPAR CURRENT LOGO APÓS PROMOVER
-		// Não espera nem o render nem o LLM
-		resetCurrentQuestion();
-
-		// garante seleção lógica
-		appState.selectedId = newId;
-		renderQuestionsHistory();
-		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
-
-		// 🔥 [NOVO] Chamar LLM DEPOIS que pergunta foi promovida e salva
-		// chama LLM automaticamente se ainda não respondeu este turno
-		if (
-			appState.interview.llmRequestedTurnId !== appState.interview.interviewTurnId &&
-			appState.interview.llmAnsweredTurnId !== appState.interview.interviewTurnId
-		) {
-			askLLM(newId); // Passar ID promovido para LLM
-		}
-
-		Logger.debug('Fim da função: "finalizeCurrentQuestion"');
-		return;
-	}
-
-	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
-	if (!modeManager.is(MODES.INTERVIEW)) {
-		console.log(
-			'⚠️ No modo normal detectado — promovendo ao histórico sem chamar LLM:',
-			appState.interview.currentQuestion.text,
-		);
-
-		const newId = String(appState.history.length + 1);
-		appState.history.push({
-			id: newId,
-			text: appState.interview.currentQuestion.text,
-			// 🔥 No modo PADRÃO: usar newId como turnId para exibir badge
-			turnId: Number.parseInt(newId),
-			createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-			lastUpdateTime:
-				appState.interview.currentQuestion.lastUpdateTime || appState.interview.currentQuestion.createdAt || Date.now(),
-		});
-
-		appState.selectedId = newId;
-		resetCurrentQuestion();
-		renderQuestionsHistory();
-		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
-
-		Logger.debug('Fim da função: "finalizeCurrentQuestion"');
-	}
-}
-
-/**
- * Força o fechamento da pergunta atual, promovendo-a ao histórico
- */
-function closeCurrentQuestionForced() {
-	Logger.debug('Início da função: "closeCurrentQuestionForced"');
-
-	// log temporario para testar a aplicação só remover depois
-	console.log('🚪 Fechando pergunta:', appState.interview.currentQuestion.text);
-
-	if (!appState.interview.currentQuestion.text) return;
-
-	appState.history.push({
-		id: crypto.randomUUID(),
-		text: finalizeQuestion(appState.interview.currentQuestion.text),
-		createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-	});
-
-	appState.interview.currentQuestion.text = '';
-	appState.selectedId = null; // 👈 libera seleção
-	renderQuestionsHistory();
-	renderCurrentQuestion();
-
-	Logger.debug('Fim da função: "closeCurrentQuestionForced"');
-}
+// ✅ DELEGADO para questionController
 
 /* ================================ */
 //	SISTEMA LLM
