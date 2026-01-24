@@ -1505,6 +1505,16 @@ const RendererAPI = {
 			callback(direction);
 		});
 	},
+
+	// 🔥 NOVO: Listener genérico para eventos de UI (compatibilidade config-manager.js)
+	onUIChange: (eventName, callback) => {
+		eventBus.on(eventName, callback);
+	},
+
+	// 🔥 NOVO: Emitir eventos de UI (compatibilidade STT handlers)
+	emitUIChange: (eventName, data) => {
+		eventBus.emit(eventName, data);
+	},
 };
 
 if (typeof module !== 'undefined' && module.exports) {
