@@ -4,6 +4,8 @@
 ========================================================= */
 
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
+const EventBus = require('./events/EventBus.js');
+
 const _getIpcRenderer = () => {
 	if (globalThis?.electron?.ipcRenderer) {
 		return globalThis.electron.ipcRenderer;
@@ -582,7 +584,7 @@ class ConfigManager {
 				if (statusText) statusText.innerText = 'Status: pronto';
 				await _ipc.invoke('initialize-api-client', openaiKey);
 			} else {
-				console.warn('⚠️ Nenhuma chave OpenAI configurada');
+				debugLogConfig('⚠️ Nenhuma chave OpenAI configurada', false);
 				if (statusText) statusText.innerText = 'Status: aguardando configuração de API';
 			}
 		} catch (error) {

@@ -19,7 +19,11 @@
 /* ================================ */
 
 const { ipcRenderer } = require('electron');
+const EventBus = require('../events/EventBus.js');
 const { getVADEngine } = require('./vad-engine');
+
+// 🔥 INSTÂNCIA DE EVENTBUS LOCAL
+const eventBus = new EventBus();
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -824,7 +828,7 @@ function handleVolumeUpdate(source, percent) {
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
 	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onTranscriptAdd', {
+		eventBus.emit('transcriptAdd', {
 			author,
 			text: '...',
 			timeStr,
@@ -837,7 +841,7 @@ function addTranscriptPlaceholder(author, placeholderId, timeStr) {
 // Preenche placeholder com transcrição final
 function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
 	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onPlaceholderFulfill', {
+		eventBus.emit('placeholderFulfill', {
 			speaker: author,
 			text: transcript,
 			placeholderId,
@@ -851,7 +855,7 @@ function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
 function clearInterim(source) {
 	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
 	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onClearInterim', { id: interimId });
+		eventBus.emit('clearInterim', { id: interimId });
 	}
 }
 
@@ -859,7 +863,7 @@ function clearInterim(source) {
 function updateInterim(source, transcript, author) {
 	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
 	if (globalThis.RendererAPI?.emitUIChange) {
-		globalThis.RendererAPI.emitUIChange('onUpdateInterim', {
+		eventBus.emit('updateInterim', {
 			id: interimId,
 			speaker: author,
 			text: transcript,
