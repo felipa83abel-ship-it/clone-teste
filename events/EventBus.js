@@ -1,16 +1,31 @@
 /**
  * EventBus - Sistema de pub/sub para desacoplar componentes
  * Substitui: UICallbacks (20+ enum properties)
+ *
+ * @typedef {function} EventCallback
+ * @param {any} data - Dados enviados pelo emit
+ * @returns {void}
+ */
+
+/**
+ * @class EventBus
+ * @description Pub/sub event bus para comunicação entre componentes
+ * @example
+ * const bus = new EventBus();
+ * bus.on('audio-start', (data) => console.log(data));
+ * bus.emit('audio-start', { duration: 5000 });
  */
 class EventBus {
 	constructor() {
+		/** @type {Object<string, EventCallback[]>} */
 		this.events = {};
 	}
 
 	/**
 	 * Registra listener para evento
-	 * @param {string} eventName - Nome do evento
-	 * @param {function} callback - Função a chamar quando evento emitir
+	 * @param {string} eventName - Nome do evento (ex: 'audio-start', 'llm-response')
+	 * @param {EventCallback} callback - Função a chamar quando evento emitir
+	 * @returns {void}
 	 */
 	on(eventName, callback) {
 		if (!this.events[eventName]) {
@@ -22,6 +37,9 @@ class EventBus {
 
 	/**
 	 * Remove listener específico
+	 * @param {string} eventName - Nome do evento
+	 * @param {EventCallback} callback - Função a remover
+	 * @returns {void}
 	 */
 	off(eventName, callback) {
 		if (!this.events[eventName]) return;
@@ -31,7 +49,8 @@ class EventBus {
 	/**
 	 * Emite evento para todos os listeners
 	 * @param {string} eventName - Nome do evento
-	 * @param {any} data - Dados a passar
+	 * @param {any} [data] - Dados a passar para listeners
+	 * @returns {void}
 	 */
 	emit(eventName, data) {
 		if (!this.events[eventName]) {
@@ -50,6 +69,8 @@ class EventBus {
 
 	/**
 	 * Remove todos listeners de um evento (ou de todos)
+	 * @param {string} [eventName] - Evento a limpar. Se omitido, limpa todos
+	 * @returns {void}
 	 */
 	clear(eventName) {
 		if (eventName) {

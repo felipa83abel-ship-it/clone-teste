@@ -1,9 +1,55 @@
 /**
  * AppState - Centraliza o estado de toda aplicação
  * Substitui: 15+ variáveis globais soltas no renderer.js
+ *
+ * @typedef {Object} AudioState
+ * @property {boolean} isRunning - Se áudio está sendo capturado
+ * @property {Array<Object>} capturedScreenshots - Screenshots capturadas
+ * @property {boolean} isCapturing - Se está capturando áudio
+ * @property {boolean} isAnalyzing - Se está analisando screenshot
+ *
+ * @typedef {Object} WindowState
+ * @property {boolean} isDraggingWindow - Se está arrastando janela
+ *
+ * @typedef {Object} CurrentQuestion
+ * @property {string} text - Texto da pergunta atual
+ * @property {number} lastUpdate - Timestamp da última atualização
+ * @property {boolean} finalized - Se pergunta foi finalizada
+ * @property {string|null} lastUpdateTime - Última hora de update
+ * @property {number|null} createdAt - Timestamp de criação
+ * @property {string} finalText - Texto final da pergunta
+ * @property {string} interimText - Texto temporário/parcial
+ *
+ * @typedef {Object} InterviewState
+ * @property {CurrentQuestion} currentQuestion - Pergunta atual
+ * @property {Array<Object>} questionsHistory - Histórico de perguntas
+ * @property {Set<string>} answeredQuestions - Perguntas respondidas
+ * @property {string|null} selectedQuestionId - ID da pergunta selecionada
+ * @property {number} interviewTurnId - ID do turno da entrevista
+ * @property {number|null} llmAnsweredTurnId - Turno da resposta LLM
+ * @property {number|null} llmRequestedTurnId - Turno da requisição LLM
+ * @property {string|null} llmRequestedQuestionId - ID da pergunta solicitada ao LLM
+ * @property {string|null} lastAskedQuestionNormalized - Última pergunta normalizada
+ *
+ * @typedef {Object} MetricsData
+ * @property {number|null} audioStartTime - Hora de início do áudio
+ * @property {number|null} llmStartTime - Hora de início do LLM
+ * @property {number|null} llmFirstTokenTime - Tempo do primeiro token
+ * @property {number|null} llmEndTime - Hora de fim do LLM
+ * @property {number|null} totalTime - Tempo total
+ * @property {number} audioSize - Tamanho do áudio em bytes
+ *
+ * @typedef {Object} LLMState
+ * @property {string} selectedProvider - Provider LLM selecionado
+ */
+
+/**
+ * Classe de gerenciamento de estado centralizado da aplicação
+ * @class AppState
  */
 class AppState {
 	constructor() {
+		/** @type {AudioState} */
 		this.audio = {
 			isRunning: false,
 			capturedScreenshots: [],
@@ -201,10 +247,18 @@ class AppState {
 		this.interview.selectedQuestionId = value;
 	}
 
+	/**
+	 * Obtém a pergunta atual
+	 * @returns {CurrentQuestion} Pergunta atual
+	 */
 	getCurrentQuestion() {
 		return this.interview.currentQuestion;
 	}
 
+	/**
+	 * Reseta a pergunta atual para estado vazio
+	 * @returns {void}
+	 */
 	resetCurrentQuestion() {
 		this.interview.currentQuestion = {
 			text: '',
@@ -217,18 +271,37 @@ class AppState {
 		};
 	}
 
+	/**
+	 * Adiciona pergunta ao histórico
+	 * @param {Object} question - Pergunta a adicionar
+	 * @returns {void}
+	 */
 	addToHistory(question) {
 		this.interview.questionsHistory.push(question);
 	}
 
+	/**
+	 * Marca pergunta como respondida
+	 * @param {string} questionId - ID da pergunta
+	 * @returns {void}
+	 */
 	markAsAnswered(questionId) {
 		this.interview.answeredQuestions.add(questionId);
 	}
 
+	/**
+	 * Verifica se pergunta foi respondida
+	 * @param {string} questionId - ID da pergunta
+	 * @returns {boolean} Se foi respondida
+	 */
 	hasAnswered(questionId) {
 		return this.interview.answeredQuestions.has(questionId);
 	}
 
+	/**
+	 * Reseta todo o estado da aplicação
+	 * @returns {void}
+	 */
 	reset() {
 		// Limpar tudo de uma vez
 		this.audio = {

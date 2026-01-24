@@ -1,6 +1,18 @@
 /**
  * Logger - Sistema de logging estruturado
  * Substitui: debugLogRenderer() frágil
+ *
+ * @typedef {Object} LogData
+ * @property {any} [key] - Dados adicionais a logar
+ */
+
+/**
+ * @class Logger
+ * @description Logger centralizado com níveis e controle de debug
+ * @example
+ * Logger.info('Iniciando app', { version: '1.0' });
+ * Logger.debug('Debug info', { value: 42 }, true); // show=true para ativar
+ * Logger.error('Erro crítico', { code: 500 });
  */
 class Logger {
 	static levels = {
@@ -10,6 +22,13 @@ class Logger {
 		ERROR: 'ERROR',
 	};
 
+	/**
+	 * Log genérico com level
+	 * @param {string} level - Nível do log (DEBUG|INFO|WARN|ERROR)
+	 * @param {string} message - Mensagem a logar
+	 * @param {LogData} [data={}] - Dados contextuais
+	 * @returns {void}
+	 */
 	static log(level, message, data = {}) {
 		const timestamp = new Date().toISOString();
 		const prefix = `[${timestamp}] [${level}]`;
@@ -21,6 +40,13 @@ class Logger {
 		}
 	}
 
+	/**
+	 * Log de debug com visibilidade controlada
+	 * @param {string} message - Mensagem a logar
+	 * @param {LogData|boolean} [data={}] - Dados ou flag de visibilidade
+	 * @param {boolean} [show=false] - Se true, mostra log colorido no console
+	 * @returns {void}
+	 */
 	static debug(message, data = {}, show = false) {
 		// Se 'data' é um booleano, é o flag 'show' (compatibilidade: Logger.debug(msg, true))
 		if (typeof data === 'boolean') {
@@ -48,14 +74,32 @@ class Logger {
 		}
 	}
 
+	/**
+	 * Log de informação
+	 * @param {string} message - Mensagem a logar
+	 * @param {LogData} [data={}] - Dados contextuais
+	 * @returns {void}
+	 */
 	static info(message, data = {}) {
 		this.log(this.levels.INFO, message, data);
 	}
 
+	/**
+	 * Log de aviso
+	 * @param {string} message - Mensagem a logar
+	 * @param {LogData} [data={}] - Dados contextuais
+	 * @returns {void}
+	 */
 	static warn(message, data = {}) {
 		this.log(this.levels.WARN, message, data);
 	}
 
+	/**
+	 * Log de erro
+	 * @param {string} message - Mensagem a logar
+	 * @param {LogData} [data={}] - Dados contextuais
+	 * @returns {void}
+	 */
 	static error(message, data = {}) {
 		this.log(this.levels.ERROR, message, data);
 	}

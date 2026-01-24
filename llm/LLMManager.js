@@ -7,16 +7,34 @@
  * - Error handling estruturado com Logger
  * - Suporte para múltiplos providers (OpenAI, Gemini, Anthropic, etc)
  *
- * Uso:
+ * @typedef {Object} LLMConfig
+ * @property {number} [timeout=60000] - Timeout em ms
+ * @property {number} [maxRetries=3] - Máximo de tentativas
+ * @property {number} [retryDelayMs=1000] - Delay inicial em ms
+ * @property {number} [backoffMultiplier=2] - Multiplicador do backoff
+ *
+ * @typedef {Object} LLMHandler
+ * @property {Function} complete - Função para completion
+ * @property {Function} stream - Função para streaming
+ *
+ * @typedef {Object} LLMMessage
+ * @property {string} role - Papel (user|assistant|system)
+ * @property {string} content - Conteúdo da mensagem
+ *
+ * @class LLMManager
+ * @description Orquestrador de modelos LLM com timeout, retry e fallback
+ * @example
  * const LLM = new LLMManager();
  * LLM.register('openai', openaiHandler);
- * LLM.register('gemini', geminiHandler);
- * const response = await LLM.complete(model, messages);
+ * const response = await LLM.complete('openai', messages);
  */
 
 const Logger = require('../utils/Logger.js');
 
 class LLMManager {
+	/**
+	 * @param {LLMConfig} [options={}] - Configurações iniciais
+	 */
 	constructor(options = {}) {
 		this.handlers = {};
 
@@ -36,9 +54,11 @@ class LLMManager {
 
 	/**
 	 * Registra handler de LLM
-	 * @param {string} name - Nome do modelo (ex: 'openai')
-	 * @param {object} handler - Handler com métodos: complete(), stream()
-	 * @param {object} options - Opções do handler (timeout, maxRetries, etc)
+	 * @param {string} name - Nome do modelo (ex: 'openai', 'gemini')
+	 * @param {LLMHandler} handler - Handler com métodos: complete(), stream()
+	 * @param {LLMConfig} [options={}] - Opções específicas do handler
+	 * @returns {void}
+	 * @throws {Error} Se handler não tem complete() e stream()
 	 */
 	register(name, handler, options = {}) {
 		if (!handler.complete || !handler.stream) {
@@ -63,7 +83,10 @@ class LLMManager {
 	}
 
 	/**
-	 * Obtém handler
+	 * Obtém handler de LLM
+	 * @param {string} name - Nome do modelo
+	 * @returns {LLMHandler} Handler do modelo
+	 * @throws {Error} Se modelo não foi registrado
 	 */
 	getHandler(name) {
 		const handlerWrapper = this.handlers[name];
@@ -76,6 +99,9 @@ class LLMManager {
 
 	/**
 	 * Obtém configuração do handler
+	 * @param {string} name - Nome do modelo
+	 * @returns {LLMConfig} Configuração do modelo
+	 * @throws {Error} Se modelo não foi registrado
 	 */
 	getHandlerConfig(name) {
 		const handlerWrapper = this.handlers[name];
@@ -87,8 +113,10 @@ class LLMManager {
 
 	/**
 	 * Timeout wrapper para Promises
-	 * @param {Promise} promise - Promise a executar
+	 * @private
+	 * @param {Promise<any>} promise - Promise a executar
 	 * @param {number} timeoutMs - Timeout em milissegundos
+	 * @returns {Promise<any>} Resultado da promise ou timeout
 	 * @throws {Error} Se timeout ultrapassado
 	 */
 	async _withTimeout(promise, timeoutMs) {
@@ -100,8 +128,11 @@ class LLMManager {
 
 	/**
 	 * Retry wrapper com backoff exponencial
+	 * @private
 	 * @param {Function} asyncFn - Função assíncrona a executar
-	 * @param {object} config - {maxRetries, retryDelayMs, backoffMultiplier}
+	 * @param {LLMConfig} config - Configuração com maxRetries, retryDelayMs, backoffMultiplier
+	 * @returns {Promise<any>} Resultado da execução
+	 * @throws {Error} Se todas as tentativas falharam
 	 */
 	async _withRetry(asyncFn, config) {
 		let lastError;
@@ -134,8 +165,10 @@ class LLMManager {
 
 	/**
 	 * Determina se erro é retentável
-	 * Erros de rede/timeout: sim
-	 * Erros de autenticação/validação: não
+	 * @private
+	 * @param {Error} error - Erro a verificar
+	 * @returns {boolean} true se pode retry, false se erro é definitivo
+	 * @description Erros de rede/timeout: retry. Autenticação/validação: não
 	 */
 	_isRetryableError(error) {
 		const message = error.message?.toLowerCase() || '';
