@@ -754,7 +754,7 @@ function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
 	if (globalThis.RendererAPI?.emitUIChange) {
 		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent });
+		eventBus.emit(ev, { percent });
 	}
 }
 

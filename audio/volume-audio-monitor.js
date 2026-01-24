@@ -320,7 +320,7 @@ function stopAudioVolumeMonitor(source) {
 		// 4️⃣ Emite volume zerado para UI
 		if (globalThis.RendererAPI?.emitUIChange) {
 			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-			globalThis.RendererAPI.emitUIChange(ev, { percent: 0 });
+			eventBus.emit(ev, { percent: 0 });
 		}
 
 		vars.setActive(false);
@@ -390,7 +390,7 @@ function handleVolumeMonitorUpdate(source, data) {
 	// Emite para UI via RendererAPI
 	if (globalThis.RendererAPI?.emitUIChange) {
 		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		globalThis.RendererAPI.emitUIChange(ev, { percent: data.percent });
+		eventBus.emit(ev, { percent: data.percent });
 	}
 }
 

@@ -325,7 +325,7 @@ class ConfigManager {
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
 						if (globalThis.RendererAPI?.emitUIChange) {
-							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'input', deviceId: input.value });
+							eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
 						}
 					} else if (input.id === 'audio-output-device') {
 						console.log('📝 Output device mudou para:', input.value || 'NENHUM');
@@ -335,7 +335,7 @@ class ConfigManager {
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
 						if (globalThis.RendererAPI?.emitUIChange) {
-							globalThis.RendererAPI.emitUIChange('onAudioDeviceChanged', { type: 'output', deviceId: input.value });
+							eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 						}
 					} else if (input.id === 'darkModeToggle') {
 						// 🔥 NOVO: Aplica classe CSS quando darkModeToggle muda
@@ -1470,20 +1470,16 @@ class ConfigManager {
 		debugLogConfig('Início da função: "registerRendererCallbacks"');
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
 
-		// VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
-		if (!globalThis.RendererAPI || typeof globalThis.RendererAPI.onUIChange !== 'function') {
-			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI.onUIChange não disponível!');
-			return;
-		}
+		const eventBus = new EventBus();
 
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
-		globalThis.RendererAPI.onUIChange('onError', message => {
+		eventBus.on('error', message => {
 			console.error(`❌ Erro renderizado: ${message}`);
 			this.showError(message);
 		});
 
 		// Transcrição
-		globalThis.RendererAPI.onUIChange('onTranscriptAdd', data => {
+		eventBus.on('transcriptAdd', data => {
 			const { author, text, timeStr, elementId, placeholderId } = data;
 			const transcriptionBox = document.getElementById(elementId || 'conversation');
 			if (!transcriptionBox) {
@@ -1537,14 +1533,14 @@ class ConfigManager {
 		});
 
 		// Status
-		globalThis.RendererAPI.onUIChange('onStatusUpdate', data => {
+		eventBus.on('statusUpdate', data => {
 			const { message } = data;
 			const statusText = document.getElementById('status');
 			if (statusText) statusText.innerText = message;
 		});
 
 		// Input Volume
-		globalThis.RendererAPI.onUIChange('onInputVolumeUpdate', data => {
+		eventBus.on('inputVolumeUpdate', data => {
 			const { percent } = data;
 			const inputVu = document.getElementById('inputVu');
 			if (inputVu) inputVu.style.width = percent + '%';
@@ -1554,7 +1550,7 @@ class ConfigManager {
 		});
 
 		// Output Volume
-		globalThis.RendererAPI.onUIChange('onOutputVolumeUpdate', data => {
+		eventBus.on('outputVolumeUpdate', data => {
 			const { percent } = data;
 			const outputVu = document.getElementById('outputVu');
 			if (outputVu) outputVu.style.width = percent + '%';
@@ -1564,7 +1560,7 @@ class ConfigManager {
 		});
 
 		// Mock Badge
-		globalThis.RendererAPI.onUIChange('onMockBadgeUpdate', data => {
+		eventBus.on('mockBadgeUpdate', data => {
 			const { visible } = data;
 			const mockBadge = document.getElementById('mockBadge');
 			if (mockBadge) {
@@ -1573,7 +1569,7 @@ class ConfigManager {
 		});
 
 		// Listen Button Toggle (altera o texto do botão "Começar a Ouvir... (Ctrl+d)")
-		globalThis.RendererAPI.onUIChange('onListenButtonToggle', data => {
+		eventBus.on('listenButtonToggle', data => {
 			const { isRunning, buttonText } = data;
 			const listenBtn = document.getElementById('listenBtn');
 			if (listenBtn) {
@@ -1595,7 +1591,7 @@ class ConfigManager {
 		});
 
 		// Clear All Selections
-		globalThis.RendererAPI.onUIChange('onClearAllSelections', () => {
+		eventBus.on('clearAllSelections', () => {
 			const currentQuestionBox = document.getElementById('currentQuestion');
 			if (currentQuestionBox) currentQuestionBox.classList.remove('selected-question');
 
@@ -1608,7 +1604,7 @@ class ConfigManager {
 		});
 
 		// Scroll to Question
-		globalThis.RendererAPI.onUIChange('onScrollToQuestion', data => {
+		eventBus.on('scrollToQuestion', data => {
 			const { questionId } = data;
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
@@ -1620,7 +1616,7 @@ class ConfigManager {
 		});
 
 		// Pergunta Atual - Elemento: currentQuestion
-		globalThis.RendererAPI.onUIChange('onCurrentQuestionUpdate', data => {
+		eventBus.on('currentQuestionUpdate', data => {
 			// NOSONAR console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
 
 			const { text, isSelected } = data;
@@ -1655,7 +1651,7 @@ class ConfigManager {
 		});
 
 		// Histórico de Perguntas
-		globalThis.RendererAPI.onUIChange('onQuestionsHistoryUpdate', data => {
+		eventBus.on('questionsHistoryUpdate', data => {
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
 
@@ -1677,7 +1673,7 @@ class ConfigManager {
 		});
 
 		// Answer Selected — exibe resposta existente e faz scroll
-		globalThis.RendererAPI.onUIChange('onAnswerSelected', payload => {
+		eventBus.on('answerSelected', payload => {
 			debugLogConfig('📌 onAnswerSelected recebido:', payload, false);
 
 			if (!payload) return;
@@ -1729,7 +1725,7 @@ class ConfigManager {
 		// 📥 LISTENER: onAnswerStreamChunk
 		// Chamado para CADA token que chega do GPT
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		globalThis.RendererAPI.onUIChange('onAnswerStreamChunk', data => {
+		eventBus.on('answerStreamChunk', data => {
 			const { questionId, turnId, accum } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1782,7 +1778,7 @@ class ConfigManager {
 		// 🔄 LISTENER: onAnswerIdUpdate
 		// Chamado quando CURRENT → 1, 2, 3, etc
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		globalThis.RendererAPI.onUIChange('onAnswerIdUpdate', data => {
+		eventBus.on('answerIdUpdate', data => {
 			const { oldId, newId } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1807,13 +1803,13 @@ class ConfigManager {
 		// ⏹️ LISTENER: onAnswerStreamEnd
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		globalThis.RendererAPI.onUIChange('onAnswerStreamEnd', data => {
+		eventBus.on('answerStreamEnd', data => {
 			debugLogConfig('✅ [STREAM_END] Limpando streamingQuestionId', false);
 			currentStreamingQuestionId = null;
 		});
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
-		globalThis.RendererAPI.onUIChange('onPlaceholderFulfill', data => {
+		eventBus.on('placeholderFulfill', data => {
 			debugLogConfig('🔔 onPlaceholderFulfill recebido:', data, false);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
@@ -1914,7 +1910,7 @@ class ConfigManager {
 		};
 
 		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
-		globalThis.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
+		eventBus.on('placeholderUpdate', data => {
 			const transcriptionBox = document.getElementById('conversation');
 			if (!transcriptionBox) return;
 
@@ -1939,7 +1935,7 @@ class ConfigManager {
 		});
 
 		// Update Interim (atualização em tempo real para transcrições interims)
-		globalThis.RendererAPI.onUIChange('onUpdateInterim', data => {
+		eventBus.on('updateInterim', data => {
 			const { id, speaker, text } = data;
 
 			let interimElement = document.getElementById(id);
@@ -1961,7 +1957,7 @@ class ConfigManager {
 		});
 
 		// Clear Interim (remove o elemento interim quando finalizado)
-		globalThis.RendererAPI.onUIChange('onClearInterim', data => {
+		eventBus.on('clearInterim', data => {
 			const { id } = data;
 			const interimElement = document.getElementById(id);
 			if (interimElement) {
@@ -1970,26 +1966,26 @@ class ConfigManager {
 		});
 
 		// Clear Transcription
-		globalThis.RendererAPI.onUIChange('onTranscriptionCleared', () => {
+		eventBus.on('transcriptionCleared', () => {
 			const transcriptionBox = document.getElementById('conversation');
 			if (transcriptionBox) transcriptionBox.innerHTML = '';
 		});
 
 		// Clear Answers
-		globalThis.RendererAPI.onUIChange('onAnswersCleared', () => {
+		eventBus.on('answersCleared', () => {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (answersHistoryBox) answersHistoryBox.innerHTML = '';
 		});
 
 		// Mode Select Update
-		globalThis.RendererAPI.onUIChange('onModeSelectUpdate', data => {
+		eventBus.on('modeSelectUpdate', data => {
 			const { mode } = data;
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			if (interviewModeSelect) interviewModeSelect.value = mode;
 		});
 
 		// 📸 NOVO: Screenshot badge
-		globalThis.RendererAPI.onUIChange('onScreenshotBadgeUpdate', data => {
+		eventBus.on('screenshotBadgeUpdate', data => {
 			const { count, visible } = data;
 			const badge = document.getElementById('screenshotBadge');
 
