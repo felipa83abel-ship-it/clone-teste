@@ -3,6 +3,9 @@
    Gerencia configurações da aplicação com persistência segura
 ========================================================= */
 
+// Imports
+const Logger = require('./utils/Logger.js');
+
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
 // ⚠️ EventBus é importado em renderer.js e disponível globalmente como 'globalThis.eventBus'
 
@@ -22,16 +25,16 @@ const _ipc = _getIpcRenderer();
 // (não precisa fazer require pois renderer.js é carregado primeiro no index.html)
 class ConfigManager {
 	constructor() {
-		debugLogConfig('Início da função: "constructor"');
+		Logger.debug('Início da função: "constructor"');
 		this.config = this.loadConfig();
 		this.initEventListeners();
 
-		debugLogConfig('Fim da função: "constructor"');
+		Logger.debug('Fim da função: "constructor"');
 	}
 
 	// Carrega configurações salvas
 	loadConfig() {
-		debugLogConfig('Início da função: "loadConfig"');
+		Logger.debug('Início da função: "loadConfig"');
 		console.log('📂 INICIANDO CARREGAMENTO DE CONFIG...');
 		try {
 			const defaultConfig = {
@@ -121,13 +124,13 @@ class ConfigManager {
 
 				console.log('✅ Configurações carregadas do localStorage');
 
-				debugLogConfig('Fim da função: "loadConfig"');
+				Logger.debug('Fim da função: "loadConfig"');
 				return merged;
 			}
 
 			console.log('✅ Configurações default carregadas');
 
-			debugLogConfig('Fim da função: "loadConfig"');
+			Logger.debug('Fim da função: "loadConfig"');
 			return defaultConfig;
 		} catch (error) {
 			console.error('Erro ao carregar configurações:', error);
@@ -137,7 +140,7 @@ class ConfigManager {
 
 	// Inicializa listeners de eventos
 	initEventListeners() {
-		debugLogConfig('Início da função: "initEventListeners"');
+		Logger.debug('Início da função: "initEventListeners"');
 		// Menu lateral
 		document.querySelectorAll('.menu-item').forEach(item => {
 			item.addEventListener('click', e => {
@@ -358,7 +361,7 @@ class ConfigManager {
 
 		console.log('✅ Listeners de eventos inicializados');
 
-		debugLogConfig('Fim da função: "initEventListeners"');
+		Logger.debug('Fim da função: "initEventListeners"');
 	}
 
 	// Helper to restart input monitoring
@@ -392,7 +395,7 @@ class ConfigManager {
 			// Buscar placeholder pelo ID
 			targetPlaceholder = document.getElementById(placeholderId);
 			if (targetPlaceholder) {
-				debugLogConfig('✅ Placeholder encontrado por ID:', placeholderId, false);
+				Logger.debug('✅ Placeholder encontrado por ID:', placeholderId, false);
 			} else {
 				console.warn('⚠️ Placeholder com ID não encontrado:', placeholderId);
 				// Fallback: busca pelo selector de data-is-placeholder
@@ -416,7 +419,7 @@ class ConfigManager {
 
 	// 🔥 NOVO: Verifica status das API keys de todos os providers
 	async checkApiKeysStatus() {
-		debugLogConfig('Início da função: "checkApiKeysStatus"');
+		Logger.debug('Início da função: "checkApiKeysStatus"');
 		try {
 			const providers = ['openai', 'google', 'openrouter'];
 
@@ -446,11 +449,11 @@ class ConfigManager {
 			console.error('❌ Erro ao verificar status das API keys:', error);
 		}
 
-		debugLogConfig('Fim da função: "checkApiKeysStatus"');
+		Logger.debug('Fim da função: "checkApiKeysStatus"');
 	}
 
 	updateApiKeyFieldStatus(provider, hasKey) {
-		debugLogConfig('Início da função: "updateApiKeyFieldStatus"');
+		Logger.debug('Início da função: "updateApiKeyFieldStatus"');
 		const input = document.getElementById(`${provider}-api-key`);
 
 		if (input) {
@@ -475,12 +478,12 @@ class ConfigManager {
 			console.warn(`⚠️ Input ${provider}-api-key não encontrado no DOM`);
 		}
 
-		debugLogConfig('Fim da função: "updateApiKeyFieldStatus"');
+		Logger.debug('Fim da função: "updateApiKeyFieldStatus"');
 	}
 
 	// 🔥 NOVO: Salva API key de forma segura
 	async saveApiKey(provider, apiKey) {
-		debugLogConfig('Início da função: "saveApiKey"');
+		Logger.debug('Início da função: "saveApiKey"');
 		try {
 			// 🔥 CRÍTICO: Valida que a chave não está vazia
 			if (!apiKey || apiKey.trim().length < 10) {
@@ -505,7 +508,7 @@ class ConfigManager {
 			this.updateApiKeyFieldStatus(provider, true);
 			this.showSaveFeedback(`API key de ${provider} salva com segurança`);
 
-			debugLogConfig('Fim da função: "saveApiKey"');
+			Logger.debug('Fim da função: "saveApiKey"');
 			return { success: true };
 		} catch (error) {
 			console.error(`Erro ao salvar API key de ${provider}:`, error);
@@ -516,7 +519,7 @@ class ConfigManager {
 
 	// 🔥 NOVO: Remove API key de forma segura
 	async deleteApiKey(provider) {
-		debugLogConfig('Início da função: "deleteApiKey"');
+		Logger.debug('Início da função: "deleteApiKey"');
 		try {
 			const confirmed = confirm(`Tem certeza que deseja remover a API key de ${provider}?`);
 
@@ -547,12 +550,12 @@ class ConfigManager {
 			this.showError(`Erro ao remover API key: ${error.message}`);
 		}
 
-		debugLogConfig('Fim da função: "deleteApiKey"');
+		Logger.debug('Fim da função: "deleteApiKey"');
 	}
 
 	// Salva configurações
 	saveConfig(showFeedback = true) {
-		debugLogConfig('Início da função: "saveConfig"');
+		Logger.debug('Início da função: "saveConfig"');
 		try {
 			const configStr = JSON.stringify(this.config);
 			localStorage.setItem('appConfig', configStr);
@@ -565,12 +568,12 @@ class ConfigManager {
 			this.showError('Erro ao salvar configurações');
 		}
 
-		debugLogConfig('Fim da função: "saveConfig"');
+		Logger.debug('Fim da função: "saveConfig"');
 	}
 
 	// 🔥 Sincroniza API key ao iniciar
 	async syncApiKeyOnStart() {
-		debugLogConfig('Início da função: "syncApiKeyOnStart"');
+		Logger.debug('Início da função: "syncApiKeyOnStart"');
 		try {
 			const statusText = document.getElementById('status');
 			const openaiKey = await _ipc.invoke('GET_API_KEY', 'openai');
@@ -580,18 +583,18 @@ class ConfigManager {
 				if (statusText) statusText.innerText = 'Status: pronto';
 				await _ipc.invoke('initialize-api-client', openaiKey);
 			} else {
-				debugLogConfig('⚠️ Nenhuma chave OpenAI configurada', false);
+				Logger.debug('⚠️ Nenhuma chave OpenAI configurada', false);
 				if (statusText) statusText.innerText = 'Status: aguardando configuração de API';
 			}
 		} catch (error) {
 			console.error('❌ Erro ao sincronizar API key:', error);
 		}
 
-		debugLogConfig('Fim da função: "syncApiKeyOnStart"');
+		Logger.debug('Fim da função: "syncApiKeyOnStart"');
 	}
 
 	showSaveFeedback() {
-		debugLogConfig('Início da função: "showSaveFeedback"');
+		Logger.debug('Início da função: "showSaveFeedback"');
 		const feedback = document.createElement('div');
 		feedback.className = 'save-feedback';
 		feedback.innerHTML = `
@@ -604,12 +607,12 @@ class ConfigManager {
 			feedback.remove();
 		}, 3000);
 
-		debugLogConfig('Fim da função: "showSaveFeedback"');
+		Logger.debug('Fim da função: "showSaveFeedback"');
 	}
 
 	// Mostra erro
 	showError(message) {
-		debugLogConfig('Início da função: "showError"');
+		Logger.debug('Início da função: "showError"');
 		const error = document.createElement('div');
 		error.className = 'save-feedback';
 		error.style.background = '#dc3545';
@@ -623,12 +626,12 @@ class ConfigManager {
 			error.remove();
 		}, 3000);
 
-		debugLogConfig('Fim da função: "showError"');
+		Logger.debug('Fim da função: "showError"');
 	}
 
 	// Carrega dispositivos de áudio disponíveis
 	async loadDevices() {
-		debugLogConfig('Início da função: "loadDevices"');
+		Logger.debug('Início da função: "loadDevices"');
 		try {
 			const devices = await navigator.mediaDevices.enumerateDevices();
 			const inputs = devices.filter(d => d.kind === 'audioinput');
@@ -665,7 +668,7 @@ class ConfigManager {
 			console.error('❌ Erro ao carregar dispositivos de áudio:', error);
 		}
 
-		debugLogConfig('Fim da função: "loadDevices"');
+		Logger.debug('Fim da função: "loadDevices"');
 	}
 
 	// Adiciona opção "Nenhum" ao select
@@ -676,7 +679,7 @@ class ConfigManager {
 
 	// Salva dispositivos selecionados
 	saveDevices() {
-		debugLogConfig('Início da função: "saveDevices"');
+		Logger.debug('Início da função: "saveDevices"');
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
 
@@ -693,12 +696,12 @@ class ConfigManager {
 			});
 		}
 
-		debugLogConfig('Fim da função: "saveDevices"');
+		Logger.debug('Fim da função: "saveDevices"');
 	}
 
 	// Restaura dispositivos salvos
 	restoreDevices() {
-		debugLogConfig('Início da função: "restoreDevices"');
+		Logger.debug('Início da função: "restoreDevices"');
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
 
@@ -719,12 +722,12 @@ class ConfigManager {
 			output: outputSelect.value,
 		});
 
-		debugLogConfig('Fim da função: "restoreDevices"');
+		Logger.debug('Fim da função: "restoreDevices"');
 	}
 
 	// 🔥 NOVO: Restaura modelos STT e LLM salvos
 	restoreSTTLLMModels() {
-		debugLogConfig('Início da função: "restoreSTTLLMModels"');
+		Logger.debug('Início da função: "restoreSTTLLMModels"');
 		console.log('🔄 INICIANDO RESTAURAÇÃO DE MODELOS STT/LLM...');
 		const providers = ['openai', 'google', 'openrouter'];
 
@@ -757,12 +760,12 @@ class ConfigManager {
 		});
 
 		console.log('🎉 RESTAURAÇÃO CONCLUÍDA');
-		debugLogConfig('Fim da função: "restoreSTTLLMModels"');
+		Logger.debug('Fim da função: "restoreSTTLLMModels"');
 	}
 
 	// 🔥 NOVO: Restaura preferências do usuário (darkMode, interviewMode, overlayOpacity)
 	restoreUserPreferences() {
-		debugLogConfig('Início da função: "restoreUserPreferences"');
+		Logger.debug('Início da função: "restoreUserPreferences"');
 		console.log('🔄 RESTAURANDO PREFERÊNCIAS DO USUÁRIO...');
 
 		// 1️⃣ Restaurar Dark Mode
@@ -797,7 +800,7 @@ class ConfigManager {
 		}
 
 		console.log('🎉 PREFERÊNCIAS RESTAURADAS COM SUCESSO');
-		debugLogConfig('Fim da função: "restoreUserPreferences"');
+		Logger.debug('Fim da função: "restoreUserPreferences"');
 	}
 
 	// Alterna entre seções de configuração
@@ -825,12 +828,12 @@ class ConfigManager {
 			this.initAudioMonitoring();
 		}
 
-		debugLogConfig('Fim da função: "switchConfigSection"');
+		Logger.debug('Fim da função: "switchConfigSection"');
 	}
 
 	// Criamos um método auxiliar para organizar o código
 	async initAudioMonitoring() {
-		debugLogConfig('Início da função: "initAudioMonitoring"');
+		Logger.debug('Início da função: "initAudioMonitoring"');
 
 		const inputSelect = document.getElementById('audio-input-device');
 		const outputSelect = document.getElementById('audio-output-device');
@@ -878,7 +881,7 @@ class ConfigManager {
 			console.log('ℹ️ Nenhum dispositivo de áudio ativado para monitoramento');
 		}
 
-		debugLogConfig('Fim da função: "initAudioMonitoring"');
+		Logger.debug('Fim da função: "initAudioMonitoring"');
 	}
 
 	// Método opcional para desligar os medidores ao sair da aba
@@ -892,7 +895,7 @@ class ConfigManager {
 
 	// Alterna entre tabs
 	switchTab(tabId) {
-		debugLogConfig('Início da função: "switchTab"');
+		Logger.debug('Início da função: "switchTab"');
 		// Remove classe active de todos os botões
 		document.querySelectorAll('.tab-button').forEach(button => {
 			button.classList.remove('active');
@@ -909,11 +912,11 @@ class ConfigManager {
 		// Mostra o painel selecionado
 		document.getElementById(tabId).classList.add('active');
 
-		debugLogConfig('Fim da função: "switchTab"');
+		Logger.debug('Fim da função: "switchTab"');
 	}
 
 	async toggleModel(model) {
-		debugLogConfig('Início da função: "toggleModel"');
+		Logger.debug('Início da função: "toggleModel"');
 		// 🔥 NOVO: Detecta se é ativação ou desativação
 		const isCurrentlyActive = this.config.api[model]?.enabled === true;
 
@@ -967,12 +970,12 @@ class ConfigManager {
 			this.showError(`Erro ao alternar modelo: ${error.message}`);
 		}
 
-		debugLogConfig('Fim da função: "toggleModel"');
+		Logger.debug('Fim da função: "toggleModel"');
 	}
 
 	// Atualiza status dos modelos na UI
 	updateModelStatusUI() {
-		debugLogConfig('Início da função: "updateModelStatusUI"');
+		Logger.debug('Início da função: "updateModelStatusUI"');
 		Object.keys(this.config.api).forEach(model => {
 			if (model !== 'activeProvider' && this.config.api[model]) {
 				const statusBadge = document
@@ -995,12 +998,12 @@ class ConfigManager {
 			}
 		});
 
-		debugLogConfig('Fim da função: "updateModelStatusUI"');
+		Logger.debug('Fim da função: "updateModelStatusUI"');
 	}
 
 	// 🔥 MODIFICAR: saveField para enviar chave quando ela for alterada
 	saveField(fieldId, value) {
-		debugLogConfig('Início da função: "saveField"');
+		Logger.debug('Início da função: "saveField"');
 		const path = this.getConfigPath(fieldId);
 		if (path) {
 			console.log(`💾 saveField("${fieldId}", "${value}")`);
@@ -1016,12 +1019,12 @@ class ConfigManager {
 			console.warn(`⚠️ saveField: fieldId "${fieldId}" não encontrado no pathMap`);
 		}
 
-		debugLogConfig('Fim da função: "saveField"');
+		Logger.debug('Fim da função: "saveField"');
 	}
 
 	// 🔥 MODIFICADO: salva API key de forma segura separadamente
 	async saveSection(section) {
-		debugLogConfig('Início da função: "saveSection"');
+		Logger.debug('Início da função: "saveSection"');
 		const sectionElement =
 			document.getElementById(section) || document.querySelector(`[data-section="${section}"]`)?.closest('.tab-pane');
 
@@ -1059,12 +1062,12 @@ class ConfigManager {
 
 		this.saveConfig();
 
-		debugLogConfig('Fim da função: "saveSection"');
+		Logger.debug('Fim da função: "saveSection"');
 	}
 
 	// Converte ID do campo para caminho na configuração
 	getConfigPath(fieldId) {
-		debugLogConfig('Início da função: "getConfigPath"');
+		Logger.debug('Início da função: "getConfigPath"');
 		const pathMap = {
 			// 🔥 API: Modelos STT e LLM (combo-boxes)
 			'openai-stt-model': ['api', 'openai', 'selectedSTTModel'],
@@ -1114,7 +1117,7 @@ class ConfigManager {
 			opacityRange: ['other', 'overlayOpacity'],
 		};
 
-		debugLogConfig('Fim da função: "getConfigPath"');
+		Logger.debug('Fim da função: "getConfigPath"');
 		return pathMap[fieldId];
 	}
 
@@ -1133,7 +1136,7 @@ class ConfigManager {
 
 	// Alterna visibilidade de senha
 	togglePasswordVisibility(inputId) {
-		debugLogConfig('Início da função: "togglePasswordVisibility"');
+		Logger.debug('Início da função: "togglePasswordVisibility"');
 		const input = document.getElementById(inputId);
 		const button = document.querySelector(`[data-target="${inputId}"]`);
 
@@ -1147,12 +1150,12 @@ class ConfigManager {
 			}
 		}
 
-		debugLogConfig('Fim da função: "togglePasswordVisibility"');
+		Logger.debug('Fim da função: "togglePasswordVisibility"');
 	}
 
 	// Envia API key atual do input para o main (quando saveField detecta mudança)
 	sendApiKeyToMain() {
-		debugLogConfig('Início da função: "sendApiKeyToMain"');
+		Logger.debug('Início da função: "sendApiKeyToMain"');
 		try {
 			const apiKeyInput = document.getElementById('openai-api-key');
 			if (!apiKeyInput) return;
@@ -1165,12 +1168,12 @@ class ConfigManager {
 			console.error('Erro em sendApiKeyToMain:', err);
 		}
 
-		debugLogConfig('Fim da função: "sendApiKeyToMain"');
+		Logger.debug('Fim da função: "sendApiKeyToMain"');
 	}
 
 	// Grava atalho do teclado
 	recordHotkey(button) {
-		debugLogConfig('Início da função: "recordHotkey"');
+		Logger.debug('Início da função: "recordHotkey"');
 		button.classList.add('recording');
 		button.textContent = 'Pressione uma tecla...';
 
@@ -1204,12 +1207,12 @@ class ConfigManager {
 
 		globalThis.addEventListener('keydown', handleKeyDown);
 
-		debugLogConfig('Fim da função: "recordHotkey"');
+		Logger.debug('Fim da função: "recordHotkey"');
 	}
 
 	// Exporta configurações
 	exportConfig() {
-		debugLogConfig('Início da função: "exportConfig"');
+		Logger.debug('Início da função: "exportConfig"');
 		const dataStr = JSON.stringify(this.config, null, 2);
 		const dataBlob = new Blob([dataStr], { type: 'application/json' });
 
@@ -1218,12 +1221,12 @@ class ConfigManager {
 		downloadLink.download = 'Askme-config.json';
 		downloadLink.click();
 
-		debugLogConfig('Fim da função: "exportConfig"');
+		Logger.debug('Fim da função: "exportConfig"');
 	}
 
 	// Importa configurações
 	importConfig() {
-		debugLogConfig('Início da função: "importConfig"');
+		Logger.debug('Início da função: "importConfig"');
 		const input = document.createElement('input');
 		input.type = 'file';
 		input.accept = '.json';
@@ -1256,12 +1259,12 @@ class ConfigManager {
 
 		input.click();
 
-		debugLogConfig('Fim da função: "importConfig"');
+		Logger.debug('Fim da função: "importConfig"');
 	}
 
 	// Restaura configurações padrão
 	async resetConfig() {
-		debugLogConfig('Início da função: "resetConfig"');
+		Logger.debug('Início da função: "resetConfig"');
 		if (
 			confirm(
 				'Tem certeza que deseja restaurar TODAS as configurações para os valores padrão?\n\nIsso vai limpar: configurações, API keys, histórico de dados e tudo mais.',
@@ -1286,13 +1289,13 @@ class ConfigManager {
 			}
 		}
 
-		debugLogConfig('Fim da função: "resetConfig"');
+		Logger.debug('Fim da função: "resetConfig"');
 	}
 
 	// Retorna configurações padrão
 	getDefaultConfig() {
-		debugLogConfig('Início da função: "getDefaultConfig"');
-		debugLogConfig('Fim da função: "getDefaultConfig"');
+		Logger.debug('Início da função: "getDefaultConfig"');
+		Logger.debug('Fim da função: "getDefaultConfig"');
 		return {
 			api: {
 				activeProvider: 'openai',
@@ -1370,7 +1373,7 @@ class ConfigManager {
 	=============================== */
 
 	async initializeController() {
-		debugLogConfig('Início da função: "initializeController"');
+		Logger.debug('Início da função: "initializeController"');
 		try {
 			// ✅ 1. Registrar UIElements ANTES de iniciar monitoramento
 			this.registerUIElements();
@@ -1425,12 +1428,12 @@ class ConfigManager {
 			console.error('❌ Erro ao inicializar controller:', error);
 		}
 
-		debugLogConfig('Fim da função: "initializeController"');
+		Logger.debug('Fim da função: "initializeController"');
 	}
 
 	// 🔥 NOVO: Registrar UIElements para que renderer.js possa ler valores
 	registerUIElements() {
-		debugLogConfig('Início da função: "registerUIElements"');
+		Logger.debug('Início da função: "registerUIElements"');
 		const elements = {
 			inputSelect: document.getElementById('audio-input-device'),
 			outputSelect: document.getElementById('audio-output-device'),
@@ -1458,12 +1461,12 @@ class ConfigManager {
 
 		globalThis.RendererAPI.registerUIElements(elements);
 
-		debugLogConfig('Fim da função: "registerUIElements"');
+		Logger.debug('Fim da função: "registerUIElements"');
 	}
 
 	// 🔥 NOVO: Registrar callbacks do renderer para atualizar DOM
 	registerRendererCallbacks() {
-		debugLogConfig('Início da função: "registerRendererCallbacks"');
+		Logger.debug('Início da função: "registerRendererCallbacks"');
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
 
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
@@ -1490,7 +1493,7 @@ class ConfigManager {
 				if (placeholderId) {
 					const existing = document.getElementById(placeholderId);
 					if (existing) {
-						debugLogConfig('⚪ Placeholder já existe, ignorando criação duplicada:', placeholderId, false);
+						Logger.debug('⚪ Placeholder já existe, ignorando criação duplicada:', placeholderId, false);
 						return;
 					}
 				}
@@ -1498,11 +1501,11 @@ class ConfigManager {
 				// 🔥 ATRIBUIR ID AO ELEMENTO REAL DO DOM
 				if (placeholderId) {
 					div.id = placeholderId;
-					debugLogConfig('🔥 ID atribuído ao placeholder real:', placeholderId, false);
+					Logger.debug('🔥 ID atribuído ao placeholder real:', placeholderId, false);
 				}
 				// 🔥 Não adicionar "..." visível - deixar para atualizar depois com texto real
 				div.innerHTML = ''; // Elemento vazio, será preenchido com onPlaceholderFulfill
-				debugLogConfig('✅ Placeholder reservado no DOM (vazio, aguardando transcrição):', placeholderId, false);
+				Logger.debug('✅ Placeholder reservado no DOM (vazio, aguardando transcrição):', placeholderId, false);
 			} else {
 				div.innerHTML = `<span style="color:#888">[${timeStr}]</span> <strong>${author}:</strong> ${text}`;
 				debugLogConfig(`✅ Transcrição adicionada: ${author} - ${text}`, false);
@@ -1668,7 +1671,7 @@ class ConfigManager {
 
 		// Answer Selected — exibe resposta existente e faz scroll
 		globalThis.eventBus.on('answerSelected', payload => {
-			debugLogConfig('📌 onAnswerSelected recebido:', payload, false);
+			Logger.debug('📌 onAnswerSelected recebido:', payload, false);
 
 			if (!payload) return;
 
@@ -1680,7 +1683,7 @@ class ConfigManager {
 
 			// remove seleção anterior
 			answersBox.querySelectorAll('.selected-answer').forEach(el => {
-				debugLogConfig('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId, false);
+				Logger.debug('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId, false);
 				el.classList.remove('selected-answer');
 			});
 
@@ -1693,12 +1696,12 @@ class ConfigManager {
 			}
 
 			// marca como selecionada
-			debugLogConfig('🎨 [onAnswerSelected] Adicionando destaque em:', questionId, false);
+			Logger.debug('🎨 [onAnswerSelected] Adicionando destaque em:', questionId, false);
 			answerEl.classList.add('selected-answer');
 
 			// garante visibilidade com scroll suave
 			if (shouldScroll) {
-				debugLogConfig('📜 [onAnswerSelected] Scrollando para resposta:', questionId, false);
+				Logger.debug('📜 [onAnswerSelected] Scrollando para resposta:', questionId, false);
 				answerEl.scrollIntoView({
 					behavior: 'smooth',
 					block: 'center',
@@ -1728,7 +1731,7 @@ class ConfigManager {
 
 			// ✅ PRIMEIRA CHUNK - não existe wrapper ainda
 			if (!wrapper) {
-				debugLogConfig('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId, false);
+				Logger.debug('⚡ [CHUNK-PRIMEIRA] Criando novo bloco para:', questionId, false);
 
 				// Criar novo div de resposta
 				wrapper = document.createElement('div');
@@ -1754,7 +1757,7 @@ class ConfigManager {
 				// Registrar qual pergunta está sendo respondida
 				currentStreamingQuestionId = questionId;
 
-				debugLogConfig('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, false);
+				Logger.debug('📊 Total blocos agora: ', answersHistoryBox.querySelectorAll('.answer-block').length, false);
 			}
 
 			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
@@ -1776,12 +1779,12 @@ class ConfigManager {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
 
-			debugLogConfig('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId, false);
+			Logger.debug('🔄 [ID_UPDATE] ' + oldId + ' → ' + newId, false);
 
 			const wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${oldId}"]`);
 			if (wrapper) {
 				wrapper.dataset.questionId = newId;
-				debugLogConfig('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId, false);
+				Logger.debug('✅ [ID_UPDATE] Atualizado: ' + oldId + ' → ' + newId, false);
 
 				// Atualizar rastreamento de streaming também
 				if (currentStreamingQuestionId === oldId) {
@@ -1797,7 +1800,7 @@ class ConfigManager {
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		globalThis.eventBus.on('answerStreamEnd', data => {
-			debugLogConfig('✅ [STREAM_END] Limpando streamingQuestionId', false);
+			Logger.debug('✅ [STREAM_END] Limpando streamingQuestionId', false);
 			currentStreamingQuestionId = null;
 		});
 
@@ -1826,7 +1829,7 @@ class ConfigManager {
 
 			// Se não existe, criar novo bloco
 			if (!wrapper) {
-				debugLogConfig('📊 [BATCH_END] Criando novo bloco para:', questionId, false);
+				Logger.debug('📊 [BATCH_END] Criando novo bloco para:', questionId, false);
 				wrapper = document.createElement('div');
 				wrapper.className = 'answer-block';
 				wrapper.dataset.questionId = questionId;
@@ -1855,12 +1858,12 @@ class ConfigManager {
 				answerContent.innerHTML = htmlContent;
 			}
 
-			debugLogConfig('✅ [BATCH_END] Resposta renderizada:', questionId, false);
+			Logger.debug('✅ [BATCH_END] Resposta renderizada:', questionId, false);
 		});
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
 		globalThis.eventBus.on('placeholderFulfill', data => {
-			debugLogConfig('🔔 onPlaceholderFulfill recebido:', data, false);
+			Logger.debug('🔔 onPlaceholderFulfill recebido:', data, false);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
 			const { speaker, text, stopStr, startStr, recordingDuration, latency, total, showMeta } = data;
@@ -1883,7 +1886,7 @@ class ConfigManager {
 			targetPlaceholder.innerHTML = `<span style="color:#888">[${stopStr}]</span> <strong>${speaker}:</strong> ${text}`;
 			delete targetPlaceholder.dataset.isPlaceholder;
 
-			debugLogConfig('✅ Placeholder atualizado:', text.substring(0, 50) + '...', false);
+			Logger.debug('✅ Placeholder atualizado:', text.substring(0, 50) + '...', false);
 
 			// Só cria/atualiza metadados se houver texto visível no placeholder e showMeta não for false
 			const hasVisibleText = text && String(text).trim().length > 0;
@@ -2051,7 +2054,7 @@ class ConfigManager {
 
 		console.log('✅ registerRendererCallbacks: Todos os callbacks UI registrados com sucesso');
 
-		debugLogConfig('Fim da função: "registerRendererCallbacks"');
+		Logger.debug('Fim da função: "registerRendererCallbacks"');
 	}
 
 	// Helper: registra listener em elemento
@@ -2097,7 +2100,7 @@ class ConfigManager {
 	}
 
 	registerDOMEventListeners() {
-		debugLogConfig('Início da função: "registerDOMEventListeners"');
+		Logger.debug('Início da função: "registerDOMEventListeners"');
 
 		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
 
@@ -2212,11 +2215,11 @@ class ConfigManager {
 
 		console.log('✅ registerDOMEventListeners: Todos os listeners registrados com sucesso');
 
-		debugLogConfig('Fim da função: "registerDOMEventListeners"');
+		Logger.debug('Fim da função: "registerDOMEventListeners"');
 	}
 
 	registerIPCListeners() {
-		debugLogConfig('Início da função: "registerIPCListeners"');
+		Logger.debug('Início da função: "registerIPCListeners"');
 
 		console.log('🔥 registerIPCListeners: Iniciando registro de IPC listeners...');
 
@@ -2318,11 +2321,11 @@ class ConfigManager {
 
 		console.log('✅ registerIPCListeners: Todos os IPC listeners registrados com sucesso');
 
-		debugLogConfig('Fim da função: "registerIPCListeners"');
+		Logger.debug('Fim da função: "registerIPCListeners"');
 	}
 
 	registerErrorHandlers() {
-		debugLogConfig('Início da função: "registerErrorHandlers"');
+		Logger.debug('Início da função: "registerErrorHandlers"');
 		globalThis.addEventListener('error', e => {
 			globalThis.RendererAPI.sendRendererError({
 				message: e.message || (e.error instanceof Error ? e.error.message : String(e.error)),
@@ -2337,11 +2340,11 @@ class ConfigManager {
 			});
 		});
 
-		debugLogConfig('Fim da função: "registerErrorHandlers"');
+		Logger.debug('Fim da função: "registerErrorHandlers"');
 	}
 
 	restoreTheme() {
-		debugLogConfig('Início da função: "restoreTheme"');
+		Logger.debug('Início da função: "restoreTheme"');
 		try {
 			const darkToggle = document.getElementById('darkModeToggle');
 			// 🔥 CORRIGIDO: Usa config.other.darkMode em vez de localStorage
@@ -2359,11 +2362,11 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao restaurar tema:', err);
 		}
 
-		debugLogConfig('Fim da função: "restoreTheme"');
+		Logger.debug('Fim da função: "restoreTheme"');
 	}
 
 	restoreMode() {
-		debugLogConfig('Início da função: "restoreMode"');
+		Logger.debug('Início da função: "restoreMode"');
 		try {
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			const savedMode = localStorage.getItem('appMode') || 'NORMAL';
@@ -2385,11 +2388,11 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao restaurar modo:', err);
 		}
 
-		debugLogConfig('Fim da função: "restoreMode"');
+		Logger.debug('Fim da função: "restoreMode"');
 	}
 
 	async initClickThroughController() {
-		debugLogConfig('Início da função: "initClickThroughController"');
+		Logger.debug('Início da função: "initClickThroughController"');
 		try {
 			const btnToggle = document.getElementById('btnToggleClick');
 			if (!btnToggle) return;
@@ -2425,7 +2428,7 @@ class ConfigManager {
 			console.warn('⚠️ Erro ao inicializar click-through:', err);
 		}
 
-		debugLogConfig('Fim da função: "initClickThroughController"');
+		Logger.debug('Fim da função: "initClickThroughController"');
 	}
 
 	/**
@@ -2433,7 +2436,7 @@ class ConfigManager {
 	 * @param {number} value - Opacidade (0-1)
 	 */
 	applyOpacity(value) {
-		debugLogConfig('Início da função: "applyOpacity"');
+		Logger.debug('Início da função: "applyOpacity"');
 		const appOpacity = Number.parseFloat(value);
 
 		// aplica opacidade no conteúdo geral
@@ -2448,7 +2451,7 @@ class ConfigManager {
 		// logs
 		console.log('🎚️ Opacity change | app:', value, '| topBar:', topbarOpacity);
 
-		debugLogConfig('Fim da função: "applyOpacity"');
+		Logger.debug('Fim da função: "applyOpacity"');
 	}
 
 	/**
@@ -2456,7 +2459,7 @@ class ConfigManager {
 	 * @param {element} dragHandle - Elemento para drag
 	 */
 	initDragHandle(dragHandle) {
-		debugLogConfig('Início da função: "initDragHandle"');
+		Logger.debug('Início da função: "initDragHandle"');
 		if (!dragHandle) {
 			console.warn('⚠️ dragHandle não fornecido');
 			return;
@@ -2533,7 +2536,7 @@ class ConfigManager {
 			}
 		});
 
-		debugLogConfig('Fim da função: "initDragHandle"');
+		Logger.debug('Fim da função: "initDragHandle"');
 	}
 
 	/**
@@ -2541,7 +2544,7 @@ class ConfigManager {
 	 * Chamado durante initEventListeners()
 	 */
 	initResetButtonListener() {
-		debugLogConfig('Início da função: "initResetButtonListener"');
+		Logger.debug('Início da função: "initResetButtonListener"');
 		const resetBtn = document.getElementById('resetHomeBtn');
 		if (resetBtn) {
 			resetBtn.addEventListener('click', () => {
@@ -2556,13 +2559,13 @@ class ConfigManager {
 		} else {
 			console.warn('⚠️ Botão reset não encontrado no DOM');
 		}
-		debugLogConfig('Fim da função: "initResetButtonListener"');
+		Logger.debug('Fim da função: "initResetButtonListener"');
 	}
 }
 
 // 🔥 MODIFICADO: Remove inicialização antiga de API key
 document.addEventListener('DOMContentLoaded', async () => {
-	debugLogConfig('Início da função: "DOMContentLoaded"');
+	Logger.debug('Início da função: "DOMContentLoaded"');
 	// 🔥 Espera pela disponibilidade de RendererAPI (carregado via renderer.js)
 	let attempts = 0;
 	while (!globalThis.RendererAPI && attempts < 50) {
@@ -2592,7 +2595,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 	console.log('✅ ConfigManager inicializado com sucesso');
 
-	debugLogConfig('Fim da função: "DOMContentLoaded"');
+	Logger.debug('Fim da função: "DOMContentLoaded"');
 });
 
 /* ===============================
@@ -2605,24 +2608,5 @@ document.addEventListener('DOMContentLoaded', async () => {
  * @param {*} msg
  * @param {boolean} showLog - true para mostrar, false para ignorar
  */
-function debugLogConfig(...args) {
-	const maybeFlag = args.at(-1);
-	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
 
-	const nowLog = new Date();
-	const timeStr =
-		`${nowLog.getHours().toString().padStart(2, '0')}:` +
-		`${nowLog.getMinutes().toString().padStart(2, '0')}:` +
-		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
-		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
-
-	if (showLog) {
-		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
-		// prettier-ignore
-		console.log(
-			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em config-manager.js:`, 
-			'color: orange; font-weight: bold;', 
-			...cleanArgs
-		);
-	}
-}
+// ✅ CONSOLIDADO: Logging agora usa Logger.debug() centralizado

@@ -38,6 +38,7 @@ const audioController = require('./controllers/audio/audio-controller.js');
 const questionController = require('./controllers/question/question-controller.js');
 const screenshotController = require('./controllers/screenshot/screenshot-controller.js');
 const rendererHelpers = require('./utils/renderer-helpers.js');
+const uiElementsRegistry = require('./utils/ui-elements-registry.js');
 
 // 🎯 INSTANCIAR
 const appState = new AppState();
@@ -198,10 +199,11 @@ let APP_CONFIG = {
  * DEPRECATED: Registra elementos de UI (migrado para EventBus em Fase 3)
  */
 let UIElements = {};
-function registerUIElements(elements) {
-	UIElements = { ...UIElements, ...elements };
-	console.log('✅ UI Elements registrados no renderer.js');
-}
+/**
+ * Registra elementos UI no registry centralizado
+ * DELEGADO para uiElementsRegistry
+ */
+const registerUIElements = elements => uiElementsRegistry.register(elements);
 
 /* ================================ */
 //	MONITORAMENTO DE VOLUME
