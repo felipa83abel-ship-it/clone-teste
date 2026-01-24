@@ -22,7 +22,7 @@ class OpenAIHandler {
 	 */
 	async complete(messages) {
 		try {
-			const response = await ipcRenderer.invoke('ask-gpt', messages);
+			const response = await ipcRenderer.invoke('ask-llm', messages);
 			return response;
 		} catch (error) {
 			this.logger.error('❌ Erro OpenAI complete:', error);
@@ -55,14 +55,14 @@ class OpenAIHandler {
 			state.isEnd = true;
 		};
 
-		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
-		ipcRenderer.once('GPT_STREAM_END', onEnd);
-		ipcRenderer.once('GPT_STREAM_ERROR', onError);
+		ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
+		ipcRenderer.once('LLM_STREAM_END', onEnd);
+		ipcRenderer.once('LLM_STREAM_ERROR', onError);
 
 		try {
 			// Invocar stream no main process
-			ipcRenderer.invoke('ask-gpt-stream', messages).catch(err => {
-				this.logger.error('❌ Erro ao invocar ask-gpt-stream:', err);
+			ipcRenderer.invoke('ask-llm-stream', messages).catch(err => {
+				this.logger.error('❌ Erro ao invocar ask-llm-stream:', err);
 				state.error = err;
 				state.isEnd = true;
 			});
@@ -83,9 +83,9 @@ class OpenAIHandler {
 			}
 		} finally {
 			// Limpar listeners para evitar memory leaks
-			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
-			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
-			ipcRenderer.removeListener('GPT_STREAM_ERROR', onError);
+			ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
+			ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
+			ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
 		}
 	}
 }

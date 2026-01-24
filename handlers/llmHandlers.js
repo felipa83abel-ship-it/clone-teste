@@ -1,10 +1,9 @@
 /**
  * llmHandlers - Handlers separados para LLM (genérico)
  *
- * Quebra a função gigante askGpt() em:
- * 1. validateLLMRequest() - validação (antigo validateAskGptRequest)
- * 2. handleLLMStream() - modo entrevista (antigo handleAskGptStream)
- * 3. handleLLMBatch() - modo normal (antigo handleAskGptBatch)
+ * 1. validateLLMRequest() - validação
+ * 2. handleLLMStream() - modo entrevista
+ * 3. handleLLMBatch() - modo normal
  */
 
 const { ipcRenderer } = require('electron');
@@ -57,9 +56,9 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 	Logger.info('Iniciando stream LLM', { questionId, textLength: text.length, turnId });
 
 	let streamedText = '';
-	appState.metrics.gptStartTime = Date.now();
-	appState.interview.gptRequestedTurnId = appState.interview.interviewTurnId;
-	appState.interview.gptRequestedQuestionId = questionId;
+	appState.metrics.llmStartTime = Date.now();
+	appState.interview.llmRequestedTurnId = appState.interview.interviewTurnId;
+	appState.interview.llmRequestedQuestionId = questionId;
 
 	// Obter handler LLM e invocar stream
 	const currentLLM = appState.selectedProvider || globalThis.configManager?.config?.api?.activeProvider || 'openai';
@@ -75,7 +74,7 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 		// Iterar tokens
 		for await (const token of streamGenerator) {
 			streamedText += token;
-			appState.metrics.gptFirstTokenTime = appState.metrics.gptFirstTokenTime || Date.now();
+			appState.metrics.llmFirstTokenTime = appState.metrics.llmFirstTokenTime || Date.now();
 
 			eventBus.emit('answerStreamChunk', {
 				questionId,
@@ -85,11 +84,11 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 			});
 		}
 
-		appState.metrics.gptEndTime = Date.now();
-		appState.interview.gptAnsweredTurnId = appState.interview.interviewTurnId;
+		appState.metrics.llmEndTime = Date.now();
+		appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
 
 		Logger.info('Stream LLM finalizado', {
-			duration: appState.metrics.gptEndTime - appState.metrics.gptStartTime,
+			duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
 		});
 
 		eventBus.emit('llmStreamEnd', {
@@ -109,7 +108,7 @@ async function handleLLMStream(appState, questionId, text, SYSTEM_PROMPT, eventB
 async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
 	Logger.info('Iniciando batch LLM', { questionId, textLength: text.length });
 
-	appState.metrics.gptStartTime = Date.now();
+	appState.metrics.llmStartTime = Date.now();
 
 	// Obter handler LLM e invocar complete
 	const currentLLM = appState.selectedProvider || globalThis.configManager?.config?.api?.activeProvider || 'openai';
@@ -121,10 +120,10 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 			{ role: 'user', content: text },
 		]);
 
-		appState.metrics.gptEndTime = Date.now();
+		appState.metrics.llmEndTime = Date.now();
 
 		Logger.info('Batch LLM finalizado', {
-			duration: appState.metrics.gptEndTime - appState.metrics.gptStartTime,
+			duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
 		});
 
 		eventBus.emit('llmBatchEnd', {

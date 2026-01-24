@@ -177,13 +177,13 @@ const response = await llmManager.ask(messages);
 
 **LLM**:
 
-- `ask-gpt` → completação OpenAI
-- `ask-gpt-stream` → streaming OpenAI via eventos
+- `ask-llm` → completação OpenAI
+- `ask-llm-stream` → streaming OpenAI via eventos
 
 **Atalhos globais**:
 
 - `Ctrl+D` → `CMD_TOGGLE_AUDIO` (inicia/para captura)
-- `Ctrl+Enter` → `CMD_ASK_GPT` (envia pergunta)
+- `Ctrl+Enter` → `CMD_ASK_LLM` (envia pergunta)
 
 ---
 
@@ -241,11 +241,11 @@ secureStore.delete('apiKeys.openai');
 ┌──────────────────────▼──────────────────────────────────────────┐
 │ 4. STREAMING: Tokens chegam via stream()                       │
 │    async *stream(messages) → yield "Node", yield ".js", ...   │
-│    Cada token → IPC GPT_STREAM_CHUNK → UI atualiza em tempo real│
+│    Cada token → IPC LLM_STREAM_CHUNK → UI atualiza em tempo real│
 └──────────────────────┬──────────────────────────────────────────┘
                        │
 ┌──────────────────────▼──────────────────────────────────────────┐
-│ 5. RESPOSTA COMPLETA: Fim do streaming (GPT_STREAM_END)        │
+│ 5. RESPOSTA COMPLETA: Fim do streaming (LLM_STREAM_END)        │
 │    Turn completo adicionado ao histórico com turnId            │
 │    Pronto para próxima pergunta                                │
 └─────────────────────────────────────────────────────────────────┘

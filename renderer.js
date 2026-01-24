@@ -58,7 +58,7 @@ eventBus.on('llmStreamEnd', data => {
 	// 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
 	// Aqui só limpamos o CURRENT para próxima pergunta
 	if (modeManager.is(MODES.INTERVIEW)) {
-		appState.interview.gptAnsweredTurnId = appState.interview.interviewTurnId;
+		appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
 		resetCurrentQuestion();
 		renderCurrentQuestion();
 	}
@@ -171,7 +171,7 @@ let APP_CONFIG = {
 // - appState.audio.{ isRunning, capturedScreenshots, isCapturing, isAnalyzing }
 // - appState.window.{ isDraggingWindow }
 // - appState.interview.{ currentQuestion, questionsHistory, selectedQuestionId, ... }
-// - appState.metrics.{ audioStartTime, gptStartTime, gptFirstTokenTime, ... }
+// - appState.metrics.{ audioStartTime, llmStartTime, llmFirstTokenTime, ... }
 // Acesso: use helpers appState.q, appState.history, appState.selectedId
 // ou use getters/setters em AppState.js para compatibilidade
 // 🔒 answeredQuestions migrado para appState.interview.answeredQuestions (AppState.js)
@@ -632,11 +632,11 @@ function handleQuestionClick(questionId) {
 		}
 	}
 
-	// Se for uma pergunta do histórico marcada como incompleta, não enviar automaticamente ao GPT
+	// Se for uma pergunta do histórico marcada como incompleta, não enviar automaticamente ao LLM
 	if (questionId !== CURRENT_QUESTION_ID) {
 		const q = appState.history.find(q => q.id === questionId);
 		if (q?.incomplete) {
-			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao GPT');
+			updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder para enviar ao LLM');
 			console.log('ℹ️ pergunta incompleta selecionada — aguarda envio manual:', q.text);
 			Logger.debug('Fim da função: "handleQuestionClick" (pergunta incompleta)');
 			return; // 🔥 CRÍTICO: Retornar aqui também
@@ -646,15 +646,15 @@ function handleQuestionClick(questionId) {
 	if (
 		modeManager.is(MODES.INTERVIEW) &&
 		appState.selectedId === CURRENT_QUESTION_ID &&
-		appState.interview.gptAnsweredTurnId === appState.interview.interviewTurnId
+		appState.interview.llmAnsweredTurnId === appState.interview.interviewTurnId
 	) {
-		updateStatusMessage('⛔ GPT já respondeu esse turno');
-		console.log('⛔ GPT já respondeu esse turno');
-		Logger.debug('Fim da função: "handleQuestionClick" (GPT já respondeu)');
+		updateStatusMessage('⛔ LLM já respondeu esse turno');
+		console.log('⛔ LLM já respondeu esse turno');
+		Logger.debug('Fim da função: "handleQuestionClick" (LLM já respondeu)');
 		return; // 🔥 CRÍTICO: Retornar aqui
 	}
 
-	// ❓ Ainda não respondida → promover CURRENT se necessário e chamar GPT
+	// ❓ Ainda não respondida → promover CURRENT se necessário e chamar LLM
 	// 🔥 Se for CURRENT, promover para histórico ANTES de chamar askLLM
 	if (questionId === CURRENT_QUESTION_ID) {
 		if (!appState.interview.currentQuestion.text?.trim()) {
@@ -704,7 +704,7 @@ function handleQuestionClick(questionId) {
 		}
 	}
 
-	// ❓ Ainda não respondida → chama GPT (click ou atalho)
+	// ❓ Ainda não respondida → chama LLM (click ou atalho)
 	askLLM();
 
 	Logger.debug('Fim da função: "handleQuestionClick"');
@@ -830,7 +830,7 @@ function finalizeCurrentQuestion() {
 		appState.interview.currentQuestion.finalized = true;
 
 		// 🔥 [NOVO] PROMOVER PARA HISTÓRICO ANTES DE CHAMAR LLM
-		// Isso garante que o texto está seguro e imutável durante resposta do GPT
+		// Isso garante que o texto está seguro e imutável durante resposta do LLM
 		const newId = String(appState.history.length + 1);
 
 		// 🔥 [CRÍTICO] Incrementa turnId APENAS na hora de promover (não na primeira fala)
@@ -856,11 +856,11 @@ function finalizeCurrentQuestion() {
 		renderQuestionsHistory();
 		renderCurrentQuestion(); // 🔥 Renderiza CURRENT limpo
 
-		// 🔥 [NOVO] Chamar GPT DEPOIS que pergunta foi promovida e salva
-		// chama GPT automaticamente se ainda não respondeu este turno
+		// 🔥 [NOVO] Chamar LLM DEPOIS que pergunta foi promovida e salva
+		// chama LLM automaticamente se ainda não respondeu este turno
 		if (
-			appState.interview.gptRequestedTurnId !== appState.interview.interviewTurnId &&
-			appState.interview.gptAnsweredTurnId !== appState.interview.interviewTurnId
+			appState.interview.llmRequestedTurnId !== appState.interview.interviewTurnId &&
+			appState.interview.llmAnsweredTurnId !== appState.interview.interviewTurnId
 		) {
 			askLLM(newId); // Passar ID promovido para LLM
 		}
@@ -872,7 +872,7 @@ function finalizeCurrentQuestion() {
 	//  ⚠️ No modo normal - trata perguntas que parecem incompletas
 	if (!modeManager.is(MODES.INTERVIEW)) {
 		console.log(
-			'⚠️ No modo normal detectado — promovendo ao histórico sem chamar GPT:',
+			'⚠️ No modo normal detectado — promovendo ao histórico sem chamar LLM:',
 			appState.interview.currentQuestion.text,
 		);
 
@@ -922,7 +922,7 @@ function closeCurrentQuestionForced() {
 }
 
 /* ================================ */
-//	SISTEMA GPT E STREAMING
+//	SISTEMA LLM
 /* ================================ */
 
 /**
@@ -937,7 +937,7 @@ async function askLLM(questionId = null) {
 		const CURRENT_QUESTION_ID = 'CURRENT';
 		const targetQuestionId = questionId || appState.selectedId;
 
-		// 1. Validar (antigo validateAskGptRequest)
+		// 1. Validar (antigo validateAskLlmRequest)
 		const {
 			questionId: validatedId,
 			text,
@@ -947,11 +947,11 @@ async function askLLM(questionId = null) {
 
 		// Rastreamento antigo (compatibilidade)
 		const normalizedText = normalizeForCompare(text);
-		appState.metrics.gptStartTime = Date.now();
+		appState.metrics.llmStartTime = Date.now();
 
 		if (isCurrent) {
-			appState.interview.gptRequestedTurnId = appState.interview.interviewTurnId;
-			appState.interview.gptRequestedQuestionId = CURRENT_QUESTION_ID;
+			appState.interview.llmRequestedTurnId = appState.interview.interviewTurnId;
+			appState.interview.llmRequestedQuestionId = CURRENT_QUESTION_ID;
 			appState.interview.lastAskedQuestionNormalized = normalizedText;
 		}
 
@@ -982,23 +982,23 @@ async function askLLM(questionId = null) {
 function logTranscriptionMetrics() {
 	if (!appState.metrics.audioStartTime) return;
 
-	const gptTime = appState.metrics.gptEndTime - appState.metrics.gptStartTime;
+	const llmTime = appState.metrics.llmEndTime - appState.metrics.llmStartTime;
 	const totalTime = appState.metrics.totalTime;
 
 	console.log(`📊 ================================`);
 	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
 	console.log(`📊 ================================`);
 	console.log(`📊 TAMANHO ÁUDIO: ${appState.metrics.audioSize} bytes`);
-	console.log(`📊 GPT: ${gptTime}ms`);
+	console.log(`📊 LLM: ${llmTime}ms`);
 	console.log(`📊 TOTAL: ${totalTime}ms`);
-	console.log(`📊 GPT % DO TOTAL: ${Math.round((gptTime / totalTime) * 100)}%`);
+	console.log(`📊 LLM % DO TOTAL: ${Math.round((llmTime / totalTime) * 100)}%`);
 	console.log(`📊 ================================`);
 
 	// Reset para próxima medição
 	appState.metrics = {
 		audioStartTime: null,
-		gptStartTime: null,
-		gptEndTime: null,
+		llmStartTime: null,
+		llmEndTime: null,
 		totalTime: null,
 		audioSize: 0,
 	};
@@ -1091,7 +1091,7 @@ async function analyzeScreenshots() {
 			return;
 		}
 
-		// ✅ Renderiza resposta do GPT
+		// ✅ Renderiza resposta do LLM como se fosse uma pergunta normal
 		const questionText = `📸 Análise de ${appState.audio.capturedScreenshots.length} screenshot(s)`;
 		const questionId = String(appState.history.length + 1);
 
@@ -1226,15 +1226,15 @@ async function resetAppState() {
 		console.log('✅ Perguntas e respostas limpas');
 		await releaseThread();
 
-		// 3️⃣ CHUNK 3: Limpar estado GPT e métricas
+		// 3️⃣ CHUNK 3: Limpar estado LLM e métricas
 		appState.interview.interviewTurnId = 0;
-		appState.interview.gptAnsweredTurnId = null;
-		appState.interview.gptRequestedTurnId = null;
-		appState.interview.gptRequestedQuestionId = null;
+		appState.interview.llmAnsweredTurnId = null;
+		appState.interview.llmRequestedTurnId = null;
+		appState.interview.llmRequestedQuestionId = null;
 		appState.metrics = {
 			audioStartTime: null,
-			gptStartTime: null,
-			gptEndTime: null,
+			llmStartTime: null,
+			llmEndTime: null,
 			totalTime: null,
 			audioSize: 0,
 		};
@@ -1468,14 +1468,14 @@ const RendererAPI = {
 		// Começar a ouvir / Parar de ouvir (Ctrl+D)
 		ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
 	},
-	onAskGpt: callback => {
-		ipcRenderer.on('CMD_ASK_GPT', callback);
+	onAskLlm: callback => {
+		ipcRenderer.on('CMD_ASK_LLM', callback);
 	},
-	onGptStreamChunk: callback => {
-		ipcRenderer.on('GPT_STREAM_CHUNK', callback);
+	onLlmStreamChunk: callback => {
+		ipcRenderer.on('LLM_STREAM_CHUNK', callback);
 	},
-	onGptStreamEnd: callback => {
-		ipcRenderer.on('GPT_STREAM_END', callback);
+	onLlmStreamEnd: callback => {
+		ipcRenderer.on('LLM_STREAM_END', callback);
 	},
 	/**
 	 * Envia erro do renderer para main

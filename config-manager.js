@@ -1441,7 +1441,7 @@ class ConfigManager {
 			currentQuestionTextBox: document.getElementById('currentQuestionText'),
 			questionsHistoryBox: document.getElementById('questionsHistory'),
 			answersHistoryBox: document.getElementById('answersHistory'),
-			askBtn: document.getElementById('askGptBtn'),
+			askBtn: document.getElementById('askLlmBtn'),
 			inputVu: document.getElementById('inputVu'),
 			outputVu: document.getElementById('outputVu'),
 			inputVuHome: document.getElementById('inputVuHome'),
@@ -1716,7 +1716,7 @@ class ConfigManager {
 
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		// 📥 LISTENER: onAnswerStreamChunk
-		// Chamado para CADA token que chega do GPT
+		// Chamado para CADA token que chega da OpenAI (streaming)
 		// ═══════════════════════════════════════════════════════════════════════════════════
 		globalThis.eventBus.on('answerStreamChunk', data => {
 			const { questionId, turnId, accum } = data;
@@ -1760,7 +1760,7 @@ class ConfigManager {
 			// ✅ CHUNKS SUBSEQUENTES - atualizar conteúdo com markdown renderizado
 			const answerContent = wrapper.querySelector('.answer-content');
 			if (answerContent) {
-				// 🔥 Renderizar como markdown em tempo real (estilo GPT)
+				// 🔥 Renderizar como markdown em tempo real (estilo ChatGPT)
 				const htmlContent = marked.parse(accum);
 				answerContent.innerHTML = htmlContent;
 				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'auto' });
@@ -2126,10 +2126,10 @@ class ConfigManager {
 			}
 		});
 
-		// Ask GPT button
-		this.registerElementListener('askGptBtn', 'click', () => {
-			if (globalThis.RendererAPI?.askGpt) {
-				globalThis.RendererAPI.askGpt();
+		// Ask LLM button
+		this.registerElementListener('askLlmBtn', 'click', () => {
+			if (globalThis.RendererAPI?.askLlm) {
+				globalThis.RendererAPI.askLlm();
 			}
 		});
 
@@ -2256,9 +2256,9 @@ class ConfigManager {
 			});
 		}
 
-		// Ask GPT (global shortcut - Ctrl+Enter)
-		if (globalThis.RendererAPI?.onAskGpt) {
-			globalThis.RendererAPI.onAskGpt(() => {
+		// Ask LLM (global shortcut - Ctrl+Enter)
+		if (globalThis.RendererAPI?.onAskLlm) {
+			globalThis.RendererAPI.onAskLlm(() => {
 				// 🔥 CORRIGIDO: Chamar handleQuestionClick() em vez de askLLM()
 				// Isso garante que passa por todas as validações: pergunta já respondida, incompleta, etc
 				// Mesma regra que o clique do mouse
@@ -2271,16 +2271,16 @@ class ConfigManager {
 			});
 		}
 
-		// GPT Stream chunks
-		if (globalThis.RendererAPI?.onGptStreamChunk) {
-			globalThis.RendererAPI.onGptStreamChunk((_, token) => {
+		// LLM Stream chunks
+		if (globalThis.RendererAPI?.onLlmStreamChunk) {
+			globalThis.RendererAPI.onLlmStreamChunk((_, token) => {
 				// Handled in renderer service
 			});
 		}
 
-		// GPT Stream end
-		if (globalThis.RendererAPI?.onGptStreamEnd) {
-			globalThis.RendererAPI.onGptStreamEnd(() => {
+		// LLM Stream end
+		if (globalThis.RendererAPI?.onLlmStreamEnd) {
+			globalThis.RendererAPI.onLlmStreamEnd(() => {
 				// Handled in renderer service
 			});
 		}

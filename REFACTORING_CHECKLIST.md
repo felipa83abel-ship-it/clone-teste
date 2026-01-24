@@ -35,9 +35,9 @@
 - [x] `let capturedScreenshots = []`
 - [x] `let isDraggingWindow = false`
 - [x] `let interviewTurnId = 0`
-- [x] `let gptAnsweredTurnId = null`
-- [x] `let gptRequestedTurnId = null`
-- [x] `let gptRequestedQuestionId = null`
+- [x] `let llmAnsweredTurnId = null`
+- [x] `let llmRequestedTurnId = null`
+- [x] `let llmRequestedQuestionId = null`
 - [x] `let lastAskedQuestionNormalized = null`
 - [x] `let selectedQuestionId = null`
 - [x] `let isCapturing = false`
@@ -130,7 +130,7 @@ eventBus.emit('answerStreamChunk', ...)
 
 ### 8️⃣ Constantes Não Utilizadas
 
-- [x] `USE_FAKE_STREAM_GPT` em `main.js` - **SERÁ MANTIDO** para economizar crédito da API
+- [x] `USE_FAKE_STREAM_LLM` em `main.js` - **SERÁ MANTIDO** para economizar crédito da API
   - Não será removido ou alterado
   - Está em uso para exibir respostas mock sem consumir API
   - Mantém comportamento atual
@@ -257,12 +257,12 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
   - Usar: `appState.window.isDraggingWindow`
 - [x] Remover `let interviewTurnId = 0`
   - Usar: `appState.interview.interviewTurnId`
-- [x] Remover `let gptAnsweredTurnId = null`
-  - Usar: `appState.interview.gptAnsweredTurnId`
-- [x] Remover `let gptRequestedTurnId = null`
-  - Usar: `appState.interview.gptRequestedTurnId`
-- [x] Remover `let gptRequestedQuestionId = null`
-  - Usar: `appState.interview.gptRequestedQuestionId`
+- [x] Remover `let llmAnsweredTurnId = null`
+  - Usar: `appState.interview.llmAnsweredTurnId`
+- [x] Remover `let llmRequestedTurnId = null`
+  - Usar: `appState.interview.llmRequestedTurnId`
+- [x] Remover `let llmRequestedQuestionId = null`
+  - Usar: `appState.interview.llmRequestedQuestionId`
 - [x] Remover `let lastAskedQuestionNormalized = null`
   - Usar: `appState.interview.lastAskedQuestionNormalized`
 - [x] Remover `let selectedQuestionId = null`
@@ -538,14 +538,14 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
   - ✅ `releaseThread()` não duplicada
 - [x] **5. Código Mock Pesado** - Fase 1
   - ✅ Mock isolado em `mock-runner.js`, removido de renderer
-  - ✅ `USE_FAKE_STREAM_GPT` em main.js mantido
+  - ✅ `USE_FAKE_STREAM_LLM` em main.js mantido
 - [x] **6. Lógica de Modo Duplicada** - Fase 4
   - ✅ `ModeManager` centraliza, zero `if (isInterviewMode)` espalhado
   - ✅ `CURRENT_MODE` global removido
 - [x] **7. UIElements Object Incompleto** - Fase 3
   - ✅ UIElements registrados, eventos via EventBus
 - [x] **8. Constantes Não Utilizadas** - MANTIDO
-  - ✅ `USE_FAKE_STREAM_GPT` em main.js funciona corretamente
+  - ✅ `USE_FAKE_STREAM_LLM` em main.js funciona corretamente
 - [x] **9. Compatibilidade Obsoleta** - Fase 1
   - ✅ `onUIChange('onAudioDeviceChanged', ...)` removido
 - [x] **10. Chamadas Inexistentes** - RESOLVIDO

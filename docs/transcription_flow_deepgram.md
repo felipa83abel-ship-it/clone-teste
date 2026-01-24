@@ -176,7 +176,7 @@ Este documento descreve o fluxo passo a passo de cada função e evento chamado 
 - **Descrição**:
   - Se `looksLikeQuestion(currentQuestion.text)`: processa.
   - Modo normal: `promoteCurrentToHistory(text)`.
-  - Modo entrevista: chama `askGpt()` se turno correto.
+  - Modo entrevista: chama `askLlm()` se turno correto.
 
 ## Pontos de Atenção e Possíveis Problemas
 

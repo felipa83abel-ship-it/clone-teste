@@ -11,20 +11,19 @@ Principais mudanças pós-refatoração
 - RendererAPI: `renderer.js` expõe uma API global (`window.RendererAPI`) usada por `config-manager.js` para iniciar/parar medidores, registrar atalhos e gerenciar click-through.
 - Janela overlay: `main.js` cria a BrowserWindow em modo overlay (transparent, frameless, alwaysOnTop) com suporte a click-through controlado via IPC (`SET_CLICK_THROUGH`, `SET_INTERACTIVE_ZONE`).
 - Fluxos de áudio: `renderer.js` centraliza captura, gravação e heurísticas (thresholds, timeouts). `transcribe-audio` e `transcribe-audio-partial` no `main` usam o cliente OpenAI para Whisper.
-- GPT: `ask-gpt` (completions) e `ask-gpt-stream` (streaming via `GPT_STREAM_CHUNK` / `GPT_STREAM_END`) ficam no `main` e enviam tokens para renderer.
+- GPT: `ask-llm` (completions) e `ask-llm-stream` (streaming via `LLM_STREAM_CHUNK` / `LLM_STREAM_END`) ficam no `main` e enviam tokens para renderer.
 
 IPC e contratos importantes
 
 - Do renderer -> main (invokes / handles):
-
   - `GET_APP_CONFIG` => retorna `APP_CONFIG` (útil para `MODE_DEBUG`).
   - `GET_API_KEY`, `SAVE_API_KEY`, `DELETE_API_KEY` => gerenciam chaves via secure store.
   - `transcribe-audio`, `transcribe-audio-partial` => recebem Buffer, escrevem arquivo temporário em `os.tmpdir()` e chamam Whisper.
-  - `ask-gpt`, `ask-gpt-stream` => solicitam respostas/stream do modelo.
+  - `ask-llm`, `ask-llm-stream` => solicitam respostas/stream do modelo.
 
 - Do main -> renderer (events):
-  - `CMD_TOGGLE_AUDIO`, `CMD_ASK_GPT` (atalhos globais: Ctrl+D, Ctrl+Enter)
-  - `API_KEY_UPDATED`, `GPT_STREAM_CHUNK`, `GPT_STREAM_END`, `GPT_STREAM_ERROR`
+  - `CMD_TOGGLE_AUDIO`, `CMD_ASK_LLM` (atalhos globais: Ctrl+D, Ctrl+Enter)
+  - `API_KEY_UPDATED`, `LLM_STREAM_CHUNK`, `LLM_STREAM_END`, `LLM_STREAM_ERROR`
 
 Padrões e convenções
 
@@ -61,6 +60,6 @@ Checklist rápido para QA após mudanças
 - `npm install` -> `npm start` inicia sem error.
 - A página carrega, `RendererAPI` disponível no window.
 - Salvar/mostrar/mostrar-máscara de API key funciona sem revelar valor completo.
-- Transcrição (`transcribe-audio`) e GPT (`ask-gpt`, `ask-gpt-stream`) respondem conforme esperado.
+- Transcrição (`transcribe-audio`) e GPT (`ask-llm`, `ask-llm-stream`) respondem conforme esperado.
 
 ---

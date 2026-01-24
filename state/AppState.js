@@ -29,17 +29,17 @@ class AppState {
 			answeredQuestions: new Set(),
 			selectedQuestionId: null,
 			interviewTurnId: 0,
-			gptAnsweredTurnId: null,
-			gptRequestedTurnId: null,
-			gptRequestedQuestionId: null,
+			llmAnsweredTurnId: null,
+			llmRequestedTurnId: null,
+			llmRequestedQuestionId: null,
 			lastAskedQuestionNormalized: null,
 		};
 
 		this.metrics = {
 			audioStartTime: null,
-			gptStartTime: null,
-			gptFirstTokenTime: null,
-			gptEndTime: null,
+			llmStartTime: null,
+			llmFirstTokenTime: null,
+			llmEndTime: null,
 			totalTime: null,
 			audioSize: 0,
 		};
@@ -128,28 +128,28 @@ class AppState {
 		this.interview.interviewTurnId = value;
 	}
 
-	get gptAnsweredTurnId() {
-		return this.interview.gptAnsweredTurnId;
+	get llmAnsweredTurnId() {
+		return this.interview.llmAnsweredTurnId;
 	}
 
-	set gptAnsweredTurnId(value) {
-		this.interview.gptAnsweredTurnId = value;
+	set llmAnsweredTurnId(value) {
+		this.interview.llmAnsweredTurnId = value;
 	}
 
-	get gptRequestedTurnId() {
-		return this.interview.gptRequestedTurnId;
+	get llmRequestedTurnId() {
+		return this.interview.llmRequestedTurnId;
 	}
 
-	set gptRequestedTurnId(value) {
-		this.interview.gptRequestedTurnId = value;
+	set llmRequestedTurnId(value) {
+		this.interview.llmRequestedTurnId = value;
 	}
 
-	get gptRequestedQuestionId() {
-		return this.interview.gptRequestedQuestionId;
+	get llmRequestedQuestionId() {
+		return this.interview.llmRequestedQuestionId;
 	}
 
-	set gptRequestedQuestionId(value) {
-		this.interview.gptRequestedQuestionId = value;
+	set llmRequestedQuestionId(value) {
+		this.interview.llmRequestedQuestionId = value;
 	}
 
 	get lastAskedQuestionNormalized() {
@@ -252,17 +252,17 @@ class AppState {
 			answeredQuestions: new Set(),
 			selectedQuestionId: null,
 			interviewTurnId: 0,
-			gptAnsweredTurnId: null,
-			gptRequestedTurnId: null,
-			gptRequestedQuestionId: null,
+			llmAnsweredTurnId: null,
+			llmRequestedTurnId: null,
+			llmRequestedQuestionId: null,
 			lastAskedQuestionNormalized: null,
 		};
 
 		this.metrics = {
 			audioStartTime: null,
-			gptStartTime: null,
-			gptFirstTokenTime: null,
-			gptEndTime: null,
+			llmStartTime: null,
+			llmFirstTokenTime: null,
+			llmEndTime: null,
 			totalTime: null,
 			audioSize: 0,
 		};

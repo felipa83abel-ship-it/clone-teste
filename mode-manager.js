@@ -86,12 +86,12 @@ class ModeManager {
 	 * Esses são os principais pontos de delegação
 	 */
 
-	// 1️⃣ Quando pergunta é finalizada (pronta para enviar ao GPT)
+	// 1️⃣ Quando pergunta é finalizada (pronta para enviar ao LLM)
 	onQuestionFinalize(question) {
 		return this.delegate('onQuestionFinalize', question);
 	}
 
-	// 2️⃣ Quando resposta do GPT termina (stream ou batch)
+	// 2️⃣ Quando resposta do LLM termina (stream ou batch)
 	onAnswerStreamEnd(data) {
 		return this.delegate('onAnswerStreamEnd', data);
 	}
@@ -111,7 +111,7 @@ class ModeManager {
 		return this.delegate('renderModeState');
 	}
 
-	// 6️⃣ Validar pergunta antes de enviar ao GPT
+	// 6️⃣ Validar pergunta antes de enviar ao LLM
 	validateQuestion(question) {
 		return this.delegate('validateQuestion', question);
 	}

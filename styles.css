@@ -88,7 +88,9 @@ body {
 	background: rgba(var(--color-black-rgb), 0);
 
 	border-radius: 12px;
-	box-shadow: 0 12px 32px rgba(var(--color-black-rgb), 0.45), 0 0 0 1px rgba(var(--color-white-rgb), 0.06);
+	box-shadow:
+		0 12px 32px rgba(var(--color-black-rgb), 0.45),
+		0 0 0 1px rgba(var(--color-white-rgb), 0.06);
 }
 
 #mainContent {
@@ -277,7 +279,11 @@ body {
 	border-radius: 4px;
 	color: rgba(var(--color-white-rgb), 0.9);
 	cursor: pointer;
-	transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+	transition:
+		background 0.15s ease,
+		border-color 0.15s ease,
+		color 0.15s ease,
+		opacity 0.15s ease;
 }
 
 .topbar-btn .icon {
@@ -467,7 +473,9 @@ body {
 	border-left: 6px solid rgba(var(--color-active-rgb), 1) !important;
 	background: rgba(var(--color-active-rgb), 0.2) !important;
 	padding-left: 12px;
-	box-shadow: inset -3px 0 0 0 rgba(var(--color-active-rgb), 0.5), 0 0 8px rgba(var(--color-active-rgb), 0.3) !important;
+	box-shadow:
+		inset -3px 0 0 0 rgba(var(--color-active-rgb), 0.5),
+		0 0 8px rgba(var(--color-active-rgb), 0.3) !important;
 	border-bottom: 2px solid rgba(var(--color-active-rgb), 0.4) !important;
 }
 
@@ -476,12 +484,12 @@ body {
 	font-weight: bold;
 }
 
-.gpt-answer {
+.llm-answer {
 	font-size: 14px;
 	line-height: 1.5;
 }
 
-.gpt-answer pre {
+.llm-answer pre {
 	background: rgba(var(--color-code-bg-rgb), var(--app-opacity));
 	color: rgba(var(--color-code-text-rgb), 1);
 	padding: 12px;
@@ -489,16 +497,16 @@ body {
 	overflow-x: auto;
 }
 
-.gpt-answer code {
+.llm-answer code {
 	font-family: Consolas, monospace;
 	font-size: 13px;
 }
 
-.gpt-answer h3 {
+.llm-answer h3 {
 	margin-top: 12px;
 }
 
-/* 🔥 MARKDOWN FORMATTING - Estilo GPT */
+/* 🔥 MARKDOWN FORMATTING - Estilo ChatGPT */
 .answer-content {
 	font-size: 14px;
 	line-height: 1.6;
@@ -960,7 +968,7 @@ textarea:focus {
 	border: 1px solid rgba(var(--color-danger-rgb), 1);
 }
 
-.btn-ask-gpt {
+.btn-ask-llm {
 	min-width: 212px;
 	display: flex;
 	align-items: center;
@@ -975,7 +983,7 @@ textarea:focus {
 	border: 1px solid rgba(var(--color-purple-rgb), var(--app-opacity));
 }
 
-.btn-ask-gpt:hover {
+.btn-ask-llm:hover {
 	background: rgba(var(--color-purple-hover-rgb), var(--app-opacity));
 }
 /* =========================================================
@@ -1217,7 +1225,6 @@ input:checked + .slider:before {
 	box-shadow: 0 3px 10px rgba(220, 53, 69, 0.6);
 	transform: scale(1.05);
 }
-}
 
 .btn-clear-screenshots:hover {
 	background: rgba(102, 126, 234, 0.95);
@@ -1241,7 +1248,9 @@ input:checked + .slider:before {
 	align-items: center;
 	gap: 8px;
 	box-shadow: 0 4px 12px rgba(var(--color-black-rgb), 0.15);
-	animation: slideIn 0.3s ease, slideOut 0.3s ease 2.7s forwards;
+	animation:
+		slideIn 0.3s ease,
+		slideOut 0.3s ease 2.7s forwards;
 	z-index: 2000;
 }
 

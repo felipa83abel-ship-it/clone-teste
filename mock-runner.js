@@ -6,7 +6,7 @@
  *
  * Responsabilidades:
  * - Simular perguntas e respostas de IA
- * - Interceptar IPC para ANALYZE_SCREENSHOTS e ask-gpt-stream
+ * - Interceptar IPC para ANALYZE_SCREENSHOTS e ask-llm-stream
  * - Rodar cenários automáticos (runMockAutoPlay)
  */
 
@@ -131,7 +131,7 @@ async function simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive) {
 	}
 
 	console.log(`🔇 [FASE-2] Silêncio detectado, fechando pergunta...`);
-	console.log(`🤖 [FASE-3] askGpt acionado - mock stream será emitido pelo interceptor`);
+	console.log(`🤖 [FASE-3] askLlm acionado - mock stream será emitido pelo interceptor`);
 
 	return true;
 }
@@ -303,9 +303,9 @@ function initMockInterceptor(context) {
 			});
 		}
 
-		// Intercepta ask-gpt-stream quando MODE_DEBUG
-		if (channel === 'ask-gpt-stream' && APP_CONFIG.MODE_DEBUG) {
-			console.log('🎭 [MOCK] Interceptando ask-gpt-stream...');
+		// Intercepta ask-llm-stream quando MODE_DEBUG
+		if (channel === 'ask-llm-stream' && APP_CONFIG.MODE_DEBUG) {
+			console.log('🎭 [MOCK] Interceptando ask-llm-stream...');
 
 			// Obtém a pergunta do primeiro argumento (array de mensagens)
 			const messages = args[0] || [];
@@ -343,11 +343,11 @@ async function emitTokensFromResponse(response) {
 		await new Promise(resolve => setTimeout(resolve, delay));
 
 		// 🔥 Emite o evento localmente (os handlers estão ouvindo no ipcRenderer)
-		ipcRenderer.emit('GPT_STREAM_CHUNK', {}, chunk);
+		ipcRenderer.emit('LLM_STREAM_CHUNK', {}, chunk);
 	}
 
 	// Finaliza o stream
-	ipcRenderer.emit('GPT_STREAM_END');
+	ipcRenderer.emit('LLM_STREAM_END');
 }
 
 // Exporta as funções para uso em renderer.js

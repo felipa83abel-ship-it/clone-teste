@@ -5,7 +5,7 @@
  *	- Inicializar a aplicação Electron
  *	- Criar a janela overlay principal
  *	- Gerenciar IPC handlers para comunicação com o renderer
- *	- Integrar com OpenAI API para GPT e visão computacional
+ *	- Integrar com OpenAI API, Google Gemini e outros serviços
  *	- Capturar screenshots discretamente
  *	- Controlar comportamento da janela (click-through, drag, etc)
  *
@@ -65,7 +65,7 @@ try {
 //	CONSTANTES
 /* ================================ */
 
-const USE_FAKE_STREAM_GPT = true; // 🤖 Mude para true para ativar os testes sem GPT real 🤖
+const USE_FAKE_STREAM_LLM = true; // 🤖 Mude para true para ativar os testes sem LLM real 🤖
 
 /* ================================ */
 //	ESTADO GLOBAL
@@ -368,8 +368,8 @@ async function handleInitializeApiClient(_, apiKey) {
 
 function registerLLMHandlers() {
 	// OpenAI handlers
-	ipcMain.handle('ask-gpt', handleAskGPT);
-	ipcMain.handle('ask-gpt-stream', handleAskGPTStream);
+	ipcMain.handle('ask-llm', handleAskLLM);
+	ipcMain.handle('ask-llm-stream', handleAskLLMStream);
 
 	// Gemini handlers
 	ipcMain.handle('ask-gemini', handleAskGemini);
@@ -405,18 +405,18 @@ async function ensureGeminiClient() {
 }
 
 /**
- * Obtém resposta do GPT para uma lista de mensagens
+ * Obtém resposta do LLM para uma lista de mensagens
  * @param {Event} _ - Evento IPC
  * @param {Array} messages - Histórico de mensagens
  * @returns {string} Resposta do modelo
  */
-async function handleAskGPT(_, messages) {
+async function handleAskLLM(_, messages) {
 	await ensureOpenAIClient();
 
 	try {
 		let response;
 
-		if (USE_FAKE_STREAM_GPT) {
+		if (USE_FAKE_STREAM_LLM) {
 			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
 		} else {
 			response = await openaiClient.chat.completions.create({
@@ -428,36 +428,36 @@ async function handleAskGPT(_, messages) {
 
 		return response.choices[0].message.content;
 	} catch (error) {
-		console.error('❌ Erro no GPT:', error.message);
+		console.error('❌ Erro no LLM:', error.message);
 		if (error.status === 401 || error.message.includes('authentication')) {
 			openaiClient = null;
-			throw new Error('Chave da API inválida para GPT. Verifique as configurações.');
+			throw new Error('Chave da API inválida para LLM. Verifique as configurações.');
 		}
 		throw error;
 	}
 }
 
 /**
- * Obtém resposta do GPT com streaming de tokens
- * Envia eventos 'GPT_STREAM_CHUNK' e 'GPT_STREAM_END' ao renderer
+ * Obtém resposta do LLM com streaming de tokens
+ * Envia eventos 'LLM_STREAM_CHUNK' e 'LLM_STREAM_END' ao renderer
  * @param {Event} event - Evento IPC com referência à janela
  * @param {Array} messages - Histórico de mensagens
  */
-async function handleAskGPTStream(event, messages) {
+async function handleAskLLMStream(event, messages) {
 	const win = BrowserWindow.fromWebContents(event.sender);
 
 	try {
 		await ensureOpenAIClient();
 	} catch (error) {
-		win.webContents.send('GPT_STREAM_ERROR', error.message);
+		win.webContents.send('LLM_STREAM_ERROR', error.message);
 		return;
 	}
 
 	try {
 		let stream;
 
-		if (USE_FAKE_STREAM_GPT) {
-			stream = fakeStreamGPT();
+		if (USE_FAKE_STREAM_LLM) {
+			stream = fakeStreamLLM();
 		} else {
 			stream = await openaiClient.chat.completions.create({
 				model: 'gpt-4o-mini',
@@ -470,18 +470,18 @@ async function handleAskGPTStream(event, messages) {
 		for await (const chunk of stream) {
 			const token = chunk.choices?.[0]?.delta?.content;
 			if (token) {
-				win.webContents.send('GPT_STREAM_CHUNK', token);
+				win.webContents.send('LLM_STREAM_CHUNK', token);
 			}
 		}
 
-		win.webContents.send('GPT_STREAM_END');
+		win.webContents.send('LLM_STREAM_END');
 	} catch (error) {
-		console.error('❌ Erro no stream GPT:', error.message);
+		console.error('❌ Erro no stream LLM:', error.message);
 		if (error.status === 401 || error.message.includes('authentication')) {
 			openaiClient = null;
-			win.webContents.send('GPT_STREAM_ERROR', 'Chave da API inválida. Configure na seção "API e Modelos".');
+			win.webContents.send('LLM_STREAM_ERROR', 'Chave da API inválida. Configure na seção "API e Modelos".');
 		} else {
-			win.webContents.send('GPT_STREAM_ERROR', error.message);
+			win.webContents.send('LLM_STREAM_ERROR', error.message);
 		}
 	}
 }
@@ -534,7 +534,7 @@ async function handleAskGeminiStream(event, messages) {
 	try {
 		await ensureGeminiClient();
 	} catch (error) {
-		win.webContents.send('GPT_STREAM_ERROR', error.message);
+		win.webContents.send('LLM_STREAM_ERROR', error.message);
 		return;
 	}
 
@@ -559,28 +559,28 @@ async function handleAskGeminiStream(event, messages) {
 		for await (const chunk of result.stream) {
 			const text = chunk.text();
 			if (text) {
-				win.webContents.send('GPT_STREAM_CHUNK', text);
+				win.webContents.send('LLM_STREAM_CHUNK', text);
 			}
 		}
 
-		win.webContents.send('GPT_STREAM_END');
+		win.webContents.send('LLM_STREAM_END');
 	} catch (error) {
 		console.error('❌ Erro no stream Gemini:', error.message);
 		if (error.message.includes('API_KEY_INVALID') || error.message.includes('authenticated')) {
 			geminiClient = null;
-			win.webContents.send('GPT_STREAM_ERROR', 'Chave da API inválida para Gemini.');
+			win.webContents.send('LLM_STREAM_ERROR', 'Chave da API inválida para Gemini.');
 		} else {
-			win.webContents.send('GPT_STREAM_ERROR', error.message);
+			win.webContents.send('LLM_STREAM_ERROR', error.message);
 		}
 	}
 }
 
 /**
- * Simula um stream de resposta do GPT (para testes)
+ * Simula um stream de resposta do LLM (para testes)
  * @returns {AsyncGenerator} Gerador de chunks simulados
  */
-async function* fakeStreamGPT() {
-	const response = 'Olá Thiago! Isso é um mock de resposta simulando o GPT 🚀';
+async function* fakeStreamLLM() {
+	const response = 'Olá Thiago! Isso é um mock de resposta simulando o LLM 🚀';
 	const chunks = response.match(/.{1,8}/g);
 
 	for (const chunk of chunks) {
@@ -858,7 +858,7 @@ async function handleAnalyzeScreenshots(_, screenshotPaths) {
 
 		let response;
 
-		if (USE_FAKE_STREAM_GPT) {
+		if (USE_FAKE_STREAM_LLM) {
 			response = { choices: [{ message: { content: 'Resposta mockada só para teste 🚀' } }] };
 		} else {
 			response = await openaiClient.chat.completions.create({
@@ -1057,9 +1057,9 @@ function registerGlobalShortcuts() {
 		mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
 	});
 
-	// Enviar pergunta ao GPT (Ctrl+Enter)
+	// Enviar pergunta ao LLM (Ctrl+Enter)
 	globalShortcut.register('Control+Enter', () => {
-		mainWindow.webContents.send('CMD_ASK_GPT');
+		mainWindow.webContents.send('CMD_ASK_LLM');
 	});
 
 	// Navegação de histórico de perguntas (Ctrl+Shift+ArrowUp)

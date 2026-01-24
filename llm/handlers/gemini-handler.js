@@ -57,9 +57,9 @@ class GeminiHandler {
 		};
 
 		// Registra ouvintes temporários
-		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
-		ipcRenderer.on('GPT_STREAM_END', onEnd);
-		ipcRenderer.on('GPT_STREAM_ERROR', onError);
+		ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
+		ipcRenderer.on('LLM_STREAM_END', onEnd);
+		ipcRenderer.on('LLM_STREAM_ERROR', onError);
 
 		try {
 			// Inicia o stream no Main
@@ -82,9 +82,9 @@ class GeminiHandler {
 			throw error;
 		} finally {
 			// Remove ouvintes para evitar vazamento de memória e duplicatas
-			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
-			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
-			ipcRenderer.removeListener('GPT_STREAM_ERROR', onError);
+			ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
+			ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
+			ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
 		}
 	}
 }
