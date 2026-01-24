@@ -39,6 +39,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('node:fs');
 const path = require('node:path');
 const SecureLogger = require('./utils/SecureLogger.js');
+const ErrorHandler = require('./utils/ErrorHandler.js');
 
 // Habilita reload automático em desenvolvimento
 if (process.env.NODE_ENV === 'development') {
@@ -255,14 +256,14 @@ function registerApiKeyHandlers() {
  */
 async function handleHasApiKey(_, provider) {
   try {
+    ErrorHandler.validateInput(provider, 'provider', 'string');
     const key = secureStore.get(`apiKeys.${provider}`);
     return {
       hasKey: !!key && key.length > 10,
       provider,
     };
   } catch (error) {
-    console.error('❌ Erro ao verificar API key:', error);
-    return { hasKey: false, provider };
+    return ErrorHandler.handleError(error, 'handleHasApiKey');
   }
 }
 
@@ -274,11 +275,11 @@ async function handleHasApiKey(_, provider) {
  */
 async function handleGetApiKey(_, provider) {
   try {
+    ErrorHandler.validateInput(provider, 'provider', 'string');
     const key = secureStore.get(`apiKeys.${provider}`);
     return key || null;
   } catch (error) {
-    console.error(`❌ Erro ao recuperar chave de ${provider}:`, error);
-    return null;
+    return ErrorHandler.handleError(error, 'handleGetApiKey');
   }
 }
 
@@ -290,6 +291,9 @@ async function handleGetApiKey(_, provider) {
  */
 async function handleSaveApiKey(_, { provider, apiKey }) {
   try {
+    ErrorHandler.validateInput(provider, 'provider', 'string');
+    ErrorHandler.validateInput(apiKey, 'apiKey', 'string');
+
     if (!apiKey || apiKey.trim().length < 2) {
       return { success: false, error: 'API key inválida' };
     }
@@ -317,8 +321,7 @@ async function handleSaveApiKey(_, { provider, apiKey }) {
 
     return { success: true, provider };
   } catch (error) {
-    console.error('Erro ao salvar API key:', error);
-    return { success: false, error: error.message };
+    return ErrorHandler.handleError(error, 'handleSaveApiKey');
   }
 }
 
@@ -330,6 +333,7 @@ async function handleSaveApiKey(_, { provider, apiKey }) {
  */
 async function handleDeleteApiKey(_, provider) {
   try {
+    ErrorHandler.validateInput(provider, 'provider', 'string');
     secureStore.delete(`apiKeys.${provider}`);
 
     // Se for OpenAI, desconecta cliente
@@ -344,8 +348,7 @@ async function handleDeleteApiKey(_, provider) {
 
     return { success: true, provider };
   } catch (error) {
-    console.error('❌ Erro ao deletar API key:', error);
-    return { success: false, error: error.message };
+    return ErrorHandler.handleError(error, 'handleDeleteApiKey');
   }
 }
 
@@ -356,11 +359,16 @@ async function handleDeleteApiKey(_, provider) {
  * @returns {Object} {initialized: boolean}
  */
 async function handleInitializeApiClient(_, apiKey) {
-  const initialized = initializeOpenAIClient(apiKey);
-  if (mainWindow?.webContents) {
-    mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
+  try {
+    ErrorHandler.validateInput(apiKey, 'apiKey', 'string');
+    const initialized = initializeOpenAIClient(apiKey);
+    if (mainWindow?.webContents) {
+      mainWindow.webContents.send('API_KEY_UPDATED', !!initialized);
+    }
+    return { initialized };
+  } catch (error) {
+    return ErrorHandler.handleError(error, 'handleInitializeApiClient');
   }
-  return { initialized };
 }
 
 /* ================================ */
@@ -414,9 +422,10 @@ async function ensureGeminiClient() {
  * @returns {string} Resposta do modelo
  */
 async function handleAskLLM(_, messages) {
-  await ensureOpenAIClient();
-
   try {
+    ErrorHandler.validateInput(messages, 'messages', 'array');
+    await ensureOpenAIClient();
+
     let response;
 
     if (USE_FAKE_STREAM_LLM) {
@@ -431,12 +440,11 @@ async function handleAskLLM(_, messages) {
 
     return response.choices[0].message.content;
   } catch (error) {
-    console.error('❌ Erro no LLM:', error.message);
     if (error.status === 401 || error.message.includes('authentication')) {
       openaiClient = null;
-      throw new Error('Chave da API inválida para LLM. Verifique as configurações.');
+      error.message = 'Chave da API inválida para LLM. Verifique as configurações.';
     }
-    throw error;
+    return ErrorHandler.handleError(error, 'handleAskLLM');
   }
 }
 
@@ -450,6 +458,7 @@ async function handleAskLLMStream(event, messages) {
   const win = BrowserWindow.fromWebContents(event.sender);
 
   try {
+    ErrorHandler.validateInput(messages, 'messages', 'array');
     await ensureOpenAIClient();
   } catch (error) {
     win.webContents.send('LLM_STREAM_ERROR', error.message);
@@ -479,7 +488,6 @@ async function handleAskLLMStream(event, messages) {
 
     win.webContents.send('LLM_STREAM_END');
   } catch (error) {
-    console.error('❌ Erro no stream LLM:', error.message);
     if (error.status === 401 || error.message.includes('authentication')) {
       openaiClient = null;
       win.webContents.send(
@@ -487,6 +495,7 @@ async function handleAskLLMStream(event, messages) {
         'Chave da API inválida. Configure na seção "API e Modelos".'
       );
     } else {
+      ErrorHandler.handleError(error, 'handleAskLLMStream');
       win.webContents.send('LLM_STREAM_ERROR', error.message);
     }
   }
@@ -499,9 +508,10 @@ async function handleAskLLMStream(event, messages) {
  * @returns {string} Resposta do modelo
  */
 async function handleAskGemini(_, messages) {
-  await ensureGeminiClient();
-
   try {
+    ErrorHandler.validateInput(messages, 'messages', 'array');
+    await ensureGeminiClient();
+
     const model = geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
     // Formata mensagens para Gemini
@@ -520,12 +530,11 @@ async function handleAskGemini(_, messages) {
     const result = await chatSession.sendMessage(lastMessage);
     return result.response.text();
   } catch (error) {
-    console.error('❌ Erro no Gemini:', error.message);
     if (error.message.includes('API_KEY_INVALID') || error.message.includes('authenticated')) {
       geminiClient = null;
-      throw new Error('Chave da API inválida para Gemini. Verifique as configurações.');
+      error.message = 'Chave da API inválida para Gemini. Verifique as configurações.';
     }
-    throw error;
+    return ErrorHandler.handleError(error, 'handleAskGemini');
   }
 }
 
@@ -538,6 +547,7 @@ async function handleAskGeminiStream(event, messages) {
   const win = BrowserWindow.fromWebContents(event.sender);
 
   try {
+    ErrorHandler.validateInput(messages, 'messages', 'array');
     await ensureGeminiClient();
   } catch (error) {
     win.webContents.send('LLM_STREAM_ERROR', error.message);
@@ -571,11 +581,12 @@ async function handleAskGeminiStream(event, messages) {
 
     win.webContents.send('LLM_STREAM_END');
   } catch (error) {
-    console.error('❌ Erro no stream Gemini:', error.message);
     if (error.message.includes('API_KEY_INVALID') || error.message.includes('authenticated')) {
       geminiClient = null;
+      ErrorHandler.handleError(error, 'handleAskGeminiStream');
       win.webContents.send('LLM_STREAM_ERROR', 'Chave da API inválida para Gemini.');
     } else {
+      ErrorHandler.handleError(error, 'handleAskGeminiStream');
       win.webContents.send('LLM_STREAM_ERROR', error.message);
     }
   }
@@ -682,7 +693,11 @@ function handleMoveWindowTo(_, { x, y }) {
  * @returns {Object|null} Bounds da janela ou null
  */
 function handleGetWindowBounds() {
-  return mainWindow ? mainWindow.getBounds() : null;
+  try {
+    return mainWindow ? mainWindow.getBounds() : null;
+  } catch (error) {
+    return ErrorHandler.handleError(error, 'handleGetWindowBounds');
+  }
 }
 
 /**
@@ -694,7 +709,7 @@ function handleGetCursorScreenPoint() {
     const { screen } = require('electron');
     return screen.getCursorScreenPoint();
   } catch (err) {
-    console.error('Erro ao obter posição do cursor:', err);
+    ErrorHandler.handleError(err, 'handleGetCursorScreenPoint');
     return { x: 0, y: 0 };
   }
 }
@@ -809,6 +824,7 @@ async function handleCaptureScreenshot() {
  */
 async function handleAnalyzeScreenshots(_, screenshotPaths) {
   try {
+    ErrorHandler.validateInput(screenshotPaths, 'screenshotPaths', 'array');
     await ensureOpenAIClient();
 
     if (!screenshotPaths || screenshotPaths.length === 0) {
@@ -887,19 +903,14 @@ async function handleAnalyzeScreenshots(_, screenshotPaths) {
       analysis,
     };
   } catch (error) {
-    console.error('❌ Erro ao analisar screenshots:', error);
-
     if (error.status === 401) {
-      return {
-        success: false,
-        error: 'API key inválida ou expirada',
-      };
+      return ErrorHandler.handleError(
+        new Error('API key inválida ou expirada'),
+        'handleAnalyzeScreenshots'
+      );
     }
 
-    return {
-      success: false,
-      error: error.message,
-    };
+    return ErrorHandler.handleError(error, 'handleAnalyzeScreenshots');
   }
 }
 
@@ -934,7 +945,7 @@ async function handleCleanupScreenshots() {
             console.log(`🗑️ Screenshot removido: ${file}`);
           }
         } catch (err) {
-          console.warn(`⚠️ Erro ao processar ${file}:`, err.message);
+          ErrorHandler.handleError(err, 'handleCleanupScreenshots');
         }
       }
     });
@@ -945,8 +956,7 @@ async function handleCleanupScreenshots() {
 
     return { success: true, cleaned };
   } catch (error) {
-    console.error('❌ Erro na limpeza:', error);
-    return { success: false, error: error.message };
+    return ErrorHandler.handleError(error, 'handleCleanupScreenshots');
   }
 }
 
