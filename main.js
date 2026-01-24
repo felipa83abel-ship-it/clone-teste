@@ -38,6 +38,7 @@ const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const fs = require('node:fs');
 const path = require('node:path');
+const SecureLogger = require('./utils/SecureLogger.js');
 
 // Habilita reload automático em desenvolvimento
 if (process.env.NODE_ENV === 'development') {
@@ -46,7 +47,7 @@ if (process.env.NODE_ENV === 'development') {
       electron: require(`${__dirname}/node_modules/electron`),
     });
   } catch (err) {
-    console.log('electron-reload não carregado:', err);
+    SecureLogger.debug('electron-reload não carregado:', err);
   }
 }
 
@@ -57,9 +58,9 @@ try {
   if (ElectronStore.default) {
     ElectronStore = ElectronStore.default;
   }
-  console.log('✅ electron-store importado com sucesso');
+  SecureLogger.success('electron-store importado com sucesso');
 } catch (error) {
-  console.error('❌ Erro ao importar electron-store:', error);
+  SecureLogger.error('Erro ao importar electron-store:', error);
   ElectronStore = null;
 }
 
@@ -89,23 +90,23 @@ if (ElectronStore) {
       name: 'secure-keys',
       encryptionKey: 'perssua-secure-storage-v1',
     });
-    console.log('✅ SecureStore inicializado com sucesso');
+    SecureLogger.success('SecureStore inicializado com sucesso');
 
     // Inicializa cliente OpenAI se houver chave salva
     const savedOpenAIKey = secureStore.get('apiKeys.openai');
     if (savedOpenAIKey && savedOpenAIKey.length > 10) {
-      console.log('🔑 Chave OpenAI encontrada - inicializando cliente...');
+      SecureLogger.info('Chave OpenAI encontrada - inicializando cliente...');
       initializeOpenAIClient(savedOpenAIKey);
     }
 
     // Inicializa cliente Gemini se houver chave salva
     const savedGeminiKey = secureStore.get('apiKeys.google');
     if (savedGeminiKey && savedGeminiKey.length > 10) {
-      console.log('🔑 Chave Gemini encontrada - inicializando cliente...');
+      SecureLogger.info('Chave Gemini encontrada - inicializando cliente...');
       initializeGeminiClient(savedGeminiKey);
     }
   } catch (error) {
-    console.error('❌ Erro ao criar secureStore:', error);
+    SecureLogger.error('Erro ao criar secureStore:', error);
   }
 }
 
@@ -119,22 +120,21 @@ function initializeOpenAIClient(apiKey = null) {
     const key = apiKey || (secureStore ? secureStore.get('apiKeys.openai') : null);
 
     if (!key || typeof key !== 'string' || key.trim().length < 10) {
-      console.warn('⚠️ Chave da API inválida ou muito curta');
+      SecureLogger.warn('Chave da API inválida ou muito curta');
       openaiClient = null;
       return false;
     }
 
-    const maskedKey = key.substring(0, 8) + '...';
-    console.log(`---> Inicializando cliente OpenAI com chave: ${maskedKey}`);
+    SecureLogger.logClientInitialization('OpenAI', key);
 
     openaiClient = new OpenAI({
       apiKey: key.trim(),
     });
 
-    console.log('✅ Cliente OpenAI inicializado com sucesso');
+    SecureLogger.success('Cliente OpenAI inicializado com sucesso');
     return true;
   } catch (error) {
-    console.error('❌ Erro ao inicializar cliente OpenAI:', error.message);
+    SecureLogger.error('Erro ao inicializar cliente OpenAI:', error);
     openaiClient = null;
     return false;
   }
@@ -150,20 +150,19 @@ function initializeGeminiClient(apiKey = null) {
     const key = apiKey || (secureStore ? secureStore.get('apiKeys.google') : null);
 
     if (!key || typeof key !== 'string' || key.trim().length < 10) {
-      console.warn('⚠️ Chave Gemini inválida ou muito curta');
+      SecureLogger.warn('Chave Gemini inválida ou muito curta');
       geminiClient = null;
       return false;
     }
 
-    const maskedKey = key.substring(0, 8) + '...';
-    console.log(`---> Inicializando cliente Gemini com chave: ${maskedKey}`);
+    SecureLogger.logClientInitialization('Gemini', key);
 
     geminiClient = new GoogleGenerativeAI(key.trim());
 
-    console.log('✅ Cliente Gemini inicializado com sucesso');
+    SecureLogger.success('Cliente Gemini inicializado com sucesso');
     return true;
   } catch (error) {
-    console.error('❌ Erro ao inicializar cliente Gemini:', error.message);
+    SecureLogger.error('Erro ao inicializar cliente Gemini:', error);
     geminiClient = null;
     return false;
   }
@@ -192,7 +191,7 @@ function registerIPCHandlers() {
   // Fechamento
   registerAppCloseHandler();
 
-  console.log('✅ Todos os handlers IPC registrados');
+  SecureLogger.success('Todos os handlers IPC registrados');
 }
 
 /* ================================ */
