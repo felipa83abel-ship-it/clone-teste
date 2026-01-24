@@ -6,65 +6,28 @@
  */
 
 const Logger = require('../../utils/Logger.js');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { ipcRenderer } = require('electron');
 
 class GeminiHandler {
 	constructor() {
 		this.initialized = false;
-		this.client = null;
 		this.logger = Logger;
-		this.model = 'gemini-1.5-flash';
 	}
 
 	/**
-	 * Inicializar cliente Gemini
-	 * @param {string} apiKey - Google API key
+	 * Inicializar handler (apenas marca como pronto, main.js cuida do client)
 	 */
-	async initialize(apiKey) {
-		try {
-			if (!apiKey) {
-				throw new Error('API key do Gemini não fornecida');
-			}
-
-			this.client = new GoogleGenerativeAI(apiKey);
-			this.initialized = true;
-			this.logger.info('✅ Gemini handler inicializado', { model: this.model });
-		} catch (error) {
-			this.logger.error('❌ Erro ao inicializar Gemini', { error: error.message });
-			throw error;
-		}
+	async initialize() {
+		this.initialized = true;
+		this.logger.info('✅ Gemini handler pronto (via IPC)');
 	}
 
 	/**
-	 * Chamar Gemini para completação (resposta completa)
-	 * @param {Array} messages - Array de mensagens {role, content}
-	 * @returns {Promise<string>} Resposta do modelo
+	 * Chamar Gemini para completação (via IPC)
 	 */
 	async complete(messages) {
-		if (!this.initialized || !this.client) {
-			throw new Error('Gemini handler não inicializado');
-		}
-
 		try {
-			const model = this.client.getGenerativeModel({ model: this.model });
-
-			// Formata mensagens para Gemini (converte user/assistant para user/model)
-			const contents = messages.map(msg => ({
-				role: msg.role === 'user' ? 'user' : 'model',
-				parts: [{ text: msg.content }],
-			}));
-
-			const result = await model.generateContent({
-				contents,
-				generationConfig: {
-					maxOutputTokens: 2048,
-					temperature: 0.7,
-					topP: 0.95,
-				},
-			});
-
-			const response = result.response;
-			return response.text();
+			return await ipcRenderer.invoke('ask-gemini', messages);
 		} catch (error) {
 			this.logger.error('❌ Erro em Gemini.complete()', { error: error.message });
 			throw error;
@@ -72,46 +35,60 @@ class GeminiHandler {
 	}
 
 	/**
-	 * Chamar Gemini com streaming
-	 * @param {Array} messages - Array de mensagens {role, content}
-	 * @returns {AsyncGenerator<string>} Async generator que emite tokens
+	 * Chamar Gemini com streaming (via IPC)
 	 */
 	async *stream(messages) {
-		if (!this.initialized || !this.client) {
-			throw new Error('Gemini handler não inicializado');
-		}
+		const tokenQueue = [];
+		let isEnd = false;
+		let streamError = null;
+
+		const onChunk = (_, chunk) => {
+			tokenQueue.push(chunk);
+		};
+
+		const onEnd = () => {
+			isEnd = true;
+		};
+
+		const onError = (_, error) => {
+			this.logger.error('❌ Erro no stream do Gemini (via IPC):', error);
+			streamError = error;
+			isEnd = true;
+		};
+
+		// Registra ouvintes temporários
+		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
+		ipcRenderer.on('GPT_STREAM_END', onEnd);
+		ipcRenderer.on('GPT_STREAM_ERROR', onError);
 
 		try {
-			const model = this.client.getGenerativeModel({ model: this.model });
+			// Inicia o stream no Main
+			ipcRenderer.invoke('ask-gemini-stream', messages);
 
-			// Formata mensagens para Gemini
-			const contents = messages.map(msg => ({
-				role: msg.role === 'user' ? 'user' : 'model',
-				parts: [{ text: msg.content }],
-			}));
+			// Aguarda e emite tokens da fila
+			while (!isEnd || tokenQueue.length > 0) {
+				if (tokenQueue.length > 0) {
+					yield tokenQueue.shift();
+				} else {
+					await new Promise(resolve => setTimeout(resolve, 10));
+				}
 
-			const result = await model.generateContentStream({
-				contents,
-				generationConfig: {
-					maxOutputTokens: 2048,
-					temperature: 0.7,
-					topP: 0.95,
-				},
-			});
-
-			// Emite tokens conforme chegam
-			for await (const chunk of result.stream) {
-				const text = chunk.text();
-				if (text) {
-					yield text;
+				if (streamError) {
+					throw new Error(streamError);
 				}
 			}
 		} catch (error) {
 			this.logger.error('❌ Erro em Gemini.stream()', { error: error.message });
 			throw error;
+		} finally {
+			// Remove ouvintes para evitar vazamento de memória e duplicatas
+			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
+			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
+			ipcRenderer.removeListener('GPT_STREAM_ERROR', onError);
 		}
 	}
 }
 
-// ✅ Exporta como singleton (mesmo padrão de openai-handler)
-module.exports = new GeminiHandler();
+if (typeof module !== 'undefined' && module.exports) {
+	module.exports = new GeminiHandler();
+}

@@ -329,6 +329,27 @@ function initMockInterceptor(context) {
 	};
 }
 
+/**
+ * Emite tokens de uma resposta mockada com delays (simula streaming)
+ * @param {string} response - Texto completo da resposta
+ */
+async function emitTokensFromResponse(response) {
+	const { ipcRenderer } = require('electron');
+	// Quebra o texto em pequenos pedaços (chunks) de 1 a 5 caracteres
+	const chunks = response.match(/.{1,5}/g) || [];
+
+	for (const chunk of chunks) {
+		const delay = 20 + Math.random() * 60; // Delay variável para parecer humano
+		await new Promise(resolve => setTimeout(resolve, delay));
+
+		// 🔥 Emite o evento localmente (os handlers estão ouvindo no ipcRenderer)
+		ipcRenderer.emit('GPT_STREAM_CHUNK', {}, chunk);
+	}
+
+	// Finaliza o stream
+	ipcRenderer.emit('GPT_STREAM_END');
+}
+
 // Exporta as funções para uso em renderer.js
 if (typeof module !== 'undefined' && module.exports) {
 	module.exports = {

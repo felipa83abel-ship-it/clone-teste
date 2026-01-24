@@ -39,50 +39,53 @@ class OpenAIHandler {
 	 * }
 	 */
 	async *stream(messages) {
+		const tokenQueue = [];
+		const state = { isEnd: false, error: null };
+
+		const onChunk = (_, token) => {
+			tokenQueue.push(token);
+		};
+
+		const onEnd = () => {
+			state.isEnd = true;
+		};
+
+		const onError = (_, error) => {
+			state.error = error;
+			state.isEnd = true;
+		};
+
+		ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
+		ipcRenderer.once('GPT_STREAM_END', onEnd);
+		ipcRenderer.once('GPT_STREAM_ERROR', onError);
+
 		try {
-			// Invocar stream
+			// Invocar stream no main process
 			ipcRenderer.invoke('ask-gpt-stream', messages).catch(err => {
 				this.logger.error('❌ Erro ao invocar ask-gpt-stream:', err);
+				state.error = err;
+				state.isEnd = true;
 			});
 
-			// Criar promise que resolve quando stream termina
-			const streamPromise = new Promise((resolve) => {
-				let tokens = [];
-
-				const onChunk = (_, token) => {
-					tokens.push(token);
-				};
-
-				const onEnd = () => {
-					ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
-					ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
-					resolve(tokens);
-				};
-
-				ipcRenderer.on('GPT_STREAM_CHUNK', onChunk);
-				ipcRenderer.once('GPT_STREAM_END', onEnd);
-			});
-
-			// Emitir tokens enquanto eles chegam e depois os pendentes
-			let allTokens = [];
-			let pendingChunk = setInterval(async () => {
-				if (allTokens.length > 0) {
-					yield allTokens.shift();
+			// Loop de geração: yield tokens enquanto estiver rodando ou houver buffer
+			while (!state.isEnd || tokenQueue.length > 0) {
+				if (tokenQueue.length > 0) {
+					yield tokenQueue.shift();
+				} else {
+					// Espera pequena para evitar loop infinito de alta CPU
+					await new Promise(resolve => setTimeout(resolve, 10));
 				}
-			}, 10);
 
-			// Aguardar stream completo
-			const finalTokens = await streamPromise;
-			clearInterval(pendingChunk);
-			allTokens.push(...finalTokens);
-
-			// Emitir tokens restantes
-			for (const token of allTokens) {
-				yield token;
+				// Verifica erro assincronamente
+				if (state.error) {
+					throw new Error(state.error);
+				}
 			}
-		} catch (error) {
-			this.logger.error('❌ Erro OpenAI stream:', error);
-			throw error;
+		} finally {
+			// Limpar listeners para evitar memory leaks
+			ipcRenderer.removeListener('GPT_STREAM_CHUNK', onChunk);
+			ipcRenderer.removeListener('GPT_STREAM_END', onEnd);
+			ipcRenderer.removeListener('GPT_STREAM_ERROR', onError);
 		}
 	}
 }

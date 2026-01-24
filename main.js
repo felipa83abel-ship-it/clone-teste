@@ -178,8 +178,8 @@ function registerIPCHandlers() {
 	// API Keys
 	registerApiKeyHandlers();
 
-	// GPT
-	registerGPTHandlers();
+	// LLM (OpenAI + Gemini)
+	registerLLMHandlers();
 
 	// Controle de Janela
 	registerWindowControlHandlers();
@@ -363,15 +363,17 @@ async function handleInitializeApiClient(_, apiKey) {
 }
 
 /* ================================ */
-//	HANDLERS DE GPT
+//	HANDLERS DE LLM (OpenAI + Gemini)
 /* ================================ */
 
-function registerGPTHandlers() {
-	// Completions simples
+function registerLLMHandlers() {
+	// OpenAI handlers
 	ipcMain.handle('ask-gpt', handleAskGPT);
-
-	// Completions com stream
 	ipcMain.handle('ask-gpt-stream', handleAskGPTStream);
+
+	// Gemini handlers
+	ipcMain.handle('ask-gemini', handleAskGemini);
+	ipcMain.handle('ask-gemini-stream', handleAskGeminiStream);
 }
 
 /**
@@ -384,6 +386,20 @@ async function ensureOpenAIClient() {
 		const initialized = initializeOpenAIClient();
 		if (!initialized) {
 			throw new Error('OpenAI API key não configurada. Configure em "API e Modelos" → OpenAI.');
+		}
+	}
+}
+
+/**
+ * Garante que o cliente Gemini está inicializado
+ * @throws {Error} Se a chave não estiver configurada
+ */
+async function ensureGeminiClient() {
+	if (!geminiClient) {
+		console.log('⚠️ Cliente Gemini não inicializado, tentando recuperar...');
+		const initialized = initializeGeminiClient();
+		if (!initialized) {
+			throw new Error('Google API key não configurada. Configure em "API e Modelos" → Google Gemini.');
 		}
 	}
 }
@@ -464,6 +480,95 @@ async function handleAskGPTStream(event, messages) {
 		if (error.status === 401 || error.message.includes('authentication')) {
 			openaiClient = null;
 			win.webContents.send('GPT_STREAM_ERROR', 'Chave da API inválida. Configure na seção "API e Modelos".');
+		} else {
+			win.webContents.send('GPT_STREAM_ERROR', error.message);
+		}
+	}
+}
+
+/**
+ * Obtém resposta do Gemini para uma lista de mensagens
+ * @param {Event} _ - Evento IPC
+ * @param {Array} messages - Histórico de mensagens
+ * @returns {string} Resposta do modelo
+ */
+async function handleAskGemini(_, messages) {
+	await ensureGeminiClient();
+
+	try {
+		const model = geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+		// Formata mensagens para Gemini
+		const systemMessage = messages.find(m => m.role === 'system');
+		const userMessages = messages.filter(m => m.role !== 'system');
+
+		const chatSession = model.startChat({
+			history: userMessages.slice(0, -1).map(m => ({
+				role: m.role === 'user' ? 'user' : 'model',
+				parts: [{ text: m.content }],
+			})),
+			systemInstruction: systemMessage ? systemMessage.content : undefined,
+		});
+
+		const lastMessage = userMessages.at(-1).content;
+		const result = await chatSession.sendMessage(lastMessage);
+		return result.response.text();
+	} catch (error) {
+		console.error('❌ Erro no Gemini:', error.message);
+		if (error.message.includes('API_KEY_INVALID') || error.message.includes('authenticated')) {
+			geminiClient = null;
+			throw new Error('Chave da API inválida para Gemini. Verifique as configurações.');
+		}
+		throw error;
+	}
+}
+
+/**
+ * Obtém resposta do Gemini com streaming de tokens
+ * @param {Event} event - Evento IPC
+ * @param {Array} messages - Histórico de mensagens
+ */
+async function handleAskGeminiStream(event, messages) {
+	const win = BrowserWindow.fromWebContents(event.sender);
+
+	try {
+		await ensureGeminiClient();
+	} catch (error) {
+		win.webContents.send('GPT_STREAM_ERROR', error.message);
+		return;
+	}
+
+	try {
+		const model = geminiClient.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
+		// Formata mensagens para Gemini
+		const systemMessage = messages.find(m => m.role === 'system');
+		const userMessages = messages.filter(m => m.role !== 'system');
+
+		const chatSession = model.startChat({
+			history: userMessages.slice(0, -1).map(m => ({
+				role: m.role === 'user' ? 'user' : 'model',
+				parts: [{ text: m.content }],
+			})),
+			systemInstruction: systemMessage ? systemMessage.content : undefined,
+		});
+
+		const lastMessage = userMessages.at(-1).content;
+		const result = await chatSession.sendMessageStream(lastMessage);
+
+		for await (const chunk of result.stream) {
+			const text = chunk.text();
+			if (text) {
+				win.webContents.send('GPT_STREAM_CHUNK', text);
+			}
+		}
+
+		win.webContents.send('GPT_STREAM_END');
+	} catch (error) {
+		console.error('❌ Erro no stream Gemini:', error.message);
+		if (error.message.includes('API_KEY_INVALID') || error.message.includes('authenticated')) {
+			geminiClient = null;
+			win.webContents.send('GPT_STREAM_ERROR', 'Chave da API inválida para Gemini.');
 		} else {
 			win.webContents.send('GPT_STREAM_ERROR', error.message);
 		}

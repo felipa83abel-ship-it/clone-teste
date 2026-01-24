@@ -45,7 +45,7 @@ modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
 
 // 🎯 REGISTRAR LLMs
 llmManager.register('openai', openaiHandler);
-llmManager.register('gemini', geminiHandler);
+llmManager.register('google', geminiHandler);
 // NOSONAR // Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
@@ -744,12 +744,27 @@ marked.setOptions({
  * @param {string} text - Texto da fala
  * @param {object} options - Opções (isInterim, shouldFinalizeAskCurrent)
  */
+/**
+ * Consolida texto de fala (interim vs final)
+ * Reduz Cognitive Complexity de handleCurrentQuestion
+ */
+function consolidateQuestionText(cleaned, isInterim) {
+	const q = appState.interview.currentQuestion;
+
+	if (isInterim) {
+		q.interimText = cleaned;
+	} else {
+		q.interimText = '';
+		q.finalText = (q.finalText ? q.finalText + ' ' : '') + cleaned;
+	}
+
+	q.text = q.finalText.trim() + (q.interimText ? ' ' + q.interimText : '');
+}
+
 function handleCurrentQuestion(author, text, options = {}) {
 	Logger.debug('Início da função: "handleCurrentQuestion"');
 
 	const cleaned = text.replaceAll(/Ê+|hum|ahn/gi, '').trim();
-
-	// Usa o tempo exato que chegou no renderer (Date.now)
 	const now = Date.now();
 
 	// Apenas consolida falas no CURRENT do OTHER
@@ -757,34 +772,13 @@ function handleCurrentQuestion(author, text, options = {}) {
 		// Se não existe texto ainda, marca tempo de criação
 		if (!appState.interview.currentQuestion.text) {
 			appState.interview.currentQuestion.createdAt = now;
-			// 🔥 NÃO incrementa turnId aqui - será feito ao promover para histórico
 		}
 
 		appState.interview.currentQuestion.lastUpdateTime = now;
 		appState.interview.currentQuestion.lastUpdate = now;
 
-		Logger.debug('appState.interview.currentQuestion antes: ', { ...appState.interview.currentQuestion }, false);
-
-		// Lógica de consolidação para evitar duplicações
-		if (options.isInterim) {
-			// Para interims: substituir o interim atual (Deepgram envia versões progressivas)
-			appState.interview.currentQuestion.interimText = cleaned;
-		} else {
-			// Para finais: limpar interim e ACUMULAR no finalText
-			appState.interview.currentQuestion.interimText = '';
-			appState.interview.currentQuestion.finalText =
-				(appState.interview.currentQuestion.finalText ? appState.interview.currentQuestion.finalText + ' ' : '') +
-				cleaned;
-		}
-
-		Logger.debug('appState.interview.currentQuestion durante: ', { ...appState.interview.currentQuestion }, false);
-
-		// Atualizar o texto total
-		appState.interview.currentQuestion.text =
-			appState.interview.currentQuestion.finalText.trim() +
-			(appState.interview.currentQuestion.interimText ? ' ' + appState.interview.currentQuestion.interimText : '');
-
-		Logger.debug('appState.interview.currentQuestion depois: ', { ...appState.interview.currentQuestion }, false);
+		// Consolidar texto
+		consolidateQuestionText(cleaned, options.isInterim);
 
 		// 🟦 CURRENT vira seleção padrão ao receber fala
 		if (!appState.selectedId) {
@@ -792,14 +786,11 @@ function handleCurrentQuestion(author, text, options = {}) {
 			clearAllSelections();
 		}
 
-		// Adiciona TUDO à conversa visual em tempo real ao elemento "currentQuestionText"
+		// Renderizar pergunta
 		renderCurrentQuestion();
 
-		// Só finaliza se estivermos em silêncio e NÃO for um interim
+		// Finalizar se em silêncio
 		if (options.shouldFinalizeAskCurrent && !options.isInterim) {
-			Logger.debug('🟢 ********  Está em silêncio, feche a pergunta e chame o GPT 🤖 ******** 🟢', true);
-
-			// fecha/finaliza a pergunta atual
 			finalizeCurrentQuestion();
 		}
 	}

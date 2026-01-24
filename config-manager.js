@@ -1860,56 +1860,40 @@ class ConfigManager {
 			}
 		});
 
-		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
-		globalThis.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
+		// Helper: Cria novo placeholder
+		const createNewPlaceholder = data => {
 			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total, placeholderId } = data;
-
-			const transcriptionBox = document.getElementById('conversation');
-			if (!transcriptionBox) return;
-
-			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
-			// fallback: cria um novo placeholder se não existir
-			if (!placeholders || placeholders.length === 0) {
-				const div = document.createElement('div');
-				div.className = 'transcript-item';
-				div.dataset.isPlaceholder = 'true';
-				const ts = timeStr || new Date().toLocaleTimeString();
-				div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
-				// Se um placeholderId foi fornecido, atribui para evitar criação duplicada por race
-				if (placeholderId) {
-					div.id = placeholderId;
-					console.log('📍 Criando placeholder com ID (fallback):', placeholderId);
-				}
-				transcriptionBox.appendChild(div);
-
-				// cria meta provisório DENTRO do placeholder SOMENTE se houver texto visível
-				const hasVisibleText = text && String(text).trim().length > 0;
-				if (hasVisibleText && (startStr || stopStr || recordingDuration)) {
-					const meta = document.createElement('div');
-					meta.className = 'transcript-meta';
-					meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
-						latency || 0
-					}ms, total ${total || 0}ms)`;
-					div.appendChild(meta);
-				}
-
-				return;
-			}
-
-			// se placeholderId foi fornecido, preferir o elemento com esse id
-			let lastPlaceholder = null;
-			if (placeholderId) {
-				lastPlaceholder = document.getElementById(placeholderId);
-				if (lastPlaceholder) console.log('📍 Atualizando placeholder por ID:', placeholderId);
-			}
-			if (!lastPlaceholder) lastPlaceholder = placeholders[placeholders.length - 1];
-
+			const div = document.createElement('div');
+			div.className = 'transcript-item';
+			div.dataset.isPlaceholder = 'true';
 			const ts = timeStr || new Date().toLocaleTimeString();
-			lastPlaceholder.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+			div.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
 
-			// Atualiza ou cria o elemento de meta DENTRO do placeholder
-			let meta = lastPlaceholder.querySelector('.transcript-meta');
+			if (placeholderId) {
+				div.id = placeholderId;
+				console.log('📍 Criando placeholder com ID (fallback):', placeholderId);
+			}
+
 			const hasVisibleText = text && String(text).trim().length > 0;
+			if (hasVisibleText && (startStr || stopStr || recordingDuration)) {
+				const meta = document.createElement('div');
+				meta.className = 'transcript-meta';
+				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${latency || 0}ms, total ${total || 0}ms)`;
+				div.appendChild(meta);
+			}
+
+			return div;
+		};
+
+		// Helper: Atualiza placeholder existente
+		const updatePlaceholder = (placeholder, data) => {
+			const { speaker, text, timeStr, startStr, stopStr, recordingDuration, latency, total } = data;
+			const ts = timeStr || new Date().toLocaleTimeString();
+			placeholder.innerHTML = `<span style="color:#888">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+
+			let meta = placeholder.querySelector('.transcript-meta');
+			const hasVisibleText = text && String(text).trim().length > 0;
+
 			if (!meta && hasVisibleText && (startStr || stopStr || recordingDuration)) {
 				meta = document.createElement('div');
 				meta.className = 'transcript-meta';
@@ -1917,20 +1901,39 @@ class ConfigManager {
 				meta.style.color = '#888';
 				meta.style.marginTop = '2px';
 				meta.style.marginBottom = '2px';
-				lastPlaceholder.appendChild(meta);
+				placeholder.appendChild(meta);
 			}
 
-			// exibe métricas provisórias (se disponíveis e houver texto)
 			if (meta && hasVisibleText && (startStr || stopStr || recordingDuration)) {
-				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${
-					latency || 0
-				}ms, total ${total || 0}ms)`;
+				meta.innerText = `[${startStr || ts} - ${stopStr || ts}] (grav ${recordingDuration || 0}ms, lat ${latency || 0}ms, total ${total || 0}ms)`;
 			} else if (meta && !hasVisibleText) {
-				// limpa/remova metadados se não há texto visível
 				meta.remove();
 			}
+		};
 
-			// mantém data-is-placeholder até receber onPlaceholderFulfill
+		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
+		globalThis.RendererAPI.onUIChange('onPlaceholderUpdate', data => {
+			const transcriptionBox = document.getElementById('conversation');
+			if (!transcriptionBox) return;
+
+			const placeholders = transcriptionBox.querySelectorAll('[data-is-placeholder="true"]');
+
+			// Criar novo placeholder se não existir
+			if (!placeholders || placeholders.length === 0) {
+				const newDiv = createNewPlaceholder(data);
+				transcriptionBox.appendChild(newDiv);
+				return;
+			}
+
+			// Obter placeholder para atualizar
+			let lastPlaceholder = null;
+			if (data.placeholderId) {
+				lastPlaceholder = document.getElementById(data.placeholderId);
+				if (lastPlaceholder) console.log('📍 Atualizando placeholder por ID:', data.placeholderId);
+			}
+			if (!lastPlaceholder) lastPlaceholder = placeholders[placeholders.length - 1];
+
+			updatePlaceholder(lastPlaceholder, data);
 		});
 
 		// Update Interim (atualização em tempo real para transcrições interims)
@@ -2003,12 +2006,53 @@ class ConfigManager {
 		debugLogConfig('Fim da função: "registerRendererCallbacks"');
 	}
 
+	// Helper: registra listener em elemento
+	registerElementListener(elementId, eventType, callback) {
+		const element = document.getElementById(elementId);
+		if (element) {
+			element.addEventListener(eventType, callback);
+		}
+	}
+
+	// Helper: Handler para mock toggle
+	handleMockToggle(mockToggle) {
+		mockToggle.addEventListener('change', async () => {
+			if (!globalThis.RendererAPI) return;
+
+			const isEnabled = mockToggle.checked;
+			if (globalThis.RendererAPI?.setAppConfig) {
+				globalThis.RendererAPI.setAppConfig({
+					...globalThis.RendererAPI.getAppConfig(),
+					MODE_DEBUG: isEnabled,
+				});
+			}
+
+			if (isEnabled) {
+				globalThis.RendererAPI?.updateMockBadge(true);
+				if (globalThis.RendererAPI?.resetAppState) {
+					await globalThis.RendererAPI.resetAppState();
+				}
+				globalThis.mockScenarioIndex = 0;
+				globalThis.mockAutoPlayActive = false;
+				setTimeout(() => {
+					if (globalThis.runMockAutoPlay) {
+						globalThis.runMockAutoPlay();
+					}
+				}, 2000);
+			} else {
+				globalThis.RendererAPI?.updateMockBadge(false);
+				if (globalThis.RendererAPI?.resetAppState) {
+					await globalThis.RendererAPI.resetAppState();
+				}
+			}
+		});
+	}
+
 	registerDOMEventListeners() {
 		debugLogConfig('Início da função: "registerDOMEventListeners"');
 
 		console.log('🔥 registerDOMEventListeners: Iniciando registro de listeners...');
 
-		// ⚠️ VERIFICAÇÃO CRÍTICA: RendererAPI DEVE estar disponível
 		if (!globalThis.RendererAPI) {
 			console.error('❌ ERRO CRÍTICO: globalThis.RendererAPI não disponível em registerDOMEventListeners!');
 			return;
@@ -2017,98 +2061,34 @@ class ConfigManager {
 		// Mock toggle
 		const mockToggle = document.getElementById('mockToggle');
 		if (mockToggle) {
-			mockToggle.addEventListener('change', async () => {
-				console.log('📝 Mock toggle mudou');
-				if (!globalThis.RendererAPI) return;
+			this.handleMockToggle(mockToggle);
 
-				const isEnabled = mockToggle.checked;
-				if (globalThis.RendererAPI?.setAppConfig) {
-					globalThis.RendererAPI.setAppConfig({
-						...globalThis.RendererAPI.getAppConfig(),
-						MODE_DEBUG: isEnabled,
-					});
-				}
-
-				if (isEnabled) {
-					globalThis.RendererAPI?.updateMockBadge(true);
-					// 🔥 Usa resetAppState() para limpar TUDO antes de iniciar mock
-					if (globalThis.RendererAPI?.resetAppState && typeof globalThis.RendererAPI.resetAppState === 'function') {
-						console.log('🧹 Disparando resetAppState() - limpeza antes do mock');
-						await globalThis.RendererAPI.resetAppState();
-					}
-					// 🎭 Resetar índice e iniciar autoplay com delay
-					globalThis.mockScenarioIndex = 0;
-					globalThis.mockAutoPlayActive = false;
-					console.log('🎭 Mock mode ATIVADO - autoplay iniciará em 2 segundos...');
-
-					// Chamar runMockAutoPlay() após delay para deixar UI resetar
-					setTimeout(() => {
-						if (globalThis.runMockAutoPlay && typeof globalThis.runMockAutoPlay === 'function') {
-							console.log('🎭 Disparando runMockAutoPlay() do config-manager');
-							globalThis.runMockAutoPlay();
-						} else {
-							console.warn('⚠️ runMockAutoPlay() não está disponível em window');
-						}
-					}, 2000);
-				} else {
-					globalThis.RendererAPI?.updateMockBadge(false);
-					// 🔥 NOVO: Usar resetAppState() para limpar TUDO completamente
-					if (globalThis.RendererAPI?.resetAppState && typeof globalThis.RendererAPI.resetAppState === 'function') {
-						console.log('🧹 Disparando resetAppState() - limpeza completa ao desativar mock');
-						await globalThis.RendererAPI.resetAppState();
-					} else {
-						console.warn('⚠️ resetAppState() não está disponível em globalThis.RendererAPI');
-					}
-				}
-			});
-
-			// 🔥 NOVO: Sincronizar toggle com APP_CONFIG inicial (MODE_DEBUG)
-			// Faz DEPOIS de registrar o listener para disparar o evento se necessário
+			// Sincronizar com config inicial
 			const currentConfig = globalThis.RendererAPI?.getAppConfig?.();
 			if (currentConfig?.MODE_DEBUG) {
 				mockToggle.checked = true;
-				// Dispara o evento change para REALMENTE ativar o modo debug
 				mockToggle.dispatchEvent(new Event('change', { bubbles: true }));
-				console.log('✅ Mock toggle inicializado como ATIVO e modo debug DISPARADO');
 			}
 		}
 
-		// Listen button click (Começar a Ouvir... (Ctrl+d))
-		const listenBtn = document.getElementById('listenBtn');
-		if (listenBtn) {
-			listenBtn.addEventListener('click', e => {
-				console.log('Botão listenBtn clicado!');
-
-				if (globalThis.RendererAPI?.listenToggleBtn) {
-					globalThis.RendererAPI.listenToggleBtn();
-				} else {
-					console.error('❌ globalThis.RendererAPI.listenToggleBtn não está disponível!');
-				}
-			});
-		}
+		// Listen button
+		this.registerElementListener('listenBtn', 'click', () => {
+			if (globalThis.RendererAPI?.listenToggleBtn) {
+				globalThis.RendererAPI.listenToggleBtn();
+			}
+		});
 
 		// Ask GPT button
-		const askBtn = document.getElementById('askGptBtn');
-		if (askBtn) {
-			askBtn.addEventListener('click', () => {
-				console.log('🔊 DEBUG: askGptBtn clicado!');
-				if (globalThis.RendererAPI?.askGpt) {
-					globalThis.RendererAPI.askGpt(); // 🔒 COMENTADA até transcrição em tempo real funcionar
-					// console.error(
-					// 	'registerDOMEventListeners: askGpt() 1759; 🔒 COMENTADA até transcrição em tempo real funcionar',
-					// );
-				}
-			});
-		}
+		this.registerElementListener('askGptBtn', 'click', () => {
+			if (globalThis.RendererAPI?.askGpt) {
+				globalThis.RendererAPI.askGpt();
+			}
+		});
 
 		// Close button
-		const btnClose = document.getElementById('btnClose');
-		if (btnClose) {
-			btnClose.addEventListener('click', () => {
-				console.log('❌ Botão Fechar clicado');
-				_ipc.send('APP_CLOSE');
-			});
-		}
+		this.registerElementListener('btnClose', 'click', () => {
+			_ipc.send('APP_CLOSE');
+		});
 
 		// Questions click handling
 		const questionsHistoryBox = document.getElementById('questionsHistory');
