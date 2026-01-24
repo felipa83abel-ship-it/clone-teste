@@ -467,35 +467,8 @@ async function transcribeWithWhisperLocal(buffer, source) {
 	}
 }
 
-// Transcreve áudio com Whisper-1 via OpenAI API
-async function transcribeWithWhisperOpenAI(buffer) {
-	const startTime = Date.now();
-	await ensureOpenAIClient();
-
-	const tempDir = os.tmpdir();
-	const tempFilePath = path.join(tempDir, `whisper-openai-${Date.now()}-${Math.random().toString(36).slice(2)}.webm`);
-	fs.writeFileSync(tempFilePath, buffer);
-
-	try {
-		debugLogWhisper(`🚀 Enviando para Whisper-1 OpenAI (online)...`, true);
-		const transcription = await openaiClient.audio.transcriptions.create({
-			file: fs.createReadStream(tempFilePath),
-			model: 'whisper-1',
-			language: 'pt',
-		});
-		debugLogWhisper(`✅ Whisper-1 concluído em ${Date.now() - startTime}ms`, true);
-		return transcription.text;
-	} catch (error) {
-		console.error(`❌ Erro OpenAI Whisper:`, error.message);
-		if (error.status === 401 || error.message?.includes('authentication')) {
-			resetOpenAIClient();
-			throw new Error('Chave da API inválida ou expirada. Configure em "API e Modelos"');
-		}
-		throw error;
-	} finally {
-		removeFileIfExists(tempFilePath);
-	}
-}
+// ✅ REMOVIDO: transcribeWithWhisperOpenAI (whisper-1) em Fase 4
+// Manter apenas whisper-cpp-local (offline)
 
 // Transcreve áudio com o modelo Whisper configurado
 async function transcribeWhisper(audioBlob, source) {
@@ -509,10 +482,8 @@ async function transcribeWhisper(audioBlob, source) {
 
 		if (sttModel === 'whisper-cpp-local') {
 			result = await transcribeWithWhisperLocal(buffer, source);
-		} else if (sttModel === 'whisper-1') {
-			result = await transcribeWithWhisperOpenAI(buffer);
 		} else {
-			throw new Error(`Modelo Whisper desconhecido: ${sttModel}`);
+			throw new Error(`Modelo Whisper desconhecido: ${sttModel} (apenas whisper-cpp-local está disponível)`);
 		}
 
 		debugLogWhisper(

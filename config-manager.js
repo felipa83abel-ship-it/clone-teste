@@ -1300,8 +1300,8 @@ class ConfigManager {
 			api: {
 				activeProvider: 'openai',
 				openai: {
-					// 🔥 MODIFICADO: API key não é mais salva aqui
-					transcriptionModel: 'whisper-1',
+					// 🔥 MODIFICADO: Whisper-1 removido em Fase 4 (usar whisper-cpp-local)
+					transcriptionModel: 'whisper-cpp-local',
 					responseModel: 'gpt-4o-mini',
 					enabled: true,
 				},

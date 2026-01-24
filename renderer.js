@@ -426,12 +426,6 @@ sttStrategy.register('whisper-cpp-local', {
 	switchDevice: switchDeviceWhisper,
 });
 
-sttStrategy.register('whisper-1', {
-	start: startAudioWhisper,
-	stop: stopAudioWhisper,
-	switchDevice: switchDeviceWhisper,
-});
-
 /* ================================ */
 //	CONTROLE DE ÁUDIO
 /* ================================ */
