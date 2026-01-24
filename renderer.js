@@ -461,121 +461,18 @@ sttStrategy.register('whisper-1', {
 /* ================================ */
 
 /**
- * Inicia captura de áudio
+ * Inicia captura de áudio (delegado ao audio-controller)
  */
-async function startAudio() {
-	const sttModel = getConfiguredSTTModel();
-	Logger.info('startAudio', { model: sttModel });
-
-	try {
-		await sttStrategy.start(sttModel, UIElements);
-	} catch (error) {
-		Logger.error('Erro ao iniciar áudio', { error: error.message });
-		throw error;
-	}
-}
-
-/**
- * Para captura de áudio
- */
-async function stopAudio() {
-	// Fecha pergunta atual se estava aberta
-	if (appState.interview.currentQuestion.text) closeCurrentQuestionForced();
-
-	const sttModel = getConfiguredSTTModel();
-	Logger.info('stopAudio', { model: sttModel });
-
-	try {
-		await sttStrategy.stop(sttModel);
-	} catch (error) {
-		Logger.error('Erro ao parar áudio', { error: error.message });
-	}
-}
+const { startAudio, stopAudio } = audioController;
 
 /**
  * Reinicia pipeline de áudio
  */
 
 /**
- * Toggle do botão de iniciar/parar escuta (Ctrl+D)
+ * Toggle do botão de escuta (delegado ao audio-controller)
  */
-async function listenToggleBtn() {
-	Logger.debug('Início da função: "listenToggleBtn"');
-
-	if (!appState.audio.isRunning) {
-		Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
-
-		// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
-		const { active: hasModel, model: activeModel } = hasActiveModel();
-		Logger.debug(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`, false);
-
-		if (!hasModel) {
-			const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
-			eventBus.emit('error', errorMsg);
-			return;
-		}
-
-		// 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
-		const hasOutputDevice = UIElements.outputSelect?.value;
-		Logger.debug(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
-
-		if (!hasOutputDevice) {
-			const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
-			Logger.warn(`⚠️ ${errorMsg}`, true);
-			Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
-			eventBus.emit('error', errorMsg);
-			return;
-		}
-	}
-
-	// Inverte o estado de appState.audio.isRunning
-	appState.audio.isRunning = !appState.audio.isRunning;
-	const buttonText = appState.audio.isRunning ? 'Parar a Escuta... (Ctrl+d)' : 'Começar a Ouvir... (Ctrl+d)';
-	const statusMsg = appState.audio.isRunning ? 'Status: ouvindo...' : 'Status: parado';
-
-	// Emite o evento 'onListenButtonToggle' para atualizar o botão de escuta
-	eventBus.emit('listenButtonToggle', {
-		isRunning: appState.audio.isRunning,
-		buttonText,
-	});
-
-	// Atualiza o status da escuta na tela
-	updateStatusMessage(statusMsg);
-
-	await (appState.audio.isRunning ? startAudio() : stopAudio());
-
-	Logger.debug('Fim da função: "listenToggleBtn"');
-}
-
-/**
- * Verifica se há um modelo de IA ativo na configuração
- * @returns {object} { active: boolean, model: string|null }
- */
-function hasActiveModel() {
-	Logger.debug('Início da função: "hasActiveModel"');
-	if (!globalThis.configManager) {
-		console.warn('⚠️ ConfigManager não inicializado ainda');
-		return { active: false, model: null };
-	}
-
-	const config = globalThis.configManager.config;
-	if (!config?.api) {
-		console.warn('⚠️ Config ou api não disponível');
-		return { active: false, model: null };
-	}
-
-	// Verifica se algum modelo está ativo e retorna o nome
-	const providers = ['openai', 'google', 'openrouter', 'custom'];
-	for (const provider of providers) {
-		if (config.api[provider]?.enabled === true) {
-			console.log(`✅ Modelo ativo encontrado: ${provider}`);
-			return { active: true, model: provider };
-		}
-	}
-
-	Logger.debug('Fim da função: "hasActiveModel"');
-	return { active: false, model: null };
-}
+const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioController;
 
 /* ================================ */
 //	RENDERIZAÇÃO E NAVEGAÇÃO DE UI
@@ -985,34 +882,6 @@ async function askLLM(questionId = null) {
 		eventBus.emit('error', error.message);
 		updateStatusMessage(`❌ ${error.message}`);
 	}
-}
-
-/**
- * Log detalhado das métricas de tempo da transcrição
- */
-function logTranscriptionMetrics() {
-	if (!appState.metrics.audioStartTime) return;
-
-	const llmTime = appState.metrics.llmEndTime - appState.metrics.llmStartTime;
-	const totalTime = appState.metrics.totalTime;
-
-	console.log(`📊 ================================`);
-	console.log(`📊 MÉTRICAS DE TEMPO DETALHADAS:`);
-	console.log(`📊 ================================`);
-	console.log(`📊 TAMANHO ÁUDIO: ${appState.metrics.audioSize} bytes`);
-	console.log(`📊 LLM: ${llmTime}ms`);
-	console.log(`📊 TOTAL: ${totalTime}ms`);
-	console.log(`📊 LLM % DO TOTAL: ${Math.round((llmTime / totalTime) * 100)}%`);
-	console.log(`📊 ================================`);
-
-	// Reset para próxima medição
-	appState.metrics = {
-		audioStartTime: null,
-		llmStartTime: null,
-		llmEndTime: null,
-		totalTime: null,
-		audioSize: 0,
-	};
 }
 
 /* ================================ */
