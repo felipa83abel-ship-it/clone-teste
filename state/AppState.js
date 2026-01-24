@@ -299,7 +299,8 @@ class AppState {
   }
 
   /**
-   * Reseta todo o estado da aplicação
+   * Reseta o estado da aplicação
+   * Inclui: audio, interview, history, selectedId, metrics, cache
    * @returns {void}
    */
   reset() {

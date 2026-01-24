@@ -14,7 +14,7 @@ module.exports = [
       'coverage/**',
     ],
     languageOptions: {
-      ecmaVersion: 2021,
+      ecmaVersion: 2022,
       sourceType: 'module',
       globals: {
         // Node.js
@@ -89,6 +89,7 @@ module.exports = [
       eqeqeq: ['warn', 'always'],
       'no-eval': 'error',
       'no-implied-eval': 'error',
+      'prefer-top-level-await': 'off', // Não suportado em CommonJS
     },
   },
 ];

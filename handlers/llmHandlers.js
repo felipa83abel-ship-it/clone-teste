@@ -11,7 +11,7 @@ const Logger = require('../utils/Logger.js');
 
 /**
  * Valida requisição de LLM
- * @param {AppState} appState - Estado da app
+ * @param {any} appState - Estado da app (AppState instance)
  * @param {string} questionId - ID da pergunta selecionada
  * @param {function} getSelectedQuestionText - Getter do texto
  * @throws {Error} Se validação falhar

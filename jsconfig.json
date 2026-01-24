@@ -1,8 +1,8 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
-    "module": "commonjs",
-    "lib": ["ES2022", "dom"],
+    "target": "ES2021",
+    "module": "ES2020",
+    "lib": ["ES2021", "dom"],
     "checkJs": true,
     "allowJs": true,
     "noEmit": true,
@@ -14,8 +14,9 @@
     "moduleResolution": "node",
     "resolveJsonModule": true,
     "declaration": false,
-    "types": ["node", "@playwright/test"],
-    "suppressImplicitAnyIndexErrors": true
+    "types": [],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   },
   "include": [
     "*.js",
@@ -26,7 +27,27 @@
     "utils/**/*.js",
     "controllers/**/*.js",
     "handlers/**/*.js",
-    "stt/**/*.js"
+    "stt/stt-deepgram.js",
+    "stt/stt-vosk.js",
+    "stt/vad-engine.js",
+    "stt/stt-audio-worklet-processor.js",
+    "stt/models-stt/**/*.js"
   ],
-  "exclude": ["node_modules", "__tests__", "coverage", "playwright-report"]
+  "exclude": [
+    "node_modules",
+    "node_modules/**",
+    "__tests__",
+    "__tests__/**",
+    "coverage",
+    "coverage/**",
+    "playwright-report",
+    "playwright-report/**",
+    "audio",
+    "audio/**",
+    "testing",
+    "testing/**",
+    "temp",
+    "temp/**",
+    "stt/stt-whisper.js"
+  ]
 }

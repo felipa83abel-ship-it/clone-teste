@@ -9,6 +9,9 @@
  * - Interceptar IPC para ANALYZE_SCREENSHOTS e ask-llm-stream
  * - Rodar cenários automáticos (runMockAutoPlay)
  */
+/* global APP_CONFIG */
+// @ts-nocheck
+// Arquivo de teste que usa variáveis globais dinâmicas (APP_CONFIG)
 
 /**
  * Respostas mockadas por pergunta

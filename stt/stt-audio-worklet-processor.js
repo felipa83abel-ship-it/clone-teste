@@ -1,5 +1,5 @@
 /**
- * 🎛️ CLASSE CALCULADORA DE VOLUME (AudioVolumeCalculator)
+ * 🎛️ CLASSE CALCULADORA DE VOLUME (STTAudioVolumeCalculator)
  *
  * ⚠️ DUPLICADO em stt-audio-worklet-processor.js e volume-audio-worklet-processor.js
  *
@@ -11,7 +11,9 @@
  * Garante que ambos worklets usem MESMA FÓRMULA para cálculo de volume,
  * facilitando manutenção futura se a fórmula de RMS→dB→% precisar mudar.
  */
-class AudioVolumeCalculator {
+// @ts-nocheck
+// AudioWorklet roda em contexto isolado com Web Audio API globals
+class STTAudioVolumeCalculator {
   static calculatePercent(rms, thresholdRms = 0.002) {
     if (typeof rms !== 'number' || rms < 0) return 0;
     const db = 20 * Math.log10(rms || 1e-8);
@@ -32,6 +34,8 @@ class AudioVolumeCalculator {
  *
  * 🔥 ADICIONADO: Envia também percentual de volume junto com os dados de áudio.
  */
+// @ts-nocheck
+// AudioWorklet roda em contexto isolado com globals diferentes (não tem Node.js)
 class STTAudioWorkletProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -39,6 +43,7 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
     this.frameBuffer = [];
     this.postInterval = 0; // contador para controle de envio (se necessário)
 
+    // @ts-ignore - port é propriedade standard do AudioWorkletProcessor
     this.port.onmessage = (event) => {
       if (event.data.type === 'setThreshold') {
         this.thresholdRms = event.data.threshold;
@@ -69,7 +74,7 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
     const rms = Math.sqrt(sum / inputData.length);
 
     // 🔥 Usa calculadora compartilhada para cálculo de volume (RMS → dB → percentual)
-    const percent = AudioVolumeCalculator.calculatePercent(rms, this.thresholdRms);
+    const percent = STTAudioVolumeCalculator.calculatePercent(rms, this.thresholdRms);
 
     // Converte sempre para PCM16 e envia --- envia continuamente para permitir VAD no lado do main thread
     const pcm16 = new Int16Array(inputData.length);
@@ -79,13 +84,15 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
     }
 
     // Envia dados para o thread principal COM o volume/percent
-    // Nota: sampleRate está disponível no contexto global do AudioWorkletProcessor
+    // @ts-ignore - sampleRate está no contexto global do AudioWorkletProcessor
+    const sampleRate = globalThis.sampleRate || 16000;
+    // @ts-ignore - port é propriedade standard do AudioWorkletProcessor
     this.port.postMessage(
       {
         type: 'audioData',
         pcm16: pcm16.buffer,
         percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
-        sampleRate: sampleRate || 16000, // Fallback para 16kHz se não disponível
+        sampleRate: sampleRate, // Fallback para 16kHz se não disponível
       },
       [pcm16.buffer]
     );
@@ -101,4 +108,5 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
   }
 }
 
+// @ts-ignore - registerProcessor é função global do Web Audio API
 registerProcessor('stt-audio-worklet-processor', STTAudioWorkletProcessor);

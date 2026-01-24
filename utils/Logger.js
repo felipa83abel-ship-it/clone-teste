@@ -14,12 +14,14 @@
  * Logger.error('Erro crítico', { code: 500 });
  */
 class Logger {
-  static levels = {
-    DEBUG: 'DEBUG',
-    INFO: 'INFO',
-    WARN: 'WARN',
-    ERROR: 'ERROR',
-  };
+  static get levels() {
+    return {
+      DEBUG: 'DEBUG',
+      INFO: 'INFO',
+      WARN: 'WARN',
+      ERROR: 'ERROR',
+    };
+  }
 
   /**
    * Log genérico com level

@@ -70,13 +70,13 @@ class AnthropicHandler {
 
   /**
    * Inicializar cliente Anthropic
-   * @param {string} apiKey - Anthropic API key
+   * @param {string} _apiKey - Anthropic API key
    */
-  async initialize(apiKey) {
+  async initialize(_apiKey) {
     try {
       // NOSONAR TODO: Descomementar quando @anthropic-ai/sdk estiver instalado
       // const Anthropic = require('@anthropic-ai/sdk');
-      // this.client = new Anthropic({ apiKey });
+      // this.client = new Anthropic({ apiKey: _apiKey });
       // this.initialized = true;
       // this.logger.info('Anthropic handler inicializado', { model: 'claude-3-sonnet' });
 
@@ -89,10 +89,10 @@ class AnthropicHandler {
 
   /**
    * Chamar Claude para completação (resposta completa)
-   * @param {Array} messages - Array de mensagens {role, content}
+   * @param {Array} _messages - Array de mensagens {role, content}
    * @returns {Promise<string>} Resposta do modelo
    */
-  async complete(messages) {
+  async complete(_messages) {
     if (!this.initialized) {
       throw new Error('Anthropic handler não inicializado');
     }
@@ -107,10 +107,10 @@ class AnthropicHandler {
 
   /**
    * Chamar Claude com streaming
-   * @param {Array} messages - Array de mensagens {role, content}
+   * @param {Array} _messages - Array de mensagens {role, content}
    * @returns {AsyncGenerator<string>} Async generator que emite tokens
    */
-  async *stream(messages) {
+  async *stream(_messages) {
     // NOSONAR TODO: Implementar streaming real ao Claude quando @anthropic-ai/sdk estiver instalado
 
     if (!this.initialized) {

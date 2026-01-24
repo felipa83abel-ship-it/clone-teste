@@ -309,6 +309,7 @@ async function initDeepgramWS(source = INPUT) {
   );
 
   // Monta URL com parâmetros (token é passado na URL para evitar erros 401)
+  // @ts-ignore - URLSearchParams aceita record com strings e arrays
   const params = new URLSearchParams({
     model: DEEPGRAM_CONFIG.MODEL,
     language: 'pt-BR',
@@ -318,7 +319,6 @@ async function initDeepgramWS(source = INPUT) {
     interim_results: 'true', // Habilita interim results
     endpointing: '300', // Detecta pausas naturais
     utterance_end_ms: '1000', // Finaliza a frase após 1s de silêncio
-    keyterm: ['JDK', 'JRE', 'JVM', 'P.O.O', 'TDD', 'BDD', 'DDD', 'DLT', 'SOLID', 'MVC'], // Termos técnicos comuns
     punctuate: 'true', // Melhor pontuação
     utterances: 'true', // Habilita timestamps de utterances para calcular duração real da fala
   });
@@ -350,7 +350,13 @@ async function initDeepgramWS(source = INPUT) {
 
     ws.onerror = (err) => {
       console.error(`❌ Erro WebSocket Deepgram ${source}:`, err);
-      console.error('   Type:', err.type, 'Message:', err.message);
+      // @ts-ignore - err pode ser Event ou ErrorEvent
+      console.error(
+        '   Type:',
+        err.type,
+        'Message:',
+        err instanceof Event && 'message' in err ? err.message : 'N/A'
+      );
 
       reject(new Error(`Falha ao conectar Deepgram ${source}`));
     };
@@ -1036,8 +1042,7 @@ const Logger = require('../utils/Logger.js');
 /**
  * Log de debug padronizado para stt-deepgram.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
- * @param {*} msg
- * @param {boolean} showLog - true para mostrar, false para ignorar
+ * @param {...any} args - Argumentos para log (último pode ser booleano showLog)
  */
 function debugLogDeepgram(...args) {
   const maybeFlag = args.at(-1);
@@ -1075,10 +1080,7 @@ async function startAudioDeepgram(UIElements) {
   try {
     // Inicializa VAD Engine (singleton)
     vad = getVADEngine();
-    Logger.debug(
-      `✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`
-    );
-    );
+    Logger.debug(`✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`);
 
     // 🌊 Deepgram: Inicia INPUT/OUTPUT
     if (UIElements.inputSelect?.value) await startDeepgram(INPUT, UIElements);

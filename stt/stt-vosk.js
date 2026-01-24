@@ -812,8 +812,7 @@ const Logger = require('../utils/Logger.js');
 /**
  * Log de debug padronizado para stt-vosk.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
- * @param {*} msg
- * @param {boolean} showLog - true para mostrar, false para ignorar
+ * @param {...any} args - Argumentos para log (último pode ser booleano showLog)
  */
 function debugLogVosk(...args) {
   const maybeFlag = args.at(-1);

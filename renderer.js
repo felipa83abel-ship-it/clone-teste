@@ -1,4 +1,6 @@
 // @ts-check
+/* global HTMLElement, APP_CONFIG */
+
 /* ================================ */
 //	IMPORTES E DEPENDÊNCIAS
 /* ================================ */
@@ -61,8 +63,8 @@ const llmManager = new LLMManager();
 const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
 
 // 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
-let mockAutoPlayActive = false;
-let mockScenarioIndex = 0;
+const mockAutoPlayActive = false;
+const mockScenarioIndex = 0;
 
 // 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (atribuídas por screenshotController)
 /** @type {Function} */
@@ -203,7 +205,7 @@ let APP_CONFIG = {
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
 /* ================================ */
 
-let UIElements = {};
+const UIElements = {};
 /**
  * Registra elementos UI no registry centralizado
  * DELEGADO para uiElementsRegistry
@@ -433,7 +435,6 @@ const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioContro
 /**
  * Aplica opacidade na interface
  * MOVIDA PARA: config-manager.js
- * @deprecated Usar ConfigManager.applyOpacity(value) em vez disso
  */
 
 /**
@@ -445,17 +446,22 @@ const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioContro
  * Configuração do Marked.js para renderização de Markdown
  * @type {any}
  */
-marked.setOptions({
-  html: true, // 🔥 Permite renderização de HTML (não escapa entidades)
+const markedOptions = {
   breaks: true,
   gfm: true, // GitHub Flavored Markdown
   highlight: function (code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
+    // @ts-ignore - highlight.js types não exportam esses métodos publicamente
+    if (lang && hljs?.getLanguage?.(lang)) {
+      // @ts-ignore
       return hljs.highlight(code, { language: lang }).value;
     }
+    // @ts-ignore
     return hljs.highlightAuto(code).value;
   },
-});
+};
+if (marked?.setOptions) {
+  marked.setOptions(markedOptions);
+}
 
 /* ================================ */
 //	CONSOLIDAÇÃO E FINALIZAÇÃO DE PERGUNTAS
@@ -635,11 +641,17 @@ const RendererAPI = {
    */
   updateClickThroughButton: (enabled, btnToggle) => {
     if (!btnToggle) return;
-    btnToggle.style.opacity = enabled ? '0.5' : '1';
-    btnToggle.title = enabled
-      ? 'Click-through ATIVO (clique para desativar)'
-      : 'Click-through INATIVO (clique para ativar)';
-    console.log('🎨 Botão atualizado - opacity:', btnToggle.style.opacity);
+    if (btnToggle instanceof HTMLElement) {
+      // @ts-ignore - style/title são propriedades HTMLElement padrão
+      btnToggle.style.opacity = enabled ? '0.5' : '1';
+      btnToggle.title = enabled
+        ? 'Click-through ATIVO (clique para desativar)'
+        : 'Click-through INATIVO (clique para ativar)';
+      console.log(
+        '🎨 Botão atualizado - opacity:',
+        btnToggle instanceof HTMLElement ? btnToggle.style.opacity : 'N/A'
+      );
+    }
   },
 
   // UI Registration
@@ -718,14 +730,15 @@ const RendererAPI = {
   },
   /**
    * Envia erro do renderer para main
-   * @param {Error} err - Erro a enviar
+   * @param {Error | any} error - Erro a enviar
    */
   sendRendererError: (error) => {
     try {
-      console.error('RENDERER ERROR', error.error || error.message || error);
+      console.error('RENDERER ERROR', error instanceof Error ? error.message : error);
       ipcRenderer.send('RENDERER_ERROR', {
-        message: String(error.message || error),
-        stack: error.error?.stack || null,
+        message: error instanceof Error ? error.message : String(error),
+        // @ts-ignore - error pode ter propriedades customizadas
+        stack: error instanceof Error ? error.stack : error?.error?.stack || null,
       });
     } catch (err) {
       console.error('Falha ao enviar RENDERER_ERROR', err);

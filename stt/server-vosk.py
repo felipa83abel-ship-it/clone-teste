@@ -5,8 +5,7 @@ Processa áudio em tempo real via stdin/stdout
 Comunica com Node.js via IPC
 
 Uso:
-    python server-vosk.py                         # Usa modelo padrão (small-pt-0.3)
-    python server-vosk.py stt/models-stt/vosk/vosk-model-pt-fb-v0.1.1  # Usa modelo maior
+    python server-vosk.py # Usa modelo padrão (small-pt-0.3)
 """
 
 import sys

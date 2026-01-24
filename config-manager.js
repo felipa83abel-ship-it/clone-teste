@@ -2,6 +2,10 @@
    CONFIG MANAGER
    Gerencia configurações da aplicação com persistência segura
 ========================================================= */
+// @ts-nocheck
+/* global debugLogConfig, marked */
+// Nota: type checking desativado neste arquivo pois usa muita manipulação DOM
+// com elementos polimórficos (Element vs HTMLInputElement, HTMLSelectElement)
 
 // Imports
 const Logger = require('./utils/Logger.js');

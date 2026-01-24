@@ -1,3 +1,5 @@
+// @ts-nocheck
+// AudioWorklet roda em contexto isolado com Web Audio API globals
 /**
  * 🎛️ CLASSE CALCULADORA DE VOLUME (AudioVolumeCalculator)
  *

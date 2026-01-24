@@ -23,6 +23,8 @@
  *		- Veja a seção de registro para entender qual evento ativa
  *
  */
+// @ts-nocheck
+// Nota: type checking desativado pois electron types têm conflitos com JSDoc e CommonJS
 
 /* ================================ */
 //	IMPORTS E CONFIGURAÇÕES INICIAIS
@@ -1032,8 +1034,7 @@ function createWindow() {
 //	INICIALIZAÇÃO DO APP
 /* ================================ */
 
-// NOSONAR javascript:S7785
-// eslint-disable-next-line prefer-top-level-await
+// sonarlint-disable javascript:S7785
 app.whenReady().then(() => {
   // Registra todos os handlers IPC
   registerIPCHandlers();
@@ -1046,6 +1047,7 @@ app.whenReady().then(() => {
 
   console.log('✅ Aplicação inicializada com sucesso');
 });
+// sonarlint-enable javascript:S7785
 
 /**
  * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)

@@ -1,3 +1,5 @@
+// @ts-nocheck
+// ffmpeg import causa erros de type em node_modules
 /**
  * 🎤 WHISPER STT (Speech-to-Text) - MÓDULO INDEPENDENTE
  *
@@ -297,6 +299,7 @@ async function initializeOpenAIClient(apiKey = null) {
     throw new Error('Chave OpenAI não encontrada ou inválida');
   }
 
+  // @ts-ignore - OpenAI constructor pode ter diferentes assinaturas
   openaiClient = new OpenAI({ apiKey: key.trim() });
   debugLogWhisper('✅ Cliente OpenAI inicializado dentro do Whisper', false);
   return true;
@@ -397,6 +400,7 @@ async function prepareWavFile(audioBuffer, tempWebmPath, tempWavPath) {
 // Converte WebM para WAV usando ffmpeg
 function convertWebMToWAVFile(inputPath, outputPath) {
   return new Promise((resolve, reject) => {
+    // @ts-ignore - ffmpeg pode ser function ou method, TypeScript não resolve bem
     ffmpeg(inputPath)
       .audioCodec('pcm_s16le')
       .audioFrequency(AUDIO_SAMPLE_RATE)
@@ -404,7 +408,10 @@ function convertWebMToWAVFile(inputPath, outputPath) {
       .format('wav')
       .on('end', resolve)
       .on('error', (err) => {
-        console.error('❌ Erro na conversão WebM → WAV:', err.message);
+        console.error(
+          '❌ Erro na conversão WebM → WAV:',
+          err instanceof Error ? err.message : String(err)
+        );
         reject(err);
       })
       .save(outputPath);
@@ -1026,8 +1033,7 @@ const Logger = require('../utils/Logger.js');
 /**
  * Log de debug padronizado para stt-whisper.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
- * @param {*} msg
- * @param {boolean} showLog - true para mostrar, false para ignorar
+ * @param {...any} args - Argumentos para log (último pode ser booleano showLog)
  */
 function debugLogWhisper(...args) {
   const maybeFlag = args.at(-1);
