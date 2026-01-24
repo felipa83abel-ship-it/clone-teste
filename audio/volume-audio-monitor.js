@@ -23,8 +23,9 @@
 
 const EventBus = require('../events/EventBus.js');
 
-// 🔥 INSTÂNCIA DE EVENTBUS LOCAL
-const eventBus = new EventBus();
+// 🔥 USA INSTÂNCIA GLOBAL CRIADA EM RENDERER.JS
+// Não criar nova instância, usar a que já existe em globalThis.eventBus
+const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda não carregou
 
 /* ================================ */
 //	CONSTANTES
@@ -328,7 +329,7 @@ function stopAudioVolumeMonitor(source) {
 
 		// 4️⃣ Emite volume zerado para UI
 		const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-		eventBus.emit(ev, { percent: 0 });
+		getEventBus().emit(ev, { percent: 0 });
 
 		vars.setActive(false);
 		console.log(`✅ Monitor de volume (${source}) parado`);
@@ -396,7 +397,7 @@ async function switchAudioVolumeDevice(source, newDeviceId) {
 function handleVolumeMonitorUpdate(source, data) {
 	// Emite para UI via EventBus
 	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-	eventBus.emit(ev, { percent: data.percent });
+	getEventBus().emit(ev, { percent: data.percent });
 }
 
 /* ================================ */

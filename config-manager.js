@@ -4,7 +4,7 @@
 ========================================================= */
 
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
-// ⚠️ EventBus é importado em renderer.js e disponível globalmente como 'eventBus'
+// ⚠️ EventBus é importado em renderer.js e disponível globalmente como 'globalThis.eventBus'
 
 const _getIpcRenderer = () => {
 	if (globalThis?.electron?.ipcRenderer) {
@@ -324,7 +324,7 @@ class ConfigManager {
 						await globalThis.RendererAPI?.switchAudioVolumeDevice('input', input.value);
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
-eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
+						globalThis.eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
 					} else if (input.id === 'audio-output-device') {
 						console.log('📝 Output device mudou para:', input.value || 'NENHUM');
 
@@ -332,7 +332,7 @@ eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
 						await globalThis.RendererAPI?.switchAudioVolumeDevice('output', input.value);
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
-eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
+						globalThis.eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 					} else if (input.id === 'darkModeToggle') {
 						// 🔥 NOVO: Aplica classe CSS quando darkModeToggle muda
 						const isDark = input.checked;
@@ -1467,13 +1467,13 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		console.log('🔥 registerRendererCallbacks: Iniciando registro de callbacks UI...');
 
 		// 🔥 NOVO: Exibir erros (validação de modelo, dispositivo, etc)
-		eventBus.on('error', message => {
+		globalThis.eventBus.on('error', message => {
 			console.error(`❌ Erro renderizado: ${message}`);
 			this.showError(message);
 		});
 
 		// Transcrição
-		eventBus.on('transcriptAdd', data => {
+		globalThis.eventBus.on('transcriptAdd', data => {
 			const { author, text, timeStr, elementId, placeholderId } = data;
 			const transcriptionBox = document.getElementById(elementId || 'conversation');
 			if (!transcriptionBox) {
@@ -1527,14 +1527,14 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Status
-		eventBus.on('statusUpdate', data => {
+		globalThis.eventBus.on('statusUpdate', data => {
 			const { message } = data;
 			const statusText = document.getElementById('status');
 			if (statusText) statusText.innerText = message;
 		});
 
 		// Input Volume
-		eventBus.on('inputVolumeUpdate', data => {
+		globalThis.eventBus.on('inputVolumeUpdate', data => {
 			const { percent } = data;
 			const inputVu = document.getElementById('inputVu');
 			if (inputVu) inputVu.style.width = percent + '%';
@@ -1544,7 +1544,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Output Volume
-		eventBus.on('outputVolumeUpdate', data => {
+		globalThis.eventBus.on('outputVolumeUpdate', data => {
 			const { percent } = data;
 			const outputVu = document.getElementById('outputVu');
 			if (outputVu) outputVu.style.width = percent + '%';
@@ -1554,7 +1554,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Mock Badge
-		eventBus.on('mockBadgeUpdate', data => {
+		globalThis.eventBus.on('mockBadgeUpdate', data => {
 			const { visible } = data;
 			const mockBadge = document.getElementById('mockBadge');
 			if (mockBadge) {
@@ -1563,7 +1563,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Listen Button Toggle (altera o texto do botão "Começar a Ouvir... (Ctrl+d)")
-		eventBus.on('listenButtonToggle', data => {
+		globalThis.eventBus.on('listenButtonToggle', data => {
 			const { isRunning, buttonText } = data;
 			const listenBtn = document.getElementById('listenBtn');
 			if (listenBtn) {
@@ -1585,7 +1585,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Clear All Selections
-		eventBus.on('clearAllSelections', () => {
+		globalThis.eventBus.on('clearAllSelections', () => {
 			const currentQuestionBox = document.getElementById('currentQuestion');
 			if (currentQuestionBox) currentQuestionBox.classList.remove('selected-question');
 
@@ -1598,7 +1598,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Scroll to Question
-		eventBus.on('scrollToQuestion', data => {
+		globalThis.eventBus.on('scrollToQuestion', data => {
 			const { questionId } = data;
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
@@ -1610,7 +1610,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Pergunta Atual - Elemento: currentQuestion
-		eventBus.on('currentQuestionUpdate', data => {
+		globalThis.eventBus.on('currentQuestionUpdate', data => {
 			// NOSONAR console.log(`📥 config-manager: onCurrentQuestionUpdate recebido:`, data);
 
 			const { text, isSelected } = data;
@@ -1645,7 +1645,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Histórico de Perguntas
-		eventBus.on('questionsHistoryUpdate', data => {
+		globalThis.eventBus.on('questionsHistoryUpdate', data => {
 			const questionsHistoryBox = document.getElementById('questionsHistory');
 			if (!questionsHistoryBox) return;
 
@@ -1667,7 +1667,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Answer Selected — exibe resposta existente e faz scroll
-		eventBus.on('answerSelected', payload => {
+		globalThis.eventBus.on('answerSelected', payload => {
 			debugLogConfig('📌 onAnswerSelected recebido:', payload, false);
 
 			if (!payload) return;
@@ -1719,7 +1719,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		// 📥 LISTENER: onAnswerStreamChunk
 		// Chamado para CADA token que chega do GPT
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		eventBus.on('answerStreamChunk', data => {
+		globalThis.eventBus.on('answerStreamChunk', data => {
 			const { questionId, turnId, accum } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1772,7 +1772,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		// 🔄 LISTENER: onAnswerIdUpdate
 		// Chamado quando CURRENT → 1, 2, 3, etc
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		eventBus.on('answerIdUpdate', data => {
+		globalThis.eventBus.on('answerIdUpdate', data => {
 			const { oldId, newId } = data;
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (!answersHistoryBox) return;
@@ -1797,13 +1797,13 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		// ⏹️ LISTENER: onAnswerStreamEnd
 		// Chamado quando stream termina
 		// ═══════════════════════════════════════════════════════════════════════════════════
-		eventBus.on('answerStreamEnd', data => {
+		globalThis.eventBus.on('answerStreamEnd', data => {
 			debugLogConfig('✅ [STREAM_END] Limpando streamingQuestionId', false);
 			currentStreamingQuestionId = null;
 		});
 
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
-		eventBus.on('placeholderFulfill', data => {
+		globalThis.eventBus.on('placeholderFulfill', data => {
 			debugLogConfig('🔔 onPlaceholderFulfill recebido:', data, false);
 
 			// 🔥 EXTRAIR O ID DO PLACEHOLDER (novo campo)
@@ -1904,7 +1904,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		};
 
 		// Placeholder Update (atualização incremental enquanto o áudio ainda está em andamento)
-		eventBus.on('placeholderUpdate', data => {
+		globalThis.eventBus.on('placeholderUpdate', data => {
 			const transcriptionBox = document.getElementById('conversation');
 			if (!transcriptionBox) return;
 
@@ -1929,7 +1929,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Update Interim (atualização em tempo real para transcrições interims)
-		eventBus.on('updateInterim', data => {
+		globalThis.eventBus.on('updateInterim', data => {
 			const { id, speaker, text } = data;
 
 			let interimElement = document.getElementById(id);
@@ -1951,7 +1951,7 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Clear Interim (remove o elemento interim quando finalizado)
-		eventBus.on('clearInterim', data => {
+		globalThis.eventBus.on('clearInterim', data => {
 			const { id } = data;
 			const interimElement = document.getElementById(id);
 			if (interimElement) {
@@ -1960,26 +1960,26 @@ eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 		});
 
 		// Clear Transcription
-		eventBus.on('transcriptionCleared', () => {
+		globalThis.eventBus.on('transcriptionCleared', () => {
 			const transcriptionBox = document.getElementById('conversation');
 			if (transcriptionBox) transcriptionBox.innerHTML = '';
 		});
 
 		// Clear Answers
-		eventBus.on('answersCleared', () => {
+		globalThis.eventBus.on('answersCleared', () => {
 			const answersHistoryBox = document.getElementById('answersHistory');
 			if (answersHistoryBox) answersHistoryBox.innerHTML = '';
 		});
 
 		// Mode Select Update
-		eventBus.on('modeSelectUpdate', data => {
+		globalThis.eventBus.on('modeSelectUpdate', data => {
 			const { mode } = data;
 			const interviewModeSelect = document.getElementById('interviewModeSelect');
 			if (interviewModeSelect) interviewModeSelect.value = mode;
 		});
 
 		// 📸 NOVO: Screenshot badge
-		eventBus.on('screenshotBadgeUpdate', data => {
+		globalThis.eventBus.on('screenshotBadgeUpdate', data => {
 			const { count, visible } = data;
 			const badge = document.getElementById('screenshotBadge');
 

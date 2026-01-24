@@ -22,8 +22,9 @@ const { ipcRenderer } = require('electron');
 const EventBus = require('../events/EventBus.js');
 const { getVADEngine } = require('./vad-engine');
 
-// 🔥 INSTÂNCIA DE EVENTBUS LOCAL
-const eventBus = new EventBus();
+// 🔥 USA INSTÂNCIA GLOBAL CRIADA EM RENDERER.JS
+// Não criar nova instância, usar a que já existe em globalThis.eventBus
+const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda não carregou
 const fs = require('node:fs');
 const path = require('node:path');
 const os = require('node:os');
@@ -820,12 +821,12 @@ function getConfiguredSTTModel() {
 function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
 	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-	eventBus.emit(ev, { percent });
+	getEventBus().emit(ev, { percent });
 }
 
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-	eventBus.emit('transcriptAdd', {
+	getEventBus().emit('transcriptAdd', {
 		author,
 		text: '...',
 		timeStr,
@@ -836,7 +837,7 @@ function addTranscriptPlaceholder(author, placeholderId, timeStr) {
 
 // Preenche placeholder com transcrição final
 function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-	eventBus.emit('placeholderFulfill', {
+	getEventBus().emit('placeholderFulfill', {
 		speaker: author,
 		text: transcript,
 		placeholderId,
@@ -848,13 +849,13 @@ function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
 // Limpa interim transcript do UI
 function clearInterim(source) {
 	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
-	eventBus.emit('clearInterim', { id: interimId });
+	getEventBus().emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
 	const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
-	eventBus.emit('updateInterim', {
+	getEventBus().emit('updateInterim', {
 		id: interimId,
 		speaker: author,
 		text: transcript,

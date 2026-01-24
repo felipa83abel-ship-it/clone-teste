@@ -1511,17 +1511,6 @@ if (typeof module !== 'undefined' && module.exports) {
 // 🎭 Exporta para o escopo global (usado em mocks e testes)
 if (typeof globalThis !== 'undefined') {
 	globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
-	globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock autoplay (via mock-runner)
+	globalThis.eventBus = eventBus; // 🎭 Exporta EventBus singleton para todos os módulos
+	globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock
 }
-
-/* ================================ */
-//	LISTENER DO BOTÃO RESET
-/* ================================ */
-
-/**
- * Adiciona listener ao botão de reset após o DOM carregar
-
- * docListener do botão de reset
- * MOVIDO PARA: config-manager.js (initEventListeners)
- * @deprecated Registrado em config-manager.js
- */
