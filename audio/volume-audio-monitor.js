@@ -18,6 +18,15 @@
  */
 
 /* ================================ */
+//	IMPORTS
+/* ================================ */
+
+const EventBus = require('../events/EventBus.js');
+
+// 🔥 INSTÂNCIA DE EVENTBUS LOCAL
+const eventBus = new EventBus();
+
+/* ================================ */
 //	CONSTANTES
 /* ================================ */
 
