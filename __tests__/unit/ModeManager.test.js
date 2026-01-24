@@ -1,4 +1,9 @@
-const { ModeManager, MODES, InterviewModeHandlers, NormalModeHandlers } = require('../../controllers/modes/mode-manager');
+const {
+	ModeManager,
+	MODES,
+	InterviewModeHandlers,
+	NormalModeHandlers,
+} = require('../../controllers/modes/mode-manager');
 
 describe('ModeManager', () => {
 	let modeManager;

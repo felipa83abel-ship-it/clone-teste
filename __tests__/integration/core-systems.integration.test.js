@@ -1,6 +1,11 @@
 const EventBus = require('../../events/EventBus');
 const AppState = require('../../state/AppState');
-const { ModeManager, MODES, InterviewModeHandlers, NormalModeHandlers } = require('../../controllers/modes/mode-manager');
+const {
+	ModeManager,
+	MODES,
+	InterviewModeHandlers,
+	NormalModeHandlers,
+} = require('../../controllers/modes/mode-manager');
 
 describe('Integration Tests - Core Systems', () => {
 	let eventBus;
@@ -162,7 +167,7 @@ describe('Integration Tests - Core Systems', () => {
 		test('should coordinate EventBus, AppState, and ModeManager in workflow', () => {
 			const events = [];
 
-			eventBus.on('workflow-step', (step) => events.push(step));
+			eventBus.on('workflow-step', step => events.push(step));
 
 			// Initialize
 			modeManager.setMode(MODES.INTERVIEW);
