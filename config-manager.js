@@ -1801,6 +1801,60 @@ class ConfigManager {
 			currentStreamingQuestionId = null;
 		});
 
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		// 📊 LISTENER: answerBatchEnd
+		// Chamado quando modo PADRÃO (não-streaming) completa a resposta
+		// ═══════════════════════════════════════════════════════════════════════════════════
+		globalThis.eventBus.on('answerBatchEnd', data => {
+			const { questionId, response } = data;
+			debugLogConfig(
+				'📊 [BATCH_END] Renderizando resposta batch:',
+				{ questionId, responseLength: response?.length },
+				false,
+			);
+
+			if (!response) {
+				console.warn('⚠️ [BATCH_END] Resposta vazia para:', questionId);
+				return;
+			}
+
+			const answersHistoryBox = document.getElementById('answersHistory');
+			if (!answersHistoryBox) return;
+
+			// Procurar bloco de resposta existente
+			let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+
+			// Se não existe, criar novo bloco
+			if (!wrapper) {
+				debugLogConfig('📊 [BATCH_END] Criando novo bloco para:', questionId, false);
+				wrapper = document.createElement('div');
+				wrapper.className = 'answer-block';
+				wrapper.dataset.questionId = questionId;
+				wrapper.innerHTML = `<div class="answer-content"></div>`;
+
+				// Inserir no topo
+				answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
+
+				// Remover destaque de outros, adicionar neste
+				answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach(el => {
+					el.classList.remove('selected-answer');
+				});
+				wrapper.classList.add('selected-answer');
+
+				// Auto-scroll para topo
+				answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
+			}
+
+			// Renderizar conteúdo (markdown)
+			const answerContent = wrapper.querySelector('.answer-content');
+			if (answerContent) {
+				const htmlContent = marked.parse(response);
+				answerContent.innerHTML = htmlContent;
+			}
+
+			debugLogConfig('✅ [BATCH_END] Resposta renderizada:', questionId, false);
+		});
+
 		// Placeholder Fulfill (para atualizar placeholders de áudio)
 		globalThis.eventBus.on('placeholderFulfill', data => {
 			debugLogConfig('🔔 onPlaceholderFulfill recebido:', data, false);
