@@ -598,57 +598,42 @@ function handleFinalVoskMessage(source, transcript) {
 
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
-	// Emite volume para UI
-	if (globalThis.RendererAPI?.emitUIChange) {
-		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		eventBus.emit(ev, { percent });
-	}
+	// Emite volume para UIconst ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
+		eventBus.emit(ev, { percent })
 }
 
 // Adiciona transcrição com placeholder ao UI
-function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		eventBus.emit('transcriptAdd', {
+function addTranscriptPlaceholder(author, placeholderId, timeStr) {eventBus.emit('transcriptAdd', {
 			author,
 			text: '...',
 			timeStr,
 			elementId: 'conversation',
 			placeholderId,
-		});
-	}
+		})
 }
 
 // Preenche placeholder com transcrição final
-function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-	if (globalThis.RendererAPI?.emitUIChange) {
-		eventBus.emit('placeholderFulfill', {
+function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {eventBus.emit('placeholderFulfill', {
 			speaker: author,
 			text: transcript,
 			placeholderId,
 			...metrics,
 			showMeta: false,
-		});
-	}
+		})
 }
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
-	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		eventBus.emit('clearInterim', { id: interimId });
-	}
+	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';eventBus.emit('clearInterim', { id: interimId })
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
-	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-	if (globalThis.RendererAPI?.emitUIChange) {
-		eventBus.emit('updateInterim', {
+	const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';eventBus.emit('updateInterim', {
 			id: interimId,
 			speaker: author,
 			text: transcript,
-		});
-	}
+		})
 }
 
 // Atualiza CURRENT question (apenas para output)

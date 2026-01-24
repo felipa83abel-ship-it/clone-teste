@@ -489,7 +489,7 @@ async function listenToggleBtn() {
 	Logger.debug('Início da função: "listenToggleBtn"');
 
 	if (!appState.audio.isRunning) {
-		console.log('🎤 listenToggleBtn: Tentando INICIAR escuta...');
+		Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
 
 		// 🔥 VALIDAÇÃO 1: Modelo de IA ativo
 		const { active: hasModel, model: activeModel } = hasActiveModel();
@@ -497,7 +497,6 @@ async function listenToggleBtn() {
 
 		if (!hasModel) {
 			const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
-			console.warn(`⚠️ ${errorMsg}`);
 			eventBus.emit('error', errorMsg);
 			return;
 		}
@@ -508,8 +507,8 @@ async function listenToggleBtn() {
 
 		if (!hasOutputDevice) {
 			const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
-			console.warn(`⚠️ ${errorMsg}`);
-			console.log('📡 DEBUG: Emitindo onError:', errorMsg);
+			Logger.warn(`⚠️ ${errorMsg}`, true);
+			Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
 			eventBus.emit('error', errorMsg);
 			return;
 		}
@@ -559,8 +558,6 @@ function hasActiveModel() {
 			return { active: true, model: provider };
 		}
 	}
-
-	console.warn('⚠️ Nenhum modelo ativo encontrado');
 
 	Logger.debug('Fim da função: "hasActiveModel"');
 	return { active: false, model: null };
@@ -1368,7 +1365,6 @@ const RendererAPI = {
 	},
 	setMockToggle: checked => {
 		APP_CONFIG.MODE_DEBUG = checked;
-		// UI será atualizada via emitUIChange
 	},
 	setModeSelect: mode => {
 		eventBus.emit('modeSelectUpdate', { mode });

@@ -327,10 +327,8 @@ function stopAudioVolumeMonitor(source) {
 		}
 
 		// 4️⃣ Emite volume zerado para UI
-		if (globalThis.RendererAPI?.emitUIChange) {
-			const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-			eventBus.emit(ev, { percent: 0 });
-		}
+		const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+		eventBus.emit(ev, { percent: 0 });
 
 		vars.setActive(false);
 		console.log(`✅ Monitor de volume (${source}) parado`);
@@ -396,11 +394,9 @@ async function switchAudioVolumeDevice(source, newDeviceId) {
  * @param {object} data - { percent: number }
  */
 function handleVolumeMonitorUpdate(source, data) {
-	// Emite para UI via RendererAPI
-	if (globalThis.RendererAPI?.emitUIChange) {
-		const ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		eventBus.emit(ev, { percent: data.percent });
-	}
+	// Emite para UI via EventBus
+	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+	eventBus.emit(ev, { percent: data.percent });
 }
 
 /* ================================ */

@@ -324,9 +324,7 @@ class ConfigManager {
 						await globalThis.RendererAPI?.switchAudioVolumeDevice('input', input.value);
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
-						if (globalThis.RendererAPI?.emitUIChange) {
-							eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
-						}
+eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: input.value });
 					} else if (input.id === 'audio-output-device') {
 						console.log('📝 Output device mudou para:', input.value || 'NENHUM');
 
@@ -334,9 +332,7 @@ class ConfigManager {
 						await globalThis.RendererAPI?.switchAudioVolumeDevice('output', input.value);
 
 						// Emite evento para STT modules se estiverem em uso (renderer fica cego ao DOM)
-						if (globalThis.RendererAPI?.emitUIChange) {
-							eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
-						}
+eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: input.value });
 					} else if (input.id === 'darkModeToggle') {
 						// 🔥 NOVO: Aplica classe CSS quando darkModeToggle muda
 						const isDark = input.checked;
