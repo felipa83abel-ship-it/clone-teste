@@ -1,8 +1,8 @@
 /**
  * 🎤 WHISPER STT (Speech-to-Text) - MÓDULO INDEPENDENTE
  *
- * Implementação isolada de transcrição com Whisper (OpenAI + Local).
- * - Suporte a whisper-1 (online, API OpenAI)
+ * Implementação isolada de transcrição com Whisper (Local).
+ * ✅ FASE 4.1: Removido whisper-1 (OpenAI/Cloud)
  * - Suporte a whisper-cpp-local (offline, alta precisão)
  * - Captura de áudio via MediaRecorder + AudioWorklet
  * - Detecção de silêncio automática (sem streaming, mas com VAD)
@@ -467,12 +467,10 @@ async function transcribeWithWhisperLocal(buffer, source) {
 	}
 }
 
-// ✅ REMOVIDO: transcribeWithWhisperOpenAI (whisper-1) em Fase 4
-// Manter apenas whisper-cpp-local (offline)
-
 // Transcreve áudio com o modelo Whisper configurado
 async function transcribeWhisper(audioBlob, source) {
-	const sttModel = getConfiguredSTTModel();
+	// ✅ Apenas whisper-cpp-local (offline) está disponível após remover whisper-1
+	const sttModel = 'whisper-cpp-local';
 	debugLogWhisper(`🎤 Transcrição (${sttModel}): ${audioBlob.size} bytes`, true);
 
 	const buffer = Buffer.from(await audioBlob.arrayBuffer());
@@ -770,24 +768,6 @@ function handleFinalWhisperMessage(source, transcript) {
 //	HELPERS
 /* ================================ */
 
-// Obtém o modelo STT configurado
-function getConfiguredSTTModel() {
-	try {
-		const activeProvider = globalThis.configManager?.config?.api?.activeProvider || 'openai';
-		const sttModel = globalThis.configManager?.config?.api?.[activeProvider]?.selectedSTTModel;
-
-		if (sttModel) {
-			return sttModel;
-		}
-
-		console.warn(`⚠️ Modelo STT não configurado para ${activeProvider}, usando padrão: whisper-1`);
-		return 'whisper-1';
-	} catch (error) {
-		console.warn('⚠️ configManager não disponível, usando padrão: whisper-1', error);
-		return 'whisper-1';
-	}
-}
-
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
 	// Emite volume para UI
@@ -993,9 +973,20 @@ function stopWhisper(source) {
  * @param {*} msg
  * @param {boolean} showLog - true para mostrar, false para ignorar
  */
+// ========== DEBUG LOGGING (Consolidado em Logger.js) ==========
+const Logger = require('../utils/Logger.js');
+
+/**
+ * Log de debug padronizado para stt-whisper.js
+ * Por padrão nunca loga, se quiser mostrar é só passar true.
+ * @param {*} msg
+ * @param {boolean} showLog - true para mostrar, false para ignorar
+ */
 function debugLogWhisper(...args) {
 	const maybeFlag = args.at(-1);
 	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
+
+	if (!showLog) return; // Ignorar se showLog é false
 
 	const nowLog = new Date();
 	const timeStr =
@@ -1004,15 +995,12 @@ function debugLogWhisper(...args) {
 		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
 		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
 
-	if (showLog) {
-		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
-		// prettier-ignore
-		console.log(
-			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em stt-whisper.js:`, 
-			'color: blue; font-weight: bold;', 
-			...cleanArgs
-		);
-	}
+	const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+	// Logar no console
+	console.log(`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em stt-whisper.js:`, 'color: blue; font-weight: bold;', ...cleanArgs);
+
+	// Registrar em Logger para histórico de debug
+	Logger.debug(`[stt-whisper] ${cleanArgs.join(' ')}`, { timeStr });
 }
 
 /* ================================ */

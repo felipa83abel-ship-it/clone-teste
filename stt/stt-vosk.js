@@ -785,6 +785,9 @@ async function stopVosk(source) {
 // DEBUG LOG VOSK
 /* ================================ */
 
+// ========== DEBUG LOGGING (Consolidado em Logger.js) ==========
+const Logger = require('../utils/Logger.js');
+
 /**
  * Log de debug padronizado para stt-vosk.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
@@ -795,6 +798,8 @@ function debugLogVosk(...args) {
 	const maybeFlag = args.at(-1);
 	const showLog = typeof maybeFlag === 'boolean' ? maybeFlag : false;
 
+	if (!showLog) return; // Ignorar se showLog é false
+
 	const nowLog = new Date();
 	const timeStr =
 		`${nowLog.getHours().toString().padStart(2, '0')}:` +
@@ -802,15 +807,12 @@ function debugLogVosk(...args) {
 		`${nowLog.getSeconds().toString().padStart(2, '0')}.` +
 		`${nowLog.getMilliseconds().toString().padStart(3, '0')}`;
 
-	if (showLog) {
-		const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
-		// prettier-ignore
-		console.log(
-			`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em stt-vosk.js:`, 
-			'color: blue; font-weight: bold;', 
-			...cleanArgs
-		);
-	}
+	const cleanArgs = typeof maybeFlag === 'boolean' ? args.slice(0, -1) : args;
+	// Logar no console
+	console.log(`%c⏱️ [${timeStr}] 🪲 ❯❯❯❯ Debug em stt-vosk.js:`, 'color: blue; font-weight: bold;', ...cleanArgs);
+
+	// Registrar em Logger para histórico de debug
+	Logger.debug(`[stt-vosk] ${cleanArgs.join(' ')}`, { timeStr });
 }
 
 /* ================================ */

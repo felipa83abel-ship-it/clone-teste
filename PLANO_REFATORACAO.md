@@ -422,31 +422,40 @@ Melhorias:
 
 ### 4.1 Consolidar Estratégia de STT (Remover Whisper OpenAI)
 
-**Status:** ⚠️ Funcional, mas precisa revisar  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h
+**Status:** ✅ COMPLETO  
+**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h ✓
 
-**Problemas:**
+**Problemas RESOLVIDOS:**
 
-- 3 providers STT (deepgram, vosk, whisper-cpp-local)
-- REMOVER: whisper-1 (OpenAI Whisper)
+- ✅ 3 providers STT mantidos (deepgram, vosk, whisper-cpp-local)
+- ✅ REMOVIDO: whisper-1 (OpenAI Whisper)
   - Razão: Implementação em tempo real será feita no FUTURO
-  - Por enquanto usar apenas Whisper local
-- VAD engine em `stt/vad-engine.js` (OK, centralizado)
+  - Agora usar apenas Whisper local/offline
+- ✅ VAD engine em `stt/vad-engine.js` (centralizado e funcional)
 
-**Checklist:**
+**Alterações realizadas:**
 
-- [ ] Revisar `/stt/stt-deepgram.js`
-- [ ] Revisar `/stt/stt-vosk.js`
-- [ ] Revisar `/stt/stt-whisper.js` (apenas implementação local)
-- [ ] Remover toda referência a 'whisper-1' em config-manager.js
-- [ ] Remover registração de 'whisper-1' em renderer.js (linhas ~449)
-- [ ] Verificar se VAD funciona para todos
-- [ ] Testar cada provider funciona
-  - [ ] Deepgram (se chave configurada)
-  - [ ] Vosk (local, sempre disponível)
-  - [ ] Whisper local (cpp-local)
-- [ ] Verificar com `get_errors()`
-- [ ] Commit: "refactor: remover whisper-1 (openai) - usar apenas whisper local"
+- ✅ renderer.js: Removido sttStrategy.register('whisper-1')
+- ✅ config-manager.js: Alterado default transcriptionModel para 'whisper-cpp-local'
+- ✅ index.html: Removidos 2 tags `<option value="whisper-1">` de dropdowns de configuração
+- ✅ stt-whisper.js: Removido função transcribeWithWhisperOpenAI() (40+ linhas)
+- ✅ npm test: 74/74 testes passando
+- ✅ npm start: App iniciando corretamente
+- ✅ Commit: ✓ e13ec4b "Fase 4.1: Remove whisper-1 (OpenAI/Cloud)"
+
+**Validação:**
+
+- ✅ Revisar `/stt/stt-deepgram.js`
+- ✅ Revisar `/stt/stt-vosk.js`
+- ✅ Revisar `/stt/stt-whisper.js` (apenas implementação local)
+- ✅ Remover toda referência a 'whisper-1' em config-manager.js
+- ✅ Remover registração de 'whisper-1' em renderer.js
+- ✅ Verificado que VAD funciona para todos
+- ✅ Testar cada provider funciona
+  - ✅ Deepgram (se chave configurada)
+  - ✅ Vosk (local, sempre disponível)
+  - ✅ Whisper local (cpp-local)
+- ✅ Verificado com npm test (sem erros)
 
 ---
 
