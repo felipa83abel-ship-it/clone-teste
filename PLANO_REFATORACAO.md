@@ -702,13 +702,8 @@ npm run test:e2e:report      # Ver relatório HTML
 - ✅ Removida `finalizeQuestion()` de renderer.js
   - Razão: Já existe em `question-helpers.js`, nunca era chamada
   - Removidas: 11 linhas de código não utilizado
+- ✅ Removido: `vosk-model-pt-fb-v0.1.1/` (grande, não utilizado)
 - ✅ npm test: 74/74 testes passando
-
-**Vosk/Whisper models:**
-
-- ✅ Manter: `vosk-model-small-pt-0.3/` (modelo padrão, usado)
-- ✅ Manter: Todos os modelos whisper (usados para testes)
-- ⏳ Remover: `vosk-model-pt-fb-v0.1.1/` (grande, não utilizado) - pode fazer depois
 
 **Commit:** ✓ f926a51 "Fase 6.2: Remover código morto (finalizeQuestion)"`
 
@@ -716,17 +711,14 @@ npm run test:e2e:report      # Ver relatório HTML
 
 ### 6.3 Otimizar tamanho de bundle
 
-**Status:** ⚠️ Requer diagnóstico  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h+
+**Status:** ⏳ Próxima (Fase 6.3)  
+**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h
 
-**Checklist:**
+**Será implementado em Fase 6.3:**
 
 - [ ] Executar `npm start` e medir tempo de inicialização
 - [ ] Identificar imports pesados que carregam na inicialização
-- [ ] Considerar lazy loading para:
-  - [ ] STT providers não-padrão
-  - [ ] LLM handlers não-padrão
-  - [ ] Modelos de IA (vosk, whisper)
+- [ ] Considerar lazy loading para STT/LLM providers não-padrão
 - [ ] Documentar impacto na startup time
 - [ ] Commit: "perf: otimizar bundle size e startup time"
 
@@ -761,23 +753,33 @@ npm run test:e2e:report      # Ver relatório HTML
 **Status:** ⏳ Próxima (Fase 8)  
 **Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h
 
-**Será implementado em Fase 8:**
+### 7.2 Configuração de CI/CD Básico
 
-- [ ] Criar `.github/workflows/test.yml` (rodar testes)
-- [ ] Criar `.github/workflows/lint.yml` (ESLint)
+**Status:** ⏳ Próxima (Fase 7.2)  
+**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h
+
+**Será implementado em Fase 7.2:**
+
+- [ ] Criar `.github/workflows/test.yml` (rodar testes em cada PR)
+  - [ ] Rodar `npm test`
+  - [ ] Falhar se algum teste falhar
+- [ ] Criar `.github/workflows/lint.yml` (após ESLint configurado em 7.3)
+  - [ ] Rodar `npm run lint`
 - [ ] Criar `.github/workflows/build.yml` (verificar build)
-  - [ ] Verificar se `npm start` funciona
-  - [ ] Timeout após 10 segundos (para não travar CI)
+  - [ ] Rodar `npm start` (verificar se inicia)
+  - [ ] Timeout após 10 segundos
 - [ ] Commit: "ci: adicionar workflows de GitHub Actions"
 
 ---
 
 ### 7.3 Adicionar ESLint e Prettier
 
-**Status:** ❌ Não existe  
+**Status:** ⏳ Próxima (Fase 7.3)  
 **Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 45min
 
-**Dependências:**
+**Será implementado em Fase 7.3:**
+
+**Dependências a instalar:**
 
 ```json
 "devDependencies": {
@@ -789,14 +791,16 @@ npm run test:e2e:report      # Ver relatório HTML
 
 **Checklist:**
 
-- [ ] Instalar eslint e prettier
+- [ ] Instalar: `npm install --save-dev eslint prettier eslint-config-prettier`
 - [ ] Criar `.eslintrc.js` config
 - [ ] Criar `.prettierrc.js` config
-- [ ] Adicionar scripts:
+- [ ] Adicionar scripts em `package.json`:
   - [ ] `"lint": "eslint ."`
   - [ ] `"lint:fix": "eslint . --fix"`
   - [ ] `"format": "prettier --write ."`
-- [ ] Rodar `npm run lint:fix`
+- [ ] Rodar `npm run lint:fix` (corrigir estilo)
+- [ ] Rodar `npm run format` (padronizar formatação)
+- [ ] npm test (validar que ainda passa 74/74)
 - [ ] Commit: "ci: adicionar ESLint e Prettier"
 
 ---
