@@ -501,22 +501,73 @@ Renderizado em HTML com markdown (marked.js) + syntax highlight (highlight.js).
 - [x] OpenAI LLM integrado e testado
 - [x] Gemini LLM integrado (pronto para testar)
 - [x] Template para novos providers
-- [ ] Testes unitários (não implementado)
-- [ ] Documentação de API em JSDoc
-- [ ] SonarQube analysis (opcional)
+- [x] Testes unitários (74 testes, Jest)
+- [x] Testes E2E (Playwright, 11 cenários)
+- [x] Documentação de API em JSDoc
+
+### ✅ Fase 5: Testes e Validação (CONCLUÍDA)
+
+**5.1 Testes Unitários**
+
+- Jest configurado com 5 suites, 74 testes, 100% passando
+- Cobertura: AppState, EventBus, ModeManager, STTStrategy
+- Todos os testes são executados via `npm test`
+
+**5.2 Testes E2E (Playwright)**
+
+- Configuração: `playwright.config.js` para Electron
+- Implementação: 11 cenários de teste (9 happy path + 2 error handling)
+- Arquivo: `__tests__/e2e/happy-path.test.js`
+- Helpers reutilizáveis em `__tests__/e2e/helpers.js`
+- Scripts npm: `npm run test:e2e`, `npm run test:e2e:headed`, `npm run test:e2e:debug`
+
+**5.3 JSDoc Type Hints**
+
+- Criado: `jsconfig.json` com `checkJs: true` para validação TypeScript
+- Documentado: AppState.js, EventBus.js, Logger.js, LLMManager.js, STTStrategy.js
+- Padrão: @typedef para tipos customizados, @class, @param, @returns para funções
+- Validação: VS Code agora mostra type hints sem precisar TypeScript
+
+### ✅ Fase 6: Limpeza e Otimização (CONCLUÍDA)
+
+**6.1 Remover Código Deprecated**
+
+- Removidos comentários DEPRECATED de renderer.js
+- Removidas linhas de documentação desatualizada
+- Funções ainda em uso: mantidas (applyOpacity, initDragHandle)
+
+**6.2 Remover Código Morto**
+
+- Removida: `finalizeQuestion()` de renderer.js (duplicada em question-helpers.js)
+- Removida: 11 linhas de código não utilizado
+- Validado: Todos os 74 testes continuam passando
 
 ---
 
-## 🔜 Próximos Passos (FASE 5.3+)
+## 🔜 Próximos Passos (FASE 7-9)
 
-1. **Teste Gemini** quando houver crédito
-2. **Integrar Anthropic** (usar template-handler.js)
-3. **Cleanup code**: Remover comentários antigos de refatoração
-4. **SonarQube**: Análise de qualidade de código
-5. **Merge para main** quando pronto para produção
+**Fase 7: Documentação**
+
+- [ ] Revisar e atualizar ARCHITECTURE.md com Fases 5-6
+- [ ] Revisar START_HERE.md
+- [ ] Revisar TESTING_INDEX.md
+- [ ] Criar guia para adicionar novos LLM/STT providers
+
+**Fase 8: Segurança e Produção**
+
+- [ ] Audit de dependências: `npm audit`
+- [ ] Verificar exposição de sensitive data em logs
+- [ ] Validar Electron security config
+- [ ] Rate limiting para LLM requests
+
+**Fase 9: Refinamentos Finais**
+
+- [ ] Error handling improvements
+- [ ] Performance monitoring
+- [ ] User feedback e iterações
 
 ---
 
-**Última atualização**: 23 jan 2026  
+**Última atualização**: 27 jan 2026  
 **Ramo**: `refatoracao`  
-**Status**: FASE 5 em progresso
+**Status**: FASE 6 CONCLUÍDA - Fase 7+ em progresso

@@ -1,6 +1,6 @@
 # 🚀 Começar Aqui - AskMe
 
-Bem-vindo ao **AskMe**! Refatoração concluída (jan 2026) com consolidação de Estado, Eventos e Modo.
+Bem-vindo ao **AskMe**! Refatoração Fases 1-6 concluídas (jan 2026) com consolidação de Estado, Eventos, Modo, Testes e Limpeza.
 
 ---
 
@@ -13,26 +13,28 @@ Bem-vindo ao **AskMe**! Refatoração concluída (jan 2026) com consolidação d
    - AppState centralizado
    - EventBus único
    - ModeManager para lógica de modo
-2. Procure testes relacionados em: docs/TEST_*.md
+   - JSDoc para type hints
+2. Execute testes: npm test (validar antes de mudanças)
 3. Siga o padrão:
    - Estado: AppState (state/AppState.js)
    - Eventos: EventBus (events/EventBus.js)
    - Modo: ModeManager (mode-manager.js)
+   - Tipos: Adicionar @typedef JSDoc aos novos módulos
 ```
 
 ### 🧪 Vou **Testar** a aplicação
 
 ```
-1. Leia: docs/TESTING_INDEX.md (começar aqui!)
-2. Teste rápido (5 min): docs/TESTING_INDEX.md → "Teste Rápido"
-3. Testes completos: escolha sua seção em docs/TEST_*.md
+1. Testes Unitários (74 testes): npm test
+2. Testes E2E (11 cenários): npm run test:e2e
+3. Documentação: docs/TESTING_INDEX.md
 ```
 
 ### 📊 Vou **Revisar** código ou entender status
 
 ```
 1. Leia: docs/DOCS_GUIDE.md (para saber o que procurar)
-2. Refatoração: docs/ARCHITECTURE.md (Fase 1-4 concluída)
+2. Refatoração: docs/ARCHITECTURE.md (Fases 1-6 CONCLUÍDAS)
 3. Procure: docs/ARCHITECTURE.md → Mudanças na Refatoração
 ```
 
@@ -57,10 +59,10 @@ npm start
 
 ### 3️⃣ Entender a arquitetura
 
-**Camadas principais** (após refatoração):
+**Camadas principais** (após refatoração Fases 1-6):
 
 ```
-renderer.js (1542 linhas)
+renderer.js (1755 linhas)
 ├── AppState (state/AppState.js) ........... Centraliza todo o estado
 ├── EventBus (events/EventBus.js) ......... Sistema único de eventos
 ├── ModeManager (mode-manager.js) ......... Lógica de modo
@@ -74,25 +76,28 @@ config-manager.js (2626 linhas)
 ├── localStorage + electron-store ........ Persistência segura
 └── UI Tabs .............................. Geral, API, Áudio, Privacidade
 
-AppState (state/AppState.js)
+AppState (state/AppState.js) [COM JSDoc TYPE HINTS]
 ├── history: [] ........................... Perguntas e respostas
 ├── interview.currentQuestion ............ Pergunta sendo formada
 ├── interview.interviewTurnId ............ Counter de turnos
 └── selectedId, isRunning, ... ........... Acessores centralizados
 ```
 
-### 4️⃣ Principais mudanças pós-refatoração
+### 4️⃣ Principais mudanças pós-refatoração (Fases 1-6)
 
-✅ **Removido**: 16 variáveis globais → `AppState` centralizado  
-✅ **Removido**: `UICallbacks` + `onUIChange()` → `EventBus` único  
-✅ **Criado**: `ModeManager` class para lógica de modo  
-✅ **Isolado**: Código mock em `mock-runner.js`  
-✅ **Resultado**: renderer.js -564 linhas (-26.8%)
+✅ **Fase 1**: Removido debugLogRenderer(), isolado mock em arquivo separado  
+✅ **Fase 2**: Removidas 16 variáveis globais → AppState centralizado  
+✅ **Fase 3**: Removidos UICallbacks + onUIChange() → EventBus único  
+✅ **Fase 4**: Criado ModeManager para lógica de modo centralizada  
+✅ **Fase 5**: 74 testes unitários (Jest) + 11 testes E2E (Playwright)  
+✅ **Fase 6**: Removidos comentários deprecated, código morto  
+✅ **Resultado**: renderer.js -351 linhas, codebase muito mais limpo
 
 ### 5️⃣ Conceitos importantes
 
 - Testar? → [docs/TESTING_INDEX.md](docs/TESTING_INDEX.md)
 - Desenvolver? → [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Tipos? → Usar JSDoc (@typedef, @param, @returns)
 - Ajuda geral? → [docs/DOCS_GUIDE.md](docs/DOCS_GUIDE.md)
 
 ---
@@ -116,8 +121,8 @@ AppState (state/AppState.js)
 
 **Testar:**
 
-- 🧪 [Índice de Testes (77 testes)](docs/TESTING_INDEX.md)
-- 📝 [Teste Rápido (5 min)](docs/TESTING_INDEX.md#-teste-rápido-quick-start)
+- 🧪 [Testes Unitários: npm test (74 testes)](docs/TESTING_INDEX.md)
+- 🎭 [Testes E2E: npm run test:e2e (11 cenários)](docs/TESTING_INDEX.md)
 
 **Desenvolver:**
 
