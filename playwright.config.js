@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Configuração do Playwright para testes E2E da app Electron
  *

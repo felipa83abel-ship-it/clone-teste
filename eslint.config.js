@@ -1,3 +1,4 @@
+// @ts-nocheck
 const js = require('@eslint/js');
 
 module.exports = [

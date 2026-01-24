@@ -443,6 +443,7 @@ const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioContro
 
 /**
  * Configuração do Marked.js para renderização de Markdown
+ * @type {any}
  */
 marked.setOptions({
   html: true, // 🔥 Permite renderização de HTML (não escapa entidades)
