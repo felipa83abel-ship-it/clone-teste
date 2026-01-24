@@ -46,7 +46,7 @@ const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
 const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 // Configuração Vosk
-const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || '../vosk-models/vosk-model-small-pt-0.3' };
+const VOSK_CONFIG = { MODEL: process.env.VOSK_MODEL || '../stt/models-stt/vosk/vosk-model-small-pt-0.3' };
 
 /* ================================ */
 //	ESTADO GLOBAL DO VOSK

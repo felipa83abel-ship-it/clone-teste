@@ -6,7 +6,7 @@ Comunica com Node.js via IPC
 
 Uso:
     python server-vosk.py                         # Usa modelo padrão (small-pt-0.3)
-    python server-vosk.py vosk-models/vosk-model-pt-fb-v0.1.1  # Usa modelo maior
+    python server-vosk.py stt/models-stt/vosk/vosk-model-pt-fb-v0.1.1  # Usa modelo maior
 """
 
 import sys
@@ -36,7 +36,7 @@ class VoskTranscriber:
             raise FileNotFoundError(
                 f"Modelo não encontrado: {model_path}\n"
                 f"Baixe em: https://alphacephei.com/vosk/models\n"
-                f"Descompacte em: ./vosk-models/"
+                f"Descompacte em: ./stt/models-stt/vosk/"
             )
         
         try:
@@ -180,7 +180,7 @@ def main(): # NOSONAR
     # Define o modelo a usar (padrão: pequeno e mais rápido)
     # Pode ser sobrescrito via argumento de linha de comando
     # vosk-model-small-pt-0.3 ou vosk-model-pt-fb-v0.1.1
-    model_path = sys.argv[1] if len(sys.argv) > 1 else "vosk-models/vosk-model-small-pt-0.3"
+    model_path = sys.argv[1] if len(sys.argv) > 1 else "stt/models-stt/vosk/vosk-model-small-pt-0.3"
     
     if len(sys.argv) > 1:
         print(f"[VOSK] Usando modelo especificado: {model_path}", file=sys.stderr)
