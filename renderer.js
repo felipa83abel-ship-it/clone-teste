@@ -20,13 +20,18 @@ const {
 const AppState = require('./state/AppState.js');
 const EventBus = require('./events/EventBus.js');
 const Logger = require('./utils/Logger.js');
-const mockRunner = require('./mock-runner.js'); // 🎭 Mock para teste em MODE_DEBUG
+const mockRunner = require('./testing/mock-runner.js'); // 🎭 Mock para teste em MODE_DEBUG
 const STTStrategy = require('./strategies/STTStrategy.js');
 const LLMManager = require('./llm/LLMManager.js');
 const openaiHandler = require('./llm/handlers/openai-handler.js');
 const geminiHandler = require('./llm/handlers/gemini-handler.js');
 const { validateLLMRequest, handleLLMStream, handleLLMBatch } = require('./handlers/llmHandlers.js');
-const { ModeManager, MODES, InterviewModeHandlers, NormalModeHandlers } = require('./mode-manager.js');
+const {
+	ModeManager,
+	MODES,
+	InterviewModeHandlers,
+	NormalModeHandlers,
+} = require('./controllers/modes/mode-manager.js');
 
 // 🎯 INSTANCIAR
 const appState = new AppState();
