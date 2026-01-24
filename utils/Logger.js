@@ -2,8 +2,7 @@
  * Logger - Sistema de logging estruturado
  * Substitui: debugLogRenderer() frágil
  *
- * @typedef {Object} LogData
- * @property {any} [key] - Dados adicionais a logar
+ * @typedef {Object.<string, any>} LogData - Objeto com dados contextuais para logging
  */
 
 /**

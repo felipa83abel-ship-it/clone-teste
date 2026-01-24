@@ -64,6 +64,14 @@ const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTE
 let mockAutoPlayActive = false;
 let mockScenarioIndex = 0;
 
+// 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (atribuídas por screenshotController)
+/** @type {Function} */
+let captureScreenshot;
+/** @type {Function} */
+let analyzeScreenshots;
+/** @type {Function} */
+let clearScreenshots;
+
 // 🎯 REGISTRAR MODOS
 modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
 modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
@@ -622,7 +630,7 @@ const RendererAPI = {
   /**
    * Atualiza botão de click-through
    * @param {boolean} enabled - Se click-through está ativo
-   * @param {element} btnToggle - Botão a atualizar
+   * @param {Element} btnToggle - Botão a atualizar
    */
   updateClickThroughButton: (enabled, btnToggle) => {
     if (!btnToggle) return;
@@ -709,7 +717,7 @@ const RendererAPI = {
   },
   /**
    * Envia erro do renderer para main
-   * @param {error} error - Erro a enviar
+   * @param {Error} err - Erro a enviar
    */
   sendRendererError: (error) => {
     try {
