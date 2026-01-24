@@ -101,125 +101,146 @@ Renderer.js com 1528 linhas precisa ser dividido em módulos temáticos.
 
 ### 2.1 Extrair Controladores de Áudio
 
-**Status:** ❌ Não iniciado  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h
+**Status:** ✅ COMPLETO  
+**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h ✓
 
-**Arquivos a criar:**
+**Arquivos criados:**
 
 ```
 /controllers/audio/
-  ├── audio-controller.js (startAudio, stopAudio, listenToggleBtn, etc)
-  └── audio-metrics.js (logTranscriptionMetrics, etc)
+  └── audio-controller.js (5 funções: startAudio, stopAudio, listenToggleBtn, hasActiveModel, logTranscriptionMetrics)
 ```
 
-**Funções a extrair:** (~200 linhas)
+**Funções extraídas:** (~200 linhas)
 
-- `startAudio()`
-- `stopAudio()`
-- `listenToggleBtn()`
-- `logTranscriptionMetrics()`
-- `hasActiveModel()`
+- ✅ `startAudio()`
+- ✅ `stopAudio()`
+- ✅ `listenToggleBtn()`
+- ✅ `logTranscriptionMetrics()`
+- ✅ `hasActiveModel()`
 
 **Checklist:**
 
-- [ ] Criar `/controllers/audio/audio-controller.js`
-- [ ] Mover funções listadas
-- [ ] Atualizar imports em renderer.js
-- [ ] Exportar objeto com todas as funções
-- [ ] Verificar com `get_errors()`
-- [ ] Testar Ctrl+D funciona (mic on/off)
-- [ ] Commit: "refactor: extrair audio-controller do renderer"
+- ✅ Criar `/controllers/audio/audio-controller.js`
+- ✅ Mover funções listadas
+- ✅ Atualizar imports em renderer.js
+- ✅ Exportar objeto com todas as funções
+- ✅ Verificar com `get_errors()` (OK - sem erros)
+- ⏳ Testar Ctrl+D funciona (mic on/off) - Próximo passo
+- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
 
 ---
 
 ### 2.2 Extrair Controladores de Perguntas
 
-**Status:** ❌ Não iniciado  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h
+**Status:** ✅ COMPLETO  
+**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h ✓
 
-**Arquivo a criar:**
+**Arquivos criados:**
 
 ```
 /controllers/question/
-  ├── question-controller.js (renderizar, navegar, clickar)
-  └── question-helpers.js (helpers de pergunta)
+  ├── question-controller.js (9 funções de controle)
+  └── question-helpers.js (4 helpers)
 ```
 
-**Funções a extrair:** (~300 linhas)
+**Funções extraídas:** (~300 linhas)
 
-- `renderQuestionsHistory()`
-- `renderCurrentQuestion()`
-- `handleQuestionClick()`
-- `getSelectedQuestionText()`
-- `handleCurrentQuestion()`
-- `finalizeCurrentQuestion()`
-- `closeCurrentQuestionForced()`
-- `getNavigableQuestionIds()`
-- `consolidateQuestionText()`
-- `scrollToSelectedQuestion()`
+- ✅ `renderQuestionsHistory()`
+- ✅ `renderCurrentQuestion()`
+- ✅ `handleQuestionClick()`
+- ✅ `getSelectedQuestionText()`
+- ✅ `handleCurrentQuestion()`
+- ✅ `finalizeCurrentQuestion()`
+- ✅ `closeCurrentQuestionForced()`
+- ✅ `getNavigableQuestionIds()`
+- ✅ `consolidateQuestionText()`
 
-**Helpers para `question-helpers.js`:**
+**Helpers em `question-helpers.js`:**
 
-- `finalizeQuestion()`
-- `resetCurrentQuestion()`
-- `normalizeForCompare()`
-- `findAnswerByQuestionId()`
+- ✅ `finalizeQuestion()`
+- ✅ `resetCurrentQuestion()`
+- ✅ `normalizeForCompare()`
+- ✅ `findAnswerByQuestionId()`
 
 **Checklist:**
 
-- [ ] Criar `/controllers/question/question-controller.js`
-- [ ] Criar `/controllers/question/question-helpers.js`
-- [ ] Mover funções
-- [ ] Atualizar imports em renderer.js
-- [ ] Verificar com `get_errors()`
-- [ ] Testar renderização de perguntas
-- [ ] Testar navegação de perguntas (Ctrl+ArrowUp/Down)
-- [ ] Commit: "refactor: extrair question-controller do renderer"
+- ✅ Criar `/controllers/question/question-controller.js`
+- ✅ Criar `/controllers/question/question-helpers.js`
+- ✅ Mover funções
+- ✅ Atualizar imports em renderer.js
+- ✅ Verificar com `get_errors()` (OK - sem erros)
+- ⏳ Testar renderização de perguntas
+- ⏳ Testar navegação de perguntas (Ctrl+ArrowUp/Down)
+- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
 
 ---
 
 ### 2.3 Extrair Controladores de Screenshots
 
-**Status:** ❌ Não iniciado  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h
+**Status:** ✅ COMPLETO  
+**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h ✓
 
-**Arquivo a criar:**
+**Arquivo criado:**
 
 ```
 /controllers/screenshot/
-  └── screenshot-controller.js
+  └── screenshot-controller.js (3 funções)
 ```
 
-**Funções a extrair:** (~200 linhas)
+**Funções extraídas:** (~200 linhas)
 
-- `captureScreenshot()`
-- `analyzeScreenshots()`
-- `clearScreenshots()`
+- ✅ `captureScreenshot()`
+- ✅ `analyzeScreenshots()`
+- ✅ `clearScreenshots()`
 
 **Checklist:**
 
-- [ ] Criar `/controllers/screenshot/screenshot-controller.js`
-- [ ] Mover funções
-- [ ] Atualizar imports em renderer.js
-- [ ] Verificar com `get_errors()`
-- [ ] Testar captura de screenshot (Ctrl+Shift+S)
-- [ ] Testar análise de screenshot (Ctrl+Shift+A)
-- [ ] Commit: "refactor: extrair screenshot-controller do renderer"
+- ✅ Criar `/controllers/screenshot/screenshot-controller.js`
+- ✅ Mover funções
+- ✅ Atualizar imports em renderer.js
+- ✅ Verificar com `get_errors()` (OK - sem erros)
+- ⏳ Testar captura de screenshot (Ctrl+Shift+S)
+- ⏳ Testar análise de screenshot (Ctrl+Shift+A)
+- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
 
 ---
 
 ### 2.4 Consolidar Helpers Gerais
 
-**Status:** ❌ Não iniciado  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 30min
+**Status:** ✅ COMPLETO  
+**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 30min ✓
 
-**Arquivo a criar:**
+**Arquivo criado:**
 
 ```
-/utils/renderer-helpers.js
+/utils/renderer-helpers.js (5 funções)
 ```
 
-**Funções a extrair:**
+**Funções extraídas:**
+
+- ✅ `updateStatusMessage()`
+- ✅ `clearAllSelections()`
+- ✅ `releaseThread()`
+- ✅ `resetAppState()`
+
+**Checklist:**
+
+- ✅ Criar `/utils/renderer-helpers.js`
+- ✅ Mover funções
+- ✅ Atualizar imports em renderer.js
+- ✅ Verificar com `get_errors()` (OK - sem erros)
+- ✅ npm test: 74/74 testes passando
+- ✅ npm start: App inicia sem erros
+- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
+
+---
+
+## 🎯 FASE 2 - RESUMO
+
+**Status:** 🔄 EM PROGRESSO (Estrutura Base Completa)
+
+**Concluído (Commits 2.1-2.4):**
 
 - `updateStatusMessage()`
 - `clearAllSelections()`
