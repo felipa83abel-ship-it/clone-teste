@@ -287,7 +287,7 @@ const whisperState = {
 /* ================================ */
 
 // Garante que o cliente OpenAI esteja inicializado
-async function ensureOpenAIClient() {
+async function _ensureOpenAIClient() {
   if (openaiClient) return true;
   return initializeOpenAIClient();
 }
@@ -306,7 +306,7 @@ async function initializeOpenAIClient(apiKey = null) {
 }
 
 // Reseta o cliente OpenAI (para reautenticação)
-function resetOpenAIClient() {
+function _resetOpenAIClient() {
   openaiClient = null;
 }
 
@@ -845,7 +845,7 @@ function clearInterim(source) {
 }
 
 // Atualiza interim transcript no UI
-function updateInterim(source, transcript, author) {
+function _updateInterim(source, transcript, author) {
   const interimId = source === INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
   getEventBus().emit('updateInterim', {
     id: interimId,

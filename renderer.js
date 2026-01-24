@@ -51,7 +51,6 @@ const {
 // 🎯 CONTROLADORES (Fase 2 - Decomposição)
 const audioController = require('./controllers/audio/audio-controller.js');
 const questionController = require('./controllers/question/question-controller.js');
-const screenshotController = require('./controllers/screenshot/screenshot-controller.js');
 const rendererHelpers = require('./utils/renderer-helpers.js');
 const uiElementsRegistry = require('./utils/ui-elements-registry.js');
 
@@ -63,8 +62,8 @@ const llmManager = new LLMManager();
 const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
 
 // 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
-const mockAutoPlayActive = false;
-const mockScenarioIndex = 0;
+const _mockAutoPlayActive = false;
+const _mockScenarioIndex = 0;
 
 // 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (atribuídas por screenshotController)
 /** @type {Function} */
@@ -137,7 +136,7 @@ eventBus.on('error', (error) => {
 (function protectAgainstScreenCapture() {
   // ✅ Desabilita getDisplayMedia (usado por Zoom, Meet, Teams para capturar)
   if (navigator?.mediaDevices?.getDisplayMedia) {
-    navigator.mediaDevices.getDisplayMedia = async function (...args) {
+    navigator.mediaDevices.getDisplayMedia = async function (..._args) {
       console.warn('🔐 BLOQUEADO: Tentativa de usar getDisplayMedia (captura de tela externa)');
       throw new Error('Screen capture not available in this window');
     };
@@ -146,7 +145,7 @@ eventBus.on('error', (error) => {
   // ✅ Desabilita captureStream (usado para captura de janela)
   if (globalThis.HTMLCanvasElement?.prototype.captureStream) {
     Object.defineProperty(globalThis.HTMLCanvasElement.prototype, 'captureStream', {
-      value: function () {
+      value: function (_this) {
         console.warn('🔐 BLOQUEADO: Tentativa de usar Canvas.captureStream()');
         throw new Error('Capture stream not available');
       },
@@ -158,15 +157,15 @@ eventBus.on('error', (error) => {
   // ✅ Intercepta getUserMedia para avisar sobre tentativas de captura de áudio
   if (navigator?.mediaDevices?.getUserMedia) {
     const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = async function (constraints) {
-      if (constraints?.video) {
+    navigator.mediaDevices.getUserMedia = async function (_constraints) {
+      if (_constraints?.video) {
         console.warn('🔐 AVISO: Tentativa de usar getUserMedia com vídeo detectada');
         // Ainda permite áudio, mas bloqueia vídeo para captura
-        if (constraints.video) {
-          delete constraints.video;
+        if (_constraints.video) {
+          delete _constraints.video;
         }
       }
-      return originalGetUserMedia(constraints);
+      return originalGetUserMedia(_constraints);
     };
   }
 
@@ -177,10 +176,7 @@ eventBus.on('error', (error) => {
 //	CONSTANTES
 /* ================================ */
 
-const YOU = 'Você';
-const OTHER = 'Outros';
-
-const ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
+const _ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
 
 const SYSTEM_PROMPT = `
@@ -197,15 +193,10 @@ Regras de resposta (priorize sempre estas):
 //	ESTADO GLOBAL
 /* ================================ */
 
-let APP_CONFIG = {
-  MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
-};
-
 /* ================================ */
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
 /* ================================ */
 
-const UIElements = {};
 /**
  * Registra elementos UI no registry centralizado
  * DELEGADO para uiElementsRegistry
@@ -220,13 +211,13 @@ const registerUIElements = (elements) => uiElementsRegistry.register(elements);
  * Escuta evento de mudança de dispositivo
  * Emitido pelo config-manager
  */
-eventBus.on('audioDeviceChanged', async (data) => {
+eventBus.on('audioDeviceChanged', async (_data) => {
   try {
     const sttModel = getConfiguredSTTModel();
-    Logger.info('audioDeviceChanged', { model: sttModel, type: data.type });
+    Logger.info('audioDeviceChanged', { model: sttModel, type: _data.type });
 
-    if (!data?.type) {
-      Logger.warn('Dados inválidos para mudança de dispositivo', data);
+    if (!_data?.type) {
+      Logger.warn('Dados inválidos para mudança de dispositivo', _data);
       return;
     }
 
@@ -235,7 +226,7 @@ eventBus.on('audioDeviceChanged', async (data) => {
       return;
     }
 
-    await sttStrategy.switchDevice(sttModel, data.type, data.deviceId);
+    await sttStrategy.switchDevice(sttModel, _data.type, _data.deviceId);
   } catch (error) {
     Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });
   }
@@ -302,11 +293,11 @@ const {
   renderQuestionsHistory,
   renderCurrentQuestion,
   handleQuestionClick,
-  scrollToSelectedQuestion,
-  consolidateQuestionText,
+  _scrollToSelectedQuestion,
+  _consolidateQuestionText,
   handleCurrentQuestion,
-  finalizeCurrentQuestion,
-  closeCurrentQuestionForced,
+  _finalizeCurrentQuestion,
+  _closeCurrentQuestionForced,
 } = questionController;
 
 /**
@@ -359,7 +350,7 @@ function normalizeForCompare(t) {
  * Funções utilitárias (delegadas ao renderer-helpers e question-controller)
  */
 const { updateStatusMessage, clearAllSelections } = rendererHelpers;
-const { findAnswerByQuestionId } = require('./controllers/question/question-helpers.js');
+const { _findAnswerByQuestionId } = require('./controllers/question/question-helpers.js');
 
 /**
  * Obtém IDs navegáveis de perguntas (CURRENT + histórico)
@@ -406,7 +397,7 @@ sttStrategy.register('whisper-cpp-local', {
 /**
  * Inicia captura de áudio (delegado ao audio-controller)
  */
-const { startAudio, stopAudio } = audioController;
+const { _startAudio, _stopAudio } = audioController;
 
 /**
  * Reinicia pipeline de áudio
@@ -415,7 +406,7 @@ const { startAudio, stopAudio } = audioController;
 /**
  * Toggle do botão de escuta (delegado ao audio-controller)
  */
-const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioController;
+const { listenToggleBtn, _hasActiveModel, _logTranscriptionMetrics } = audioController;
 
 /* ================================ */
 //	RENDERIZAÇÃO E NAVEGAÇÃO DE UI
@@ -446,21 +437,21 @@ const { listenToggleBtn, hasActiveModel, logTranscriptionMetrics } = audioContro
  * Configuração do Marked.js para renderização de Markdown
  * @type {any}
  */
-const markedOptions = {
+const _markedOptions = {
   breaks: true,
   gfm: true, // GitHub Flavored Markdown
-  highlight: function (code, lang) {
+  highlight: function (_code, _lang) {
     // @ts-ignore - highlight.js types não exportam esses métodos publicamente
-    if (lang && hljs?.getLanguage?.(lang)) {
+    if (_lang && hljs?.getLanguage?.(_lang)) {
       // @ts-ignore
-      return hljs.highlight(code, { language: lang }).value;
+      return hljs.highlight(_code, { language: _lang }).value;
     }
     // @ts-ignore
-    return hljs.highlightAuto(code).value;
+    return hljs.highlightAuto(_code).value;
   },
 };
 if (marked?.setOptions) {
-  marked.setOptions(markedOptions);
+  marked.setOptions(_markedOptions);
 }
 
 /* ================================ */
@@ -499,7 +490,7 @@ if (marked?.setOptions) {
  */
 async function askLLM(questionId = null) {
   try {
-    const CURRENT_QUESTION_ID = 'CURRENT';
+    const _CURRENT_QUESTION_ID = 'CURRENT';
     const targetQuestionId = questionId || appState.selectedId;
 
     // 1. Validar (antigo validateAskLlmRequest)
@@ -560,7 +551,7 @@ async function askLLM(questionId = null) {
 /**
  * Libera a thread e reseta o app (delegado ao renderer-helpers)
  */
-const { releaseThread, resetAppState } = rendererHelpers;
+const { _releaseThread, resetAppState } = rendererHelpers;
 
 //	DEBUG LOG RENDERER
 /* ================================ */
@@ -661,7 +652,7 @@ const RendererAPI = {
 
   // API Key
   setAppConfig: (config) => {
-    APP_CONFIG = config;
+    Object.assign(APP_CONFIG, config);
     // 🎭 Inicializa mock interceptor se MODE_DEBUG estiver ativo
     if (APP_CONFIG.MODE_DEBUG) {
       mockRunner.initMockInterceptor({

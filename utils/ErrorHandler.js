@@ -127,7 +127,7 @@ class ErrorHandler {
    * @param {string} originalMessage - Mensagem original
    * @returns {string} Mensagem amigável
    */
-  static getUserFriendlyMessage(errorType, originalMessage) {
+  static getUserFriendlyMessage(errorType, _originalMessage) {
     const messages = {
       [this.ErrorTypes.VALIDATION_ERROR]:
         'Dados fornecidos inválidos. Verifique e tente novamente.',

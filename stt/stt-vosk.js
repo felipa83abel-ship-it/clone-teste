@@ -19,7 +19,7 @@
 /* ================================ */
 
 const { spawn } = require('node:child_process');
-const path = require('node:path');
+const _path = require('node:path');
 const EventBus = require('../events/EventBus.js');
 const { getVADEngine } = require('./vad-engine');
 

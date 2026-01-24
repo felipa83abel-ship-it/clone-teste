@@ -38,7 +38,7 @@ class VolumeAudioWorkletProcessor extends AudioWorkletProcessor {
     this.thresholdRms = 0.002; // Default para filtrar ruído
   }
 
-  process(inputs, outputs, parameters) {
+  process(inputs, _outputs, _parameters) {
     const input = inputs[0];
     if (!input || input.length === 0) {
       return true;

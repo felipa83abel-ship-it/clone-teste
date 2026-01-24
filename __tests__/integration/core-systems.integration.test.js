@@ -210,7 +210,7 @@ describe('Integration Tests - Core Systems', () => {
 
       try {
         modeManager.setMode('INVALID');
-      } catch (e) {
+      } catch {
         // Ignore error
       }
 

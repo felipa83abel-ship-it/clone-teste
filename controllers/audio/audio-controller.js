@@ -7,8 +7,8 @@
 
 const Logger = require('../../utils/Logger.js');
 // @ts-ignore - destructuring com CommonJS
-const { AppState } = require('../../state/AppState.js');
-const EventBus = require('../../events/EventBus.js');
+const { _AppState } = require('../../state/AppState.js');
+const _EventBus = require('../../events/EventBus.js');
 
 // As variáveis globais são passadas como dependências
 let appState;
@@ -16,15 +16,15 @@ let eventBus;
 let sttStrategy;
 let globalConfig; // Referência ao configManager global
 let UIElements;
-let CURRENT_QUESTION_ID;
-let modeManager;
-let MODES;
+let _CURRENT_QUESTION_ID;
+let _modeManager;
+let _MODES;
 
 // Importes para buscar configuração
 let getConfiguredSTTModel;
 let closeCurrentQuestionForced;
 let updateStatusMessage;
-let findAnswerByQuestionId;
+let _findAnswerByQuestionId;
 
 /**
  * Inicializar audio-controller com dependências
@@ -36,15 +36,15 @@ function initAudioController(deps) {
   sttStrategy = deps.sttStrategy;
   globalConfig = deps.globalConfig;
   UIElements = deps.UIElements;
-  CURRENT_QUESTION_ID = deps.CURRENT_QUESTION_ID;
-  modeManager = deps.modeManager;
-  MODES = deps.MODES;
+  _CURRENT_QUESTION_ID = deps.CURRENT_QUESTION_ID;
+  _modeManager = deps.modeManager;
+  _MODES = deps.MODES;
 
   // Funções externas
   getConfiguredSTTModel = deps.getConfiguredSTTModel;
   closeCurrentQuestionForced = deps.closeCurrentQuestionForced;
   updateStatusMessage = deps.updateStatusMessage;
-  findAnswerByQuestionId = deps.findAnswerByQuestionId;
+  _findAnswerByQuestionId = deps.findAnswerByQuestionId;
 }
 
 /**

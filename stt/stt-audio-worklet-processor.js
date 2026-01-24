@@ -56,7 +56,7 @@ class STTAudioWorkletProcessor extends AudioWorkletProcessor {
 
   // NOSONAR javascript:S3516
 
-  process(inputs, outputs, parameters) {
+  process(inputs, _outputs, _parameters) {
     const input = inputs[0];
     if (!input || input.length === 0) {
       // NOSONAR javascript:S3516

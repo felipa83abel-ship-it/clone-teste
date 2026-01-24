@@ -1845,7 +1845,7 @@ class ConfigManager {
     // ⏹️ LISTENER: onAnswerStreamEnd
     // Chamado quando stream termina
     // ═══════════════════════════════════════════════════════════════════════════════════
-    globalThis.eventBus.on('answerStreamEnd', (data) => {
+    globalThis.eventBus.on('answerStreamEnd', (_data) => {
       Logger.debug('✅ [STREAM_END] Limpando streamingQuestionId', false);
       currentStreamingQuestionId = null;
     });
@@ -2339,7 +2339,7 @@ class ConfigManager {
 
     // LLM Stream chunks
     if (globalThis.RendererAPI?.onLlmStreamChunk) {
-      globalThis.RendererAPI.onLlmStreamChunk((_, token) => {
+      globalThis.RendererAPI.onLlmStreamChunk((_chunk, _token) => {
         // Handled in renderer service
       });
     }
@@ -2563,7 +2563,7 @@ class ConfigManager {
         });
       };
 
-      const onPointerUp = (ev) => {
+      const onPointerUp = (_ev) => {
         try {
           dragHandle.removeEventListener('pointermove', onPointerMove);
           dragHandle.removeEventListener('pointerup', onPointerUp);

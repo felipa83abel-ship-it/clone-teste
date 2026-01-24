@@ -84,7 +84,7 @@ describe('ModeManager', () => {
 
     test('should not validate empty/whitespace questions in interview mode', () => {
       const result1 = modeManager.validateQuestion('');
-      const result2 = modeManager.validateQuestion('   ');
+      const _result2 = modeManager.validateQuestion('   ');
 
       // Empty string is falsy
       expect(!result1).toBe(true);

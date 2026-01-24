@@ -127,22 +127,22 @@ class ModeManager {
 // MODO INTERVIEW: Modo de entrevista
 // ============================================
 const InterviewModeHandlers = {
-  onQuestionFinalize(question) {
+  onQuestionFinalize(_question) {
     // No modo entrevista: sempre promove para histórico e incrementa turnId
     return true;
   },
 
-  onAnswerStreamEnd(data) {
+  onAnswerStreamEnd(_data) {
     // No modo entrevista: marca turnId que foi respondido
     return true;
   },
 
-  onQuestionClick(questionId) {
+  onQuestionClick(_questionId) {
     // No modo entrevista: bloqueia re-perguntas se já foi respondida
     return true;
   },
 
-  canReAsk(questionId) {
+  canReAsk(_questionId) {
     // Modo entrevista: nunca permite re-perguntar
     return false;
   },
@@ -152,9 +152,9 @@ const InterviewModeHandlers = {
     return 'interview';
   },
 
-  validateQuestion(question) {
+  validateQuestion(_question) {
     // Modo entrevista: aceita qualquer pergunta com texto
-    return question && question.trim().length > 0;
+    return _question && _question.trim().length > 0;
   },
 };
 
@@ -162,22 +162,22 @@ const InterviewModeHandlers = {
 // MODO NORMAL: Modo normal (sem modo entrevista)
 // ============================================
 const NormalModeHandlers = {
-  onQuestionFinalize(question) {
+  onQuestionFinalize(_question) {
     // No modo normal: apenas consolida, não incrementa turnId
     return true;
   },
 
-  onAnswerStreamEnd(data) {
+  onAnswerStreamEnd(_data) {
     // No modo normal: sem rastreamento de turno
     return true;
   },
 
-  onQuestionClick(questionId) {
+  onQuestionClick(_questionId) {
     // No modo normal: sempre permite perguntar
     return true;
   },
 
-  canReAsk(questionId) {
+  canReAsk(_questionId) {
     // Modo normal: sempre permite re-perguntar
     return true;
   },
@@ -187,9 +187,9 @@ const NormalModeHandlers = {
     return 'normal';
   },
 
-  validateQuestion(question) {
+  validateQuestion(_question) {
     // Modo normal: aceita qualquer pergunta com texto
-    return question && question.trim().length > 0;
+    return _question && _question.trim().length > 0;
   },
 };
 

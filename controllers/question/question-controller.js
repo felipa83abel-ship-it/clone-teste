@@ -5,7 +5,7 @@
 
 const Logger = require('../../utils/Logger.js');
 const {
-  normalizeForCompare,
+  _normalizeForCompare,
   finalizeQuestion,
   resetCurrentQuestion,
   findAnswerByQuestionId,

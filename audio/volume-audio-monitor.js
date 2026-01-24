@@ -32,9 +32,9 @@ const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se 
 /* ================================ */
 
 const INPUT = 'input';
-const OUTPUT = 'output';
+const _OUTPUT = 'output';
 
-const AUDIO_SAMPLE_RATE = 16000; // Hz
+const _AUDIO_SAMPLE_RATE = 16000; // Hz
 
 // AudioWorkletProcessor
 const VOLUME_MONITOR_WORKLET = 'volume-audio-worklet-processor';
