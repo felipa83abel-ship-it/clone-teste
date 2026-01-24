@@ -1,5 +1,5 @@
 // @ts-check
-/* global HTMLElement, APP_CONFIG */
+/* global HTMLElement */
 
 /* ================================ */
 //	IMPORTES E DEPENDÊNCIAS
@@ -177,7 +177,6 @@ eventBus.on('error', (error) => {
 /* ================================ */
 
 const _ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
-const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
 
 const SYSTEM_PROMPT = `
 Você é um assistente para entrevistas técnicas de Java. Responda como candidato.
@@ -192,6 +191,12 @@ Regras de resposta (priorize sempre estas):
 /* ================================ */
 //	ESTADO GLOBAL
 /* ================================ */
+
+const APP_CONFIG = {
+  MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
+};
+
+const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
 
 /* ================================ */
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
@@ -293,11 +298,7 @@ const {
   renderQuestionsHistory,
   renderCurrentQuestion,
   handleQuestionClick,
-  _scrollToSelectedQuestion,
-  _consolidateQuestionText,
   handleCurrentQuestion,
-  _finalizeCurrentQuestion,
-  _closeCurrentQuestionForced,
 } = questionController;
 
 /**
@@ -350,7 +351,6 @@ function normalizeForCompare(t) {
  * Funções utilitárias (delegadas ao renderer-helpers e question-controller)
  */
 const { updateStatusMessage, clearAllSelections } = rendererHelpers;
-const { _findAnswerByQuestionId } = require('./controllers/question/question-helpers.js');
 
 /**
  * Obtém IDs navegáveis de perguntas (CURRENT + histórico)
@@ -395,18 +395,9 @@ sttStrategy.register('whisper-cpp-local', {
 /* ================================ */
 
 /**
- * Inicia captura de áudio (delegado ao audio-controller)
- */
-const { _startAudio, _stopAudio } = audioController;
-
-/**
- * Reinicia pipeline de áudio
- */
-
-/**
  * Toggle do botão de escuta (delegado ao audio-controller)
  */
-const { listenToggleBtn, _hasActiveModel, _logTranscriptionMetrics } = audioController;
+const { listenToggleBtn } = audioController;
 
 /* ================================ */
 //	RENDERIZAÇÃO E NAVEGAÇÃO DE UI
@@ -490,7 +481,6 @@ if (marked?.setOptions) {
  */
 async function askLLM(questionId = null) {
   try {
-    const _CURRENT_QUESTION_ID = 'CURRENT';
     const targetQuestionId = questionId || appState.selectedId;
 
     // 1. Validar (antigo validateAskLlmRequest)
@@ -551,7 +541,7 @@ async function askLLM(questionId = null) {
 /**
  * Libera a thread e reseta o app (delegado ao renderer-helpers)
  */
-const { _releaseThread, resetAppState } = rendererHelpers;
+const { resetAppState } = rendererHelpers;
 
 //	DEBUG LOG RENDERER
 /* ================================ */

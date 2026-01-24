@@ -18,7 +18,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "check-types": "bash check-types.sh"
+    "check-types": "tsc -p jsconfig.json --pretty"
   },
   "keywords": [],
   "author": "",

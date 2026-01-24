@@ -8,7 +8,7 @@
  */
 
 const { _electron: electron } = require('playwright');
-const path = require('path');
+const path = require('node:path');
 
 /**
  * Inicia a aplicação Electron com modo de teste

@@ -1043,7 +1043,6 @@ function createWindow() {
 //	INICIALIZAÇÃO DO APP
 /* ================================ */
 
-// sonarlint-disable javascript:S7785
 app.whenReady().then(() => {
   // Registra todos os handlers IPC
   registerIPCHandlers();

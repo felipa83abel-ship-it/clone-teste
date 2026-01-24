@@ -94,7 +94,7 @@ class ErrorHandler {
       message.includes('api') ||
       message.includes('request') ||
       message.includes('response') ||
-      error?.status
+      (error && typeof error === 'object' && 'status' in error)
     ) {
       return this.ErrorTypes.API_ERROR;
     }
@@ -124,7 +124,6 @@ class ErrorHandler {
   /**
    * Retorna mensagem amigável para o usuário baseada no tipo de erro
    * @param {string} errorType - Tipo de erro
-   * @param {string} originalMessage - Mensagem original
    * @returns {string} Mensagem amigável
    */
   static getUserFriendlyMessage(errorType, _originalMessage) {
@@ -180,7 +179,17 @@ class ErrorHandler {
    */
   static createError(message, type = this.ErrorTypes.INTERNAL_ERROR) {
     const error = new Error(message);
-    error.type = type;
+    try {
+      Object.defineProperty(error, 'type', {
+        value: type,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      });
+    } catch {
+      // Se não conseguir adicionar propriedade, apenas continua
+      // Alguns tipos de Error não permitem adicionar propriedades
+    }
     return error;
   }
 

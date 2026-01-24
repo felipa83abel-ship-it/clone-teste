@@ -15,11 +15,9 @@ const Logger = require('../../utils/Logger.js');
 const { ipcRenderer } = require('electron');
 
 class GeminiHandler {
-  constructor() {
-    this.initialized = false;
-    this.logger = Logger;
-    this.model = 'gemini-pro';
-  }
+  initialized = false;
+  logger = Logger;
+  model = 'gemini-pro';
 
   /**
    * Inicializar handler (apenas marca como pronto, main.js cuida do client)

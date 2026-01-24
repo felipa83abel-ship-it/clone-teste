@@ -6,7 +6,6 @@
  * 3. handleLLMBatch() - modo normal
  */
 
-const { _ipcRenderer } = require('electron');
 const Logger = require('../utils/Logger.js');
 
 /**

@@ -1,15 +1,17 @@
 {
   "compilerOptions": {
-    "target": "ES2021",
+    "target": "ES2022",
     "module": "ES2020",
-    "lib": ["ES2021", "dom"],
+    "lib": ["ES2022", "dom"],
     "checkJs": true,
     "allowJs": true,
     "noEmit": true,
     "strict": false,
     "noImplicitAny": false,
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
@@ -20,6 +22,7 @@
   },
   "include": [
     "*.js",
+    "types/**/*.d.ts",
     "state/**/*.js",
     "events/**/*.js",
     "llm/**/*.js",

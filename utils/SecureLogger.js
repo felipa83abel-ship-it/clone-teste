@@ -59,7 +59,7 @@ class SecureLogger {
     console.error(`❌ ${message}`);
     if (isDev && error) {
       console.error(error);
-    } else if (error && error.message) {
+    } else if (error?.message) {
       // Em produção, mostra apenas a mensagem, nunca o stack trace
       console.error(`   ${error.message}`);
     }

@@ -10,7 +10,7 @@
  */
 
 const { defineConfig, devices } = require('@playwright/test');
-const _path = require('path');
+const _path = require('node:path');
 
 module.exports = defineConfig({
   testDir: './__tests__/e2e',
