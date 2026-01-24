@@ -45,96 +45,96 @@ const VOLUME_MONITOR_WORKLET_PATH = './audio/volume-audio-worklet-processor.js';
 /* ================================ */
 
 const volumeMonitorState = {
-	input: {
-		_isActive: false,
-		_stream: null,
-		_audioContext: null,
-		_processor: null,
-		_source: null,
-		_deviceId: null,
+  input: {
+    _isActive: false,
+    _stream: null,
+    _audioContext: null,
+    _processor: null,
+    _source: null,
+    _deviceId: null,
 
-		isActive() {
-			return this._isActive;
-		},
-		setActive(val) {
-			this._isActive = val;
-		},
-		stream() {
-			return this._stream;
-		},
-		setStream(val) {
-			this._stream = val;
-		},
-		audioContext() {
-			return this._audioContext;
-		},
-		setAudioContext(val) {
-			this._audioContext = val;
-		},
-		processor() {
-			return this._processor;
-		},
-		setProcessor(val) {
-			this._processor = val;
-		},
-		source() {
-			return this._source;
-		},
-		setSource(val) {
-			this._source = val;
-		},
-		deviceId() {
-			return this._deviceId;
-		},
-		setDeviceId(val) {
-			this._deviceId = val;
-		},
-	},
-	output: {
-		_isActive: false,
-		_stream: null,
-		_audioContext: null,
-		_processor: null,
-		_source: null,
-		_deviceId: null,
+    isActive() {
+      return this._isActive;
+    },
+    setActive(val) {
+      this._isActive = val;
+    },
+    stream() {
+      return this._stream;
+    },
+    setStream(val) {
+      this._stream = val;
+    },
+    audioContext() {
+      return this._audioContext;
+    },
+    setAudioContext(val) {
+      this._audioContext = val;
+    },
+    processor() {
+      return this._processor;
+    },
+    setProcessor(val) {
+      this._processor = val;
+    },
+    source() {
+      return this._source;
+    },
+    setSource(val) {
+      this._source = val;
+    },
+    deviceId() {
+      return this._deviceId;
+    },
+    setDeviceId(val) {
+      this._deviceId = val;
+    },
+  },
+  output: {
+    _isActive: false,
+    _stream: null,
+    _audioContext: null,
+    _processor: null,
+    _source: null,
+    _deviceId: null,
 
-		isActive() {
-			return this._isActive;
-		},
-		setActive(val) {
-			this._isActive = val;
-		},
-		stream() {
-			return this._stream;
-		},
-		setStream(val) {
-			this._stream = val;
-		},
-		audioContext() {
-			return this._audioContext;
-		},
-		setAudioContext(val) {
-			this._audioContext = val;
-		},
-		processor() {
-			return this._processor;
-		},
-		setProcessor(val) {
-			this._processor = val;
-		},
-		source() {
-			return this._source;
-		},
-		setSource(val) {
-			this._source = val;
-		},
-		deviceId() {
-			return this._deviceId;
-		},
-		setDeviceId(val) {
-			this._deviceId = val;
-		},
-	},
+    isActive() {
+      return this._isActive;
+    },
+    setActive(val) {
+      this._isActive = val;
+    },
+    stream() {
+      return this._stream;
+    },
+    setStream(val) {
+      this._stream = val;
+    },
+    audioContext() {
+      return this._audioContext;
+    },
+    setAudioContext(val) {
+      this._audioContext = val;
+    },
+    processor() {
+      return this._processor;
+    },
+    setProcessor(val) {
+      this._processor = val;
+    },
+    source() {
+      return this._source;
+    },
+    setSource(val) {
+      this._source = val;
+    },
+    deviceId() {
+      return this._deviceId;
+    },
+    setDeviceId(val) {
+      this._deviceId = val;
+    },
+  },
 };
 
 /* ================================ */
@@ -147,33 +147,33 @@ const volumeMonitorState = {
  * @returns {Promise<void>}
  */
 async function registerVolumeMonitorWorklet(audioContext) {
-	if (!audioContext) {
-		console.error('❌ AudioContext não disponível para registrar worklet');
-		return;
-	}
+  if (!audioContext) {
+    console.error('❌ AudioContext não disponível para registrar worklet');
+    return;
+  }
 
-	// 🔥 Verifica se worklet já foi registrado neste AudioContext
-	// Armazena em propriedade do contexto para rastrear
-	const REGISTERED_KEY = '_volumeMonitorWorkletRegistered';
-	if (audioContext[REGISTERED_KEY]) {
-		console.log('ℹ️ Volume monitor worklet já registrado neste AudioContext');
-		return;
-	}
+  // 🔥 Verifica se worklet já foi registrado neste AudioContext
+  // Armazena em propriedade do contexto para rastrear
+  const REGISTERED_KEY = '_volumeMonitorWorkletRegistered';
+  if (audioContext[REGISTERED_KEY]) {
+    console.log('ℹ️ Volume monitor worklet já registrado neste AudioContext');
+    return;
+  }
 
-	try {
-		console.log(`📂 Tentando carregar worklet de: ${VOLUME_MONITOR_WORKLET_PATH}`);
+  try {
+    console.log(`📂 Tentando carregar worklet de: ${VOLUME_MONITOR_WORKLET_PATH}`);
 
-		// 🔥 Path deve ser relativo ao arquivo HTML (index.html), não ao módulo
-		await audioContext.audioWorklet.addModule(VOLUME_MONITOR_WORKLET_PATH);
-		audioContext[REGISTERED_KEY] = true; // Marca como registrado
-		console.log('✅ Volume monitor worklet registrado com sucesso');
-	} catch (err) {
-		console.error('❌ Erro ao registrar volume monitor worklet:');
-		console.error('   Nome:', err.name);
-		console.error('   Mensagem:', err.message);
-		console.error('   Stack:', err.stack);
-		throw new Error(`Failed to load AudioWorklet: ${err.message}`);
-	}
+    // 🔥 Path deve ser relativo ao arquivo HTML (index.html), não ao módulo
+    await audioContext.audioWorklet.addModule(VOLUME_MONITOR_WORKLET_PATH);
+    audioContext[REGISTERED_KEY] = true; // Marca como registrado
+    console.log('✅ Volume monitor worklet registrado com sucesso');
+  } catch (err) {
+    console.error('❌ Erro ao registrar volume monitor worklet:');
+    console.error('   Nome:', err.name);
+    console.error('   Mensagem:', err.message);
+    console.error('   Stack:', err.stack);
+    throw new Error(`Failed to load AudioWorklet: ${err.message}`);
+  }
 }
 
 /* ================================ */
@@ -189,102 +189,102 @@ async function registerVolumeMonitorWorklet(audioContext) {
  * @returns {Promise<void>}
  */
 async function startAudioVolumeMonitor(source, deviceId) {
-	// 🔥 VALIDAÇÃO 1: Input e Output são STREAMS INDEPENDENTES
-	// Permite monitor mesmo se STT está rodando em outro stream
-	// (ex: STT no OUTPUT, monitor no INPUT - são devices diferentes)
-	const vars = volumeMonitorState[source];
+  // 🔥 VALIDAÇÃO 1: Input e Output são STREAMS INDEPENDENTES
+  // Permite monitor mesmo se STT está rodando em outro stream
+  // (ex: STT no OUTPUT, monitor no INPUT - são devices diferentes)
+  const vars = volumeMonitorState[source];
 
-	// 🔥 VALIDAÇÃO 2: Verifica se já está ativo PARA ESTE SOURCE
-	if (vars.isActive()) {
-		console.log(`ℹ️ Monitor de volume (${source}) já está ativo`);
-		return;
-	}
+  // 🔥 VALIDAÇÃO 2: Verifica se já está ativo PARA ESTE SOURCE
+  if (vars.isActive()) {
+    console.log(`ℹ️ Monitor de volume (${source}) já está ativo`);
+    return;
+  }
 
-	// 🔥 VALIDAÇÃO 3: Verifica deviceId
-	if (!deviceId) {
-		console.warn(`⚠️ Nenhum dispositivo ${source} selecionado para monitor de volume`);
-		return;
-	}
+  // 🔥 VALIDAÇÃO 3: Verifica deviceId
+  if (!deviceId) {
+    console.warn(`⚠️ Nenhum dispositivo ${source} selecionado para monitor de volume`);
+    return;
+  }
 
-	try {
-		console.log(`🎛️ Iniciando monitor de volume (${source}) com dispositivo: ${deviceId}...`);
+  try {
+    console.log(`🎛️ Iniciando monitor de volume (${source}) com dispositivo: ${deviceId}...`);
 
-		// 1️⃣ Cria ou reutiliza AudioContext
-		let audioContext = vars.audioContext();
-		if (!audioContext) {
-			audioContext = new AudioContext();
-			vars.setAudioContext(audioContext);
-			console.log(`✅ AudioContext criado com sucesso`);
-		}
+    // 1️⃣ Cria ou reutiliza AudioContext
+    let audioContext = vars.audioContext();
+    if (!audioContext) {
+      audioContext = new AudioContext();
+      vars.setAudioContext(audioContext);
+      console.log(`✅ AudioContext criado com sucesso`);
+    }
 
-		// 2️⃣ Registra worklet
-		try {
-			await registerVolumeMonitorWorklet(audioContext);
-		} catch (error_) {
-			console.error(`❌ Não consegui registrar worklet:`, error_.message);
-			throw new Error(`AudioWorklet registration failed: ${error_.message}`);
-		}
+    // 2️⃣ Registra worklet
+    try {
+      await registerVolumeMonitorWorklet(audioContext);
+    } catch (error_) {
+      console.error(`❌ Não consegui registrar worklet:`, error_.message);
+      throw new Error(`AudioWorklet registration failed: ${error_.message}`);
+    }
 
-		// 3️⃣ Captura stream de áudio do dispositivo
-		let stream;
-		try {
-			stream = await navigator.mediaDevices.getUserMedia({
-				audio: { deviceId: { exact: deviceId } },
-			});
-			console.log(`✅ Stream de áudio capturado (${source})`);
-		} catch (error_) {
-			console.error(`❌ Erro ao capturar stream (${source}):`, error_.message);
-			throw error_;
-		}
-		vars.setStream(stream);
-		vars.setDeviceId(deviceId);
+    // 3️⃣ Captura stream de áudio do dispositivo
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { deviceId: { exact: deviceId } },
+      });
+      console.log(`✅ Stream de áudio capturado (${source})`);
+    } catch (error_) {
+      console.error(`❌ Erro ao capturar stream (${source}):`, error_.message);
+      throw error_;
+    }
+    vars.setStream(stream);
+    vars.setDeviceId(deviceId);
 
-		// 4️⃣ Cria source do stream
-		const source_obj = audioContext.createMediaStreamSource(stream);
-		vars.setSource(source_obj);
-		console.log(`✅ MediaStreamSource criado`);
+    // 4️⃣ Cria source do stream
+    const source_obj = audioContext.createMediaStreamSource(stream);
+    vars.setSource(source_obj);
+    console.log(`✅ MediaStreamSource criado`);
 
-		// 5️⃣ Cria AudioWorkletNode
-		let processor;
-		try {
-			processor = new AudioWorkletNode(audioContext, VOLUME_MONITOR_WORKLET);
-			console.log(`✅ AudioWorkletNode criado`);
-		} catch (error_) {
-			console.error(`❌ Erro ao criar AudioWorkletNode:`, error_.message);
-			throw error_;
-		}
-		vars.setProcessor(processor);
+    // 5️⃣ Cria AudioWorkletNode
+    let processor;
+    try {
+      processor = new AudioWorkletNode(audioContext, VOLUME_MONITOR_WORKLET);
+      console.log(`✅ AudioWorkletNode criado`);
+    } catch (error_) {
+      console.error(`❌ Erro ao criar AudioWorkletNode:`, error_.message);
+      throw error_;
+    }
+    vars.setProcessor(processor);
 
-		// 6️⃣ Processa mensagens do worklet
-		processor.port.onmessage = event => {
-			if (event.data.type === 'volumeUpdate') {
-				handleVolumeMonitorUpdate(source, event.data);
-			}
-		};
+    // 6️⃣ Processa mensagens do worklet
+    processor.port.onmessage = (event) => {
+      if (event.data.type === 'volumeUpdate') {
+        handleVolumeMonitorUpdate(source, event.data);
+      }
+    };
 
-		// 7️⃣ Conecta source → processor
-		source_obj.connect(processor);
-		// processor → audioContext.destination (para manter ativo)
-		processor.connect(audioContext.destination);
+    // 7️⃣ Conecta source → processor
+    source_obj.connect(processor);
+    // processor → audioContext.destination (para manter ativo)
+    processor.connect(audioContext.destination);
 
-		vars.setActive(true);
+    vars.setActive(true);
 
-		console.log(`✅ Monitor de volume (${source}) iniciado com sucesso`);
-	} catch (error) {
-		console.error(`❌ Erro ao iniciar monitor de volume (${source}):`, error);
+    console.log(`✅ Monitor de volume (${source}) iniciado com sucesso`);
+  } catch (error) {
+    console.error(`❌ Erro ao iniciar monitor de volume (${source}):`, error);
 
-		// Limpa estado em caso de erro
-		if (vars.stream()) {
-			vars
-				.stream()
-				.getTracks()
-				.forEach(track => track.stop());
-		}
-		vars.setStream(null);
-		vars.setProcessor(null);
-		vars.setSource(null);
-		vars.setActive(false);
-	}
+    // Limpa estado em caso de erro
+    if (vars.stream()) {
+      vars
+        .stream()
+        .getTracks()
+        .forEach((track) => track.stop());
+    }
+    vars.setStream(null);
+    vars.setProcessor(null);
+    vars.setSource(null);
+    vars.setActive(false);
+  }
 }
 
 /* ================================ */
@@ -296,46 +296,46 @@ async function startAudioVolumeMonitor(source, deviceId) {
  * @param {string} source - 'input' ou 'output'
  */
 function stopAudioVolumeMonitor(source) {
-	const vars = volumeMonitorState[source];
+  const vars = volumeMonitorState[source];
 
-	if (!vars.isActive()) {
-		console.log(`ℹ️ Monitor de volume (${source}) já está inativo`);
-		return;
-	}
+  if (!vars.isActive()) {
+    console.log(`ℹ️ Monitor de volume (${source}) já está inativo`);
+    return;
+  }
 
-	console.log(`🛑 Parando monitor de volume (${source})...`);
+  console.log(`🛑 Parando monitor de volume (${source})...`);
 
-	try {
-		// 1️⃣ Desconecta processor
-		if (vars.processor()) {
-			vars.processor().disconnect();
-			vars.setProcessor(null);
-		}
+  try {
+    // 1️⃣ Desconecta processor
+    if (vars.processor()) {
+      vars.processor().disconnect();
+      vars.setProcessor(null);
+    }
 
-		// 2️⃣ Para stream de áudio
-		if (vars.stream()) {
-			vars
-				.stream()
-				.getTracks()
-				.forEach(track => track.stop());
-			vars.setStream(null);
-		}
+    // 2️⃣ Para stream de áudio
+    if (vars.stream()) {
+      vars
+        .stream()
+        .getTracks()
+        .forEach((track) => track.stop());
+      vars.setStream(null);
+    }
 
-		// 3️⃣ Fecha source
-		if (vars.source()) {
-			vars.source().disconnect();
-			vars.setSource(null);
-		}
+    // 3️⃣ Fecha source
+    if (vars.source()) {
+      vars.source().disconnect();
+      vars.setSource(null);
+    }
 
-		// 4️⃣ Emite volume zerado para UI
-		const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-		getEventBus().emit(ev, { percent: 0 });
+    // 4️⃣ Emite volume zerado para UI
+    const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+    getEventBus().emit(ev, { percent: 0 });
 
-		vars.setActive(false);
-		console.log(`✅ Monitor de volume (${source}) parado`);
-	} catch (error) {
-		console.error(`❌ Erro ao parar monitor de volume (${source}):`, error);
-	}
+    vars.setActive(false);
+    console.log(`✅ Monitor de volume (${source}) parado`);
+  } catch (error) {
+    console.error(`❌ Erro ao parar monitor de volume (${source}):`, error);
+  }
 }
 
 /* ================================ */
@@ -349,40 +349,40 @@ function stopAudioVolumeMonitor(source) {
  * @returns {Promise<void>}
  */
 async function switchAudioVolumeDevice(source, newDeviceId) {
-	const vars = volumeMonitorState[source];
+  const vars = volumeMonitorState[source];
 
-	console.log(`🔄 [switchAudioVolumeDevice] Trocando dispositivo de ${source}`);
-	console.log(`   Dispositivo anterior: ${vars.deviceId() || 'NENHUM'}`);
-	console.log(`   Novo dispositivo: ${newDeviceId || 'NENHUM'}`);
+  console.log(`🔄 [switchAudioVolumeDevice] Trocando dispositivo de ${source}`);
+  console.log(`   Dispositivo anterior: ${vars.deviceId() || 'NENHUM'}`);
+  console.log(`   Novo dispositivo: ${newDeviceId || 'NENHUM'}`);
 
-	// Se o novo dispositivo é vazio ("Nenhum"), para o monitor
-	if (!newDeviceId || newDeviceId === '') {
-		console.log(`   → Dispositivo vazio, parando monitor...`);
-		stopAudioVolumeMonitor(source);
-		return;
-	}
+  // Se o novo dispositivo é vazio ("Nenhum"), para o monitor
+  if (!newDeviceId || newDeviceId === '') {
+    console.log(`   → Dispositivo vazio, parando monitor...`);
+    stopAudioVolumeMonitor(source);
+    return;
+  }
 
-	// Se não está ativo, INICIA com o novo dispositivo
-	if (!vars.isActive()) {
-		console.log(`   → Monitor inativo, INICIANDO com novo dispositivo...`);
-		await startAudioVolumeMonitor(source, newDeviceId);
-		return;
-	}
+  // Se não está ativo, INICIA com o novo dispositivo
+  if (!vars.isActive()) {
+    console.log(`   → Monitor inativo, INICIANDO com novo dispositivo...`);
+    await startAudioVolumeMonitor(source, newDeviceId);
+    return;
+  }
 
-	// Se está ativo, verifica se realmente mudou
-	if (vars.deviceId() === newDeviceId) {
-		console.log(`   → Dispositivo é o mesmo, nenhuma mudança necessária`);
-		return;
-	}
+  // Se está ativo, verifica se realmente mudou
+  if (vars.deviceId() === newDeviceId) {
+    console.log(`   → Dispositivo é o mesmo, nenhuma mudança necessária`);
+    return;
+  }
 
-	console.log(`   → Monitor ativo, REINICIANDO com novo dispositivo...`);
-	stopAudioVolumeMonitor(source);
+  console.log(`   → Monitor ativo, REINICIANDO com novo dispositivo...`);
+  stopAudioVolumeMonitor(source);
 
-	// Pequeno delay para garantir que tudo foi limpo
-	await new Promise(resolve => setTimeout(resolve, 100));
+  // Pequeno delay para garantir que tudo foi limpo
+  await new Promise((resolve) => setTimeout(resolve, 100));
 
-	// Reinicia com novo dispositivo
-	await startAudioVolumeMonitor(source, newDeviceId);
+  // Reinicia com novo dispositivo
+  await startAudioVolumeMonitor(source, newDeviceId);
 }
 
 /* ================================ */
@@ -395,9 +395,9 @@ async function switchAudioVolumeDevice(source, newDeviceId) {
  * @param {object} data - { percent: number }
  */
 function handleVolumeMonitorUpdate(source, data) {
-	// Emite para UI via EventBus
-	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-	getEventBus().emit(ev, { percent: data.percent });
+  // Emite para UI via EventBus
+  const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+  getEventBus().emit(ev, { percent: data.percent });
 }
 
 /* ================================ */
@@ -405,7 +405,7 @@ function handleVolumeMonitorUpdate(source, data) {
 /* ================================ */
 
 module.exports = {
-	startAudioVolumeMonitor,
-	stopAudioVolumeMonitor,
-	switchAudioVolumeDevice,
+  startAudioVolumeMonitor,
+  stopAudioVolumeMonitor,
+  switchAudioVolumeDevice,
 };

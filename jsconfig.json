@@ -1,30 +1,30 @@
 {
-	"compilerOptions": {
-		"target": "ES2020",
-		"module": "commonjs",
-		"lib": ["ES2020"],
-		"checkJs": true,
-		"allowJs": true,
-		"noEmit": true,
-		"strict": false,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"forceConsistentCasingInFileNames": true,
-		"moduleResolution": "node",
-		"resolveJsonModule": true,
-		"declaration": false,
-		"types": ["node", "@playwright/test"]
-	},
-	"include": [
-		"*.js",
-		"state/**/*.js",
-		"events/**/*.js",
-		"llm/**/*.js",
-		"strategies/**/*.js",
-		"utils/**/*.js",
-		"controllers/**/*.js",
-		"handlers/**/*.js",
-		"stt/**/*.js"
-	],
-	"exclude": ["node_modules", "__tests__", "coverage", "playwright-report"]
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "checkJs": true,
+    "allowJs": true,
+    "noEmit": true,
+    "strict": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "declaration": false,
+    "types": ["node", "@playwright/test"]
+  },
+  "include": [
+    "*.js",
+    "state/**/*.js",
+    "events/**/*.js",
+    "llm/**/*.js",
+    "strategies/**/*.js",
+    "utils/**/*.js",
+    "controllers/**/*.js",
+    "handlers/**/*.js",
+    "stt/**/*.js"
+  ],
+  "exclude": ["node_modules", "__tests__", "coverage", "playwright-report"]
 }

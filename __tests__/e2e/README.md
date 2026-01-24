@@ -131,21 +131,21 @@ const { test, expect } = require('@playwright/test');
 const { launchApp, closeApp } = require('./helpers');
 
 test.describe('Meu teste', () => {
-	let app, window;
+  let app, window;
 
-	test.beforeAll(async () => {
-		const result = await launchApp();
-		app = result.app;
-		window = result.window;
-	});
+  test.beforeAll(async () => {
+    const result = await launchApp();
+    app = result.app;
+    window = result.window;
+  });
 
-	test.afterAll(async () => {
-		await closeApp(app);
-	});
+  test.afterAll(async () => {
+    await closeApp(app);
+  });
 
-	test('Fazer algo', async () => {
-		expect(true).toBeTruthy();
-	});
+  test('Fazer algo', async () => {
+    expect(true).toBeTruthy();
+  });
 });
 ```
 

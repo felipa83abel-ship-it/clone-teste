@@ -12,13 +12,13 @@
  * facilitando manutenção futura se a fórmula de RMS→dB→% precisar mudar.
  */
 class AudioVolumeCalculator {
-	static calculatePercent(rms, thresholdRms = 0.002) {
-		if (typeof rms !== 'number' || rms < 0) return 0;
-		const db = 20 * Math.log10(rms || 1e-8);
-		let percent = Math.max(0, Math.min(100, ((db - -60) / -(-60)) * 100));
-		if (rms <= thresholdRms) percent = 0;
-		return percent;
-	}
+  static calculatePercent(rms, thresholdRms = 0.002) {
+    if (typeof rms !== 'number' || rms < 0) return 0;
+    const db = 20 * Math.log10(rms || 1e-8);
+    let percent = Math.max(0, Math.min(100, ((db - -60) / -(-60)) * 100));
+    if (rms <= thresholdRms) percent = 0;
+    return percent;
+  }
 }
 
 /**
@@ -33,72 +33,72 @@ class AudioVolumeCalculator {
  * 🔥 ADICIONADO: Envia também percentual de volume junto com os dados de áudio.
  */
 class STTAudioWorkletProcessor extends AudioWorkletProcessor {
-	constructor() {
-		super();
-		this.thresholdRms = 0.002; // Default, será sobrescrito por mensagem
-		this.frameBuffer = [];
-		this.postInterval = 0; // contador para controle de envio (se necessário)
+  constructor() {
+    super();
+    this.thresholdRms = 0.002; // Default, será sobrescrito por mensagem
+    this.frameBuffer = [];
+    this.postInterval = 0; // contador para controle de envio (se necessário)
 
-		this.port.onmessage = event => {
-			if (event.data.type === 'setThreshold') {
-				this.thresholdRms = event.data.threshold;
-			}
-			if (event.data.type === 'setPostIntervalMs') {
-				this.postIntervalMs = event.data.ms;
-			}
-		};
-	}
+    this.port.onmessage = (event) => {
+      if (event.data.type === 'setThreshold') {
+        this.thresholdRms = event.data.threshold;
+      }
+      if (event.data.type === 'setPostIntervalMs') {
+        this.postIntervalMs = event.data.ms;
+      }
+    };
+  }
 
-	// NOSONAR javascript:S3516
-	// eslint-disable-next-line no-unreachable
-	process(inputs, outputs, parameters) {
-		const input = inputs[0];
-		if (!input || input.length === 0) {
-			// NOSONAR javascript:S3516
-			// eslint-disable-next-line no-unreachable
-			return true;
-		}
+  // NOSONAR javascript:S3516
 
-		const inputData = input[0]; // Canal mono
+  process(inputs, outputs, parameters) {
+    const input = inputs[0];
+    if (!input || input.length === 0) {
+      // NOSONAR javascript:S3516
 
-		// Calcula RMS
-		let sum = 0;
-		for (const sample of inputData) {
-			sum += sample * sample;
-		}
-		const rms = Math.sqrt(sum / inputData.length);
+      return true;
+    }
 
-		// 🔥 Usa calculadora compartilhada para cálculo de volume (RMS → dB → percentual)
-		const percent = AudioVolumeCalculator.calculatePercent(rms, this.thresholdRms);
+    const inputData = input[0]; // Canal mono
 
-		// Converte sempre para PCM16 e envia --- envia continuamente para permitir VAD no lado do main thread
-		const pcm16 = new Int16Array(inputData.length);
-		for (let i = 0; i < inputData.length; i++) {
-			const s = Math.max(-1, Math.min(1, inputData[i]));
-			pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
-		}
+    // Calcula RMS
+    let sum = 0;
+    for (const sample of inputData) {
+      sum += sample * sample;
+    }
+    const rms = Math.sqrt(sum / inputData.length);
 
-		// Envia dados para o thread principal COM o volume/percent
-		// Nota: sampleRate está disponível no contexto global do AudioWorkletProcessor
-		this.port.postMessage(
-			{
-				type: 'audioData',
-				pcm16: pcm16.buffer,
-				percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
-				sampleRate: sampleRate || 16000, // Fallback para 16kHz se não disponível
-			},
-			[pcm16.buffer],
-		);
+    // 🔥 Usa calculadora compartilhada para cálculo de volume (RMS → dB → percentual)
+    const percent = AudioVolumeCalculator.calculatePercent(rms, this.thresholdRms);
 
-		// Sempre envia atualização de volume (pode ser 0 se estiver em silêncio ruidoso)
-		this.port.postMessage({
-			type: 'volumeUpdate',
-			percent: percent,
-		});
+    // Converte sempre para PCM16 e envia --- envia continuamente para permitir VAD no lado do main thread
+    const pcm16 = new Int16Array(inputData.length);
+    for (let i = 0; i < inputData.length; i++) {
+      const s = Math.max(-1, Math.min(1, inputData[i]));
+      pcm16[i] = s < 0 ? Math.round(s * 0x8000) : Math.round(s * 0x7fff);
+    }
 
-		// Nota: Esta função sempre retorna o mesmo valor por design, para manter o processamento contínuo, (obrigatório para AudioWorkletProcessor).
-		return percent >= 0; // NOSONAR javascript:S3516
-	}
+    // Envia dados para o thread principal COM o volume/percent
+    // Nota: sampleRate está disponível no contexto global do AudioWorkletProcessor
+    this.port.postMessage(
+      {
+        type: 'audioData',
+        pcm16: pcm16.buffer,
+        percent: percent, // 🔥 ADICIONADO: Enviar percent junto com audioData
+        sampleRate: sampleRate || 16000, // Fallback para 16kHz se não disponível
+      },
+      [pcm16.buffer]
+    );
+
+    // Sempre envia atualização de volume (pode ser 0 se estiver em silêncio ruidoso)
+    this.port.postMessage({
+      type: 'volumeUpdate',
+      percent: percent,
+    });
+
+    // Nota: Esta função sempre retorna o mesmo valor por design, para manter o processamento contínuo, (obrigatório para AudioWorkletProcessor).
+    return percent >= 0; // NOSONAR javascript:S3516
+  }
 }
 
 registerProcessor('stt-audio-worklet-processor', STTAudioWorkletProcessor);

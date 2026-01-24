@@ -64,63 +64,63 @@
 const Logger = require('../../utils/Logger.js');
 
 class AnthropicHandler {
-	initialized = false;
-	client = null;
-	logger = Logger;
+  initialized = false;
+  client = null;
+  logger = Logger;
 
-	/**
-	 * Inicializar cliente Anthropic
-	 * @param {string} apiKey - Anthropic API key
-	 */
-	async initialize(apiKey) {
-		try {
-			// NOSONAR TODO: Descomementar quando @anthropic-ai/sdk estiver instalado
-			// const Anthropic = require('@anthropic-ai/sdk');
-			// this.client = new Anthropic({ apiKey });
-			// this.initialized = true;
-			// this.logger.info('Anthropic handler inicializado', { model: 'claude-3-sonnet' });
+  /**
+   * Inicializar cliente Anthropic
+   * @param {string} apiKey - Anthropic API key
+   */
+  async initialize(apiKey) {
+    try {
+      // NOSONAR TODO: Descomementar quando @anthropic-ai/sdk estiver instalado
+      // const Anthropic = require('@anthropic-ai/sdk');
+      // this.client = new Anthropic({ apiKey });
+      // this.initialized = true;
+      // this.logger.info('Anthropic handler inicializado', { model: 'claude-3-sonnet' });
 
-			throw new Error('Anthropic handler: ainda não implementado - use OpenAI por enquanto');
-		} catch (error) {
-			Logger.error('Erro ao inicializar Anthropic', { error: error.message });
-			throw error;
-		}
-	}
+      throw new Error('Anthropic handler: ainda não implementado - use OpenAI por enquanto');
+    } catch (error) {
+      Logger.error('Erro ao inicializar Anthropic', { error: error.message });
+      throw error;
+    }
+  }
 
-	/**
-	 * Chamar Claude para completação (resposta completa)
-	 * @param {Array} messages - Array de mensagens {role, content}
-	 * @returns {Promise<string>} Resposta do modelo
-	 */
-	async complete(messages) {
-		if (!this.initialized) {
-			throw new Error('Anthropic handler não inicializado');
-		}
+  /**
+   * Chamar Claude para completação (resposta completa)
+   * @param {Array} messages - Array de mensagens {role, content}
+   * @returns {Promise<string>} Resposta do modelo
+   */
+  async complete(messages) {
+    if (!this.initialized) {
+      throw new Error('Anthropic handler não inicializado');
+    }
 
-		try {
-			throw new Error('Anthropic handler: complete() ainda não implementado');
-		} catch (error) {
-			Logger.error('Erro em Anthropic.complete()', { error: error.message });
-			throw error;
-		}
-	}
+    try {
+      throw new Error('Anthropic handler: complete() ainda não implementado');
+    } catch (error) {
+      Logger.error('Erro em Anthropic.complete()', { error: error.message });
+      throw error;
+    }
+  }
 
-	/**
-	 * Chamar Claude com streaming
-	 * @param {Array} messages - Array de mensagens {role, content}
-	 * @returns {AsyncGenerator<string>} Async generator que emite tokens
-	 */
-	async *stream(messages) {
-		// NOSONAR TODO: Implementar streaming real ao Claude quando @anthropic-ai/sdk estiver instalado
+  /**
+   * Chamar Claude com streaming
+   * @param {Array} messages - Array de mensagens {role, content}
+   * @returns {AsyncGenerator<string>} Async generator que emite tokens
+   */
+  async *stream(messages) {
+    // NOSONAR TODO: Implementar streaming real ao Claude quando @anthropic-ai/sdk estiver instalado
 
-		if (!this.initialized) {
-			yield '';
-			throw new Error('Anthropic handler não inicializado');
-		}
+    if (!this.initialized) {
+      yield '';
+      throw new Error('Anthropic handler não inicializado');
+    }
 
-		yield '';
-		throw new Error('Anthropic handler não implementado - instale @anthropic-ai/sdk');
-	}
+    yield '';
+    throw new Error('Anthropic handler não implementado - instale @anthropic-ai/sdk');
+  }
 }
 
 // ✅ Exporta como singleton (mesmo padrão de openai-handler)

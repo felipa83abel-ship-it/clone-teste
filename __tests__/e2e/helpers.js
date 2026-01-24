@@ -16,30 +16,30 @@ const path = require('path');
  * @returns {Promise<Object>} { app, window } - Instância da app e janela
  */
 async function launchApp(options = {}) {
-	const {
-		debug = false,
-		headless = !process.env.HEADED, // Padrão: headless, a menos que HEADED esteja setado
-	} = options;
+  const {
+    debug = false,
+    headless = !process.env.HEADED, // Padrão: headless, a menos que HEADED esteja setado
+  } = options;
 
-	// Variáveis de ambiente para modo debug/teste
-	const envVars = {
-		MODE_DEBUG: '1', // Habilita modo mock para STT/LLM
-		NODE_ENV: 'test',
-		...process.env,
-	};
+  // Variáveis de ambiente para modo debug/teste
+  const envVars = {
+    MODE_DEBUG: '1', // Habilita modo mock para STT/LLM
+    NODE_ENV: 'test',
+    ...process.env,
+  };
 
-	// Inicia a app Electron
-	const app = await electron.launch({
-		args: [path.join(__dirname, '../../main.js')],
-		env: envVars,
-		headless: headless && !debug,
-	});
+  // Inicia a app Electron
+  const app = await electron.launch({
+    args: [path.join(__dirname, '../../main.js')],
+    env: envVars,
+    headless: headless && !debug,
+  });
 
-	// Aguarda a primeira janela ser criada
-	const window = await app.firstWindow();
-	await window.waitForLoadState('networkidle');
+  // Aguarda a primeira janela ser criada
+  const window = await app.firstWindow();
+  await window.waitForLoadState('networkidle');
 
-	return { app, window };
+  return { app, window };
 }
 
 /**
@@ -47,7 +47,7 @@ async function launchApp(options = {}) {
  * @param {Object} app - Instância da app
  */
 async function closeApp(app) {
-	await app.close();
+  await app.close();
 }
 
 /**
@@ -55,8 +55,8 @@ async function closeApp(app) {
  * @param {Object} window - Janela Electron
  */
 async function toggleAudioCapture(window) {
-	await window.keyboard.press('Control+D');
-	await window.waitForTimeout(500); // Aguarda processamento
+  await window.keyboard.press('Control+D');
+  await window.waitForTimeout(500); // Aguarda processamento
 }
 
 /**
@@ -64,8 +64,8 @@ async function toggleAudioCapture(window) {
  * @param {Object} window - Janela Electron
  */
 async function sendToLLM(window) {
-	await window.keyboard.press('Control+Enter');
-	await window.waitForTimeout(1000); // Aguarda processamento
+  await window.keyboard.press('Control+Enter');
+  await window.waitForTimeout(1000); // Aguarda processamento
 }
 
 /**
@@ -73,8 +73,8 @@ async function sendToLLM(window) {
  * @param {Object} window - Janela Electron
  */
 async function captureScreenshot(window) {
-	await window.keyboard.press('Control+Shift+S');
-	await window.waitForTimeout(500); // Aguarda processamento
+  await window.keyboard.press('Control+Shift+S');
+  await window.waitForTimeout(500); // Aguarda processamento
 }
 
 /**
@@ -82,8 +82,8 @@ async function captureScreenshot(window) {
  * @param {Object} window - Janela Electron
  */
 async function analyzeScreenshot(window) {
-	await window.keyboard.press('Control+Shift+A');
-	await window.waitForTimeout(1000); // Aguarda processamento (envia para LLM)
+  await window.keyboard.press('Control+Shift+A');
+  await window.waitForTimeout(1000); // Aguarda processamento (envia para LLM)
 }
 
 /**
@@ -93,7 +93,7 @@ async function analyzeScreenshot(window) {
  * @returns {Promise<boolean>}
  */
 async function elementExists(window, selector) {
-	return (await window.$(selector)) !== null;
+  return (await window.$(selector)) !== null;
 }
 
 /**
@@ -103,7 +103,7 @@ async function elementExists(window, selector) {
  * @param {number} timeout - Timeout em ms
  */
 async function waitForElement(window, selector, timeout = 5000) {
-	await window.waitForSelector(selector, { timeout });
+  await window.waitForSelector(selector, { timeout });
 }
 
 /**
@@ -113,9 +113,9 @@ async function waitForElement(window, selector, timeout = 5000) {
  * @returns {Promise<string>}
  */
 async function getElementText(window, selector) {
-	const element = await window.$(selector);
-	if (!element) return null;
-	return await element.textContent();
+  const element = await window.$(selector);
+  if (!element) return null;
+  return await element.textContent();
 }
 
 /**
@@ -124,28 +124,28 @@ async function getElementText(window, selector) {
  * @param {Object} options - { timeout, interval }
  */
 async function waitForCondition(condition, options = {}) {
-	const { timeout = 10000, interval = 100 } = options;
-	const startTime = Date.now();
+  const { timeout = 10000, interval = 100 } = options;
+  const startTime = Date.now();
 
-	while (Date.now() - startTime < timeout) {
-		if (await condition()) {
-			return true;
-		}
-		await new Promise(resolve => setTimeout(resolve, interval));
-	}
+  while (Date.now() - startTime < timeout) {
+    if (await condition()) {
+      return true;
+    }
+    await new Promise((resolve) => setTimeout(resolve, interval));
+  }
 
-	throw new Error(`Condição não foi satisfeita em ${timeout}ms`);
+  throw new Error(`Condição não foi satisfeita em ${timeout}ms`);
 }
 
 module.exports = {
-	launchApp,
-	closeApp,
-	toggleAudioCapture,
-	sendToLLM,
-	captureScreenshot,
-	analyzeScreenshot,
-	elementExists,
-	waitForElement,
-	getElementText,
-	waitForCondition,
+  launchApp,
+  closeApp,
+  toggleAudioCapture,
+  sendToLLM,
+  captureScreenshot,
+  analyzeScreenshot,
+  elementExists,
+  waitForElement,
+  getElementText,
+  waitForCondition,
 };
