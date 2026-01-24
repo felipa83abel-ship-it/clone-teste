@@ -1678,7 +1678,6 @@ class ConfigManager {
 			const answersBox = document.getElementById('answersHistory');
 			if (!answersBox) return;
 
-			debugLogConfig('🎨 [onAnswerSelected] Removendo destaque anterior', false);
 			// remove seleção anterior
 			answersBox.querySelectorAll('.selected-answer').forEach(el => {
 				debugLogConfig('🎨 [onAnswerSelected] Removendo destaque de:', el.dataset.questionId, false);
@@ -2208,8 +2207,8 @@ class ConfigManager {
 				// Mesma regra que o clique do mouse
 				if (globalThis.RendererAPI?.handleQuestionClick) {
 					console.log('🔥 Atalho Ctrl+Enter detectado - chamando handleQuestionClick');
-					// Usar selectedQuestionId da API ou fallback para CURRENT
-					const selectedId = globalThis.RendererAPI?.selectedQuestionId || 'CURRENT';
+					// Usar selectedId da API (que sincroniza navegação) ou fallback para CURRENT
+					const selectedId = globalThis.RendererAPI?.selectedId || 'CURRENT';
 					globalThis.RendererAPI.handleQuestionClick(selectedId);
 				}
 			});
