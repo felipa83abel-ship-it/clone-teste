@@ -1,6 +1,6 @@
 # Arquitetura AskMe - Refatoração Completa
 
-Documento de referência da arquitetura após refatoração FASE 1-4 (jan 2026).
+Documento de referência da arquitetura após refatoração FASE 1-4 (jan 2026) com consolidação de Estado, Eventos e Modo.
 
 ## 📋 Visão Geral
 
@@ -11,52 +11,186 @@ Documento de referência da arquitetura após refatoração FASE 1-4 (jan 2026).
 │  USUÁRIO (Ctrl+D: captura áudio, Ctrl+Enter: pergunta) │
 └──────────────┬──────────────────────────────────────┘
                │
-        ┌──────▼────────┐
-        │   Overlay UI   │  (transparente, frameless, sempre visível)
-        │  (index.html)  │
-        └──────┬────────┘
+        ┌──────▼────────────────────────┐
+        │   Overlay UI (index.html)      │  (transparente, frameless, sempre visível)
+        │  ┌─ config-manager.js (DOM)    │
+        │  └─ RendererAPI (bridge)       │
+        └──────┬─────────────────────────┘
                │
-      ┌────────▼─────────┐
-      │  ModeController   │  (Fala → STT → LLM → Resposta)
-      └────────┬─────────┘
+      ┌────────▼──────────────────────────────┐
+      │   renderer.js (Orquestração)          │
+      │  ┌─ AppState (State Centralized)      │
+      │  ├─ EventBus (Global Events)          │
+      │  ├─ ModeManager (INTERVIEW/NORMAL)    │
+      │  └─ Event Listeners (Handler Chain)   │
+      └────────┬──────────────────────────────┘
                │
-    ┌──────────┼──────────┐
-    │          │          │
-    ▼          ▼          ▼
-  STT       LLM        IPC
- Engine    Manager    Handlers
+    ┌──────────┼──────────────────┐
+    │          │                  │
+    ▼          ▼                  ▼
+  STT       LLM               IPC (main.js)
+ Providers  Handlers         Electron APIs
 ```
+
+---
+
+## 🎯 Mudanças na Refatoração
+
+### ✅ Fase 1: Limpeza Rápida
+
+- Removido: `debugLogRenderer()` → centralizado em `Logger.debug()` com flag
+- Removido: `releaseThread()` duplicada
+- Isolado: Código mock em `mock-runner.js` (~500 linhas)
+- Removido: Funções mortas (`promoteCurrentToHistory`, `getNavigableQuestionIds`, `restartAudioPipeline`)
+
+### ✅ Fase 2: Consolidação de Estado
+
+- Migrado: 14 variáveis globais → `AppState` centralizado
+- Adicionado: Getters/setters em AppState para acesso simplificado
+- Exemplos: `appState.currentQuestion`, `appState.history`, `appState.selectedId`
+
+### ✅ Fase 3: Consolidação de Eventos
+
+- Removido: `UICallbacks` object (25+ callbacks)
+- Removido: Função `onUIChange()` obsoleta
+- Consolidado: Todos os eventos → `EventBus` global
+- Exemplo: `onError` → `error`, `onTranscriptAdd` → `transcriptAdd`
+
+### ✅ Fase 4: Consolidação de Modo
+
+- Criado: `ModeManager` class (201 linhas) centralizando lógica de modo
+- Removido: `CURRENT_MODE` global variable
+- Removido: `ModeController` antigo
+- Modos: `MODES.INTERVIEW` (streaming, auto-ask), `MODES.NORMAL` (batch)
+
+### 📊 Resultados
+
+- **renderer.js**: 2106 linhas → 1542 linhas (-564, -26.8%)
+- **Arquivos novos**: `mock-runner.js`, `mode-manager.js`
+- **Variáveis globais**: 16 → 1 (AppState)
+- **Sistemas de eventos**: 2 (UICallbacks + EventBus) → 1 (EventBus)
 
 ---
 
 ## 🎯 Camadas Principais
 
-### 1. **Renderer (Frontend)**
+### 1. **Renderer (Frontend) - Camada de Orquestração**
 
 **Arquivos**: `renderer.js`, `config-manager.js`, `index.html`, `styles.css`
 
-#### renderer.js
+#### renderer.js (Orquestrador Central)
 
-- **Ponto de entrada** do app (rodando no contexto renderer do Electron)
-- Expõe `window.RendererAPI` com métodos:
-  - `startAudioCapture()` / `stopAudioCapture()`
-  - `registerHotkey(keys, callback)`
-  - `setText(text)`
-  - Integração com medidores (VAD, volume)
+**Responsabilidades**:
 
-#### ModeController
+- Inicializa `AppState`, `EventBus`, `ModeManager`
+- Registra listeners para eventos globais
+- Orquestra fluxo: Captura de áudio → STT → LLM → Emissão de eventos
+- Expõe `window.RendererAPI` com métodos públicos
 
-- **Orquestra o fluxo** principal: Fala → STT → LLM → UI
-- Gerencia turnos (questions/answers) com `turnId` único
-- Estados: `IDLE`, `LISTENING`, `TRANSCRIBING`, `ASKING_LLM`, `WAITING_RESPONSE`
-- Heurísticas de silêncio/timeout configuráveis
+**Componentes principais**:
 
-#### config-manager.js
+```javascript
+// AppState: Estado centralizado
+appState.history          // array de perguntas
+appState.interview.currentQuestion  // pergunta sendo formada
+appState.selectedId       // pergunta selecionada
 
-- Persiste configurações em localStorage + secure store (electron-store)
-- Gerencia seleção de providers (OpenAI, Google/Gemini, OpenRouter)
-- UI abas: Geral, API e Modelos, Áudio, Privacidade, Reset
-- Integração com IPC para salvar/deletar chaves seguras
+// EventBus: Sistema de eventos único
+eventBus.on('transcriptAdd', data => {...})
+eventBus.emit('answerStreamChunk', {...})
+
+// ModeManager: Lógica de modo
+modeManager.is(MODES.INTERVIEW)   // checking modo
+modeManager.handle('onQuestionFinalize', ...)  // delegação
+```
+
+**Event Listeners Consolidados** (linhas 42-85):
+
+- `answerStreamChunk`: Streamer chunking para UI (INTERVIEW mode)
+- `llmStreamEnd`: Marca como respondida, limpa pergunta atual
+- `llmBatchEnd`: Marca como respondida, emite answerBatchEnd para UI
+- `error`: Handler global de erros
+- `audioDeviceChanged`: Reinicializa STT quando dispositivo muda
+
+#### AppState (estado/AppState.js)
+
+**Estrutura centralizada**:
+
+```javascript
+{
+  history: [],  // array de questions ({id, text, turnId, response})
+  interview: {
+    currentQuestion: {},       // pergunta sendo formada
+    interviewTurnId: 0,        // counter de turnos (INTERVIEW mode)
+    answeredQuestions: Set,    // tracking de respondidas
+    lastAskedQuestionNormalized: null,
+    llmRequestedQuestionId: null,
+    llmAnsweredTurnId: null
+  },
+  audio: {
+    isRunning: false,
+    capturedScreenshots: [],
+    isCapturing: false,
+    isAnalyzing: false
+  },
+  window: {
+    isDraggingWindow: false,
+    selectedId: null  // pergunta selecionada via navegação
+  }
+}
+```
+
+**Getters/Setters para acesso simplificado**:
+
+```javascript
+appState.q                    // shortcut para currentQuestion
+appState.history              // getter com proteção
+appState.selectedId           // pergunta selecionada
+appState.isRunning            // status de captura
+appState.addToHistory(...)    // method para adicionar
+```
+
+#### ModeManager (mode-manager.js)
+
+**Modos Disponíveis**:
+
+- `MODES.INTERVIEW`: Streaming, auto-ask LLM, turnId = counter incremental
+- `MODES.NORMAL`: Batch processing, manual ask, turnId = question ID
+
+**Responsabilidades**:
+
+```javascript
+modeManager.is(MODES.INTERVIEW); // check modo
+modeManager.handle('onQuestionFinalize', questionId); // delegação
+modeManager.handle('onAnswerRequest', questionId); // routing lógica
+```
+
+**Handler Delegation**:
+
+- Em INTERVIEW: `finalizeQuestion()` incrementa `interviewTurnId`
+- Em NORMAL: `finalizeQuestion()` usa `Number.parseInt(questionId)` como `turnId`
+
+#### config-manager.js (DOM & UI Events)
+
+- Gerencia DOM (listener para `transcriptAdd`, `answerBatchEnd`, `answerStreamChunk`)
+- Renderiza markdown com `marked.parse()`
+- Renderiza badges com `turn-id-badge`
+- Persiste configurações em localStorage + electron-store
+- Gerencia providers (OpenAI, Google/Gemini, OpenRouter)
+- Abas: Geral, API e Modelos, Áudio, Privacidade, Reset
+
+#### EventBus (events/EventBus.js - Singleton)
+
+**Eventos Principais**:
+
+| Evento                   | Origem      | Destino        | Payload                          |
+| ------------------------ | ----------- | -------------- | -------------------------------- |
+| `transcriptAdd`          | STT modules | config-manager | `{text, duration, timestamp}`    |
+| `answerStreamChunk`      | renderer.js | config-manager | `{questionId, chunk, turnId}`    |
+| `answerBatchEnd`         | renderer.js | config-manager | `{questionId, response, turnId}` |
+| `questionsHistoryUpdate` | renderer.js | config-manager | `{questions}`                    |
+| `error`                  | Any module  | renderer.js    | `{message, error}`               |
+| `audioDeviceChanged`     | STT         | renderer.js    | `{device}`                       |
 
 ---
 
