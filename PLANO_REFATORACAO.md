@@ -238,9 +238,39 @@ Renderer.js com 1528 linhas precisa ser dividido em módulos temáticos.
 
 ## 🎯 FASE 2 - RESUMO
 
-**Status:** 🔄 EM PROGRESSO (Estrutura Base Completa)
+**Status:** � EM PROGRESSO (50% Completo)
 
-**Concluído (Commits 2.1-2.4):**
+**Estrutura Base Criada (Commits 2.1-2.4):**
+
+- ✅ Audio Controller: 5 funções extraídas (`startAudio`, `stopAudio`, `listenToggleBtn`, `hasActiveModel`, `logTranscriptionMetrics`)
+- ✅ Question Controller: 9 funções extraídas + 4 helpers
+- ✅ Screenshot Controller: 3 funções extraídas
+- ✅ Renderer Helpers: 5 funções extraídas
+
+**Delegação ao Renderer (Em Andamento):**
+
+- ✅ startAudio() e stopAudio() removidas e delegadas
+- ✅ listenToggleBtn() e hasActiveModel() removidas e delegadas
+- ✅ logTranscriptionMetrics() removida e delegada
+- ⏳ captureScreenshot(), analyzeScreenshots(), clearScreenshots() - pendente
+- ⏳ releaseThread() e resetAppState() - pendente
+- ⏳ Funções de pergunta - pendente (renderQuestionsHistory, handleQuestionClick, etc)
+- ⏳ Funções utilitárias - pendente (updateStatusMessage, clearAllSelections)
+
+**Métrica de Progresso:**
+
+- renderer.js: 1538 → 1407 linhas (-131 linhas, -8.5% ✓)
+- Objetivo: 1533 → 450 linhas (-71% reduction)
+- Progresso atual: Começado
+
+**Próximos Passos:**
+
+1. Remover funções de screenshot do renderer (economia de ~180 linhas)
+2. Remover funções de pergunta do renderer (economia de ~400 linhas)
+3. Remover funções utilitárias do renderer (economia de ~100 linhas)
+4. Atualizar RendererAPI com imports delegados
+5. Testar com npm test e npm start
+6. Commit final da Fase 2
 
 - `updateStatusMessage()`
 - `clearAllSelections()`
