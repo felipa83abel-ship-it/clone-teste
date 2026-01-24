@@ -33,6 +33,12 @@ const {
 	NormalModeHandlers,
 } = require('./controllers/modes/mode-manager.js');
 
+// 🎯 CONTROLADORES (Fase 2 - Decomposição)
+const audioController = require('./controllers/audio/audio-controller.js');
+const questionController = require('./controllers/question/question-controller.js');
+const screenshotController = require('./controllers/screenshot/screenshot-controller.js');
+const rendererHelpers = require('./utils/renderer-helpers.js');
+
 // 🎯 INSTANCIAR
 const appState = new AppState();
 const eventBus = new EventBus();
