@@ -154,10 +154,6 @@ eventBus.on('error', error => {
 
 const YOU = 'Você';
 const OTHER = 'Outros';
-// ✅ DEPRECATED: MODES definido em mode-manager.js (veja linhas 29-40)
-
-// ✅ DEPRECATED: CURRENT_MODE removido - use modeManager.getMode() (Fase 4)
-// Modo atual gerenciado por modeManager (veja linhas 36-40)
 
 const ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
@@ -180,25 +176,10 @@ let APP_CONFIG = {
 	MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
 };
 
-// 🔥 NOTA: Estado agora centralizado em appState (veja linhas 30-31)
-// - appState.audio.{ isRunning, capturedScreenshots, isCapturing, isAnalyzing }
-// - appState.window.{ isDraggingWindow }
-// - appState.interview.{ currentQuestion, questionsHistory, selectedQuestionId, ... }
-// - appState.metrics.{ audioStartTime, llmStartTime, llmFirstTokenTime, ... }
-// Acesso: use helpers appState.q, appState.history, appState.selectedId
-// ou use getters/setters em AppState.js para compatibilidade
-// 🔒 answeredQuestions migrado para appState.interview.answeredQuestions (AppState.js)
-
 /* ================================ */
 //	SISTEMA DE CALLBACKS E UI ELEMENTS
 /* ================================ */
-// ✅ DEPRECATED: UICallbacks migrado para EventBus (Fase 3)
-// Anteriormente: const UICallbacks = { ... } com 25+ callbacks
-// Agora: eventBus.emit('eventName', data) centralizado
 
-/**
- * DEPRECATED: Registra elementos de UI (migrado para EventBus em Fase 3)
- */
 let UIElements = {};
 /**
  * Registra elementos UI no registry centralizado
@@ -643,7 +624,6 @@ const RendererAPI = {
 	/**
 	 * Inicializa drag handle para movimento de janela
 	 * MOVIDA PARA: config-manager.js
-	 * @deprecated Usar ConfigManager.initDragHandle(dragHandle) em vez disso
 	 */
 
 	// Click-through
