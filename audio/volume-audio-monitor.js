@@ -7,7 +7,7 @@
  * Usa mesmo padrão dos STT modules:
  * - AudioWorklet para captura de áudio
  * - RMS → dB → percentual para volume
- * - Emite via globalThis.RendererAPI.emitUIChange('onInputVolumeUpdate' / 'onOutputVolumeUpdate')
+ * - Emite via eventBus.emit('inputVolumeUpdate' / 'outputVolumeUpdate')
  *
  * ⚠️ NÃO inicia se já há transcrição ativa (isRunning = true)
  *
