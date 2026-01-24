@@ -396,19 +396,29 @@ Logger.debug('currentQuestion:', { ...currentQuestion }, true); // mostra
 
 #### 4.3 Consolidar RendererAPI e Converter emitUIChange para eventBus
 
-- [x] Remover `emitUIChange` da exportação de RendererAPI
-- [x] Converter 3 chamadas emitUIChange restantes para eventBus.emit:
-  - Line 1273: `emitUIChange('onAnswersCleared')` → `eventBus.emit('answersCleared')`
-  - Line 1368: `emitUIChange('onMockBadgeUpdate', ...)` → `eventBus.emit('screenshotBadgeUpdate', ...)`
-  - Line 1375: `emitUIChange('onModeSelectUpdate', ...)` → `eventBus.emit('modeSelectUpdate', ...)`
+- [x] Remover `emitUIChange` e `onUIChange` da exportação de RendererAPI em renderer.js
+- [x] Converter 21 chamadas `globalThis.RendererAPI.onUIChange()` em config-manager.js para usar `eventBus.on()` diretamente
+  - Adicionada importação de EventBus em config-manager.js
+  - Removida verificação crítica de RendererAPI
+  - Todos os eventos convertidos com mapa correto (onError → error, onTranscriptAdd → transcriptAdd, etc)
+- [x] Converter 4+ chamadas `globalThis.RendererAPI.emitUIChange()` em STT modules para usar `eventBus.emit()` diretamente
+  - Adicionada importação de EventBus nos 3 módulos STT
+  - Instância local de eventBus criada em cada STT module
+  - Conversão de nomes de eventos (onTranscriptAdd → transcriptAdd, etc)
 - [x] Atualizar mock-runner.js para usar eventBus em vez de emitUIChange
 - [x] Corrigir getters em RendererAPI (get isAudioRunning, get selectedId)
 - [x] Remover propriedades com sintaxe inválida (appState.audio.isRunning como key)
 
-**Commit:** ✅ `7a739dd` - refator(fase-4.3): consolidar RendererAPI e converter emitUIChange para eventBus
+**Commit:** ✅ `c2c684a` - refactor: Convert RendererAPI.onUIChange/emitUIChange to direct EventBus usage
 
-- [x] Verificar: `timeout 30 npm start` ✅ OK
-- [x] Verificar erros de sintaxe com `get_errors` ✅ OK (zero erros)
+- [x] Verificar: `npm start` inicia sem erros ✅ OK (zero erros críticos)
+- [x] Verificar: Nenhuma referência a onUIChange/emitUIChange em RendererAPI ✅ OK
+
+**Total Fase 4.3:** ✅ CONCLUÍDA COM SUCESSO
+
+- Sistema de eventos consolidado **unicamente para EventBus**
+- RendererAPI NOT usado para callbacks de eventos
+- Arquitetura de eventos limpa e centralizada
 
 **Total Fase 4:** ✅ CONCLUÍDA - 3 commits (4.1, 4.2, 4.3)
 
