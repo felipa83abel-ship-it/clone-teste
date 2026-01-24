@@ -598,12 +598,14 @@ function handleFinalVoskMessage(source, transcript) {
 
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
-	// Emite volume para UIconst ev = source === INPUT ? 'onInputVolumeUpdate' : 'onOutputVolumeUpdate';
-		eventBus.emit(ev, { percent })
+	// Emite volume para UI
+	const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+	eventBus.emit(ev, { percent });
 }
 
 // Adiciona transcrição com placeholder ao UI
-function addTranscriptPlaceholder(author, placeholderId, timeStr) {eventBus.emit('transcriptAdd', {
+function addTranscriptPlaceholder(author, placeholderId, timeStr) {
+	eventBus.emit('transcriptAdd', {
 			author,
 			text: '...',
 			timeStr,
