@@ -1075,9 +1075,9 @@ async function startAudioDeepgram(UIElements) {
   try {
     // Inicializa VAD Engine (singleton)
     vad = getVADEngine();
-    debugLogRenderer(
-      `✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`,
-      true
+    Logger.debug(
+      `✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`
+    );
     );
 
     // 🌊 Deepgram: Inicia INPUT/OUTPUT
@@ -1108,9 +1108,8 @@ function stopAudioDeepgram() {
  */
 async function switchDeviceDeepgram(source, newDeviceId) {
   try {
-    debugLogRenderer(
-      `🔄 [switchDeviceDeepgram] Início: source=${source}, newDeviceId="${newDeviceId}"`,
-      false
+    Logger.debug(
+      `🔄 [switchDeviceDeepgram] Início: source=${source}, newDeviceId="${newDeviceId}"`
     );
     const result = await changeDeviceDeepgram(source, newDeviceId);
     return result;

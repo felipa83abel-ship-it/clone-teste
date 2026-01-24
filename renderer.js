@@ -329,35 +329,6 @@ function getSelectedQuestionText() {
 }
 
 /**
- * Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
- * @returns {string} Texto da pergunta selecionada
- */
-function getSelectedQuestionText() {
-  Logger.debug('Início da função: "getSelectedQuestionText"');
-  Logger.debug('Fim da função: "getSelectedQuestionText"');
-
-  // 1️⃣ Se existe seleção explícita
-  if (appState.selectedId === CURRENT_QUESTION_ID) {
-    return appState.interview.currentQuestion.text;
-  }
-
-  if (appState.selectedId) {
-    const q = appState.history.find((q) => q.id === appState.selectedId);
-    if (q?.text) return q.text;
-  }
-
-  // 2️⃣ Fallback: CURRENT (se tiver texto)
-  if (
-    appState.interview.currentQuestion.text &&
-    appState.interview.currentQuestion.text.trim().length > 0
-  ) {
-    return appState.interview.currentQuestion.text;
-  }
-
-  return '';
-}
-
-/**
  * Normaliza texto para comparação
  * Remove pontuação, converte para lowercase, remove espaços extras
  * @param {string} t - Texto a normalizar
