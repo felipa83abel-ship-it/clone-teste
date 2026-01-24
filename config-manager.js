@@ -4,10 +4,7 @@
 ========================================================= */
 
 // Acesso ao ipcRenderer do processo renderer (nodeIntegration = true)
-const EventBus = require('./events/EventBus.js');
-
-// 🔥 INSTÂNCIA GLOBAL DO EVENTBUS
-const eventBus = new EventBus();
+// ⚠️ EventBus é importado em renderer.js e disponível globalmente como 'eventBus'
 
 const _getIpcRenderer = () => {
 	if (globalThis?.electron?.ipcRenderer) {
