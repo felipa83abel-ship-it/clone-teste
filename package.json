@@ -9,6 +9,10 @@
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:coverage": "jest --coverage",
+		"test:e2e": "cross-env MODE_DEBUG=1 playwright test",
+		"test:e2e:headed": "cross-env MODE_DEBUG=1 HEADED=1 playwright test --headed",
+		"test:e2e:debug": "cross-env MODE_DEBUG=1 playwright test --debug",
+		"test:e2e:report": "playwright show-report",
 		"debug": "cross-env NODE_ENV=development electron --inspect=9229 --remote-debugging-port=9223 ."
 	},
 	"keywords": [],
@@ -16,6 +20,7 @@
 	"license": "ISC",
 	"type": "commonjs",
 	"devDependencies": {
+		"@playwright/test": "^1.58.0",
 		"cross-env": "^10.1.0",
 		"electron": "^39.2.7",
 		"electron-reload": "^2.0.0-alpha.1",

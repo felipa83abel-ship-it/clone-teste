@@ -1,6 +1,7 @@
 module.exports = {
 	testEnvironment: 'node',
-	testMatch: ['**/__tests__/**/*.test.js'],
+	testMatch: ['**/__tests__/**/*.test.js', '!**/__tests__/e2e/**'],
+	testPathIgnorePatterns: ['/__tests__/e2e/'],
 	coverageDirectory: './coverage',
 	collectCoverageFrom: [
 		'state/**/*.js',
