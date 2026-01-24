@@ -250,17 +250,6 @@ function getConfiguredSTTModel() {
 }
 
 /**
- * Finaliza pergunta adicionando "?" se necessário
- * @param {string} t - Texto da pergunta
- * @returns {string} Pergunta finalizada
- */
-function finalizeQuestion(t) {
-	Logger.debug('Início da função: "finalizeQuestion"');
-	Logger.debug('Fim da função: "finalizeQuestion"');
-	return t.trim().endsWith('?') ? t.trim() : t.trim() + '?';
-}
-
-/**
  * Reseta o estado da pergunta atual (CURRENT)
  */
 function resetCurrentQuestion() {
