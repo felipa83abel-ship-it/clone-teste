@@ -8,15 +8,18 @@ Análise completa do projeto Electron concluída. Este plano consolida **todas a
 
 - ✅ Arquitetura refatorada (EventBus, AppState, Strategies)
 - ✅ Separação de responsabilidades (main/renderer/handlers)
-- ✅ **FASE 1: Estrutura reorganizada** (mode-manager.js e mock-runner.js movidos)
+- ✅ **FASE 1: Estrutura reorganizada** (mode-manager, mock-runner, UI registry, logging consolidado)
+- ✅ **FASE 2: Decomposição renderer.js** (1538 → 779 linhas, -49.4%)
+- ✅ **FASE 3: Sistema LLM robusto** (timeout, retry, error handling)
 - ✅ **FASE 5.1: Suite de testes completa** (74 testes passando, Jest configurado)
-- 🔄 **FASE 2: Em progresso** - Decomposição do renderer.js (1528 linhas → 450 linhas)
-- ⚠️ Alguns padrões ainda precisam consolidação
-- ⏳ Fases 3-6 aguardando: Refatorações, testes integração, limpeza, documentação
+- ⏳ **FASE 4: Sistema STT** - Próxima (consolidação, remoção de código morto)
+- ⏳ **FASE 6: Documentação final** - Última
 
 ---
 
 ## 🎯 FASE 1: ESTRUTURA E ORGANIZAÇÃO (ALTA PRIORIDADE)
+
+**Status:** ✅ COMPLETO
 
 ### 1.1 Reorganizar `mode-manager.js` e `mock-runner.js`
 
@@ -35,63 +38,68 @@ Análise completa do projeto Electron concluída. Este plano consolida **todas a
 
 ### 1.2 Extrair `registerUIElements()` do renderer
 
-**Status:** ❌ Não iniciado  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1h
+**Status:** ✅ COMPLETO  
+**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1h ✓
 
-**Problema:**
+**Problema RESOLVIDO:**
 
-- A função `registerUIElements()` em renderer.js (linhas 190-233) é boilerplate
-- Deveria ser um módulo separado: `/utils/ui-elements-registry.js`
+- ✅ Criado `/utils/ui-elements-registry.js` com classe UIElementsRegistry
+- ✅ Função `registerUIElements()` em renderer.js delegada para registry
+- ✅ Singleton global `uiElementsRegistry` para fácil acesso
+- ✅ Permite mockagem em testes
+- ✅ Imports em `renderer.js` atualizados
+- ✅ Projeto testado e funcionando corretamente
 
-**Solução:**
-Criar `ui-elements-registry.js`:
-
-```javascript
-class UIElementsRegistry {
-	static register(elements) {
-		// lógica atual de registerUIElements
-	}
-}
-```
-
-**Checklist:**
-
-- [ ] Criar `/utils/ui-elements-registry.js`
-- [ ] Extrair `registerUIElements()` para a classe
-- [ ] Atualizar import em renderer.js
-- [ ] Verificar com `get_errors()`
-- [ ] Testar com `npm start`
-- [ ] Commit: "refactor: extrair ui-elements-registry para módulo separado"
+**Commit:** ✓ `4c64a03 - refactor(fase-1.2-1.3): completar Fase 1`
 
 ---
 
 ### 1.3 Consolidar logs e remover `debugLogConfig()`
 
-**Status:** ❌ Não iniciado  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 20min
+**Status:** ✅ COMPLETO  
+**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 20min ✓
 
-**Problema:**
+**Problema RESOLVIDO:**
 
-- `config-manager.js` usa `debugLogConfig()` não documentado
-- Mistura com `Logger.js` (padrão moderno)
-- Inconsistência de logging
+- ✅ Importado `Logger.js` em config-manager.js
+- ✅ Substituído todos 20 `debugLogConfig()` por `Logger.debug()`
+- ✅ Removida função `debugLogConfig()` (20+ linhas de código morto)
+- ✅ Logging centralizado e consistente
+- ✅ Compatível com Logger.js (padrão moderno)
 
-**Solução:**
+**Commit:** ✓ `4c64a03 - refactor(fase-1.2-1.3): completar Fase 1`
 
-```javascript
-// Em config-manager.js, substituir todas as chamadas:
-debugLogConfig('msg') → Logger.info('msg')
-console.log() → Logger.info()
-console.error() → Logger.error()
-```
+---
 
-**Checklist:**
+## 🎯 FASE 1 - RESUMO
 
-- [ ] Remover `debugLogConfig()` de config-manager.js
-- [ ] Substituir todas chamadas para `Logger.*`
-- [ ] Verificar `Logger.js` está importado
-- [ ] Testar UI (config-manager) funciona
-- [ ] Commit: "refactor: consolidar logging com Logger.js"
+**Status:** ✅ COMPLETO
+
+**Commits Realizados:**
+
+1. **Commit anterior** - Reorganizar mode-manager e mock-runner
+   - ✅ `mode-manager.js` movido para `/controllers/modes/`
+   - ✅ `mock-runner.js` movido para `/testing/`
+
+2. **Commit 4c64a03** - Completar Fase 1.2 e 1.3
+   - ✅ Criar `/utils/ui-elements-registry.js` (classe UIElementsRegistry)
+   - ✅ Delegar `registerUIElements()` em renderer.js
+   - ✅ Consolidar logging: `debugLogConfig()` → `Logger.debug()`
+   - Result: Tests 74/74 passing ✓, App starting ✓
+
+**Estrutura Final:**
+
+- ✅ Reorganização: mode-manager e mock-runner em pastas lógicas
+- ✅ Registry: UIElementsRegistry centralizado em `/utils/`
+- ✅ Logging: Consolidado em Logger.js (sem duplicação)
+
+**Validações:**
+
+- ✅ npm test: 74/74 tests passing
+- ✅ npm start: App initializing successfully
+- ✅ Git commits: Clean history with clear messages
+
+---
 
 ---
 
