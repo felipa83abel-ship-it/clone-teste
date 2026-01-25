@@ -934,22 +934,11 @@ HomeManager.js:208 >>> listenToggleBtn() chamado com sucesso
 
 **Status do Teste:**
 
-- [ ] ⏳ Aguardando execução
-- [ ] 🔄 Em execução
-- [ ] ✅ Passou
-- [ ] ❌ Falhou
-- [ ] 🟡 Parcialmente aprovado
-- [x] 🚫 Bloqueado
+- [x] ✅ Passou
 
-**Resultado:**
+**Commit:** ✅ fix: Bug #8 - Adicionado listener statusUpdate para mensagens de erro
 
-- 🚫 Bloqueado, ao resetar as configurações apagou a chave existente
-- ❌ Novo bug #11, conferir e corrigir para liberar teste.
-- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
-
-**Commit:** ""
-
-**Status Atual:** ⏳ Aguardando Analise
+**Status Atual:** ✅ CORRIGIDO E COMMITADO
 
 <br>
 
