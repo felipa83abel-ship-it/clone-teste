@@ -142,13 +142,10 @@ class ConfigManager {
       this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus);
       await this.windowManager.initialize();
 
-      // TODO: Criar instâncias dos outros managers
-      // this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus)
+      // Cria instância do HomeManager
+      this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus);
+      await this.homeManager.initialize();
 
-      // TODO: Chamar initialize() em outros managers
-      // await this.homeManager.initialize()
-
-      // TODO: Mover resto da lógica de inicialização
       console.log('✅ Todos os managers inicializados');
     } catch (error) {
       console.error('❌ Erro ao inicializar managers:', error);
