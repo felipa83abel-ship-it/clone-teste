@@ -61,6 +61,12 @@ const sttStrategy = new STTStrategy();
 const llmManager = new LLMManager();
 const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
 
+// 🎯 Inicializar renderer-helpers com dependências
+rendererHelpers.initRendererHelpers({
+  appState,
+  eventBus,
+});
+
 // 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
 const _mockAutoPlayActive = false;
 const _mockScenarioIndex = 0;
