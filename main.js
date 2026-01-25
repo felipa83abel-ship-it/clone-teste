@@ -620,7 +620,7 @@ function registerWindowControlHandlers() {
   ipcMain.on('SET_INTERACTIVE_ZONE', handleSetInteractiveZone);
 
   // Controla movimento e drag da janela
-  ipcMain.on('START_WINDOW_DRAG', handleStartWindowDrag);
+  ipcMain.handle('START_WINDOW_DRAG', handleStartWindowDrag);
   ipcMain.on('MOVE_WINDOW_TO', handleMoveWindowTo);
 
   // Retorna informações da janela
@@ -661,11 +661,13 @@ function handleSetInteractiveZone(_, isInteractive) {
 /**
  * Inicia o arraste (drag) da janela
  * @param {Event} _ - Evento IPC
+ * @returns {Promise<void>}
  */
 function handleStartWindowDrag() {
-  if (!mainWindow) return;
+  if (!mainWindow) return Promise.reject(new Error('MainWindow not available'));
   mainWindow.moveTop();
   mainWindow.startDrag?.();
+  return Promise.resolve();
 }
 
 /**
@@ -1043,6 +1045,7 @@ function createWindow() {
 //	INICIALIZAÇÃO DO APP
 /* ================================ */
 
+// sonarlint-disable javascript:S7785
 app.whenReady().then(() => {
   // Registra todos os handlers IPC
   registerIPCHandlers();

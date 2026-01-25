@@ -26,6 +26,7 @@ class HomeManager {
    * Inicializa listeners do HOME
    */
   async initialize() {
+    console.log('🏠🏠🏠 HomeManager.initialize() INICIADO 🏠🏠🏠');
     Logger.debug('🏠 HomeManager: Iniciando');
     this.#initMockToggle();
     this.#initResetHomeButton();
@@ -33,6 +34,7 @@ class HomeManager {
     this.#initQuestionsHistoryListener();
     await this.restoreState();
     Logger.debug('🏠 HomeManager: Inicialização completa');
+    console.log('🏠🏠🏠 HomeManager.initialize() COMPLETO 🏠🏠🏠');
   }
 
   /**
@@ -74,6 +76,9 @@ class HomeManager {
     const element = document.getElementById(elementId);
     if (element) {
       element.addEventListener(eventType, callback);
+      console.log(`   ✅ Listener registrado: ${elementId}`);
+    } else {
+      console.warn(`   ⚠️ Elemento não encontrado: ${elementId}`);
     }
   }
 
@@ -148,26 +153,55 @@ class HomeManager {
    * Registra listeners dos botões de ação (listen, ask llm, close)
    */
   #initActionButtonListeners() {
+    console.log('>>> #initActionButtonListeners INICIADO');
     Logger.debug('🏠 HomeManager: #initActionButtonListeners');
 
     // Listen button
+    console.log('>>> Registrando listenBtn...');
     this.registerElementListener('listenBtn', 'click', () => {
-      if (globalThis.RendererAPI?.listenToggleBtn) {
-        globalThis.RendererAPI.listenToggleBtn();
+      try {
+        console.log('>>> listenBtn CLICADO!');
+        if (globalThis.RendererAPI?.listenToggleBtn) {
+          console.log('>>> Chamando listenToggleBtn()...');
+          globalThis.RendererAPI.listenToggleBtn();
+          console.log('>>> listenToggleBtn() chamado com sucesso');
+        } else {
+          console.warn('>>> listenToggleBtn NÃO EXISTE em RendererAPI!');
+        }
+      } catch (error) {
+        console.error('>>> ERRO ao chamar listenToggleBtn:', error);
       }
     });
 
     // Ask LLM button
+    console.log('>>> Registrando askLlmBtn...');
     this.registerElementListener('askLlmBtn', 'click', () => {
-      if (globalThis.RendererAPI?.askLlm) {
-        globalThis.RendererAPI.askLlm();
+      try {
+        console.log('>>> askLlmBtn CLICADO!');
+        if (globalThis.RendererAPI?.askLLM) {
+          console.log('>>> Chamando askLLM()...');
+          globalThis.RendererAPI.askLLM();
+          console.log('>>> askLLM() chamado com sucesso');
+        } else {
+          console.warn('>>> askLLM NÃO EXISTE em RendererAPI!');
+        }
+      } catch (error) {
+        console.error('>>> ERRO ao chamar askLLM:', error);
       }
     });
 
     // Close button
+    console.log('>>> Registrando btnClose...');
     this.registerElementListener('btnClose', 'click', () => {
-      this.ipc.send('APP_CLOSE');
+      try {
+        console.log('>>> btnClose CLICADO - enviando APP_CLOSE IPC');
+        this.ipc.send('APP_CLOSE');
+        console.log('>>> APP_CLOSE IPC enviado com sucesso');
+      } catch (error) {
+        console.error('>>> ERRO ao enviar APP_CLOSE:', error);
+      }
     });
+    console.log('>>> #initActionButtonListeners COMPLETO');
   }
 
   /**

@@ -1,0 +1,22 @@
+const { execSync } = require('child_process');
+const path = require('path');
+
+console.log('🧪 Iniciando teste manual de cliques...');
+console.log('⚠️ ABRA A APP MANUALMENTE E CLIQUE NOS BOTÕES');
+console.log('📌 Se só o botão de fechar funciona, o problema está nos listeners');
+console.log('');
+console.log('Para debugar:');
+console.log('1. Abra DevTools com Ctrl+Shift+I');
+console.log('2. Vá para a aba Console');
+console.log('3. Clique em Começar a Ouvir (listenBtn)');
+console.log('4. Procure por logs com >>> para ver se o listener está funcionando');
+console.log('');
+console.log('Se ver:');
+console.log('  ✅ Listener registrado: listenBtn');
+console.log('  >>> listenBtn CLICADO!');
+console.log('  Então o listener está funcionando.');
+console.log('');
+console.log('Se não ver, o elemento não foi encontrado no DOM');
+console.log('');
+console.log('Para iniciar a app, execute:');
+console.log('  npm start');
