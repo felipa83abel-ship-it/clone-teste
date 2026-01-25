@@ -38,6 +38,7 @@ class WindowConfigManager {
     console.log('🚀 WindowConfigManager.initialize()');
     await this.restoreState();
     this.#initWindowListeners();
+    await this.initClickThroughController();
   }
 
   /**
@@ -242,7 +243,110 @@ class WindowConfigManager {
    * Inicializa click-through controller
    */
   async initClickThroughController() {
-    // Implementado via IPC no main.js (SET_CLICK_THROUGH event)
+    console.log('🖱️ Inicializando click-through controller...');
+
+    const btnToggleClick = document.getElementById('btnToggleClick');
+
+    if (!btnToggleClick) {
+      console.warn('   ⚠️ btnToggleClick não encontrado no DOM');
+      return;
+    }
+
+    try {
+      // ✅ SINCRONIZAR: Buscar estado ATUAL de main.js
+      const currentClickThroughState = await this.ipc.invoke('GET_CLICK_THROUGH');
+      console.log(`   📡 Estado do click-through em main: ${currentClickThroughState}`);
+
+      // ✅ RESTAURAR DECISÃO ANTERIOR DO USUÁRIO
+      // Se o usuário fechou com click-through ativo, inicia ativo
+      const savedClickThroughState = this.configManager.config.other?.clickThroughEnabled ?? false;
+      console.log(`   💾 Estado salvo em localStorage: ${savedClickThroughState}`);
+
+      if (savedClickThroughState && !currentClickThroughState) {
+        // User deixou ativado, mas main está desativado - sincronizar ativando
+        console.log('🔄 Restaurando click-through para estado anterior (ATIVADO)');
+        this.ipc.send('SET_CLICK_THROUGH', true);
+      }
+
+      // ✅ Usar estado sincronizado como referência
+      let localClickThroughState = savedClickThroughState;
+      console.log(
+        `   ✅ Click-through iniciará como: ${localClickThroughState ? 'ATIVADO' : 'DESATIVADO'}`
+      );
+
+      // ✅ ATUALIZAR VISUAL DO BOTÃO COM ESTADO RESTAURADO
+      if (globalThis.RendererAPI?.updateClickThroughButton) {
+        globalThis.RendererAPI.updateClickThroughButton(localClickThroughState, btnToggleClick);
+        console.log(
+          `   🎨 Visual do botão atualizado: opacity=${localClickThroughState ? '0.5' : '1'}`
+        );
+      }
+
+      // ✅ Registrar listener para alterações
+      btnToggleClick.addEventListener('click', async () => {
+        try {
+          // Toggle local
+          localClickThroughState = !localClickThroughState;
+          console.log(`🖱️ Click-through: ${localClickThroughState ? 'ATIVANDO' : 'DESATIVANDO'}`);
+
+          // Enviar para main via IPC (one-way)
+          this.ipc.send('SET_CLICK_THROUGH', localClickThroughState);
+
+          // Atualizar visual
+          if (globalThis.RendererAPI?.updateClickThroughButton) {
+            globalThis.RendererAPI.updateClickThroughButton(localClickThroughState, btnToggleClick);
+          }
+
+          // Salvar em config
+          this.configManager.config.other.clickThroughEnabled = localClickThroughState;
+          this.configManager.saveConfig(false);
+
+          console.log(`   ✅ Click-through ${localClickThroughState ? 'ATIVADO' : 'DESATIVADO'}`);
+        } catch (error) {
+          console.error('❌ Erro ao toggle click-through:', error);
+          // Reverter estado local em caso de erro
+          localClickThroughState = !localClickThroughState;
+        }
+      });
+
+      // ✅ ZONA INTERATIVA: Quando click-through está ativado, permitir cliques no botão
+      btnToggleClick.addEventListener('mouseenter', () => {
+        if (localClickThroughState) {
+          console.log('🖱️ Zona interativa ATIVADA (mouse sobre botão)');
+          this.ipc.send('SET_INTERACTIVE_ZONE', true);
+        }
+      });
+
+      btnToggleClick.addEventListener('mouseleave', () => {
+        if (localClickThroughState) {
+          console.log('🖱️ Zona interativa DESATIVADA (mouse saiu do botão)');
+          this.ipc.send('SET_INTERACTIVE_ZONE', false);
+        }
+      });
+
+      // ✅ ZONAS INTERATIVAS GLOBAIS: Monitorar TODOS os elementos com classe .interactive-zone
+      // Nota: SET_INTERACTIVE_ZONE é sempre enviado, mas main.js só aplica se clickThroughEnabled=true
+      const interactiveZones = document.querySelectorAll('.interactive-zone');
+      console.log(`🖱️ ${interactiveZones.length} zonas interativas encontradas`);
+
+      interactiveZones.forEach((zone) => {
+        zone.addEventListener('mouseenter', () => {
+          // Ativa zona interativa quando mouse entra (permite cliques se click-through ativo)
+          this.ipc.send('SET_INTERACTIVE_ZONE', true);
+          console.log(`🖱️ Zona interativa ATIVADA: ${zone.id || zone.className}`);
+        });
+
+        zone.addEventListener('mouseleave', () => {
+          // Desativa zona interativa quando mouse sai (cliques passam através se CT ativo)
+          this.ipc.send('SET_INTERACTIVE_ZONE', false);
+          console.log(`🖱️ Zona interativa DESATIVADA: ${zone.id || zone.className}`);
+        });
+      });
+
+      console.log('   ✅ Click-through controller inicializado');
+    } catch (error) {
+      console.error('❌ Erro ao inicializar click-through:', error);
+    }
   }
 
   /**

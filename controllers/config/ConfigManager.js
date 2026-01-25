@@ -71,6 +71,17 @@ class ConfigManager {
         if (parsed.privacy) merged.privacy = { ...defaultConfig.privacy, ...parsed.privacy };
         if (parsed.other) merged.other = { ...defaultConfig.other, ...parsed.other };
 
+        console.log('📊 CONFIG MERGED - other section:');
+        console.log(
+          '   defaultConfig.other.clickThroughEnabled:',
+          defaultConfig.other.clickThroughEnabled
+        );
+        console.log('   parsed.other:', parsed.other);
+        console.log(
+          '   merged.other.clickThroughEnabled (FORÇADO PARA FALSE):',
+          merged.other.clickThroughEnabled
+        );
+
         console.log('✅ Configurações carregadas do localStorage');
         Logger.debug('Fim da função: "loadConfig"');
         return merged;
@@ -186,8 +197,7 @@ class ConfigManager {
    */
   getDefaultConfig() {
     Logger.debug('Início da função: "getDefaultConfig"');
-    Logger.debug('Fim da função: "getDefaultConfig"');
-    return {
+    const config = {
       api: {
         activeProvider: 'openai',
         openai: {
@@ -230,8 +240,13 @@ class ConfigManager {
         darkMode: true,
         interviewMode: 'INTERVIEW',
         overlayOpacity: 0.75,
+        clickThroughEnabled: false,
       },
     };
+    console.log('📋 DEFAULT CONFIG - other section:');
+    console.log('   clickThroughEnabled:', config.other.clickThroughEnabled);
+    Logger.debug('Fim da função: "getDefaultConfig"');
+    return config;
   }
 
   /**
