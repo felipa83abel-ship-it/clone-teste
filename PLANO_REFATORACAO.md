@@ -182,26 +182,26 @@ EventBus         ModeManager │      │    │      │      │
   - [ ] 3.1.3 - `saveDevices()` - persistir seleção
   - [ ] 3.1.4 - `restoreDevices()` - restaurar seleção salva
   - [ ] 3.1.5 - `initAudioMonitoring()` - iniciar VU meters
-  - [ ] 3.1.6 - `stopAudioMonitoring()` - parar VU meters
-  - [ ] 3.1.7 - Listeners de mudança de dispositivo
+  - [x] 3.1.6 - `stopAudioMonitoring()` - parar VU meters
+  - [x] 3.1.7 - Listeners de mudança de dispositivo
 
-- [ ] **3.2** Implementar métodos do Manager
-  - [ ] 3.2.1 - `constructor(configManager, ipc, eventBus, rendererAPI)`
-  - [ ] 3.2.2 - `initialize()` - carregar e restaurar
-  - [ ] 3.2.3 - `startMonitoring(type)` - iniciar VU meter
-  - [ ] 3.2.4 - `stopMonitoring(type)` - parar VU meter
-  - [ ] 3.2.5 - `getSelectedDevices()` - getter
+- [x] **3.2** Implementar métodos do Manager
+  - [x] 3.2.1 - `constructor(configManager, ipc, eventBus, rendererAPI)`
+  - [x] 3.2.2 - `initialize()` - carregar e restaurar
+  - [x] 3.2.3 - `startMonitoring(type)` - iniciar VU meter
+  - [x] 3.2.4 - `stopMonitoring(type)` - parar VU meter
+  - [x] 3.2.5 - `getSelectedDevices()` - getter
 
-- [ ] **3.3** Atualizar ConfigManager
-  - [ ] 3.3.1 - `this.audioManager = new AudioDeviceManager(...)`
-  - [ ] 3.3.2 - Chamar `this.audioManager.initialize()` no `initializeController()`
-  - [ ] 3.3.3 - Remover código de Audio do ConfigManager
+- [x] **3.3** Atualizar ConfigManager
+  - [x] 3.3.1 - `this.audioManager = new AudioDeviceManager(...)`
+  - [x] 3.3.2 - Chamar `this.audioManager.initialize()` no `initializeController()`
+  - [x] 3.3.3 - Remover código de Audio do ConfigManager
 
-- [ ] **3.4** Validação: AudioDeviceManager funcional
-  - [ ] 3.4.1 - `npm start` e entrar em "Áudio e Tela" tab
-  - [ ] 3.4.2 - Verificar carregamento de dispositivos, VU meters
-  - [ ] 3.4.3 - Trocar dispositivo e verificar persistência
-  - [ ] 3.4.4 - Fazer commit: "refactor: extrair AudioDeviceManager"
+- [x] **3.4** Validação: AudioDeviceManager funcional
+  - [x] 3.4.1 - `npm start` e entrar em "Áudio e Tela" tab
+  - [x] 3.4.2 - Verificar carregamento de dispositivos, VU meters
+  - [x] 3.4.3 - Trocar dispositivo e verificar persistência
+  - [x] 3.4.4 - Fazer commit: "refactor: extrair AudioDeviceManager"
 
 ---
 
