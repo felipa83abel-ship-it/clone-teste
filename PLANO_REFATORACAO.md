@@ -22,18 +22,21 @@ Este plano refatora o arquivo monolítico `config-manager.js` (2678 linhas) em u
 ### **Estrutura Final**:
 
 ```
-controllers/
-  config/
-    ConfigManager.js                    (300 linhas - orquestrador)
-    managers/
-      ApiKeyManager.js                  (250 linhas)
-      AudioDeviceManager.js             (200 linhas)
-      ModelSelectionManager.js          (200 linhas)
-      ScreenConfigManager.js            (150 linhas)
-      PrivacyConfigManager.js           (100 linhas)
-      WindowConfigManager.js            (150 linhas)
-      HomeManager.js                    (100 linhas)
+projeto/
+├── config-manager.js                   (371 linhas - orquestrador)
+└── controllers/
+    └── config/
+        └── managers/
+            ├── ApiKeyManager.js         (361 linhas)
+            ├── AudioDeviceManager.js    (261 linhas)
+            ├── ModelSelectionManager.js (266 linhas)
+            ├── ScreenConfigManager.js   (261 linhas)
+            ├── PrivacyConfigManager.js  (200 linhas)
+            ├── WindowConfigManager.js   (261 linhas)
+            └── HomeManager.js           (189 linhas)
 ```
+
+**NOTA IMPORTANTE**: `config-manager.js` fica **na raiz**, NÃO em `controllers/config/`
 
 ---
 
@@ -102,8 +105,8 @@ EventBus         ModeManager │      │    │      │      │
 <script src="./controllers/config/managers/WindowConfigManager.js"></script>
 <script src="./controllers/config/managers/HomeManager.js"></script>
 
-<!-- 3️⃣ ConfigManager (orquestrador, depende dos managers) -->
-<script src="./controllers/config/ConfigManager.js"></script>
+<!-- 3️⃣ ConfigManager (orquestrador, depende dos managers) - NA RAIZ -->
+<script src="./config-manager.js"></script>
 
 <!-- 4️⃣ Inicialização no DOMContentLoaded -->
 <script>
@@ -310,9 +313,9 @@ EventBus         ModeManager │      │    │      │      │
   - [x] 6.3.3 - Chamar `this.modelManager.reset()`
   - [x] 6.3.4 - Chamar reset em todos os managers
 
-- [x] **6.4** Mover arquivo
-  - [x] 6.4.1 - `controllers/config/ConfigManager.js` → `config-manager.js` (raiz)
-  - [x] 6.4.2 - Remover arquivo antigo (2678 linhas → 371 linhas)
+- [x] **6.4** Finalizar arquivo ConfigManager
+  - [x] 6.4.1 - ConfigManager fica em **`config-manager.js` (RAIZ)** — NÃO em `controllers/config/`
+  - [x] 6.4.2 - Refatorar de 2678 linhas → 371 linhas (mantém nome do arquivo)
 
 - [x] **6.5** Validação: ConfigManager como orquestrador
   - [x] 6.5.1 - `npm start` com timeout
@@ -452,57 +455,150 @@ Se houvesse um "Fase 9", seria apenas sobre melhorias estéticas que não afetam
 
 ---
 
-## 📁 Estrutura Final Completa
+## � AUDITORIA DE ARQUITETURA DO PROJETO
+
+### **Status Atual vs Padrão Esperado**
+
+Após análise completa, aqui está a reorganização necessária para manter **consistência e clareza**:
+
+#### **✅ CORRETO - Estrutura Temática em `/controllers`**
+
+```
+controllers/
+├── audio/                    ✅ Audio features
+│   └── audio-controller.js
+├── modes/                    ✅ Mode management
+│   └── mode-manager.js
+├── question/                 ✅ Question features
+│   └── question-controller.js
+├── screenshot/               ✅ Screenshot features
+│   └── screenshot-controller.js
+└── config/                   ✅ Config management (será atualizado)
+    ├── ConfigManager.js      (será movido de raiz)
+    └── managers/             (7 Managers já existem aqui)
+```
+
+#### **✅ CORRETO - Camadas de Infraestrutura**
+
+```
+state/                        ✅ State management
+├── AppState.js              (global app state)
+
+events/                       ✅ Event system
+├── EventBus.js              (pub/sub events)
+
+handlers/                     ✅ Business logic handlers
+├── llmHandlers.js           (LLM responses)
+
+llm/                          ✅ LLM abstractions
+├── LLMManager.js            (orchestrator)
+└── handlers/                (provider-specific)
+
+stt/                          ✅ Speech-to-text
+├── STTStrategy.js           (interface)
+├── stt-whisper.js
+├── stt-vosk.js
+├── stt-deepgram.js
+└── models-stt/              (model files)
+
+strategies/                   ✅ Strategy pattern
+├── STTStrategy.js
+
+audio/                        ✅ Audio utilities
+├── volume-audio-monitor.js
+└── audio/                   (samples e worklet)
+
+utils/                        ✅ Utilities
+├── ErrorHandler.js
+├── Logger.js
+├── SecureLogger.js
+├── renderer-helpers.js
+└── ui-elements-registry.js
+
+types/                        ✅ Type definitions
+├── globals.d.ts
+└── fluent-ffmpeg.d.ts
+```
+
+#### **✅ CORRETO - Raiz do Projeto**
+
+```
+root/
+├── index.html               ✅ Entry point
+├── renderer.js              ✅ Renderer process initialization
+├── config-manager.js        ⏳ SERÁ MOVIDO PARA controllers/config/ConfigManager.js
+├── main.js                  ✅ Main process
+├── styles.css               ✅ Global styles
+├── package.json             ✅ Dependencies
+├── jest.config.js           ✅ Test config
+├── jsconfig.json            ✅ JS config
+├── eslint.config.js         ✅ Linter config
+└── playwright.config.js     ✅ E2E test config
+```
+
+#### **❌ PROBLEMA IDENTIFICADO**
+
+- `config-manager.js` na raiz → **Deve estar em `controllers/config/ConfigManager.js`**
+  - Raiz deve conter APENAS configuração de build/desenvolvimento
+  - Lógica de aplicação deve estar em `controllers/`
+
+#### **SOLUÇÃO**
+
+1. Mover `config-manager.js` → `controllers/config/ConfigManager.js`
+2. Atualizar imports em `index.html`
+3. Atualizar imports internos nos Managers
+4. Commitar mudança
+
+---
+
+## �📁 Estrutura Final Completa (Implementada)
 
 ```
 projeto/
-├── config-manager.js              ❌ DELETADO
+├── config-manager.js                   ✅ AQUI (raiz, 371 linhas)
+│   └── Orquestrador: loadConfig(), saveConfig(), initializeController(),
+│       registerUIElements(), registerRendererCallbacks(), resetConfig()
 │
 ├── index.html
-│   └── imports atualizados para novos arquivos
+│   └── imports: renderer.js → Managers (7 arquivos) → config-manager.js
 │
 └── controllers/
     └── config/
-        ├── ConfigManager.js       (300 linhas)
-        │   - Orquestrador
-        │   - loadConfig(), saveConfig()
-        │   - initializeController()
-        │   - registerUIElements(), registerRendererCallbacks()
-        │   - resetConfig()
-        │
         └── managers/
-            ├── ApiKeyManager.js   (250 linhas)
+            ├── ApiKeyManager.js        (361 linhas)
             │   - saveApiKey(), deleteApiKey(), checkApiKeysStatus()
             │   - initApiKeyInputListeners(), initApiKeyVisibilityListeners()
             │   - updateApiKeyFieldStatus(), restoreState(), reset()
             │
-            ├── AudioDeviceManager.js (200 linhas)
+            ├── AudioDeviceManager.js   (261 linhas)
             │   - loadDevices(), saveDevices(), restoreDevices()
             │   - startMonitoring(), stopMonitoring()
             │   - initialize(), restoreState(), reset()
             │
-            ├── ModelSelectionManager.js (200 linhas)
+            ├── ModelSelectionManager.js (266 linhas)
             │   - toggleModel(), restoreSTTLLMModels()
             │   - updateModelStatusUI()
             │   - initialize(), restoreState(), reset()
             │
-            ├── ScreenConfigManager.js (150 linhas)
+            ├── ScreenConfigManager.js  (261 linhas)
             │   - recordHotkey(), listeners de formato
             │   - initialize(), restoreState(), reset()
             │
-            ├── PrivacyConfigManager.js (100 linhas)
+            ├── PrivacyConfigManager.js (200 linhas)
             │   - Checkboxes de privacidade
             │   - initialize(), restoreState(), reset()
             │
-            ├── WindowConfigManager.js (150 linhas)
+            ├── WindowConfigManager.js  (261 linhas)
             │   - initDragHandle(), initClickThroughController()
             │   - applyOpacity(), restoreTheme()
             │   - initialize(), restoreState(), reset()
             │
-            └── HomeManager.js (100 linhas)
+            └── HomeManager.js          (189 linhas)
                 - Mock toggle, reset home button
                 - initialize(), restoreState(), reset()
 ```
+
+**CLARIFICAÇÃO**: O antigo `config-manager.js` (2678 linhas) foi **refatorado** (não deletado), com seu código disperso nos 7 Managers + ConfigManager. O arquivo final é `config-manager.js` na raiz (371 linhas), que orquestra tudo.
 
 ---
 
@@ -775,3 +871,86 @@ A: Considere dividir em 2 Managers (ex: ApiKeyManager + ModelValidationManager)
 
 **P: Posso refatorar apenas 1 Manager por vez?**
 A: SIM! Fases 2-5 são independentes (ApiKeyManager não depende de Audio, etc)
+
+---
+
+## ��� FASE 9: RELOCAÇÃO DE CONFIGMANAGER (EXECUTADA ✅)
+
+### **Objetivo**: Mover ConfigManager de raiz para `controllers/config/` para manter consistência arquitetural
+
+### **Execução Realizada**:
+
+- [x] **9.1** Criar arquivo `controllers/config/ConfigManager.js`
+  - [x] Copiar conteúdo de `config-manager.js` (raiz)
+  - [x] Atualizar referência de type: `/// <reference path="../../types/globals.d.ts" />`
+
+- [x] **9.2** Atualizar `index.html`
+  - [x] Adicionar imports de 7 Managers
+  - [x] Mudar import: `./config-manager.js` → `./controllers/config/ConfigManager.js`
+  - [x] Ordem: renderer.js → 7 Managers → ConfigManager
+
+- [x] **9.3** Remover arquivo antigo
+  - [x] Deletar `config-manager.js` da raiz
+
+- [x] **9.4** Validação
+  - [x] `npm start` - ✅ **PASSOU SEM ERROS**
+  - [x] App inicializa corretamente
+  - [x] ConfigManager carrega todos os Managers
+
+---
+
+## ��� ARQUITETURA FINAL (VALIDADA E COMPLETA)
+
+```
+projeto/
+├── index.html                          ✅ Entry point
+│   └── Carrega: renderer → 7 Managers → ConfigManager
+│
+├── controllers/
+│   ├── audio/                          ✅ Audio utilities
+│   ├── modes/                          ✅ Mode management
+│   ├── question/                       ✅ Question features
+│   ├── screenshot/                     ✅ Screenshot features
+│   └── config/                         ✅ AQUI (novo local)
+│       ├── ConfigManager.js            (371 linhas - Orquestrador)
+│       └── managers/
+│           ├── ApiKeyManager.js        (361 linhas)
+│           ├── AudioDeviceManager.js   (261 linhas)
+│           ├── ModelSelectionManager.js (266 linhas)
+│           ├── ScreenConfigManager.js  (261 linhas)
+│           ├── PrivacyConfigManager.js (200 linhas)
+│           ├── WindowConfigManager.js  (261 linhas)
+│           └── HomeManager.js          (189 linhas)
+│
+├── state/                              ✅ AppState.js
+├── events/                             ✅ EventBus.js
+├── handlers/                           ✅ llmHandlers.js
+├── llm/                                ✅ LLMManager.js + handlers/
+├── stt/                                ✅ STTStrategy.js + implementations
+├── audio/                              ✅ volume-audio-monitor.js
+├── utils/                              ✅ Helpers (ErrorHandler, Logger, etc)
+├── types/                              ✅ globals.d.ts
+├── renderer.js                         ✅
+├── main.js                             ✅
+├── styles.css                          ✅
+│
+└── [Build Config]
+    ├── package.json, jest.config.js, jsconfig.json
+    ├── eslint.config.js, playwright.config.js
+```
+
+### **Status Final**: ��� **REFATORAÇÃO COMPLETA E VALIDADA**
+
+✅ **Alcançado:**
+- ✅ ConfigManager em local correto (`controllers/config/ConfigManager.js`)
+- ✅ Toda lógica de aplicação estruturada em `controllers/` por tema
+- ✅ Raiz limpa apenas com configuração de build/desenvolvimento
+- ✅ 7 Managers especializados funcionando isoladamente
+- ✅ App inicia sem erros (validado com `npm start`)
+- ✅ Arquitetura modular, escalável e compreensível
+
+✅ **Próximos Passos (Opcional):**
+- Phase 8.3: Limpeza de código (remover console.log de debug)
+- Documentação completa em `docs/`
+- Testes E2E com Playwright
+
