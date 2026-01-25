@@ -36,9 +36,49 @@ class ConfigManager {
    * @returns {object} Config carregada ou padrão
    */
   loadConfig() {
-    // TODO: Implementar - mover de config-manager.js original
-    console.log('📂 ConfigManager.loadConfig()');
-    return {};
+    Logger.debug('Início da função: "loadConfig"');
+    console.log('📂 INICIANDO CARREGAMENTO DE CONFIG...');
+    try {
+      const defaultConfig = this.getDefaultConfig();
+      const saved = localStorage.getItem('appConfig');
+      console.log(
+        `🔍 localStorage.getItem('appConfig'): ${saved ? 'ENCONTRADO (' + saved.length + ' bytes)' : 'NÃO ENCONTRADO'}`
+      );
+
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        console.log('📂 Configurações encontradas no localStorage');
+
+        // Merge profundo para preservar estados salvos
+        const merged = { ...defaultConfig };
+        if (parsed.api) {
+          merged.api = { ...defaultConfig.api, ...parsed.api };
+          Object.keys(defaultConfig.api).forEach((provider) => {
+            if (parsed.api[provider] && typeof parsed.api[provider] === 'object') {
+              merged.api[provider] = {
+                ...defaultConfig.api[provider],
+                ...parsed.api[provider],
+              };
+            }
+          });
+        }
+        if (parsed.audio) merged.audio = { ...defaultConfig.audio, ...parsed.audio };
+        if (parsed.screen) merged.screen = { ...defaultConfig.screen, ...parsed.screen };
+        if (parsed.privacy) merged.privacy = { ...defaultConfig.privacy, ...parsed.privacy };
+        if (parsed.other) merged.other = { ...defaultConfig.other, ...parsed.other };
+
+        console.log('✅ Configurações carregadas do localStorage');
+        Logger.debug('Fim da função: "loadConfig"');
+        return merged;
+      }
+
+      console.log('✅ Configurações default carregadas');
+      Logger.debug('Fim da função: "loadConfig"');
+      return defaultConfig;
+    } catch (error) {
+      console.error('Erro ao carregar configurações:', error);
+      return this.getDefaultConfig();
+    }
   }
 
   /**
@@ -46,8 +86,19 @@ class ConfigManager {
    * @param {boolean} showFeedback - Se deve mostrar feedback visual
    */
   saveConfig(showFeedback = true) {
-    // TODO: Implementar - mover de config-manager.js original
-    console.log('💾 ConfigManager.saveConfig()');
+    Logger.debug('Início da função: "saveConfig"');
+    try {
+      const configStr = JSON.stringify(this.config);
+      localStorage.setItem('appConfig', configStr);
+      console.log('💾 Configurações salvas com sucesso');
+      if (showFeedback) {
+        this.showSaveFeedback();
+      }
+    } catch (error) {
+      console.error('❌ Erro ao salvar configurações:', error);
+      this.showError('Erro ao salvar configurações');
+    }
+    Logger.debug('Fim da função: "saveConfig"');
   }
 
   /**
@@ -56,18 +107,30 @@ class ConfigManager {
   async initializeController() {
     console.log('🚀 ConfigManager.initializeController() - Inicializando managers...');
 
-    // TODO: Criar instâncias dos managers
-    // this.apiKeyManager = new ApiKeyManager(this, _ipc, eventBus)
-    // this.audioManager = new AudioDeviceManager(this, _ipc, eventBus, rendererAPI)
-    // ... etc
+    try {
+      // Cria instância do ApiKeyManager
+      this.apiKeyManager = new ApiKeyManager(this, _ipc, globalThis.eventBus);
+      await this.apiKeyManager.initialize();
 
-    // TODO: Chamar initialize() em cada manager
-    // await this.apiKeyManager.initialize()
-    // await this.audioManager.initialize()
-    // ... etc
+      // TODO: Criar instâncias dos outros managers
+      // this.audioManager = new AudioDeviceManager(this, _ipc, globalThis.eventBus, globalThis.RendererAPI)
+      // this.modelManager = new ModelSelectionManager(this, _ipc, globalThis.eventBus, this.apiKeyManager)
+      // this.screenManager = new ScreenConfigManager(this, _ipc, globalThis.eventBus)
+      // this.privacyManager = new PrivacyConfigManager(this, _ipc, globalThis.eventBus)
+      // this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus)
+      // this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus)
 
-    // TODO: Mover resto da lógica de inicialização
-    console.log('✅ Todos os managers inicializados');
+      // TODO: Chamar initialize() em cada manager
+      // await this.audioManager.initialize()
+      // await this.modelManager.initialize()
+      // ... etc
+
+      // TODO: Mover resto da lógica de inicialização
+      console.log('✅ Todos os managers inicializados');
+    } catch (error) {
+      console.error('❌ Erro ao inicializar managers:', error);
+      throw error;
+    }
   }
 
   /**
@@ -94,8 +157,53 @@ class ConfigManager {
    * Retorna configuração padrão
    */
   getDefaultConfig() {
-    // TODO: Implementar - mover de config-manager.js original
-    return {};
+    Logger.debug('Início da função: "getDefaultConfig"');
+    Logger.debug('Fim da função: "getDefaultConfig"');
+    return {
+      api: {
+        activeProvider: 'openai',
+        openai: {
+          selectedSTTModel: 'vosk',
+          selectedLLMModel: 'gpt-4o-mini',
+          enabled: true,
+        },
+        google: {
+          selectedSTTModel: 'vosk',
+          selectedLLMModel: 'gemini-pro',
+          enabled: false,
+        },
+        openrouter: {
+          selectedSTTModel: 'vosk',
+          selectedLLMModel: '',
+          enabled: false,
+        },
+      },
+      audio: {
+        inputDevice: '',
+        outputDevice: '',
+        autoDetect: true,
+      },
+      screen: {
+        screenshotHotkey: 'Ctrl+Shift+S',
+        excludeAppFromScreenshot: true,
+        imageFormat: 'png',
+      },
+      privacy: {
+        hideFromScreenCapture: false,
+        disableTelemetry: false,
+        autoClearData: false,
+        dataRetentionDays: 7,
+      },
+      other: {
+        language: 'pt-BR',
+        theme: 'dark',
+        autoUpdate: true,
+        logLevel: 'info',
+        darkMode: true,
+        interviewMode: 'INTERVIEW',
+        overlayOpacity: 0.75,
+      },
+    };
   }
 
   /**
@@ -172,9 +280,21 @@ class ConfigManager {
    * Mostra feedback visual de salvamento
    * @param {string} message - Mensagem custom (opcional)
    */
-  showSaveFeedback(message) {
-    // TODO: Implementar - mover de config-manager.js original
-    console.log('✅ ' + (message || 'Configurações salvas com sucesso!'));
+  showSaveFeedback(message = 'Configurações salvas com sucesso!') {
+    Logger.debug('Início da função: "showSaveFeedback"');
+    const feedback = document.createElement('div');
+    feedback.className = 'save-feedback';
+    feedback.innerHTML = `
+      <span class="material-icons">check_circle</span>
+      ${message}
+    `;
+    document.body.appendChild(feedback);
+
+    setTimeout(() => {
+      feedback.remove();
+    }, 3000);
+
+    Logger.debug('Fim da função: "showSaveFeedback"');
   }
 
   /**
@@ -182,8 +302,21 @@ class ConfigManager {
    * @param {string} message - Mensagem de erro
    */
   showError(message) {
-    // TODO: Implementar - mover de config-manager.js original
-    console.error('❌ ' + message);
+    Logger.debug('Início da função: "showError"');
+    const error = document.createElement('div');
+    error.className = 'save-feedback';
+    error.style.background = '#dc3545';
+    error.innerHTML = `
+      <span class="material-icons">error</span>
+      ${message}
+    `;
+    document.body.appendChild(error);
+
+    setTimeout(() => {
+      error.remove();
+    }, 3000);
+
+    Logger.debug('Fim da função: "showError"');
   }
 }
 
