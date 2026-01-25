@@ -236,13 +236,6 @@ class WindowConfigManager {
   }
 
   /**
-   * Inicializa drag handle para movimento de janela
-   */
-  initDragHandle() {
-    // Implementado em restoreUserPreferences()
-  }
-
-  /**
    * Inicializa click-through controller
    */
   async initClickThroughController() {
@@ -255,6 +248,10 @@ class WindowConfigManager {
   restoreTheme() {
     // Implementado em restoreUserPreferences()
   }
+
+  // ==========================================
+  // MÉTODOS PRIVADOS
+  // ==========================================
 
   /**
    * Registra listener do slider de opacidade

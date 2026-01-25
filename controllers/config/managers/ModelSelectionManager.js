@@ -56,13 +56,13 @@ class ModelSelectionManager {
   async reset() {
     console.log('🔄 ModelSelectionManager.reset()');
     const providers = ['openai', 'google', 'openrouter'];
-    
+
     providers.forEach((provider) => {
       this.configManager.config.api[provider].selectedSTTModel = 'vosk';
       this.configManager.config.api[provider].selectedLLMModel = '';
       this.configManager.config.api[provider].enabled = false;
     });
-    
+
     this.configManager.config.api.activeProvider = 'openai';
     this.configManager.saveConfig(false);
     await this.restoreState();
@@ -258,8 +258,5 @@ class ModelSelectionManager {
         });
       }
     });
-  }
-}
-    console.log(`[ModelSelectionManager] #initModelSelectListeners`);
   }
 }
