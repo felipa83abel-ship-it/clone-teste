@@ -176,12 +176,12 @@ EventBus         ModeManager │      │    │      │      │
 
 **Responsabilidades**: Tudo relacionado a dispositivos de áudio
 
-- [ ] **3.1** Mover código para AudioDeviceManager.js
-  - [ ] 3.1.1 - `loadDevices()` - enumerateDevices
-  - [ ] 3.1.2 - `addNoneOption(select)` - helper
-  - [ ] 3.1.3 - `saveDevices()` - persistir seleção
-  - [ ] 3.1.4 - `restoreDevices()` - restaurar seleção salva
-  - [ ] 3.1.5 - `initAudioMonitoring()` - iniciar VU meters
+- [x] **3.1** Mover código para AudioDeviceManager.js
+  - [x] 3.1.1 - `loadDevices()` - enumerateDevices
+  - [x] 3.1.2 - `addNoneOption(select)` - helper
+  - [x] 3.1.3 - `saveDevices()` - persistir seleção
+  - [x] 3.1.4 - `restoreDevices()` - restaurar seleção salva
+  - [x] 3.1.5 - `initAudioMonitoring()` - iniciar VU meters
   - [x] 3.1.6 - `stopAudioMonitoring()` - parar VU meters
   - [x] 3.1.7 - Listeners de mudança de dispositivo
 
