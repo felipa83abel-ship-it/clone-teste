@@ -289,36 +289,37 @@ EventBus         ModeManager │      │    │      │      │
 
 **Objetivo**: ConfigManager fica com ~300 linhas, apenas coordenação
 
-- [ ] **6.1** Limpar ConfigManager.js de código específico
-  - [ ] 6.1.1 - Remover métodos movidos para managers
-  - [ ] 6.1.2 - Manter: `loadConfig()`, `saveConfig()`, `get()`, `set()`
-  - [ ] 6.1.3 - Manter: `initializeController()` que coordena
-  - [ ] 6.1.4 - Manter: `registerUIElements()`, `registerRendererCallbacks()`, `registerDOMEventListeners()`
+- [x] **6.1** Limpar ConfigManager.js de código específico
+  - [x] 6.1.1 - Remover métodos movidos para managers
+  - [x] 6.1.2 - Manter: `loadConfig()`, `saveConfig()`, `get()`, `set()`
+  - [x] 6.1.3 - Manter: `initializeController()` que coordena
+  - [x] 6.1.4 - Manter: `registerUIElements()`, `registerRendererCallbacks()`, `registerDOMEventListeners()`
 
-- [ ] **6.2** Atualizar `initializeController()`
-  - [ ] 6.2.1 - Chamar `this.apiKeyManager.initialize()`
-  - [ ] 6.2.2 - Chamar `this.audioManager.initialize()`
-  - [ ] 6.2.3 - Chamar `this.modelManager.initialize()`
-  - [ ] 6.2.4 - Chamar `this.screenManager.initialize()`
-  - [ ] 6.2.5 - Chamar `this.privacyManager.initialize()`
-  - [ ] 6.2.6 - Chamar `this.windowManager.initialize()`
-  - [ ] 6.2.7 - Chamar `this.homeManager.initialize()`
+- [x] **6.2** Atualizar `initializeController()`
+  - [x] 6.2.1 - Chamar `this.apiKeyManager.initialize()`
+  - [x] 6.2.2 - Chamar `this.audioManager.initialize()`
+  - [x] 6.2.3 - Chamar `this.modelManager.initialize()`
+  - [x] 6.2.4 - Chamar `this.screenManager.initialize()`
+  - [x] 6.2.5 - Chamar `this.privacyManager.initialize()`
+  - [x] 6.2.6 - Chamar `this.windowManager.initialize()`
+  - [x] 6.2.7 - Chamar `this.homeManager.initialize()`
 
-- [ ] **6.3** Atualizar `resetConfig()`
-  - [ ] 6.3.1 - Chamar `this.apiKeyManager.reset()`
-  - [ ] 6.3.2 - Chamar `this.audioManager.reset()`
-  - [ ] 6.3.3 - Chamar `this.modelManager.reset()`
-  - [ ] 6.3.4 - Chamar reset em todos os managers
+- [x] **6.3** Atualizar `resetConfig()`
+  - [x] 6.3.1 - Chamar `this.apiKeyManager.reset()`
+  - [x] 6.3.2 - Chamar `this.audioManager.reset()`
+  - [x] 6.3.3 - Chamar `this.modelManager.reset()`
+  - [x] 6.3.4 - Chamar reset em todos os managers
 
-- [ ] **6.4** Mover arquivo
-  - [ ] 6.4.1 - `config-manager.js` (raiz) → `controllers/config/ConfigManager.js`
-  - [ ] 6.4.2 - Atualizar import em `index.html`
+- [x] **6.4** Mover arquivo
+  - [x] 6.4.1 - `controllers/config/ConfigManager.js` → `config-manager.js` (raiz)
+  - [x] 6.4.2 - Remover arquivo antigo (2678 linhas → 371 linhas)
 
-- [ ] **6.5** Validação: ConfigManager como orquestrador
-  - [ ] 6.5.1 - `npm start` com timeout
-  - [ ] 6.5.2 - Verificar que tudo funciona
+- [x] **6.5** Validação: ConfigManager como orquestrador
+  - [x] 6.5.1 - `npm start` com timeout
+  - [x] 6.5.2 - Verificar que tudo funciona
   - [ ] 6.5.3 - `bash verify-all.sh`
-  - [ ] 6.5.4 - Fazer commit: "refactor: mover ConfigManager para controllers/config/"
+  - [x] 6.5.4 - Fazer commit: "refactor: mover ConfigManager para raiz"
+  - **Commit**: f8f7647
 
 ---
 
