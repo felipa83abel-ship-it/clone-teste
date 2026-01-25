@@ -125,12 +125,6 @@ class AudioDeviceManager {
         input: this.configManager.config.audio.inputDevice,
         output: this.configManager.config.audio.outputDevice,
       });
-
-      // Emite evento
-      this.eventBus.emit('AUDIO_DEVICE_UPDATED', {
-        inputDevice: this.configManager.config.audio.inputDevice,
-        outputDevice: this.configManager.config.audio.outputDevice,
-      });
     }
 
     Logger.debug('Fim da função: "saveDevices"');
@@ -160,6 +154,14 @@ class AudioDeviceManager {
       input: inputSelect.value,
       output: outputSelect.value,
     });
+
+    // Inicia monitoramento de volume para os dispositivos restaurados
+    if (inputSelect.value) {
+      await this.rendererAPI?.startAudioVolumeMonitor('input', inputSelect.value);
+    }
+    if (outputSelect.value) {
+      await this.rendererAPI?.startAudioVolumeMonitor('output', outputSelect.value);
+    }
 
     Logger.debug('Fim da função: "restoreDevices"');
   }

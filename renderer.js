@@ -231,6 +231,30 @@ const registerUIElements = (elements) => uiElementsRegistry.register(elements);
 /* ================================ */
 
 /**
+ * Escuta atualização de volume de entrada
+ */
+eventBus.on('inputVolumeUpdate', (data) => {
+  const { percent } = data;
+  const inputVu = document.getElementById('inputVu');
+  if (inputVu) inputVu.style.width = percent + '%';
+
+  const inputVuHome = document.getElementById('inputVuHome');
+  if (inputVuHome) inputVuHome.style.width = percent + '%';
+});
+
+/**
+ * Escuta atualização de volume de saída
+ */
+eventBus.on('outputVolumeUpdate', (data) => {
+  const { percent } = data;
+  const outputVu = document.getElementById('outputVu');
+  if (outputVu) outputVu.style.width = percent + '%';
+
+  const outputVuHome = document.getElementById('outputVuHome');
+  if (outputVuHome) outputVuHome.style.width = percent + '%';
+});
+
+/**
  * Escuta evento de mudança de dispositivo
  * Emitido pelo config-manager
  */
