@@ -141,6 +141,72 @@ eventBus.on('llmBatchEnd', (data) => {
 
 eventBus.on('error', (error) => {
   Logger.error('Erro na eventBus', { error });
+  // 🔥 NOVO: Mostrar erro visual ao usuário
+  if (window.RendererAPI?.configManager?.showError) {
+    window.RendererAPI.configManager.showError(error);
+  }
+});
+
+// 🔥 NOVO: Listener para atualizar botão de listen
+eventBus.on('listenButtonToggle', ({ isRunning, buttonText }) => {
+  const listenBtn = document.getElementById('listen-btn');
+  if (listenBtn) {
+    listenBtn.textContent = buttonText;
+    listenBtn.classList.toggle('listening', isRunning);
+  }
+});
+
+// 🔥 NOVO: Listener para atualizar transcrição interim (parcial)
+eventBus.on('updateInterim', ({ id, speaker, text }) => {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = text || '';
+    if (speaker) {
+      element.dataset.speaker = speaker;
+    }
+  }
+});
+
+// 🔥 NOVO: Listener para atualizar mensagem de status
+eventBus.on('statusUpdate', ({ message }) => {
+  // Atualiza a UI diretamente, sem chamar updateStatusMessage (que emitiria novamente)
+  const statusDiv =
+    document.getElementById('status-message') || document.querySelector('[data-status-message]');
+  if (statusDiv) {
+    statusDiv.textContent = message || '';
+  }
+});
+
+// 🔥 NOVO: Listener para adicionar transcrição com placeholder
+eventBus.on('transcriptAdd', ({ author, text, timeStr, elementId, placeholderId }) => {
+  const container = document.getElementById(elementId);
+  if (container) {
+    const div = document.createElement('div');
+    div.id = placeholderId;
+    div.className = 'transcript-item';
+    div.dataset.speaker = author;
+    div.innerHTML = `<strong>${author}:</strong> <span class="transcript-text">${text}</span>${timeStr ? ` <small>${timeStr}</small>` : ''}`;
+    container.appendChild(div);
+  }
+});
+
+// 🔥 NOVO: Listener para preencher placeholder de transcrição
+eventBus.on('placeholderFulfill', ({ speaker, text, placeholderId, showMeta }) => {
+  const element = document.getElementById(placeholderId);
+  if (element) {
+    const textSpan = element.querySelector('.transcript-text');
+    if (textSpan) {
+      textSpan.textContent = text;
+    }
+  }
+});
+
+// 🔥 NOVO: Listener para limpar transcrição interim
+eventBus.on('clearInterim', ({ id }) => {
+  const element = document.getElementById(id);
+  if (element) {
+    element.textContent = '';
+  }
 });
 
 /* ================================ */

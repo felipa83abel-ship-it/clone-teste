@@ -229,7 +229,10 @@ class WindowConfigManager {
       this.applyOpacity(value);
     }
 
-    this.configManager.saveConfig();
+    // Para opacityRange: salvar silenciosamente (sem feedback visual)
+    // Para outros campos: mostrar feedback visual
+    const showFeedback = field !== 'opacityRange';
+    this.configManager.saveConfig(showFeedback);
 
     console.log(`   ✅ Campo ${field} salvo`);
     Logger.debug('Fim da função: "saveWindowField"');

@@ -516,12 +516,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   // INICIALIZAR AUDIO CONTROLLER COM DEPENDÊNCIAS
   // ==========================================
   if (globalThis.RendererAPI?.initAudioController) {
+    // 🔥 Popula UIElements com seletores reais do DOM
+    const uiElements = {
+      inputSelect: document.getElementById('audio-input-device'),
+      outputSelect: document.getElementById('audio-output-device'),
+      listeningBtn: document.getElementById('listening-btn'),
+      listenBtn: document.getElementById('listen-btn'),
+    };
+
     const audioControllerDeps = {
       appState: globalThis.appState,
       eventBus: globalThis.eventBus,
       sttStrategy: globalThis.RendererAPI.sttStrategy,
       globalConfig: globalThis.configManager,
-      UIElements: {}, // Será preenchido conforme necessário
+      UIElements: uiElements, // ✅ Agora com seletores reais
       CURRENT_QUESTION_ID: 'CURRENT',
       modeManager: globalThis.RendererAPI.modeManager,
       MODES: globalThis.RendererAPI.MODES,
