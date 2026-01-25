@@ -442,4 +442,5 @@ module.exports = {
   consolidateQuestionText,
   handleCurrentQuestion,
   scrollToSelectedQuestion,
+  findAnswerByQuestionId,
 };

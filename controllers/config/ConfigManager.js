@@ -372,4 +372,26 @@ document.addEventListener('DOMContentLoaded', async () => {
   await globalThis.configManager.initializeController();
 
   console.log('✅ ConfigManager inicializado com sucesso');
+
+  // ==========================================
+  // INICIALIZAR AUDIO CONTROLLER COM DEPENDÊNCIAS
+  // ==========================================
+  if (globalThis.RendererAPI?.initAudioController) {
+    const audioControllerDeps = {
+      appState: globalThis.appState,
+      eventBus: globalThis.eventBus,
+      sttStrategy: globalThis.RendererAPI.sttStrategy,
+      globalConfig: globalThis.configManager,
+      UIElements: {}, // Será preenchido conforme necessário
+      CURRENT_QUESTION_ID: 'CURRENT',
+      modeManager: globalThis.RendererAPI.modeManager,
+      MODES: globalThis.RendererAPI.MODES,
+      getConfiguredSTTModel: globalThis.RendererAPI.getConfiguredSTTModel,
+      closeCurrentQuestionForced: globalThis.RendererAPI.closeCurrentQuestionForced,
+      updateStatusMessage: globalThis.RendererAPI.updateStatusMessage,
+      findAnswerByQuestionId: globalThis.RendererAPI.findAnswerByQuestionId,
+    };
+    globalThis.RendererAPI.initAudioController(audioControllerDeps);
+    console.log('✅ AudioController inicializado com sucesso');
+  }
 });

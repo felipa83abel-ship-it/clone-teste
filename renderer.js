@@ -299,6 +299,7 @@ const {
   renderCurrentQuestion,
   handleQuestionClick,
   handleCurrentQuestion,
+  findAnswerByQuestionId,
 } = questionController;
 
 /**
@@ -351,21 +352,8 @@ function normalizeForCompare(t) {
  * Funções utilitárias (delegadas ao renderer-helpers e question-controller)
  */
 const { updateStatusMessage, clearAllSelections } = rendererHelpers;
-
-/**
- * Obtém IDs navegáveis de perguntas (CURRENT + histórico)
- * 🔥 ORDEM: CURRENT primeiro, depois histórico em ordem REVERSA (visualmente correto)
- * Porque o histórico é renderizado com reverse(), então a ordem navegável deve ser:
- * [CURRENT, ID_último, ID_penúltimo, ..., ID_primeiro]
- * @returns {array} Array de IDs navegáveis
- */
-function getNavigableQuestionIds() {
-  const ids = [];
-  if (appState.currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
-  // 🔥 CORRIGIDO: Reverter histórico para ficar coerente com ordem visual renderizada
-  [...appState.history].reverse().forEach((q) => ids.push(q.id));
-  return ids;
-}
+const { closeCurrentQuestionForced, getNavigableQuestionIds: getNavQuestionIds } =
+  questionController;
 
 /* ================================ */
 //	🎯 REGISTRAR STTs (Refatoração Fase 2)
@@ -616,6 +604,24 @@ const RendererAPI = {
     ipcRenderer.send('SET_CLICK_THROUGH', enabled);
   },
   /**
+   * Inicia movimento de janela via drag
+   */
+  startWindowDrag: () => {
+    return ipcRenderer.invoke('START_WINDOW_DRAG');
+  },
+  /**
+   * Define opacidade da janela
+   * @param {number} opacity - Valor de 0 a 1
+   */
+  setWindowOpacity: (opacity) => {
+    // Aplicar CSS na janela/body
+    const opacityValue = Math.max(0, Math.min(1, opacity));
+    if (document.body) {
+      document.body.style.opacity = opacityValue.toString();
+    }
+    return Promise.resolve();
+  },
+  /**
    * Atualiza botão de click-through
    * @param {boolean} enabled - Se click-through está ativo
    * @param {Element} btnToggle - Botão a atualizar
@@ -662,7 +668,7 @@ const RendererAPI = {
    * @param {string} direction - 'up' ou 'down'
    */
   navigateQuestions: (direction) => {
-    const all = getNavigableQuestionIds();
+    const all = getNavQuestionIds();
     if (all.length === 0) return;
 
     let index = all.indexOf(appState.selectedId);
@@ -745,6 +751,23 @@ const RendererAPI = {
       callback(direction);
     });
   },
+
+  // ==========================================
+  // EXPORTAR DEPENDÊNCIAS PARA AUDIO CONTROLLER
+  // ==========================================
+  sttStrategy,
+  modeManager,
+  MODES,
+  getConfiguredSTTModel,
+  updateStatusMessage,
+  closeCurrentQuestionForced,
+  findAnswerByQuestionId,
+  initAudioController: (deps) => {
+    const { initAudioController: initAudioCtrl } = audioController;
+    if (typeof initAudioCtrl === 'function') {
+      initAudioCtrl(deps);
+    }
+  },
 };
 
 if (typeof module !== 'undefined' && module.exports) {
@@ -756,6 +779,7 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof globalThis !== 'undefined') {
   globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
   globalThis.eventBus = eventBus; // 🎭 Exporta EventBus singleton para todos os módulos
+  globalThis.appState = appState; // 🎭 Exporta appState para audio-controller e outros
   globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock
   globalThis._ipc = ipcRenderer; // 🎭 Exporta ipcRenderer para ConfigManager e Managers
 }
