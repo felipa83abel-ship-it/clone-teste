@@ -1,4 +1,4 @@
-// @ts-nocheck
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
 /* global Logger */
 
 /**

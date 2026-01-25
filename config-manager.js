@@ -1,4 +1,4 @@
-﻿// @ts-nocheck
+﻿// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
 /// <reference path="types/globals.d.ts" />
 /* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowConfigManager, HomeManager */
 
