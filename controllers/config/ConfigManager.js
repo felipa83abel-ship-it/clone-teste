@@ -138,12 +138,14 @@ class ConfigManager {
       this.privacyManager = new PrivacyConfigManager(this, _ipc, globalThis.eventBus);
       await this.privacyManager.initialize();
 
+      // Cria instância do WindowConfigManager
+      this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus);
+      await this.windowManager.initialize();
+
       // TODO: Criar instâncias dos outros managers
-      // this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus)
       // this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus)
 
       // TODO: Chamar initialize() em outros managers
-      // await this.windowManager.initialize()
       // await this.homeManager.initialize()
 
       // TODO: Mover resto da lógica de inicialização

@@ -209,31 +209,31 @@ EventBus         ModeManager │      │    │      │      │
 
 **Responsabilidades**: Seleção de STT/LLM e ativação de modelos
 
-- [ ] **4.1** Mover código para ModelSelectionManager.js
-  - [ ] 4.1.1 - `restoreSTTLLMModels()` - restaurar seleção
-  - [ ] 4.1.2 - `toggleModel(model)` - ativar/desativar
-  - [ ] 4.1.3 - `updateModelStatusUI()` - atualizar badges
-  - [ ] 4.1.4 - Listeners de model toggle buttons
-  - [ ] 4.1.5 - Listeners de STT/LLM select changes
+- [x] **4.1** Mover código para ModelSelectionManager.js
+  - [x] 4.1.1 - `restoreSTTLLMModels()` - restaurar seleção
+  - [x] 4.1.2 - `toggleModel(model)` - ativar/desativar
+  - [x] 4.1.3 - `updateModelStatusUI()` - atualizar badges
+  - [x] 4.1.4 - Listeners de model toggle buttons
+  - [x] 4.1.5 - Listeners de STT/LLM select changes
 
-- [ ] **4.2** Implementar métodos do Manager
-  - [ ] 4.2.1 - `constructor(configManager, ipc, eventBus, apiKeyManager)`
-  - [ ] 4.2.2 - `initialize()` - registra listeners
-  - [ ] 4.2.3 - `toggleModel(provider)` - ativar/desativar com validação
-  - [ ] 4.2.4 - `updateUI()` - atualizar status badges
-  - [ ] 4.2.5 - `restoreState()` - restaurar seleção salva
-  - [ ] 4.2.6 - `reset()` - reseta modelos
+- [x] **4.2** Implementar métodos do Manager
+  - [x] 4.2.1 - `constructor(configManager, ipc, eventBus, apiKeyManager)`
+  - [x] 4.2.2 - `initialize()` - registra listeners
+  - [x] 4.2.3 - `toggleModel(provider)` - ativar/desativar com validação
+  - [x] 4.2.4 - `updateUI()` - atualizar status badges
+  - [x] 4.2.5 - `restoreState()` - restaurar seleção salva
+  - [x] 4.2.6 - `reset()` - reseta modelos
 
-- [ ] **4.3** Atualizar ConfigManager
-  - [ ] 4.3.1 - `this.modelManager = new ModelSelectionManager(..., this.apiKeyManager)`
-  - [ ] 4.3.2 - Chamar `this.modelManager.initialize()` no `initializeController()`
-  - [ ] 4.3.3 - Remover código de Model do ConfigManager
+- [x] **4.3** Atualizar ConfigManager
+  - [x] 4.3.1 - `this.modelManager = new ModelSelectionManager(..., this.apiKeyManager)`
+  - [x] 4.3.2 - Chamar `this.modelManager.initialize()` no `initializeController()`
+  - [x] 4.3.3 - Remover código de Model do ConfigManager
 
-- [ ] **4.4** Validação: ModelSelectionManager funcional
-  - [ ] 4.4.1 - `npm start` e entrar em "API e Modelos" tab
-  - [ ] 4.4.2 - Ativar/desativar modelos (com/sem chave)
-  - [ ] 4.4.3 - Verificar que apenas 1 modelo pode estar ativo
-  - [ ] 4.4.4 - Fazer commit: "refactor: extrair ModelSelectionManager"
+- [x] **4.4** Validação: ModelSelectionManager funcional
+  - [x] 4.4.1 - `npm start` e entrar em "API e Modelos" tab
+  - [x] 4.4.2 - Ativar/desativar modelos (com/sem chave)
+  - [x] 4.4.3 - Verificar que apenas 1 modelo pode estar ativo
+  - [x] 4.4.4 - Fazer commit: "refactor: extrair ModelSelectionManager"
 
 ---
 
@@ -241,29 +241,32 @@ EventBus         ModeManager │      │    │      │      │
 
 #### **ScreenConfigManager**
 
-- [ ] **5.1** Mover código relacionado a screenshot
-  - [ ] 5.1.1 - Hotkey recording (`recordHotkey()`)
-  - [ ] 5.1.2 - Listeners de formato e excludeApp
-  - [ ] 5.1.3 - Restauração de estado
-  - [ ] 5.1.4 - Criar `ScreenConfigManager.js`
+- [x] **5.1** Mover código relacionado a screenshot
+  - [x] 5.1.1 - Hotkey recording (`recordHotkey()`)
+  - [x] 5.1.2 - Listeners de formato e excludeApp
+  - [x] 5.1.3 - Restauração de estado
+  - [x] 5.1.4 - Criar `ScreenConfigManager.js`
+  - **Commit**: d0dc546
 
 #### **PrivacyConfigManager**
 
-- [ ] **5.2** Mover código relacionado a privacidade
-  - [ ] 5.2.1 - Checkboxes de privacidade
-  - [ ] 5.2.2 - Data retention select
-  - [ ] 5.2.3 - Listeners
-  - [ ] 5.2.4 - Restauração de estado
-  - [ ] 5.2.5 - Criar `PrivacyConfigManager.js`
+- [x] **5.2** Mover código relacionado a privacidade
+  - [x] 5.2.1 - Checkboxes de privacidade
+  - [x] 5.2.2 - Data retention select
+  - [x] 5.2.3 - Listeners
+  - [x] 5.2.4 - Restauração de estado
+  - [x] 5.2.5 - Criar `PrivacyConfigManager.js`
+  - **Commit**: bcd14a0
 
 #### **WindowConfigManager**
 
-- [ ] **5.3** Mover código relacionado a janela
-  - [ ] 5.3.1 - `initDragHandle()` - movimento de janela
-  - [ ] 5.3.2 - `initClickThroughController()` - click-through toggle
-  - [ ] 5.3.3 - `applyOpacity()` - slider de opacidade
-  - [ ] 5.3.4 - `restoreTheme()` - dark mode toggle
-  - [ ] 5.3.5 - Criar `WindowConfigManager.js`
+- [x] **5.3** Mover código relacionado a janela
+  - [x] 5.3.1 - `initDragHandle()` - movimento de janela
+  - [x] 5.3.2 - `initClickThroughController()` - click-through toggle
+  - [x] 5.3.3 - `applyOpacity()` - slider de opacidade
+  - [x] 5.3.4 - `restoreTheme()` - dark mode toggle
+  - [x] 5.3.5 - Criar `WindowConfigManager.js`
+  - **Commit**: aa8bbe3
 
 #### **HomeManager**
 
@@ -274,10 +277,10 @@ EventBus         ModeManager │      │    │      │      │
   - [ ] 5.4.4 - Criar `HomeManager.js`
 
 - [ ] **5.5** Validação: Todos os managers criados
-  - [ ] 5.5.1 - `npm start` com timeout
+  - [x] 5.5.1 - `npm start` com timeout (validado para ScreenConfig, Privacy, Window)
   - [ ] 5.5.2 - Testar cada seção rapidamente
   - [ ] 5.5.3 - `npm test`
-  - [ ] 5.5.4 - Fazer commit: "refactor: extrair managers restantes"
+  - [ ] 5.5.4 - Fazer commit: "refactor: extrair managers restantes" (quando HomeManager concluído)
 
 ---
 
