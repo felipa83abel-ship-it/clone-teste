@@ -1,5 +1,5 @@
 ﻿/* =========================================================
-   CONFIG MANAGER
+   CONFIG MANAGER - old
    Gerencia configurações da aplicação com persistência segura
 ========================================================= */
 // @ts-nocheck

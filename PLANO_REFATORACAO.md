@@ -1,1199 +1,709 @@
-# 📋 PLANO DE REFATORAÇÃO - AskMe
+# PLANO DE REFATORAÇÃO - config-manager.js → Arquitetura em Managers
 
-## 📊 Resumo Executivo
-
-Análise completa do projeto Electron concluída. Este plano consolida **todas as melhorias** identificadas em ordem de prioridade e impacto, com foco em **estabilidade, manutenibilidade e preparação para produção**.
-
-### Status Geral - ATUALIZADO (24 jan 2026)
-
-**REFATORAÇÃO COMPLETA: FASES 1-7 ✅ | INICIANDO FASES 8-9**
-
-- ✅ **FASE 1: Estrutura reorganizada** (mode-manager, mock-runner, UI registry, logging consolidado)
-- ✅ **FASE 2: Decomposição renderer.js** (1538 → 779 linhas, -49.4%)
-- ✅ **FASE 3: Sistema LLM robusto** (timeout, retry, error handling)
-- ✅ **FASE 4: Sistema STT consolidado** (whisper-1 removido, debug logging unificado)
-- ✅ **FASE 5: Testes e Validação** (74 testes Jest + 11 E2E Playwright + JSDoc types)
-- ✅ **FASE 6: Limpeza e Otimização** (6.1 deprecated ✅, 6.2 dead code ✅, 6.3 bundle ✅)
-- ✅ **FASE 7: Documentação atualizada** (7.1 docs ✅, 7.2 CI/CD ✅, 7.3 ESLint + Type Checking ✅)
-- ✅ **FASE 8: Segurança e Produção** (8.1 SecureLogger ✅, 8.2 Audit ✅, 8.3 Security ✅)
-- ✅ **FASE 9: Refinamentos Finais** (9.1 ErrorHandler ✅, 9.2 Integração IPC ✅)
+**Status**: 🟢 Aprovado - Pronto para Execução  
+**Data de Criação**: 24 de janeiro de 2026  
+**Versão do Plano**: 2.0 (Opção B - Arquitetura em Classes)  
+**Opção Escolhida**: Quebrar em Managers por Funcionalidade
 
 ---
 
-## 🎯 FASE 1: ESTRUTURA E ORGANIZAÇÃO (ALTA PRIORIDADE)
+## 📋 Sumário Executivo
 
-**Status:** ✅ COMPLETO
+Este plano refatora o arquivo monolítico `config-manager.js` (2678 linhas) em uma **arquitetura modular com 7 classes especializadas (Managers)**, cada uma com responsabilidade única.
 
-### 1.1 Reorganizar `mode-manager.js` e `mock-runner.js`
+### **Objetivo Final**:
 
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Baixa | **Tempo:** 30min ✓
+- ✅ Cada Manager ~200-300 linhas (fácil navegar e manter)
+- ✅ Separação por **funcionalidade**, não por seção
+- ✅ Escalável indefinidamente (novas features = novo Manager ou estender existente)
+- ✅ Testável isoladamente (cada Manager com testes unitários)
+- ✅ ConfigManager atua apenas como **orquestrador**
 
-**Problema RESOLVIDO:**
-
-- ✅ `mode-manager.js` movido para `/controllers/modes/`
-- ✅ `mock-runner.js` movido para `/testing/`
-- ✅ Imports em `renderer.js` atualizados
-- ✅ Projeto testado e funcionando corretamente (npm start OK)
-- [ ] Commit: "refactor: reorganizar mode-manager e mock-runner para estrutura lógica"
-
----
-
-### 1.2 Extrair `registerUIElements()` do renderer
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1h ✓
-
-**Problema RESOLVIDO:**
-
-- ✅ Criado `/utils/ui-elements-registry.js` com classe UIElementsRegistry
-- ✅ Função `registerUIElements()` em renderer.js delegada para registry
-- ✅ Singleton global `uiElementsRegistry` para fácil acesso
-- ✅ Permite mockagem em testes
-- ✅ Imports em `renderer.js` atualizados
-- ✅ Projeto testado e funcionando corretamente
-
-**Commit:** ✓ `4c64a03 - refactor(fase-1.2-1.3): completar Fase 1`
-
----
-
-### 1.3 Consolidar logs e remover `debugLogConfig()`
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 20min ✓
-
-**Problema RESOLVIDO:**
-
-- ✅ Importado `Logger.js` em config-manager.js
-- ✅ Substituído todos 20 `debugLogConfig()` por `Logger.debug()`
-- ✅ Removida função `debugLogConfig()` (20+ linhas de código morto)
-- ✅ Logging centralizado e consistente
-- ✅ Compatível com Logger.js (padrão moderno)
-
-**Commit:** ✓ `4c64a03 - refactor(fase-1.2-1.3): completar Fase 1`
-
----
-
-## 🎯 FASE 1 - RESUMO
-
-**Status:** ✅ COMPLETO
-
-**Commits Realizados:**
-
-1. **Commit anterior** - Reorganizar mode-manager e mock-runner
-   - ✅ `mode-manager.js` movido para `/controllers/modes/`
-   - ✅ `mock-runner.js` movido para `/testing/`
-
-2. **Commit 4c64a03** - Completar Fase 1.2 e 1.3
-   - ✅ Criar `/utils/ui-elements-registry.js` (classe UIElementsRegistry)
-   - ✅ Delegar `registerUIElements()` em renderer.js
-   - ✅ Consolidar logging: `debugLogConfig()` → `Logger.debug()`
-   - Result: Tests 74/74 passing ✓, App starting ✓
-
-**Estrutura Final:**
-
-- ✅ Reorganização: mode-manager e mock-runner em pastas lógicas
-- ✅ Registry: UIElementsRegistry centralizado em `/utils/`
-- ✅ Logging: Consolidado em Logger.js (sem duplicação)
-
-**Validações:**
-
-- ✅ npm test: 74/74 tests passing
-- ✅ npm start: App initializing successfully
-- ✅ Git commits: Clean history with clear messages
-
----
-
----
-
-## 🎯 FASE 2: DECOMPOSIÇÃO DO RENDERER (ALTA PRIORIDADE)
-
-Renderer.js com 1528 linhas precisa ser dividido em módulos temáticos.
-
-### 2.1 Extrair Controladores de Áudio
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h ✓
-
-**Arquivos criados:**
+### **Estrutura Final**:
 
 ```
-/controllers/audio/
-  └── audio-controller.js (5 funções: startAudio, stopAudio, listenToggleBtn, hasActiveModel, logTranscriptionMetrics)
+controllers/
+  config/
+    ConfigManager.js                    (300 linhas - orquestrador)
+    managers/
+      ApiKeyManager.js                  (250 linhas)
+      AudioDeviceManager.js             (200 linhas)
+      ModelSelectionManager.js          (200 linhas)
+      ScreenConfigManager.js            (150 linhas)
+      PrivacyConfigManager.js           (100 linhas)
+      WindowConfigManager.js            (150 linhas)
+      HomeManager.js                    (100 linhas)
 ```
 
-**Funções extraídas:** (~200 linhas)
-
-- ✅ `startAudio()`
-- ✅ `stopAudio()`
-- ✅ `listenToggleBtn()`
-- ✅ `logTranscriptionMetrics()`
-- ✅ `hasActiveModel()`
-
-**Checklist:**
-
-- ✅ Criar `/controllers/audio/audio-controller.js`
-- ✅ Mover funções listadas
-- ✅ Atualizar imports em renderer.js
-- ✅ Exportar objeto com todas as funções
-- ✅ Verificar com `get_errors()` (OK - sem erros)
-- ⏳ Testar Ctrl+D funciona (mic on/off) - Próximo passo
-- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
-
 ---
 
-### 2.2 Extrair Controladores de Perguntas
+## 🎯 Arquitetura: Separação por Funcionalidade (Não por Seção)
 
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h ✓
-
-**Arquivos criados:**
+### **Princípio**: Cada Manager cuida de UMA funcionalidade completa
 
 ```
-/controllers/question/
-  ├── question-controller.js (9 funções de controle)
-  └── question-helpers.js (4 helpers)
+❌ ERRADO - Separar por seção:
+  HomeSection.js, ApiModelsSection.js, AudioScreenSection.js
+  Problema: ApiKeyManager seria compartilhado por 3 seções
+
+✅ CERTO - Separar por funcionalidade:
+  ApiKeyManager → Gerencia API keys de TODOS os providers
+                  (aparece em: OpenAI tab, Google tab, OpenRouter tab)
 ```
 
-**Funções extraídas:** (~300 linhas)
+### **Mapeamento: Funcionalidade → Manager**
 
-- ✅ `renderQuestionsHistory()`
-- ✅ `renderCurrentQuestion()`
-- ✅ `handleQuestionClick()`
-- ✅ `getSelectedQuestionText()`
-- ✅ `handleCurrentQuestion()`
-- ✅ `finalizeCurrentQuestion()`
-- ✅ `closeCurrentQuestionForced()`
-- ✅ `getNavigableQuestionIds()`
-- ✅ `consolidateQuestionText()`
+| Funcionalidade            | Manager                    | Responsabilidades                                                                                        |
+| ------------------------- | -------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **API Keys**              | `ApiKeyManager.js`         | Salvar, deletar, restaurar, mascarar, validar API keys de qualquer provider (OpenAI, Google, OpenRouter) |
+| **Seleção de Modelos**    | `ModelSelectionManager.js` | Gerenciar seleção de STT/LLM, ativar/desativar modelos, validar modelos                                  |
+| **Dispositivos de Áudio** | `AudioDeviceManager.js`    | Carregar dispositivos, selecionar, restaurar, monitorar volume (input/output)                            |
+| **Captura de Tela**       | `ScreenConfigManager.js`   | Hotkey de screenshot, excluir app, formato de imagem                                                     |
+| **Privacidade**           | `PrivacyConfigManager.js`  | Hide from capture, telemetria, auto-clear, retenção de dados                                             |
+| **Janela & Visual**       | `WindowConfigManager.js`   | Drag handle, click-through toggle, opacity range, dark mode                                              |
+| **Home & Q&A**            | `HomeManager.js`           | Transcrição, perguntas, respostas, botões de ação (listen, ask)                                          |
+| **Orquestração**          | `ConfigManager.js`         | Inicializar todos os managers, persistência de config, coordenação geral                                 |
 
-**Helpers em `question-helpers.js`:**
-
-- ✅ `finalizeQuestion()`
-- ✅ `resetCurrentQuestion()`
-- ✅ `normalizeForCompare()`
-- ✅ `findAnswerByQuestionId()`
-
-**Checklist:**
-
-- ✅ Criar `/controllers/question/question-controller.js`
-- ✅ Criar `/controllers/question/question-helpers.js`
-- ✅ Mover funções
-- ✅ Atualizar imports em renderer.js
-- ✅ Verificar com `get_errors()` (OK - sem erros)
-- ⏳ Testar renderização de perguntas
-- ⏳ Testar navegação de perguntas (Ctrl+ArrowUp/Down)
-- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
-
----
-
-### 2.3 Extrair Controladores de Screenshots
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h ✓
-
-**Arquivo criado:**
+### **Diagrama: Dependências e Fluxo**
 
 ```
-/controllers/screenshot/
-  └── screenshot-controller.js (3 funções)
+                    index.html
+                        │
+           ┌────────────┴────────────┐
+           │                         │
+      renderer.js              ConfigManager.js
+     (orquestrador)            (orquestrador)
+           │                         │
+    ┌──────┴──────────┐     ┌──────┬─┴──┬──────┬──────┐
+    │                 │     │      │    │      │      │
+EventBus         ModeManager │      │    │      │      │
+   │                 │   ApiKey Audio Model Screen Privacy Window Home
+   │                 │  Manager Manager Manager Manager Manager Manager
+   │                 │     │      │    │      │      │
+   └─────────────────┴─────┴──────┴────┴──────┴──────┴─────────┘
+                        │
+                    DOM (index.html)
+                        │
+                 globalThis.configManager
 ```
 
-**Funções extraídas:** (~200 linhas)
+### **Carregamento em index.html**
 
-- ✅ `captureScreenshot()`
-- ✅ `analyzeScreenshots()`
-- ✅ `clearScreenshots()`
+```html
+<!-- 1️⃣ Renderer (sistema de eventos e estado) -->
+<script src="./renderer.js"></script>
 
-**Checklist:**
+<!-- 2️⃣ Managers (independentes, nenhuma ordem específica) -->
+<script src="./controllers/config/managers/ApiKeyManager.js"></script>
+<script src="./controllers/config/managers/AudioDeviceManager.js"></script>
+<script src="./controllers/config/managers/ModelSelectionManager.js"></script>
+<script src="./controllers/config/managers/ScreenConfigManager.js"></script>
+<script src="./controllers/config/managers/PrivacyConfigManager.js"></script>
+<script src="./controllers/config/managers/WindowConfigManager.js"></script>
+<script src="./controllers/config/managers/HomeManager.js"></script>
 
-- ✅ Criar `/controllers/screenshot/screenshot-controller.js`
-- ✅ Mover funções
-- ✅ Atualizar imports em renderer.js
-- ✅ Verificar com `get_errors()` (OK - sem erros)
-- ⏳ Testar captura de screenshot (Ctrl+Shift+S)
-- ⏳ Testar análise de screenshot (Ctrl+Shift+A)
-- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
+<!-- 3️⃣ ConfigManager (orquestrador, depende dos managers) -->
+<script src="./controllers/config/ConfigManager.js"></script>
 
----
-
-### 2.4 Consolidar Helpers Gerais
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 30min ✓
-
-**Arquivo criado:**
-
-```
-/utils/renderer-helpers.js (5 funções)
+<!-- 4️⃣ Inicialização no DOMContentLoaded -->
+<script>
+  document.addEventListener('DOMContentLoaded', async () => {
+    globalThis.configManager = new ConfigManager();
+    await globalThis.configManager.initializeController();
+  });
+</script>
 ```
 
-**Funções extraídas:**
+---
 
-- ✅ `updateStatusMessage()`
-- ✅ `clearAllSelections()`
-- ✅ `releaseThread()`
-- ✅ `resetAppState()`
+## ✅ CHECKLIST DE REFATORAÇÃO (POR FASE)
 
-**Checklist:**
+### **FASE 1: Design e Estrutura (Alta Prioridade)**
 
-- ✅ Criar `/utils/renderer-helpers.js`
-- ✅ Mover funções
-- ✅ Atualizar imports em renderer.js
-- ✅ Verificar com `get_errors()` (OK - sem erros)
-- ✅ npm test: 74/74 testes passando
-- ✅ npm start: App inicia sem erros
-- ✅ Commit: "refactor(fase-2.1-2.4): criar estrutura base de controladores"
+- [ ] **1.1** Criar estrutura de diretórios e arquivos
+  - [ ] 1.1.1 - Criar pasta `controllers/config/`
+  - [ ] 1.1.2 - Criar pasta `controllers/config/managers/`
+  - [ ] 1.1.3 - Criar stubs vazios para os 7 files (sem código, só `class X {}`)
+
+- [ ] **1.2** Documentar interface de cada Manager
+  - [ ] 1.2.1 - ApiKeyManager: métodos públicos e responsabilidades
+  - [ ] 1.2.2 - AudioDeviceManager: métodos públicos e responsabilidades
+  - [ ] 1.2.3 - ModelSelectionManager: métodos públicos e responsabilidades
+  - [ ] 1.2.4 - ScreenConfigManager: métodos públicos e responsabilidades
+  - [ ] 1.2.5 - PrivacyConfigManager: métodos públicos e responsabilidades
+  - [ ] 1.2.6 - WindowConfigManager: métodos públicos e responsabilidades
+  - [ ] 1.2.7 - HomeManager: métodos públicos e responsabilidades
+
+- [ ] **1.3** Validação: Estrutura pronta
+  - [ ] 1.3.1 - Verificar que todos os arquivos existem
+  - [ ] 1.3.2 - Fazer commit: "refactor: criar estrutura de managers"
 
 ---
 
-## 🎯 FASE 2 - RESUMO
+### **FASE 2: Extração de ApiKeyManager (Alta Prioridade)**
 
-**Status:** ✅ COMPLETO
+**Responsabilidades**: Tudo relacionado a API keys
 
-**Commits Realizados:**
+- [ ] **2.1** Mover código do config-manager.js para ApiKeyManager.js
+  - [ ] 2.1.1 - `saveApiKey(provider, apiKey)`
+  - [ ] 2.1.2 - `deleteApiKey(provider)`
+  - [ ] 2.1.3 - `checkApiKeysStatus()`
+  - [ ] 2.1.4 - `updateApiKeyFieldStatus(provider, hasKey)`
+  - [ ] 2.1.5 - Listeners de API key input (focus, blur, input, copy, cut)
+  - [ ] 2.1.6 - Listeners de visibilidade toggle
 
-1. **Commit 1209b1b** - Criar estrutura base de controladores (2.1-2.4)
-   - ✅ Criar `/controllers/audio/audio-controller.js` (5 funções)
-   - ✅ Criar `/controllers/question/question-controller.js` (9 funções)
-   - ✅ Criar `/controllers/question/question-helpers.js` (4 helpers)
-   - ✅ Criar `/controllers/screenshot/screenshot-controller.js` (3 funções)
-   - ✅ Criar `/utils/renderer-helpers.js` (5 funções)
-   - ✅ Adicionar imports em renderer.js
-   - Result: Tests 74/74 passing ✓
+- [ ] **2.2** Implementar métodos do Manager
+  - [ ] 2.2.1 - `constructor(configManager, ipc, eventBus)`
+  - [ ] 2.2.2 - `initialize()` - registra listeners
+  - [ ] 2.2.3 - `restoreState()` - restaura status de chaves salvas
+  - [ ] 2.2.4 - `reset()` - deleta todas as chaves ao resetar config
+  - [ ] 2.2.5 - Métodos privados `#initInputListeners()`, `#initVisibilityListeners()`
 
-2. **Commit 9389c60** - Remover e delegar audio functions
-   - ✅ Remover: startAudio, stopAudio, listenToggleBtn, hasActiveModel, logTranscriptionMetrics
-   - Redução: 1538 → 1407 linhas (-131, -8.5%)
-   - Result: Tests 74/74 passing ✓
+- [ ] **2.3** Atualizar ConfigManager para usar ApiKeyManager
+  - [ ] 2.3.1 - `this.apiKeyManager = new ApiKeyManager(...)`
+  - [ ] 2.3.2 - Chamar `this.apiKeyManager.initialize()` no `initializeController()`
+  - [ ] 2.3.3 - Remover código de ApiKey do ConfigManager
 
-3. **Commit d91f869** - Remover e delegar screenshot + helpers
-   - ✅ Remover: captureScreenshot, analyzeScreenshots, clearScreenshots, releaseThread, resetAppState, updateStatusMessage, clearAllSelections
-   - Redução: 1407 → 1071 linhas (-336, -23.8%)
-   - Result: Tests 74/74 passing ✓
-
-4. **Commit 0b0ab6c** - Remover e delegar question functions
-   - ✅ Remover: renderCurrentQuestion, handleQuestionClick, scrollToSelectedQuestion, consolidateQuestionText, handleCurrentQuestion, finalizeCurrentQuestion, closeCurrentQuestionForced
-   - Redução: 1071 → 779 linhas (-292, -27.3%)
-   - **TOTAL FASE 2:** 1538 → 779 linhas (-759, -49.4% ✅)
-   - Result: Tests 74/74 passing ✓, App starting correctly ✓
-
-**Estrutura Final:**
-
-- ✅ Audio Controller: 5 funções extraídas e delegadas
-- ✅ Question Controller: 9 funções extraídas e delegadas + 4 helpers
-- ✅ Screenshot Controller: 3 funções extraídas e delegadas
-- ✅ Renderer Helpers: 5 funções extraídas e delegadas
-- ✅ Renderer.js reduzido de 1538 para 779 linhas (49.4% reduction!)
-
-**Validações:**
-
-- ✅ npm test: 74/74 tests passing
-- ✅ npm start: App initializing successfully
-- ✅ Git commits: Clean history with clear messages
+- [ ] **2.4** Validação: ApiKeyManager funcional
+  - [ ] 2.4.1 - `npm start` com timeout e testar API key save/delete
+  - [ ] 2.4.2 - Verificar mascaramento, visibilidade, listeners
+  - [ ] 2.4.3 - `npm test` - executar sem erros
+  - [ ] 2.4.4 - Fazer commit: "refactor: extrair ApiKeyManager"
 
 ---
 
-## 🎯 FASE 3: SISTEMA DE LLM (ALTA PRIORIDADE)
+### **FASE 3: Extração de AudioDeviceManager (Alta Prioridade)**
 
-**Status:** ✅ COMPLETO
+**Responsabilidades**: Tudo relacionado a dispositivos de áudio
 
-**Commit 407c789** - Melhorar robustez de LLM com timeout, retry e error handling
+- [ ] **3.1** Mover código para AudioDeviceManager.js
+  - [ ] 3.1.1 - `loadDevices()` - enumerateDevices
+  - [ ] 3.1.2 - `addNoneOption(select)` - helper
+  - [ ] 3.1.3 - `saveDevices()` - persistir seleção
+  - [ ] 3.1.4 - `restoreDevices()` - restaurar seleção salva
+  - [ ] 3.1.5 - `initAudioMonitoring()` - iniciar VU meters
+  - [ ] 3.1.6 - `stopAudioMonitoring()` - parar VU meters
+  - [ ] 3.1.7 - Listeners de mudança de dispositivo
 
-### 3.1 Validar e Melhorar LLMManager
+- [ ] **3.2** Implementar métodos do Manager
+  - [ ] 3.2.1 - `constructor(configManager, ipc, eventBus, rendererAPI)`
+  - [ ] 3.2.2 - `initialize()` - carregar e restaurar
+  - [ ] 3.2.3 - `startMonitoring(type)` - iniciar VU meter
+  - [ ] 3.2.4 - `stopMonitoring(type)` - parar VU meter
+  - [ ] 3.2.5 - `getSelectedDevices()` - getter
 
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1h ✓
+- [ ] **3.3** Atualizar ConfigManager
+  - [ ] 3.3.1 - `this.audioManager = new AudioDeviceManager(...)`
+  - [ ] 3.3.2 - Chamar `this.audioManager.initialize()` no `initializeController()`
+  - [ ] 3.3.3 - Remover código de Audio do ConfigManager
 
-**Melhorias implementadas:**
-
-- ✅ Timeout configurável (padrão 60s) para evitar travamentos
-- ✅ Retry com backoff exponencial para falhas temporárias
-  - Até 3 tentativas por padrão
-  - Delay inicial 1s, multiplica por 2 a cada tentativa
-  - Erros não-retentáveis (401, 404, validação) pulam retry
-- ✅ Error handling estruturado com Logger.js
-- ✅ Separação clara entre erros retentáveis vs não-retentáveis
-- ✅ Logging contextuado (eventos importantes registrados)
-
-**Checklist:**
-
-- ✅ Adicionar timeout wrapper em LLMManager
-- ✅ Implementar retry com backoff exponencial
-- ✅ Adicionar tratamento de erro estruturado
-- ✅ Testar com npm test (74/74 passing)
-- ✅ Testar com npm start (app inicia corretamente)
-- ✅ Commit: "refactor(fase-3.1): melhorar robustez de LLMManager"
-
----
-
-### 3.2 Validar Handlers OpenAI e Gemini
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1.5h ✓
-
-**OpenAI Handler (`/llm/handlers/openai-handler.js`):**
-
-Melhorias:
-
-- ✅ Mapear códigos HTTP (401, 429, 404, etc) para mensagens amigáveis
-  - 401: "🔑 Chave API inválida ou expirada"
-  - 429: "⏱️ Limite de requisições atingido"
-  - Token limit: "📝 Pergunta muito longa"
-  - Network: "🌐 Erro de conexão de rede"
-- ✅ Logging estruturado com contexto (model, messagesCount, etc)
-- ✅ Validação de resposta (não vazia)
-- ✅ Cleanup automático de listeners (evita memory leaks)
-- ✅ Error handling em complete() e stream()
-
-**Gemini Handler (`/llm/handlers/gemini-handler.js`):**
-
-Melhorias:
-
-- ✅ Mesmo padrão de error handling que OpenAI
-- ✅ Mensagens específicas para erros Gemini:
-  - "⚠️ Gemini API não está ativada na sua conta Google Cloud"
-  - "📊 Limite de quota do Gemini atingido"
-  - "🔐 Sem permissão para usar Gemini API"
-- ✅ Logging estruturado com contexto
-- ✅ Cleanup automático de listeners
-- ✅ Error handling em complete() e stream()
-
-**Checklist:**
-
-- ✅ Adicionar mapping de erros HTTP → mensagens amigáveis
-- ✅ Adicionar logging estruturado em ambos handlers
-- ✅ Implementar cleanup automático de listeners
-- ✅ Testar com npm test (74/74 passing ✓)
-- ✅ Testar com npm start (app inicia ✓)
-- ✅ Commit: "refactor(fase-3.2): melhorar robustez de handlers"
+- [ ] **3.4** Validação: AudioDeviceManager funcional
+  - [ ] 3.4.1 - `npm start` e entrar em "Áudio e Tela" tab
+  - [ ] 3.4.2 - Verificar carregamento de dispositivos, VU meters
+  - [ ] 3.4.3 - Trocar dispositivo e verificar persistência
+  - [ ] 3.4.4 - Fazer commit: "refactor: extrair AudioDeviceManager"
 
 ---
 
-### 3.3 Validar Template Handler (Referência Genérica)
+### **FASE 4: Extração de ModelSelectionManager (Alta Prioridade)**
 
-**Status:** ✅ VALIDADO  
-**Impacto:** Baixo | **Complexidade:** Baixa | **Tempo:** 15min ✓
+**Responsabilidades**: Seleção de STT/LLM e ativação de modelos
 
-**Propósito:**
+- [ ] **4.1** Mover código para ModelSelectionManager.js
+  - [ ] 4.1.1 - `restoreSTTLLMModels()` - restaurar seleção
+  - [ ] 4.1.2 - `toggleModel(model)` - ativar/desativar
+  - [ ] 4.1.3 - `updateModelStatusUI()` - atualizar badges
+  - [ ] 4.1.4 - Listeners de model toggle buttons
+  - [ ] 4.1.5 - Listeners de STT/LLM select changes
 
-- `/llm/handlers/template-handler.js` serve como exemplo genérico para futuras integrações
-- Não associado a nenhum provider específico (não é Anthropic)
-- Apenas referência de implementação para novos devs
+- [ ] **4.2** Implementar métodos do Manager
+  - [ ] 4.2.1 - `constructor(configManager, ipc, eventBus, apiKeyManager)`
+  - [ ] 4.2.2 - `initialize()` - registra listeners
+  - [ ] 4.2.3 - `toggleModel(provider)` - ativar/desativar com validação
+  - [ ] 4.2.4 - `updateUI()` - atualizar status badges
+  - [ ] 4.2.5 - `restoreState()` - restaurar seleção salva
+  - [ ] 4.2.6 - `reset()` - reseta modelos
 
-**Status:**
+- [ ] **4.3** Atualizar ConfigManager
+  - [ ] 4.3.1 - `this.modelManager = new ModelSelectionManager(..., this.apiKeyManager)`
+  - [ ] 4.3.2 - Chamar `this.modelManager.initialize()` no `initializeController()`
+  - [ ] 4.3.3 - Remover código de Model do ConfigManager
 
-- ✅ Template validado e documentado
-- ✅ Instrções de implementação claras (5 passos)
-- ✅ Exemplo prático (Anthropic Claude) incluído
-- ✅ Referência de providers já implementados
-
----
-
-## 🎯 FASE 3 - RESUMO
-
-**Status:** ✅ COMPLETO
-
-**Commits Realizados:**
-
-1. **Commit 407c789** - Melhorar robustez de LLM
-   - ✅ LLMManager: timeout, retry, backoff exponencial
-   - ✅ OpenAI Handler: error mapping, logging, cleanup
-   - ✅ Gemini Handler: error mapping, logging, cleanup
-   - Result: Tests 74/74 passing ✓, App starting ✓
-
-**Métrica de Qualidade:**
-
-- LLMManager: 61 → 190 linhas (robustez +200%)
-- OpenAI Handler: 91 → 160 linhas (features +75%)
-- Gemini Handler: 85 → 155 linhas (features +80%)
-- **Total Fase 3:** ~600 linhas de código robusto e documentado
-
-**Validações:**
-
-- ✅ npm test: 74/74 tests passing
-- ✅ npm start: App initializing successfully
-- ✅ Error handling: Mensagens amigáveis ao usuário
-- ✅ Logging: Estruturado com contexto
-- ✅ Memory leaks: Cleanup automático de listeners
+- [ ] **4.4** Validação: ModelSelectionManager funcional
+  - [ ] 4.4.1 - `npm start` e entrar em "API e Modelos" tab
+  - [ ] 4.4.2 - Ativar/desativar modelos (com/sem chave)
+  - [ ] 4.4.3 - Verificar que apenas 1 modelo pode estar ativo
+  - [ ] 4.4.4 - Fazer commit: "refactor: extrair ModelSelectionManager"
 
 ---
 
----
+### **FASE 5: Extração de Managers Restantes (Média Prioridade)**
 
-## 🎯 FASE 4: SISTEMA DE TRANSCRIÇÃO (MÉDIA PRIORIDADE)
+#### **ScreenConfigManager**
 
-### 4.1 Consolidar Estratégia de STT (Remover Whisper OpenAI)
+- [ ] **5.1** Mover código relacionado a screenshot
+  - [ ] 5.1.1 - Hotkey recording (`recordHotkey()`)
+  - [ ] 5.1.2 - Listeners de formato e excludeApp
+  - [ ] 5.1.3 - Restauração de estado
+  - [ ] 5.1.4 - Criar `ScreenConfigManager.js`
 
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h ✓
+#### **PrivacyConfigManager**
 
-**Problemas RESOLVIDOS:**
+- [ ] **5.2** Mover código relacionado a privacidade
+  - [ ] 5.2.1 - Checkboxes de privacidade
+  - [ ] 5.2.2 - Data retention select
+  - [ ] 5.2.3 - Listeners
+  - [ ] 5.2.4 - Restauração de estado
+  - [ ] 5.2.5 - Criar `PrivacyConfigManager.js`
 
-- ✅ 3 providers STT mantidos (deepgram, vosk, whisper-cpp-local)
-- ✅ REMOVIDO: whisper-1 (OpenAI Whisper)
-  - Razão: Implementação em tempo real será feita no FUTURO
-  - Agora usar apenas Whisper local/offline
-- ✅ VAD engine em `stt/vad-engine.js` (centralizado e funcional)
+#### **WindowConfigManager**
 
-**Alterações realizadas:**
+- [ ] **5.3** Mover código relacionado a janela
+  - [ ] 5.3.1 - `initDragHandle()` - movimento de janela
+  - [ ] 5.3.2 - `initClickThroughController()` - click-through toggle
+  - [ ] 5.3.3 - `applyOpacity()` - slider de opacidade
+  - [ ] 5.3.4 - `restoreTheme()` - dark mode toggle
+  - [ ] 5.3.5 - Criar `WindowConfigManager.js`
 
-- ✅ renderer.js: Removido sttStrategy.register('whisper-1')
-- ✅ config-manager.js: Alterado default transcriptionModel para 'whisper-cpp-local'
-- ✅ index.html: Removidos 2 tags `<option value="whisper-1">` de dropdowns de configuração
-- ✅ stt-whisper.js: Removido função transcribeWithWhisperOpenAI() (40+ linhas)
-- ✅ npm test: 74/74 testes passando
-- ✅ npm start: App iniciando corretamente
-- ✅ Commit: ✓ e13ec4b "Fase 4.1: Remove whisper-1 (OpenAI/Cloud)"
+#### **HomeManager**
 
-**Validação:**
+- [ ] **5.4** Mover código relacionado a HOME
+  - [ ] 5.4.1 - `registerElementListener()` helpers
+  - [ ] 5.4.2 - `handleMockToggle()` - mock mode
+  - [ ] 5.4.3 - `initResetButtonListener()` - reset home
+  - [ ] 5.4.4 - Criar `HomeManager.js`
 
-- ✅ Revisar `/stt/stt-deepgram.js`
-- ✅ Revisar `/stt/stt-vosk.js`
-- ✅ Revisar `/stt/stt-whisper.js` (apenas implementação local)
-- ✅ Remover toda referência a 'whisper-1' em config-manager.js
-- ✅ Remover registração de 'whisper-1' em renderer.js
-- ✅ Verificado que VAD funciona para todos
-- ✅ Testar cada provider funciona
-  - ✅ Deepgram (se chave configurada)
-  - ✅ Vosk (local, sempre disponível)
-  - ✅ Whisper local (cpp-local)
-- ✅ Verificado com npm test (sem erros)
-
----
-
-### 4.2 Consolidar Debug Logging STT em Logger.js
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 30min ✓
-
-**Problemas RESOLVIDOS:**
-
-- ✅ Consolidar debug logging de STT em Logger.js (centralizado)
-- ✅ Remover getConfiguredSTTModel() obsoleto de stt-whisper.js
-- ✅ Todos 3 providers (Whisper, Vosk, Deepgram) integram com Logger
-- ✅ Histórico permanente de debug via Logger.debug()
-- ✅ Mantém console.log para visual feedback em tempo real
-
-**Alterações realizadas:**
-
-- ✅ stt-whisper.js: Adiciona Logger.js import + registra em Logger.debug()
-- ✅ stt-vosk.js: Adiciona Logger.js import + registra em Logger.debug()
-- ✅ stt-deepgram.js: Adiciona Logger.js import + registra em Logger.debug()
-- ✅ stt-whisper.js: Remove getConfiguredSTTModel() (função obsoleta)
-- ✅ npm test: 74/74 testes passando
-- ✅ npm start: App iniciando corretamente
-- ✅ Commit: ✓ 38ac887 "Fase 4.2: Consolidar debug logging STT em Logger.js"
-
-**Consolidação Final:**
-
-- ✅ Debug logging STT centralizado em Logger.js
-- ✅ Histórico permanente de debug para troubleshooting
-- ✅ Visual feedback em tempo real via console.log
-- ✅ Sem arquivo separado (stt-debug-utils.js não criado)
+- [ ] **5.5** Validação: Todos os managers criados
+  - [ ] 5.5.1 - `npm start` com timeout
+  - [ ] 5.5.2 - Testar cada seção rapidamente
+  - [ ] 5.5.3 - `npm test`
+  - [ ] 5.5.4 - Fazer commit: "refactor: extrair managers restantes"
 
 ---
 
-## 🎯 FASE 4 - RESUMO COMPLETO
+### **FASE 6: ConfigManager como Orquestrador (Alta Prioridade)**
 
-**Status:** ✅ COMPLETO
+**Objetivo**: ConfigManager fica com ~300 linhas, apenas coordenação
 
-**Commits Realizados:**
+- [ ] **6.1** Limpar ConfigManager.js de código específico
+  - [ ] 6.1.1 - Remover métodos movidos para managers
+  - [ ] 6.1.2 - Manter: `loadConfig()`, `saveConfig()`, `get()`, `set()`
+  - [ ] 6.1.3 - Manter: `initializeController()` que coordena
+  - [ ] 6.1.4 - Manter: `registerUIElements()`, `registerRendererCallbacks()`, `registerDOMEventListeners()`
 
-1. **Commit e13ec4b** - Remove whisper-1 (OpenAI/Cloud)
-   - ✅ Removido whisper-1 de todos os 5 arquivos
-   - ✅ Default alterado para whisper-cpp-local
-   - ✅ UI (index.html) atualizada
-   - Result: Tests 74/74 passing ✓, App starting ✓
+- [ ] **6.2** Atualizar `initializeController()`
+  - [ ] 6.2.1 - Chamar `this.apiKeyManager.initialize()`
+  - [ ] 6.2.2 - Chamar `this.audioManager.initialize()`
+  - [ ] 6.2.3 - Chamar `this.modelManager.initialize()`
+  - [ ] 6.2.4 - Chamar `this.screenManager.initialize()`
+  - [ ] 6.2.5 - Chamar `this.privacyManager.initialize()`
+  - [ ] 6.2.6 - Chamar `this.windowManager.initialize()`
+  - [ ] 6.2.7 - Chamar `this.homeManager.initialize()`
 
-2. **Commit 38ac887** - Consolidar debug logging em Logger.js
-   - ✅ Integração Logger.js em todos 3 providers STT
-   - ✅ Remove getConfiguredSTTModel() obsoleto
-   - ✅ Histórico permanente de debug
-   - Result: Tests 74/74 passing ✓, App starting ✓
+- [ ] **6.3** Atualizar `resetConfig()`
+  - [ ] 6.3.1 - Chamar `this.apiKeyManager.reset()`
+  - [ ] 6.3.2 - Chamar `this.audioManager.reset()`
+  - [ ] 6.3.3 - Chamar `this.modelManager.reset()`
+  - [ ] 6.3.4 - Chamar reset em todos os managers
 
-**Métrica de Qualidade Fase 4:**
+- [ ] **6.4** Mover arquivo
+  - [ ] 6.4.1 - `config-manager.js` (raiz) → `controllers/config/ConfigManager.js`
+  - [ ] 6.4.2 - Atualizar import em `index.html`
 
-- stt-whisper.js: Removidas ~40 linhas (whisper-1 + função obsoleta)
-- stt-vosk.js: Consolidado debug com Logger
-- stt-deepgram.js: Consolidado debug com Logger
-- **Total Fase 4:** -40 linhas de código morto + consolidação de logging
-
-**Validações:**
-
-- ✅ npm test: 74/74 tests passing
-- ✅ npm start: App initializing successfully
-- ✅ Whisper-1 completamente removido
-- ✅ Debug logging centralizado em Logger.js
-- ✅ 3 providers STT funcionais (Deepgram, Vosk, Whisper-Local)
+- [ ] **6.5** Validação: ConfigManager como orquestrador
+  - [ ] 6.5.1 - `npm start` com timeout
+  - [ ] 6.5.2 - Verificar que tudo funciona
+  - [ ] 6.5.3 - `bash verify-all.sh`
+  - [ ] 6.5.4 - Fazer commit: "refactor: mover ConfigManager para controllers/config/"
 
 ---
 
-## 🎯 FASE 5: VALIDAÇÃO E TESTES (ALTA PRIORIDADE)
+### **FASE 7: Testes Unitários e Documentação (Média Prioridade)**
 
-### 5.1 Implementar Testes Unitários Básicos
+- [ ] **7.1** Adicionar testes para cada Manager
+  - [ ] 7.1.1 - `__tests__/unit/ApiKeyManager.test.js`
+  - [ ] 7.1.2 - `__tests__/unit/AudioDeviceManager.test.js`
+  - [ ] 7.1.3 - `__tests__/unit/ModelSelectionManager.test.js`
+  - [ ] 7.1.4 - Testes básicos: initialize, restore, reset
 
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 2h ✓
+- [ ] **7.2** Adicionar JSDoc em cada Manager
+  - [ ] 7.2.1 - JSDoc para classe
+  - [ ] 7.2.2 - JSDoc para métodos públicos
+  - [ ] 7.2.3 - Tipo de parâmetros e retorno
 
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Alta | **Tempo:** 3h+ ✓
+- [ ] **7.3** Atualizar documentação
+  - [ ] 7.3.1 - docs/ARCHITECTURE.md - novo diagrama de managers
+  - [ ] 7.3.2 - Criar docs/CONFIG_MANAGER_ARCHITECTURE.md (novo arquivo)
 
-**Implementado com sucesso:**
+- [ ] **7.4** Validação: Testes e docs
+  - [ ] 7.4.1 - `npm test`
+  - [ ] 7.4.2 - `npm run check-types`
+  - [ ] 7.4.3 - Fazer commit: "test+docs: adicionar testes e documentação de managers"
+
+---
+
+### **FASE 8: Validação Final Completa (Alta Prioridade)**
+
+- [ ] **8.1** Testes de integração
+  - [ ] 8.1.1 - `npm start` deixar rodar 15s
+  - [ ] 8.1.2 - Testar fluxo completo de API key (save, delete, toggle)
+  - [ ] 8.1.3 - Testar fluxo de áudio (load devices, restaurar, VU meters)
+  - [ ] 8.1.4 - Testar fluxo de modelos (toggle, restaurar)
+  - [ ] 8.1.5 - Testar reset completo
+
+- [ ] **8.2** Verificação com verify-all.sh
+  - [ ] 8.2.1 - `bash verify-all.sh`
+  - [ ] 8.2.2 - Revisar `temp/quality-report.txt`
+  - [ ] 8.2.3 - Corrigir warnings ESLint/Prettier
+  - [ ] 8.2.4 - Verificar type checking
+
+- [ ] **8.3** Limpeza final
+  - [ ] 8.3.1 - Remover console.log de debug
+  - [ ] 8.3.2 - Remover código comentado
+  - [ ] 8.3.3 - Consolidar imports
+
+- [ ] **8.4** Commits finais
+  - [ ] 8.4.1 - `npm start` final com timeout
+  - [ ] 8.4.2 - Fazer commit: "refactor: validação final de arquitetura em managers"
+  - [ ] 8.4.3 - Tag: `config-manager-refactored-v2`
+
+---
+
+## 📊 Estatísticas Esperadas
+
+## 📊 Estatísticas Esperadas
+
+| Métrica                           | Antes                           | Depois                                     | Ganho        |
+| --------------------------------- | ------------------------------- | ------------------------------------------ | ------------ |
+| **Arquivo monolítico**            | config-manager.js (2678 linhas) | 7 files ~200-300 linhas cada               | ✅ Modular   |
+| **Linhas por arquivo**            | 2678 (gigante)                  | ~300 (ConfigManager) + ~250 (cada Manager) | ↓ 90%        |
+| **Testabilidade**                 | Baixa                           | Alta (cada Manager isolado)                | ↑ Muito      |
+| **Escalabilidade**                | Limitada                        | Indefinida (novo Manager = nova feature)   | ✅ Escalável |
+| **Tempo para encontrar código**   | 5+ minutos (Ctrl+F)             | <1 minuto (saber qual Manager)             | ↓ 80%        |
+| **Complexidade média por classe** | Alto                            | Médio-baixo                                | ↓ 60%        |
+
+---
+
+## 📁 Estrutura Final Completa
 
 ```
-/__tests__/
-  ├── setup.js (configuração Jest global)
-  ├── unit/
-  │   ├── AppState.test.js (17 testes)
-  │   ├── EventBus.test.js (14 testes)
-  │   ├── ModeManager.test.js (16 testes)
-  │   └── STTStrategy.test.js (7 testes)
-  └── integration/
-      └── core-systems.integration.test.js (20 testes)
+projeto/
+├── config-manager.js              ❌ DELETADO
+│
+├── index.html
+│   └── imports atualizados para novos arquivos
+│
+└── controllers/
+    └── config/
+        ├── ConfigManager.js       (300 linhas)
+        │   - Orquestrador
+        │   - loadConfig(), saveConfig()
+        │   - initializeController()
+        │   - registerUIElements(), registerRendererCallbacks()
+        │   - resetConfig()
+        │
+        └── managers/
+            ├── ApiKeyManager.js   (250 linhas)
+            │   - saveApiKey(), deleteApiKey(), checkApiKeysStatus()
+            │   - initApiKeyInputListeners(), initApiKeyVisibilityListeners()
+            │   - updateApiKeyFieldStatus(), restoreState(), reset()
+            │
+            ├── AudioDeviceManager.js (200 linhas)
+            │   - loadDevices(), saveDevices(), restoreDevices()
+            │   - startMonitoring(), stopMonitoring()
+            │   - initialize(), restoreState(), reset()
+            │
+            ├── ModelSelectionManager.js (200 linhas)
+            │   - toggleModel(), restoreSTTLLMModels()
+            │   - updateModelStatusUI()
+            │   - initialize(), restoreState(), reset()
+            │
+            ├── ScreenConfigManager.js (150 linhas)
+            │   - recordHotkey(), listeners de formato
+            │   - initialize(), restoreState(), reset()
+            │
+            ├── PrivacyConfigManager.js (100 linhas)
+            │   - Checkboxes de privacidade
+            │   - initialize(), restoreState(), reset()
+            │
+            ├── WindowConfigManager.js (150 linhas)
+            │   - initDragHandle(), initClickThroughController()
+            │   - applyOpacity(), restoreTheme()
+            │   - initialize(), restoreState(), reset()
+            │
+            └── HomeManager.js (100 linhas)
+                - Mock toggle, reset home button
+                - initialize(), restoreState(), reset()
 ```
 
-**Instalado:**
+---
 
-```json
-"devDependencies": {
-  "jest": "^29.7.0"
+## 🔍 Análise: Por que Opção B (Arquitetura em Managers)?
+
+### **Problema Resolvido: Dispersão de Lógica Relacionada**
+
+**Antes (config-manager.js monolítico)**:
+
+```
+API Keys espalhadas em 8 métodos:
+  - initEventListeners() (5 listeners = 130 linhas)
+  - saveSection() (20 linhas de lógica)
+  - saveApiKey() (15 linhas)
+  - deleteApiKey() (25 linhas)
+  - checkApiKeysStatus() (15 linhas)
+  - updateApiKeyFieldStatus() (30 linhas)
+  - Listeners de visibilidade (40 linhas)
+  → Total: ~280 linhas espalhadas em métodos diferentes
+
+Audio Device espalhadas em 6 métodos:
+  - loadDevices() (20 linhas)
+  - saveDevices() (10 linhas)
+  - restoreDevices() (15 linhas)
+  - initAudioMonitoring() (40 linhas)
+  - stopAudioMonitoring() (5 linhas)
+  - Listeners genéricos (10 linhas)
+  → Total: ~100 linhas espalhadas
+```
+
+**Depois (Arquitetura em Managers)**:
+
+```
+ApiKeyManager.js - 250 linhas
+  ✅ TUDO relacionado a API keys num só lugar
+  ✅ Métodos públicos: saveApiKey(), deleteApiKey(), checkStatus()
+  ✅ Métodos privados: #initInputListeners(), #initVisibilityListeners()
+  ✅ Fácil testar isoladamente
+  ✅ Fácil entender fluxo completo
+
+AudioDeviceManager.js - 200 linhas
+  ✅ TUDO relacionado a áudio num só lugar
+  ✅ Métodos públicos: loadDevices(), startMonitoring(), stopMonitoring()
+  ✅ Métodos privados: #initListeners()
+  ✅ Fácil estender (ex: adicionar novo tipo de monitoramento)
+```
+
+### **Benefício: Escalabilidade**
+
+```
+Cenário 1 ano do futuro: Adicionar suporte a nova API (ex: Hugging Face)
+
+Com Opção A (monolítico):
+  1. config-manager.js agora tem 3500 linhas
+  2. Precisa adicionar:
+     - Nova tab em HTML
+     - Listeners genéricos para nova API
+     - Métodos de save/delete em ApiKeyManager (que não existe)
+  3. Código fica mais disperso
+
+Com Opção B (Managers):
+  1. ConfigManager.js ainda tem ~300 linhas
+  2. Cria: providers/HuggingFaceKeyManager.js (estende ApiKeyManager)
+  3. Adiciona instantiação em ConfigManager
+  4. Pronto! Novo provider sem tocar em código existente
+```
+
+### **Benefício: Testabilidade**
+
+```
+Testar ApiKeyManager:
+
+❌ Opção A (difícil):
+  - Precisa mockar TODO o ConfigManager
+  - Precisa mockar localStorage, IPC, EventBus, DOM
+  - Teste frágil (quebra se qualquer coisa muda)
+
+✅ Opção B (fácil):
+  - Mocka apenas: configManager (para persistência), ipc, eventBus
+  - Testa método isoladamente
+  - Teste robusto (só quebra se ApiKeyManager muda)
+
+Exemplo:
+  const mockIpc = { invoke: jest.fn() }
+  const mockEventBus = { emit: jest.fn() }
+  const manager = new ApiKeyManager(mockConfigManager, mockIpc, mockEventBus)
+
+  it('salva API key corretamente', async () => {
+    await manager.saveApiKey('openai', 'sk-1234')
+    expect(mockIpc.invoke).toHaveBeenCalledWith('SAVE_API_KEY', ...)
+  })
+```
+
+---
+
+## ⏱️ Timeline Estimado
+
+| Fase      | Descrição                  | Tempo         | Cumulativo   |
+| --------- | -------------------------- | ------------- | ------------ |
+| 1         | Design e estrutura         | 1 dia         | 1 dia        |
+| 2         | ApiKeyManager              | 1 dia         | 2 dias       |
+| 3         | AudioDeviceManager         | 1 dia         | 3 dias       |
+| 4         | ModelSelectionManager      | 1 dia         | 4 dias       |
+| 5         | Managers restantes         | 1.5 dias      | 5.5 dias     |
+| 6         | ConfigManager orquestrador | 1 dia         | 6.5 dias     |
+| 7         | Testes e docs              | 1 dia         | 7.5 dias     |
+| 8         | Validação final            | 1 dia         | 8.5 dias     |
+| **Total** | **Refatoração completa**   | **~1 semana** | **8.5 dias** |
+
+---
+
+## ✨ Benefícios Esperados Após Refatoração
+
+### **Imediatos (Semana 1)**
+
+- ✅ Código mais organizado (encontra funcionalidade em 1 arquivo)
+- ✅ Mais fácil de debugar (erro em API key → olhar ApiKeyManager.js)
+- ✅ Menos cognitive load (ler 250 linhas vs 2678)
+
+### **Curto Prazo (1-2 semanas)**
+
+- ✅ Testes unitários práticos (cada Manager testável isoladamente)
+- ✅ Adicionar features novo é mais rápido (ex: novo provider API)
+- ✅ Code review mais eficiente (menor contexto)
+
+### **Longo Prazo (1-2 anos)**
+
+- ✅ Escalável indefinidamente (novo Manager = nova feature)
+- ✅ Refatoração futura mais fácil (ex: React/Web Components)
+- ✅ Documentação mantém-se relevante (cada Manager auto-explicativo)
+
+---
+
+## 🚀 Próximas Etapas (Após Refatoração Completa)
+
+### **Futuro - Melhorias Avançadas**
+
+1. **Providers Dinâmicos**: Sistema de plugins para novos providers de API
+2. **State Machine**: Máquina de estados para API key (saved, dirty, validating)
+3. **Composição**: Mais uso de `RendererAPI` para separar DOM
+4. **Testes E2E**: Playwright para fluxos completos user → UI → renderer → main
+5. **Migração Framework**: Base sólida para React/Vue se necessário
+
+---
+
+## 📝 Convenções de Código (para Managers)
+
+### **Estrutura de um Manager**
+
+```javascript
+/**
+ * ApiKeyManager - Gerencia API keys de todos os providers
+ * Responsabilidades:
+ *   - Salvar/deletar chaves de forma segura
+ *   - Listeners de input (focus, blur, copy, cut)
+ *   - Mascaramento e visibilidade
+ *   - Validação e restauração
+ *
+ * Compartilha dados com: ConfigManager (persistência), IPC (store seguro)
+ */
+class ApiKeyManager {
+  /**
+   * @param {ConfigManager} configManager - Referência ao orquestrador
+   * @param {IpcRenderer} ipc - Comunicação com main.js
+   * @param {EventBus} eventBus - Sistema de eventos global
+   */
+  constructor(configManager, ipc, eventBus) {
+    this.configManager = configManager
+    this.ipc = ipc
+    this.eventBus = eventBus
+  }
+
+  /**
+   * Inicializa todos os listeners desta funcionalidade
+   */
+  async initialize() {
+    this.#initApiKeyInputListeners()
+    this.#initApiKeyVisibilityListeners()
+    await this.restoreState()
+  }
+
+  /**
+   * Restaura estado salvo (chaves verificadas)
+   */
+  async restoreState() {
+    await this.checkApiKeysStatus()
+  }
+
+  /**
+   * Reseta tudo ao resetar config (deleta todas as chaves)
+   */
+  async reset() {
+    for (const provider of ['openai', 'google', 'openrouter']) {
+      await this.deleteApiKey(provider)
+    }
+  }
+
+  // Métodos públicos (API do Manager)
+  async saveApiKey(provider, apiKey) {...}
+  async deleteApiKey(provider) {...}
+  async checkApiKeysStatus() {...}
+  updateApiKeyFieldStatus(provider, hasKey) {...}
+
+  // Métodos privados (implementação)
+  #initApiKeyInputListeners() {...}
+  #initApiKeyVisibilityListeners() {...}
 }
 ```
 
-**Resultados:**
-
-- ✅ Jest configurado com `jest.config.js`
-- ✅ 74 testes implementados e **TODOS PASSANDO** ✓
-- ✅ npm scripts: `test`, `test:watch`, `test:coverage`
-- ✅ Testes cobrem: AppState, EventBus, ModeManager, STTStrategy
-- ✅ Testes de integração validam coordenação entre sistemas
-- ✅ Setup.js suprime logs de console durante testes
-- ✅ Cobertura total: `node`, `common`, principais módulos refatorados
-
-**Commit:** ✓ `test(fase-5.1): adicionar suite de testes completa`
-
 ---
 
-### 5.2 Implementar E2E Test para Happy Path
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Alta | **Tempo:** 2h ✓
-
-**Implementado com sucesso:**
+## 🎯 Dependências Entre Managers
 
 ```
-/__tests__/e2e/
-  ├── helpers.js (funções auxiliares)
-  ├── happy-path.test.js (11 cenários de teste)
-  └── README.md (documentação)
-
-playwright.config.js (configuração)
-```
-
-**Ferramentas instaladas:**
-
-```json
-"devDependencies": {
-  "@playwright/test": "^1.58.0"
-}
-```
-
-**Testes Implementados:**
-
-- ✅ Happy Path (9 cenários):
-  1. App abre e UI carrega
-  2. Captura de áudio inicia (Ctrl+D)
-  3. Transcrição gerada (modo DEBUG)
-  4. Enviar para LLM (Ctrl+Enter)
-  5. Resposta de streaming válida
-  6. Capturar screenshot (Ctrl+Shift+S)
-  7. Analisar screenshot (Ctrl+Shift+A)
-  8. Histórico intacto
-  9. App responsiva
-
-- ✅ Tratamento de Erros (2 cenários):
-  1. Erro ao enviar sem áudio
-  2. App não crasheia com Ctrl+D rápidos
-
-**Configuração:**
-
-- MODE_DEBUG=1 - Simula STT/LLM em testes
-- Playwright rodar em headless (padrão)
-- Jest excluir testes E2E
-- Timeout: 30s por teste
-
-**npm Scripts:**
-
-```bash
-npm run test:e2e              # Rodar headless
-npm run test:e2e:headed      # Com interface visível
-npm run test:e2e:debug       # Modo debug Playwright
-npm run test:e2e:report      # Ver relatório HTML
-```
-
-**Commit:** ✓ `b20c482 - Fase 5.2: Implementar E2E Test para Happy Path`
-
-**Validações:**
-
-- ✅ Jest: 74/74 unitários passando (E2E excluído)
-- ✅ Playwright: Configurado e pronto
-- ✅ Helpers: 10 funções auxiliares prontas
-- ✅ Documentação: README.md completo
-
----
-
-### 5.3 Adicionar Validação de Tipos com JSDoc
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 2h ✓
-
-**Implementado com sucesso:**
-
-- ✅ `jsconfig.json` criado com `checkJs: true`
-- ✅ 6 módulos documentados com JSDoc completo
-- ✅ renderer.js com `// @ts-check` ativado
-- ✅ Type hints funcionando no VS Code
-- ✅ 74 testes continuam passando
-
-**Módulos documentados:**
-
-1. `state/AppState.js` - @typedef para tipos de estado
-2. `events/EventBus.js` - @typedef EventCallback
-3. `utils/Logger.js` - @typedef LogData
-4. `llm/LLMManager.js` - @typedef LLMConfig, Handler, Message
-5. `strategies/STTStrategy.js` - @typedef UIElements, STTStrategyImpl
-6. `renderer.js` - // @ts-check ativado
-
-**Commit:** ✓ 706b6d9 "Fase 5.3: JSDoc type hints para validação TypeScript"
-
----
-
-## 🎯 FASE 6: LIMPEZA E OTIMIZAÇÃO (MÉDIA PRIORIDADE)
-
-### 6.1 Remover Código Deprecated
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 20min ✓
-
-**Alterações realizadas:**
-
-- ✅ Removidos comentários DEPRECATED de renderer.js
-  - Removido: MODES (linhas 157)
-  - Removido: CURRENT_MODE (linhas 159)
-  - Removido: UICallbacks (linhas 195-200)
-  - Removido: Documentação obsoleta de estado global
-- ✅ Removidos @deprecated de funções ativas
-- ✅ applyWindowOpacity: Não existe em config-manager (verificado)
-- ✅ initDragHandle: Mantida (ainda em uso)
-- ✅ npm test: 74/74 testes passando
-
-**Commit:** ✓ 36e389a "Fase 6.1: Remover código deprecated"
-
----
-
-### 6.2 Remover Código Morto
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 15min ✓
-
-**Alterações realizadas:**
-
-- ✅ Removida `finalizeQuestion()` de renderer.js
-  - Razão: Já existe em `question-helpers.js`, nunca era chamada
-  - Removidas: 11 linhas de código não utilizado
-- ✅ Removido: `vosk-model-pt-fb-v0.1.1/` (grande, não utilizado)
-- ✅ npm test: 74/74 testes passando
-
-**Commit:** ✓ f926a51 "Fase 6.2: Remover código morto (finalizeQuestion)"`
-
----
-
-### 6.3 Otimizar tamanho de bundle
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h ✓
-
-**Implementado em Fase 6.3:**
-
-- [x] Executado `npm start` e medido tempo de inicialização (~3-4s)
-- [x] Identificados imports pesados: node_modules (527 MB), stt/ (313 MB)
-- [x] Analisado lazy loading para STT/LLM providers
-- [x] Documentado em `docs/BUNDLE_OPTIMIZATION.md`
-- [x] Conclusão: Bundle já está otimizado, nenhuma alteração necessária
-- [x] Commit: 17337ec "Fase 6.3: Análise de bundle optimization"
-
----
-
-## 🎯 FASE 7: DOCUMENTAÇÃO E CONFIGURAÇÃO (MÉDIA PRIORIDADE)
-
-### 7.1 Atualizar Documentação (após refatoração)
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 45min ✓
-
-**Arquivos atualizados:**
-
-- ✅ `docs/ARCHITECTURE.md` - Adicionadas Fases 5, 6, 7
-- ✅ `docs/START_HERE.md` - Atualizado com nova estrutura
-- ✅ Status refletindo Fases 1-7 completas
-
-**Conteúdo adicionado:**
-
-- Seção "Fase 5: Testes e Validação" com detalhes
-- Seção "Fase 6: Limpeza e Otimização" com resultados
-- Referências a jsconfig.json, JSDoc, Playwright
-- Status atualizado para "27 jan 2026 - FASE 6 COMPLETA"
-
-**Commit:** ✓ 8f658e1 "Fase 7: Atualizar documentacao (Fases 5-6)"
-
----
-
-### 7.2 Configuração de CI/CD Básico
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h ✓
-
-**Implementado em Fase 7.2:**
-
-- [x] Criado `.github/workflows/test.yml` (Jest em Node 18 e 20)
-  - [x] Roda `npm test` com coverage
-  - [x] Envia relatório ao Codecov
-- [x] Criado `.github/workflows/lint.yml` (ESLint + Prettier)
-  - [x] Roda `npm run lint` com formato JSON
-  - [x] Roda `npm run format:check`
-- [x] Criado `.github/workflows/build.yml` (multi-platform)
-  - [x] Roda em Ubuntu, Windows e macOS
-  - [x] Testa `npm start` com timeout de 3s
-- [x] Commit: 9127067 "Fase 7.2: Adicionar workflows GitHub Actions"
-
----
-
-### 7.3 Adicionar ESLint e Prettier
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Baixa | **Tempo:** 45min ✓
-
-**Implementado em Fase 7.3:**
-
-- [x] Instaladas dependências: eslint, prettier, eslint-config-prettier, @eslint/js
-- [x] Criado `eslint.config.js` (formato v9 flat config)
-  - [x] Suporte a Node.js, Browser, Audio APIs, Jest, Playwright
-  - [x] Rules customizadas: no-console, no-unused-vars, eqeqeq
-- [x] Criado `.prettierrc.js` com padrões: semicolons, singleQuote, printWidth=100
-- [x] Criado `.prettierignore` excluindo modelos e docs
-- [x] Adicionados scripts em `package.json`:
-  - [x] `npm run lint` - verifica código
-  - [x] `npm run lint:fix` - corrige automaticamente
-  - [x] `npm run format` - padroniza formatação
-  - [x] `npm run format:check` - verifica formatação
-- [x] Rodado `npm run lint:fix`: corrigidas issues
-- [x] Rodado `npm run format`: padronizado código
-- [x] npm test: 74/74 passando ✅
-- [x] npm start: aplicação iniciando ✅
-- [x] Commit: 5e732c4 "Fase 7.3: Adicionar ESLint e Prettier"
-
----
-
-## 🎯 FASE 8: SEGURANÇA E PRODUÇÃO (ALTA PRIORIDADE)
-
-### 8.1 Remover Logs Sensíveis
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Baixa | **Tempo:** 30min ✓
-
-**Implementado:**
-
-- [x] Criar `utils/SecureLogger.js` com métodos especializados
-  - [x] `SecureLogger.info()` - sempre visível
-  - [x] `SecureLogger.debug()` - apenas em desenvolvimento
-  - [x] `SecureLogger.warn()` - sempre visível
-  - [x] `SecureLogger.error()` - nunca mostra stack trace em produção
-  - [x] `SecureLogger.maskSensitive()` - máscara chaves (8 chars visíveis)
-  - [x] `SecureLogger.logClientInitialization()` - log de API keys mascaradas
-- [x] Atualizar main.js para usar SecureLogger em lugar de console.\*
-- [x] Garantir que dados sensíveis não apareçam em logs de produção
-- [x] Validação: npm test 74/74 passando ✅
-- [x] Commit: 3903b00 "Fase 8.1: Sistema seguro de logging para produção"
-
----
-
-### 8.2 Auditar Dependências
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Baixa | **Tempo:** 30min ✓
-
-**Implementado:**
-
-- [x] Rodar `npm audit`
-  - [x] Resultado: **0 vulnerabilidades encontradas** ✅
-  - [x] Audited 447 packages
-- [x] Verificar pacotes desatualizados com `npm outdated`
-- [x] Atualizar openai de 6.15.0 → 6.16.0
-- [x] Confirmar que dotenv, jest, electron estão em versões estáveis
-- [x] Validação: npm test 74/74 passando após atualizações ✅
-- [x] Commit: 219c26c "Fase 8.2: Auditar e atualizar dependências"
-
----
-
-### 8.3 Validar Segurança do Electron
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Alto | **Complexidade:** Média | **Tempo:** 1h ✓
-
-**Análise Realizada:**
-
-- [x] Revisar `nodeIntegration: true` em main.js (documentado como intencional)
-- [x] Revisar `contextIsolation: false` (documentado como intencional)
-- [x] Validar proteção contra injeção XSS (✅ Protected - Marked.js sanitiza)
-- [x] Validar proteção contra injeção de código (✅ Protected - sem eval())
-- [x] Validar proteção contra RCE (✅ Protected - APIs não executam código)
-- [x] Validar proteção contra path traversal (✅ Protected - tmpdir controlado)
-- [x] Validar proteção contra CSRF (✅ N/A - Electron não tem servidor HTTP)
-- [x] Documentar decisões de segurança
-- [x] Criar `docs/SECURITY_AUDIT.md` (auditoria completa)
-- [x] Commit: PENDING - será feito agora
-
-**Conclusão:**
-✅ **SEGURO PARA PRODUÇÃO** com NODE_ENV=production
-
-**Recomendações para Fase 9 (Opcional):**
-
-- Migrar para `contextBridge` (melhoria de isolamento)
-- Adicionar limpeza automática de histórico de LLM
-- Adicionar validação de schema para respostas de API
-
----
-
-- [ ] Revisar proteção contra injeção XSS
-- [ ] Testar proteção contra captura de tela (já implementado)
-- [ ] Documentar decisões de segurança
-- [ ] Commit: "security: auditar configurações de segurança Electron"
-
----
-
-## 🎯 FASE 9: REFINAMENTO FINAL (BAIXA PRIORIDADE)
-
-### 9.1 Melhorar Tratamento de Erros
-
-**Status:** ✅ COMPLETO  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1.5h ✓
-
-**Implementado:**
-
-- [x] Criar `utils/ErrorHandler.js` com sistema centralizado
-  - [x] 7 tipos de erro pré-definidos (VALIDATION, API, AUTH, NETWORK, FILE, CONFIG, INTERNAL)
-  - [x] Detecção automática de tipo baseada em mensagem
-  - [x] Validação de entrada integrada (`validateInput()`)
-  - [x] Mensagens amigáveis ao usuário (dev vs produção)
-- [x] Integrar com `SecureLogger` para logging estruturado
-- [x] Adicionar async wrapper (`asyncHandler()`)
-- [x] Criar `docs/MELHORIAS_ERROR_HANDLING.md` com exemplos e checklist
-- [x] Validação: npm test 74/74 passando ✅
-- [x] Commit: 1f660f4 "Fase 9.1: Melhorar tratamento de erros"
-
-**Próximas Melhorias (Opcional):**
-
-- [ ] Integrar ErrorHandler em todos os handlers IPC principais
-- [ ] Adicionar error boundaries para renderer.js
-- [ ] Implementar telemetria de erros (opcional)
-
----
-
-### 9.2 Implementar Rate Limiting / Throttling
-
-**Status:** ❌ Não existe  
-**Impacto:** Médio | **Complexidade:** Média | **Tempo:** 1h
-
-**Casos de uso:**
-
-- Rate limit para API calls (LLM, STT)
-- Throttle para mouse events
-- Debounce para mudanças de config
-
-**Checklist:**
-
-- [ ] Criar `/utils/rate-limiter.js`
-- [ ] Criar `/utils/throttle.js`
-- [ ] Criar `/utils/debounce.js`
-- [ ] Aplicar a config changes
-- [ ] Aplicar a LLM calls
-- [ ] Testar comportamento
-- [ ] Commit: "feat: implementar rate-limiting e throttling"
-
----
-
-### 9.3 Performance Monitoring
-
-**Status:** ❌ Não existe  
-**Impacto:** Baixo | **Complexidade:** Média | **Tempo:** 1h
-
-**Checklist:**
-
-- [ ] Adicionar performance marks em operações críticas
-- [ ] Implementar `performance.measure()` para LLM, STT, etc
-- [ ] Adicionar dashboard de métricas (opcional)
-- [ ] Documentar métricas coletadas
-- [ ] Commit: "feat: adicionar performance monitoring"
-
----
-
-## ✅ CHECKLIST FINAL (Executar ao final de CADA fase)
-
-Após cada fase completada, executar:
-
-```bash
-# 1. Verificar erros
-npm start  # Deve iniciar sem erros
-# Esperar 10 segundos (para não travar), depois Ctrl+C
-
-# 2. Verificar código
-npm run lint:fix  # (após fase 7.3)
-
-# 3. Rodar testes (após fase 5)
-npm test
-
-# 4. Commit em português
-git add .
-git commit -m "refactor: [descricao da fase]"
-
-# 5. Push
----
-
-## ✨ REFATORAÇÃO COMPLETA - RESUMO FINAL
-
-**Data de Conclusão:** 24 de janeiro de 2026
-**Total de Commits:** 28 commits nesta sessão
-**Status:** ✅ FASES 1-9.1 COMPLETAS
-
-### 📊 MÉTRICAS FINAIS
-
-#### Código
-
-| Métrica | Antes | Depois | Mudança |
-|---|---|---|---|
-| Linhas em renderer.js | 1.538 | 779 | -49.4% ✅ |
-| Arquivos na raiz | 2 (desorganizados) | 0 | Reorganizados ✅ |
-| Estrutura de pastas | 7 | 10+ (bem organizadas) | Melhorada ✅ |
-| Funções em renderer | 40+ | 15 | Decompostas ✅ |
-
-#### Testes e Qualidade
-
-| Métrica | Status |
-|---|---|
-| Testes Unitários | 74/74 passando ✅ |
-| Suites de Teste | 5 suites ✅ |
-| Testes E2E | 11 cenários ✅ |
-| Cobertura | ~70% |
-| Type Checking | Ativado + pragmático ✅ |
-| ESLint | Configurado ✅ |
-| Prettier | Configurado ✅ |
-
-#### Segurança
-
-| Métrica | Status |
-|---|---|
-| Vulnerabilidades npm | 0 ✅ |
-| Logging Seguro | SecureLogger implementado ✅ |
-| Proteção de Captura | mainWindow.setContentProtection(true) ✅ |
-| Tratamento de Erros | ErrorHandler implementado ✅ |
-| Validação de Entrada | Implementada ✅ |
-
-#### Documentação
-
-| Documento | Status |
-|---|---|
-| START_HERE.md | ✅ Guia de início |
-| ARCHITECTURE.md | ✅ Arquitetura explicada |
-| FEATURES.md | ✅ Recursos documentados |
-| SECURITY_AUDIT.md | ✅ Auditoria completa |
-| MELHORIAS_ERROR_HANDLING.md | ✅ Tratamento de erros |
-| CI/CD Workflows | ✅ 3 workflows GitHub Actions |
-
-### 🎯 TRABALHO COMPLETADO
-
-#### Fase 1: Estrutura e Organização ✅
-- Reorganização de arquivos
-- Extração de UIElementsRegistry
-- Consolidação de logging
-
-#### Fase 2: Decomposição renderer.js ✅
-- Controllers de áudio
-- Controllers de perguntas
-- Controllers de screenshots
-- Sistema de eventos
-- Redução de 1.538 → 779 linhas (-49.4%)
-
-#### Fase 3: Sistema LLM Robusto ✅
-- Timeout e retry automático
-- Tratamento de erro robusto
-- Suporte multi-provider (OpenAI, Gemini)
-
-#### Fase 4: Sistema STT Consolidado ✅
-- Unificação de debug logging
-- Suporte Vosk, Deepgram, Whisper
-- Validação de áudio
-
-#### Fase 5: Testes e Validação ✅
-- 74 testes Jest
-- 11 cenários E2E Playwright
-- JSDoc type hints
-
-#### Fase 6: Limpeza e Otimização ✅
-- Remoção de código deprecated
-- Remoção de dead code
-- Análise de bundle
-
-#### Fase 7: Documentação e CI/CD ✅
-- Docs atualizadas
-- 3 workflows GitHub Actions
-- ESLint + Prettier
-
-#### Fase 8: Segurança e Produção ✅
-- SecureLogger implementado
-- Dependências auditadas (0 vulnerabilidades)
-- Segurança Electron validada
-
-#### Fase 9.1: Tratamento de Erros ✅
-- ErrorHandler centralizado
-- Validação de entrada
-- 7 tipos de erro detectados automaticamente
-
-#### Fase 9.2: Integração de ErrorHandler ✅
-- 15 handlers IPC integrados com ErrorHandler
-- Padrão consistente: try-catch + ErrorHandler.handleError()
-- npm test 74/74 passando ✅
-
-### 💡 PRINCIPAIS MELHORIAS
-
-1. **Manutenibilidade:** Código organizado em módulos bem definidos
-2. **Qualidade:** 100% de testes passando (74/74)
-3. **Segurança:** Zero vulnerabilidades + logging seguro
-4. **Performance:** Bundle otimizado, startup ~3-4s
-5. **Developer Experience:** Type hints, ESLint, Prettier
-6. **Documentation:** Completa e atualizada
-
-### 📈 IMPACTO TÉCNICO
-
-| Aspecto | Impacto |
-|---|---|
-| Legibilidade | Muito melhorada |
-| Testabilidade | Muito melhorada |
-| Manutenibilidade | Muito melhorada |
-| Performance | Mantida/melhorada |
-| Segurança | Muito melhorada |
-| Developer Experience | Muito melhorada |
-
-### 🚀 PRONTO PARA PRODUÇÃO
-
-✅ **Status:** Aplicação pronta para deploy em produção
-
-**Checklist Final:**
-- [x] npm audit = 0 vulnerabilidades
-- [x] npm test = 74/74 passando
-- [x] npm start = funciona corretamente
-- [x] Documentação atualizada
-- [x] Type checking ativado
-- [x] Logging seguro implementado
-- [x] Tratamento de erros centralizado
-- [x] CI/CD workflows configurados
-
----
-
-## 📚 DOCUMENTAÇÃO GERADA
-
-Novos documentos criados:
-
-1. `docs/SECURITY_AUDIT.md` - Auditoria completa de segurança
-2. `docs/MELHORIAS_ERROR_HANDLING.md` - Sistema de tratamento de erros
-3. `utils/SecureLogger.js` - Logger seguro para produção
-4. `utils/ErrorHandler.js` - Tratamento centralizado de erros
-5. `.github/workflows/test.yml` - CI/CD para testes
-6. `.github/workflows/lint.yml` - CI/CD para linting
-7. `.github/workflows/build.yml` - CI/CD para build multi-platform
-8. `eslint.config.js` - Configuração ESLint v9
-9. `.prettierrc.js` - Configuração Prettier
-
-### 📄 ARQUIVOS PRINCIPAIS ATUALIZADOS
-
-- `main.js` - Usa SecureLogger
-- `renderer.js` - Organizado e reduzido
-- `package.json` - Scripts adicionados (check-types, lint, format)
-- `jsconfig.json` - Type checking pragmático
-- `PLANO_REFATORACAO.md` - Status atualizado
-
----
-
-## 🎓 LIÇÕES APRENDIDAS
-
-1. **Type Checking:** Não desabilitar, apenas calibrar
-2. **Security:** Implementar cedo, não deixar para o final
-3. **Documentation:** Manter sincronizada com código
-4. **Testing:** Crítico para refatoração segura
-5. **Error Handling:** Centralizar para consistência
-
----
-
-## 📋 PRÓXIMOS PASSOS SUGERIDOS (FUTURO)
-
-### Fase 9.2: Integração de ErrorHandler
-- [x] Integrar ErrorHandler em todos handlers IPC (COMPLETO - commit 7c8983d)
-- [ ] Adicionar error boundaries em renderer.js (opcional)
-- [ ] Implementar telemetria de erros (opcional)
-
-### Fase 10: Refinamentos Opcionais
-- [ ] Migrar para contextBridge (melhor isolamento)
-- [ ] Implementar rate limiting
-- [ ] Adicionar caching de respostas LLM
-- [ ] Criar dashboard de performance
-
----
-
-**Refatoração realizada por:** GitHub Copilot
-**Tempo total:** ~8-10 horas
-**Qualidade final:** Pronta para produção ✨
-
-git push origin main
+ConfigManager (orquestrador)
+    │
+    ├── ApiKeyManager
+    │   └── dependência: (nenhuma com outro Manager)
+    │
+    ├── AudioDeviceManager
+    │   └── dependência: (nenhuma)
+    │
+    ├── ModelSelectionManager
+    │   └── dependência: ApiKeyManager (valida se tem chave antes de ativar)
+    │
+    ├── ScreenConfigManager
+    │   └── dependência: (nenhuma)
+    │
+    ├── PrivacyConfigManager
+    │   └── dependência: (nenhuma)
+    │
+    ├── WindowConfigManager
+    │   └── dependência: (nenhuma)
+    │
+    └── HomeManager
+        └── dependência: (nenhuma)
+
+Rule: Managers NÃO dependem um do outro (apenas de ConfigManager)
+      Se precisa chamar outro Manager, passa por ConfigManager
 ```
 
 ---
 
-## 📊 RESUMO DE MÉTRICAS
+## ✅ Checklist de Aprovação
 
-### Antes da Refatoração:
+Antes de começar a FASE 1, confirme:
 
-- Total de linhas em renderer.js: **1528** linhas
-- Arquivos na raiz sem organização: **2** (mode-manager, mock-runner)
-- Estrutura de pastas: **7 pastas** (audio, docs, events, handlers, llm, state, strategies, stt, utils)
-- Testes: **0**
-- Cobertura: **0%**
+- [ ] Entendi que será **arquitetura em Managers** (Opção B)
+- [ ] Entendi que **config-manager.js será deletado**
+- [ ] Entendi que **ConfigManager.js vai para `controllers/config/`**
+- [ ] Entendi que **cada Manager é independente** (testável isoladamente)
+- [ ] Entendi que **timeline é ~1 semana de trabalho**
+- [ ] Acordo que o código atual `config-manager.js` será **totalmente refatorado**
+- [ ] Concordo com a estrutura de 7 Managers + 1 ConfigManager
 
-### Esperado Após Refatoração:
-
-- Linhas em renderer.js: **~400-500** (reduzido 70%)
-- Arquivos organizados: **Todos em pastas lógicas**
-- Estrutura de pastas: **+2 novas** (/controllers/audio, /controllers/question, /controllers/screenshot, /tests)
-- Testes unitários: **6+ suites**
-- Cobertura: **~70%+**
-- Performance startup: **Medido e otimizado**
+**Se SIM em todos, a refatoração pode começar! 🚀**
 
 ---
 
-## 🚀 PRÓXIMOS PASSOS
+## 📞 Dúvidas Frequentes
 
-1. ✅ **Leu este plano?** Você está aqui!
-2. **Quer começar?** Siga a FASE 1 (30min - rápido win)
-3. **Está bloqueado?** Entre em contato com o desenvolvedor
-4. **Concluiu uma fase?** Update este arquivo ✏️
+**P: E se eu precisar de uma funcionalidade que não se encaixa em nenhum Manager?**
+A: Crie um novo Manager! Ex: `TimelineManager.js`, `NotificationManager.js`
 
-**Status geral esperado:**
+**P: Como Managers se comunicam entre si?**
+A: Via `eventBus.emit()` e `eventBus.on()` ou via ConfigManager (composição)
 
-- Fim da Fase 1-2: Estrutura sólida, renderer reduzido
-- Fim da Fase 3-4: LLM e STT validados
-- Fim da Fase 5-6: Testes + Limpeza
-- Fim da Fase 7-9: Pronto para produção ✨
+**P: E se um Manager ficar muito grande (>500 linhas)?**
+A: Considere dividir em 2 Managers (ex: ApiKeyManager + ModelValidationManager)
 
----
-
-**Última atualização:** 24 de janeiro de 2026  
-**Próxima revisão:** Após conclusão da Fase 1
+**P: Posso refatorar apenas 1 Manager por vez?**
+A: SIM! Fases 2-5 são independentes (ApiKeyManager não depende de Audio, etc)
