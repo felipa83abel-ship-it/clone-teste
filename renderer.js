@@ -142,8 +142,8 @@ eventBus.on('llmBatchEnd', (data) => {
 eventBus.on('error', (error) => {
   Logger.error('Erro na eventBus', { error });
   // 🔥 NOVO: Mostrar erro visual ao usuário
-  if (window.RendererAPI?.configManager?.showError) {
-    window.RendererAPI.configManager.showError(error);
+  if (globalThis.configManager?.showError) {
+    globalThis.configManager.showError(error);
   }
 });
 
