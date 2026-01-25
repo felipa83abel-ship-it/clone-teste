@@ -120,23 +120,23 @@ EventBus         ModeManager │      │    │      │      │
 
 ### **FASE 1: Design e Estrutura (Alta Prioridade)**
 
-- [ ] **1.1** Criar estrutura de diretórios e arquivos
-  - [ ] 1.1.1 - Criar pasta `controllers/config/`
-  - [ ] 1.1.2 - Criar pasta `controllers/config/managers/`
-  - [ ] 1.1.3 - Criar stubs vazios para os 7 files (sem código, só `class X {}`)
+- [x] **1.1** Criar estrutura de diretórios e arquivos
+  - [x] 1.1.1 - Criar pasta `controllers/config/`
+  - [x] 1.1.2 - Criar pasta `controllers/config/managers/`
+  - [x] 1.1.3 - Criar stubs vazios para os 7 files (sem código, só `class X {}`)
 
-- [ ] **1.2** Documentar interface de cada Manager
-  - [ ] 1.2.1 - ApiKeyManager: métodos públicos e responsabilidades
-  - [ ] 1.2.2 - AudioDeviceManager: métodos públicos e responsabilidades
-  - [ ] 1.2.3 - ModelSelectionManager: métodos públicos e responsabilidades
-  - [ ] 1.2.4 - ScreenConfigManager: métodos públicos e responsabilidades
-  - [ ] 1.2.5 - PrivacyConfigManager: métodos públicos e responsabilidades
-  - [ ] 1.2.6 - WindowConfigManager: métodos públicos e responsabilidades
-  - [ ] 1.2.7 - HomeManager: métodos públicos e responsabilidades
+- [x] **1.2** Documentar interface de cada Manager
+  - [x] 1.2.1 - ApiKeyManager: métodos públicos e responsabilidades
+  - [x] 1.2.2 - AudioDeviceManager: métodos públicos e responsabilidades
+  - [x] 1.2.3 - ModelSelectionManager: métodos públicos e responsabilidades
+  - [x] 1.2.4 - ScreenConfigManager: métodos públicos e responsabilidades
+  - [x] 1.2.5 - PrivacyConfigManager: métodos públicos e responsabilidades
+  - [x] 1.2.6 - WindowConfigManager: métodos públicos e responsabilidades
+  - [x] 1.2.7 - HomeManager: métodos públicos e responsabilidades
 
-- [ ] **1.3** Validação: Estrutura pronta
-  - [ ] 1.3.1 - Verificar que todos os arquivos existem
-  - [ ] 1.3.2 - Fazer commit: "refactor: criar estrutura de managers"
+- [x] **1.3** Validação: Estrutura pronta
+  - [x] 1.3.1 - Verificar que todos os arquivos existem
+  - [x] 1.3.2 - Fazer commit: "refactor: criar estrutura de managers"
 
 ---
 
