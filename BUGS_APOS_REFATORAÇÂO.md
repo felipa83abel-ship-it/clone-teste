@@ -88,9 +88,9 @@ D:\\Dev\\Projeto Electron\\git-felipa-perssua\\clone-teste\\events\\EventBus.js:
 - ✅ Toggle alterna entre light/dark mode
 - ✅ Tema é persistido ao fechar/abrir app
 
-**Commit:** Pronto para commit - Bug #1 testado e aprovado
+**Commit:** a975298 - Bug #1 commitado com sucesso
 
-**Status Atual:** ✅ CORRIGIDO - Pronto para commit
+**Status Atual:** ✅ CORRIGIDO E COMMITADO
 
 <br>
 
@@ -788,17 +788,9 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 - [ ] 🟡 Parcialmente aprovado
 - [ ] 🚫 Bloqueado
 
-**Commit:** ""
+**Commit:** a975298 - Bug #5 commitado com sucesso
 
-**Status Atual:** ⏳ Liberado, aguardando commit
-
-<br>
-
----
-
-<br>
-
-### BUG #6: Seção (API e Modelos) - Troca de Abas em "API e Modelos" 🔑
+**Status Atual:** ✅ CORRIGIDO E COMMITADO
 
 **Problema:** Abas não trocam quando clicadas
 
@@ -838,15 +830,9 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 - [ ] 🟡 Parcialmente aprovado
 - [ ] 🚫 Bloqueado
 
-**Commit:** ""
+**Commit:** a975298 - Bug #6 commitado com sucesso
 
-**Status Atual:** ⏳ Liberado, aguardando commit
-
-<br>
-
----
-
-<br>
+**Status Atual:** ✅ CORRIGIDO E COMMITADO
 
 ### BUG #7: Seção (API e Modelos)- Ativar/Desativar Modelos 🤖
 
