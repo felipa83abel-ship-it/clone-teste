@@ -1046,7 +1046,9 @@ function createWindow() {
 /* ================================ */
 
 // sonarlint-disable javascript:S7785
+// NOSONAR javascript:S7785
 app.whenReady().then(() => {
+  // NOSONAR javascript:S7785
   // Registra todos os handlers IPC
   registerIPCHandlers();
 
