@@ -31,14 +31,12 @@ class ModelSelectionManager {
     this.eventBus = eventBus;
     this.apiKeyManager = apiKeyManager;
 
-    console.log('🎯 ModelSelectionManager criado');
   }
 
   /**
    * Inicializa listeners e restaura estado
    */
   async initialize() {
-    console.log('🚀 ModelSelectionManager.initialize()');
     await this.restoreState();
     this.#initModelToggleListeners();
     this.#initModelSelectListeners();
@@ -48,7 +46,6 @@ class ModelSelectionManager {
    * Restaura seleção de modelos salvos
    */
   async restoreState() {
-    console.log('📂 ModelSelectionManager.restoreState()');
     await this.restoreSTTLLMModels();
     this.updateModelStatusUI();
   }
@@ -57,7 +54,6 @@ class ModelSelectionManager {
    * Reseta modelos para padrão
    */
   async reset() {
-    console.log('🔄 ModelSelectionManager.reset()');
     const providers = ['openai', 'google', 'openrouter'];
 
     providers.forEach((provider) => {
@@ -80,7 +76,6 @@ class ModelSelectionManager {
    */
   restoreSTTLLMModels() {
     Logger.debug('Início da função: "restoreSTTLLMModels"');
-    console.log('🔄 INICIANDO RESTAURAÇÃO DE MODELOS STT/LLM...');
     const providers = ['openai', 'google', 'openrouter'];
 
     providers.forEach((provider) => {
@@ -90,11 +85,8 @@ class ModelSelectionManager {
       const savedSTTModel = this.configManager.config.api[provider]?.selectedSTTModel || 'vosk';
 
       if (sttSelect) {
-        console.log(`   📝 ${sttSelectId}: antes="${sttSelect.value}" → depois="${savedSTTModel}"`);
         sttSelect.value = savedSTTModel;
-        console.log(`   ✅ STT restaurado - ${provider}: ${savedSTTModel}`);
       } else {
-        console.log(`   ⚠️ Select ${sttSelectId} não encontrado no DOM`);
       }
 
       // Restaurar LLM Model
@@ -103,15 +95,11 @@ class ModelSelectionManager {
       const savedLLMModel = this.configManager.config.api[provider]?.selectedLLMModel || '';
 
       if (llmSelect) {
-        console.log(`   📝 ${llmSelectId}: antes="${llmSelect.value}" → depois="${savedLLMModel}"`);
         llmSelect.value = savedLLMModel;
-        console.log(`   ✅ LLM restaurado - ${provider}: ${savedLLMModel}`);
       } else {
-        console.log(`   ⚠️ Select ${llmSelectId} não encontrado no DOM`);
       }
     });
 
-    console.log('🎉 RESTAURAÇÃO CONCLUÍDA');
     Logger.debug('Fim da função: "restoreSTTLLMModels"');
   }
 
@@ -128,7 +116,6 @@ class ModelSelectionManager {
         // DESATIVAÇÃO: Sempre permitida
         this.configManager.config.api[model].enabled = false;
 
-        console.log(`✅ Modelo ${model} desativado com sucesso`);
         this.configManager.showSaveFeedback(`Modelo ${model} desativado`);
         this.updateModelStatusUI();
         this.configManager.saveConfig();
@@ -142,7 +129,6 @@ class ModelSelectionManager {
       const savedKey = await this.ipc.invoke('GET_API_KEY', model);
 
       if (!savedKey || savedKey.length < 10) {
-        console.log(`⚠️ Não é possível ativar o modelo ${model} sem chave válida`);
         this.configManager.showError(`Configure a API key de ${model} antes de ativar`);
         return;
       }
@@ -163,7 +149,6 @@ class ModelSelectionManager {
         this.configManager.config.api[model].enabled = true;
         this.configManager.config.api.activeProvider = model;
 
-        console.log(`✅ Modelo ${model} ativado com sucesso`);
         this.configManager.showSaveFeedback(`Modelo ${model} ativado`);
       }
 
@@ -224,7 +209,6 @@ class ModelSelectionManager {
    * Registra listeners em botões de toggle de modelo
    */
   #initModelToggleListeners() {
-    console.log('🎯 ModelSelectionManager.#initModelToggleListeners()');
     document.querySelectorAll('button[data-model]').forEach((button) => {
       button.addEventListener('click', (e) => {
         const model = e.currentTarget.dataset.model;
@@ -237,7 +221,6 @@ class ModelSelectionManager {
    * Registra listeners em selects de STT/LLM
    */
   #initModelSelectListeners() {
-    console.log('🎯 ModelSelectionManager.#initModelSelectListeners()');
     const providers = ['openai', 'google', 'openrouter'];
 
     providers.forEach((provider) => {
@@ -247,7 +230,6 @@ class ModelSelectionManager {
         sttSelect.addEventListener('change', (e) => {
           this.configManager.config.api[provider].selectedSTTModel = e.target.value;
           this.configManager.saveConfig();
-          console.log(`📝 STT Model alterado - ${provider}: ${e.target.value}`);
         });
       }
 
@@ -257,7 +239,6 @@ class ModelSelectionManager {
         llmSelect.addEventListener('change', (e) => {
           this.configManager.config.api[provider].selectedLLMModel = e.target.value;
           this.configManager.saveConfig();
-          console.log(`📝 LLM Model alterado - ${provider}: ${e.target.value}`);
         });
       }
     });

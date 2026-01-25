@@ -23,14 +23,12 @@ class ApiKeyManager {
     this.ipc = ipc;
     this.eventBus = eventBus;
 
-    console.log('🔑 ApiKeyManager criado');
   }
 
   /**
    * Inicializa todos os listeners de API key
    */
   async initialize() {
-    console.log('🚀 ApiKeyManager.initialize()');
     await this.checkApiKeysStatus();
     this.#initApiKeyInputListeners();
     this.#initApiKeyVisibilityListeners();
@@ -41,7 +39,6 @@ class ApiKeyManager {
    * Restaura estado salvo (verifica chaves existentes)
    */
   async restoreState() {
-    console.log('📂 ApiKeyManager.restoreState()');
     await this.checkApiKeysStatus();
   }
 
@@ -49,7 +46,6 @@ class ApiKeyManager {
    * Reseta tudo (deleta todas as API keys)
    */
   async reset() {
-    console.log('🔄 ApiKeyManager.reset()');
     for (const provider of ['openai', 'google', 'openrouter']) {
       await this.deleteApiKey(provider);
     }
@@ -76,11 +72,9 @@ class ApiKeyManager {
       }
 
       const trimmedKey = apiKey.trim();
-      console.log(
         `Enviando para main.js - provider: ${provider}, key length: ${trimmedKey.length}`
       );
       const masked = trimmedKey ? trimmedKey.substring(0, 8) + '...' : '';
-      console.log(`Chave (masked): ${masked}`);
 
       // Salva a chave de forma segura
       await this.ipc.invoke('SAVE_API_KEY', {
@@ -88,7 +82,6 @@ class ApiKeyManager {
         apiKey: trimmedKey,
       });
 
-      console.log(`API key de ${provider} salva com sucesso`);
       this.updateApiKeyFieldStatus(provider, true);
       this.configManager.showSaveFeedback(`API key de ${provider} salva com segurança`);
 
@@ -118,12 +111,10 @@ class ApiKeyManager {
       const result = await this.ipc?.invoke('DELETE_API_KEY', provider);
 
       if (result?.success) {
-        console.log(`✅ API key de ${provider} removida com sucesso`);
         this.updateApiKeyFieldStatus(provider, false);
 
         // Se o modelo estava ativo, desativa automaticamente
         if (this.configManager.config.api?.[provider]?.enabled === true) {
-          console.log(`🔴 Desativando modelo ${provider} pois sua chave foi removida`);
           this.configManager.config.api[provider].enabled = false;
           this.configManager.config.api.activeProvider = null;
           this.configManager.saveConfig();
@@ -158,13 +149,9 @@ class ApiKeyManager {
       for (const provider of providers) {
         const savedKey = await this.ipc.invoke('GET_API_KEY', provider);
 
-        console.log(`🔍 Verificando ${provider}:`, savedKey ? 'KEY_EXISTS' : 'NO_KEY');
-
         if (savedKey && typeof savedKey === 'string' && savedKey.length > 10) {
-          console.log(`✅ Chave de ${provider} carregada com sucesso (length: ${savedKey.length})`);
           this.updateApiKeyFieldStatus(provider, true);
         } else {
-          console.log(`⚠️ Nenhuma chave salva para ${provider}`);
           this.updateApiKeyFieldStatus(provider, false);
 
           // Desativa modelo se não houver chave
@@ -174,7 +161,6 @@ class ApiKeyManager {
         }
       }
 
-      console.log('✅ Verificação de API keys concluída');
     } catch (error) {
       console.error('❌ Erro ao verificar status das API keys:', error);
     }
@@ -198,14 +184,12 @@ class ApiKeyManager {
         input.placeholder = 'API key configurada (clique para alterar)';
         input.type = 'password';
 
-        console.log(`🔐 Campo ${provider}-api-key configurado como MASCARADO`);
       } else {
         input.value = '';
         input.dataset.hasKey = 'false';
         input.placeholder = 'Insira sua API key';
         input.type = 'password';
 
-        console.log(`🔓 Campo ${provider}-api-key configurado como VAZIO`);
       }
     } else {
       console.warn(`⚠️ Input ${provider}-api-key não encontrado no DOM`);
@@ -222,7 +206,6 @@ class ApiKeyManager {
    * Registra listeners em campos de API key (input, focus, blur, copy, cut)
    */
   #initApiKeyInputListeners() {
-    console.log('📋 ApiKeyManager.#initApiKeyInputListeners()');
     document.querySelectorAll('.api-key-input').forEach((input) => {
       // Ao digitar (input event), marca campo como tendo conteúdo
       input.addEventListener('input', (e) => {
@@ -240,7 +223,6 @@ class ApiKeyManager {
           e.target.value = '';
           e.target.type = 'text';
           e.target.placeholder = 'Insira uma nova API key';
-          console.log(`📝 Campo limpo para edição - provider: ${e.target.id}`);
         } else if (!hasKey && e.target.value === '') {
           e.target.type = 'text';
         }
@@ -255,14 +237,12 @@ class ApiKeyManager {
           e.target.value = '••••••••••••••••••••••••••';
           e.target.type = 'password';
           e.target.placeholder = 'API key configurada (clique para alterar)';
-          console.log(`🔒 Máscara restaurada após cancelamento`);
         } else if (
           !isEmpty &&
           !hasKey &&
           e.target.value.length > 0 &&
           !e.target.value.includes('••••')
         ) {
-          console.log(`📝 Novo valor digitado - aguardando salvar`);
         }
       });
 
@@ -288,7 +268,6 @@ class ApiKeyManager {
    * Registra listeners em botões de visibilidade de API key
    */
   #initApiKeyVisibilityListeners() {
-    console.log('👁️  ApiKeyManager.#initApiKeyVisibilityListeners()');
     document.querySelectorAll('.btn-toggle-visibility').forEach((button) => {
       button.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -317,7 +296,6 @@ class ApiKeyManager {
               input.value = realKey;
               input.type = 'text';
               btn.innerHTML = '<span class="material-icons">visibility_off</span>';
-              console.log(`👁️ Mostrando chave salva de ${provider}`);
             } else {
               console.warn(`⚠️ Chave de ${provider} não encontrada no store`);
             }
@@ -329,17 +307,14 @@ class ApiKeyManager {
         else if (hasNewValue && input.type === 'text') {
           input.type = 'password';
           btn.innerHTML = '<span class="material-icons">visibility</span>';
-          console.log(`🔒 Ocultando chave digitada`);
         }
         // CASO 3: Chave nova está mascarada → mostra novamente
         else if (hasNewValue && input.type === 'password') {
           input.type = 'text';
           btn.innerHTML = '<span class="material-icons">visibility_off</span>';
-          console.log(`👁️ Mostrando chave digitada`);
         }
         // CASO 4: Campo vazio ou mascara de placeholder → não faz nada
         else {
-          console.log(`⚠️ Campo em estado indefinido - ignorando clique`);
         }
       });
     });
@@ -349,7 +324,6 @@ class ApiKeyManager {
    * Registra listeners em botões de deletar API key
    */
   #initApiKeyDeleteListeners() {
-    console.log('🗑️  ApiKeyManager.#initApiKeyDeleteListeners()');
     document.querySelectorAll('.btn-delete-api-key').forEach((button) => {
       button.addEventListener('click', (e) => {
         const provider = e.currentTarget.dataset.provider;

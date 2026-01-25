@@ -16,7 +16,6 @@
  */
 class ConfigManager {
   constructor() {
-    console.log('🔧 ConfigManager iniciando...');
 
     // Carrega config do localStorage
     this.config = this.loadConfig();
@@ -41,17 +40,14 @@ class ConfigManager {
    */
   loadConfig() {
     Logger.debug('Início da função: "loadConfig"');
-    console.log('📂 INICIANDO CARREGAMENTO DE CONFIG...');
     try {
       const defaultConfig = this.getDefaultConfig();
       const saved = localStorage.getItem('appConfig');
-      console.log(
         `🔍 localStorage.getItem('appConfig'): ${saved ? 'ENCONTRADO (' + saved.length + ' bytes)' : 'NÃO ENCONTRADO'}`
       );
 
       if (saved) {
         const parsed = JSON.parse(saved);
-        console.log('📂 Configurações encontradas no localStorage');
 
         // Merge profundo para preservar estados salvos
         const merged = { ...defaultConfig };
@@ -71,12 +67,10 @@ class ConfigManager {
         if (parsed.privacy) merged.privacy = { ...defaultConfig.privacy, ...parsed.privacy };
         if (parsed.other) merged.other = { ...defaultConfig.other, ...parsed.other };
 
-        console.log('✅ Configurações carregadas do localStorage');
         Logger.debug('Fim da função: "loadConfig"');
         return merged;
       }
 
-      console.log('✅ Configurações default carregadas');
       Logger.debug('Fim da função: "loadConfig"');
       return defaultConfig;
     } catch (error) {
@@ -94,7 +88,6 @@ class ConfigManager {
     try {
       const configStr = JSON.stringify(this.config);
       localStorage.setItem('appConfig', configStr);
-      console.log('💾 Configurações salvas com sucesso');
       if (showFeedback) {
         this.showSaveFeedback();
       }
@@ -109,7 +102,6 @@ class ConfigManager {
    * Inicializa todos os managers e listeners
    */
   async initializeController() {
-    console.log('🚀 ConfigManager.initializeController() - Inicializando managers...');
 
     try {
       // Cria instância do ApiKeyManager
@@ -150,7 +142,6 @@ class ConfigManager {
       this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus);
       await this.homeManager.initialize();
 
-      console.log('✅ Todos os managers inicializados');
     } catch (error) {
       console.error('❌ Erro ao inicializar managers:', error);
       throw error;
@@ -161,7 +152,6 @@ class ConfigManager {
    * Reseta todas as configurações para padrão
    */
   async resetConfig() {
-    console.log('🔄 ConfigManager.resetConfig() - Resetando tudo...');
 
     // TODO: Chamar reset() em cada manager
     // await this.apiKeyManager.reset()
@@ -170,7 +160,6 @@ class ConfigManager {
 
     this.config = this.getDefaultConfig();
     this.saveConfig();
-    console.log('✅ Configurações resetadas');
   }
 
   // ==========================================
@@ -261,7 +250,6 @@ class ConfigManager {
    */
   registerUIElements() {
     // TODO: Implementar - mover de config-manager.js original
-    console.log('📋 ConfigManager.registerUIElements()');
   }
 
   /**
@@ -269,7 +257,6 @@ class ConfigManager {
    */
   registerRendererCallbacks() {
     // TODO: Implementar - mover de config-manager.js original
-    console.log('📡 ConfigManager.registerRendererCallbacks()');
   }
 
   /**
@@ -277,7 +264,6 @@ class ConfigManager {
    */
   registerDOMEventListeners() {
     // TODO: Implementar - mover de config-manager.js original
-    console.log('🖱️  ConfigManager.registerDOMEventListeners()');
   }
 
   /**
@@ -285,7 +271,6 @@ class ConfigManager {
    */
   registerIPCListeners() {
     // TODO: Implementar - mover de config-manager.js original
-    console.log('🔌 ConfigManager.registerIPCListeners()');
   }
 
   /**
@@ -293,7 +278,6 @@ class ConfigManager {
    */
   registerErrorHandlers() {
     // TODO: Implementar - mover de config-manager.js original
-    console.log('⚠️  ConfigManager.registerErrorHandlers()');
   }
 
   // ==========================================
@@ -349,7 +333,6 @@ class ConfigManager {
 // ==========================================
 
 document.addEventListener('DOMContentLoaded', async () => {
-  console.log('📖 DOMContentLoaded - Inicializando ConfigManager...');
 
   // Aguarda RendererAPI estar disponível
   let attempts = 0;
@@ -367,5 +350,4 @@ document.addEventListener('DOMContentLoaded', async () => {
   globalThis.configManager = new ConfigManager();
   await globalThis.configManager.initializeController();
 
-  console.log('✅ ConfigManager inicializado com sucesso');
 });
