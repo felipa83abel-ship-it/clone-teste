@@ -92,9 +92,6 @@ class ApiKeyManager {
       this.updateApiKeyFieldStatus(provider, true);
       this.configManager.showSaveFeedback(`API key de ${provider} salva com segurança`);
 
-      // Emite evento no EventBus
-      this.eventBus.emit('API_KEY_UPDATED', { provider, hasKey: true });
-
       Logger.debug('Fim da função: "saveApiKey"');
       return { success: true };
     } catch (error) {
@@ -133,9 +130,6 @@ class ApiKeyManager {
         } else {
           this.configManager.showSaveFeedback(`API key de ${provider} removida`);
         }
-
-        // Emite evento no EventBus
-        this.eventBus.emit('API_KEY_UPDATED', { provider, hasKey: false });
       } else {
         this.configManager.showError(`Erro ao remover API key de ${provider}`);
       }
