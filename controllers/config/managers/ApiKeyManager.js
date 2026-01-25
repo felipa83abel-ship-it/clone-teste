@@ -108,10 +108,8 @@ class ApiKeyManager {
   async deleteApiKey(provider) {
     Logger.debug('Início da função: "deleteApiKey"');
     try {
-      const confirmed = confirm(`Tem certeza que deseja remover a API key de ${provider}?`);
-
-      if (!confirmed) return;
-
+      // 🔥 REMOVIDO: confirm() bloqueava a execução e interferia com listeners
+      // Agora deleta direto - o clique no botão já é confirmação suficiente
       const result = await this.ipc?.invoke('DELETE_API_KEY', provider);
 
       if (result?.success) {
@@ -187,6 +185,7 @@ class ApiKeyManager {
 
     if (input) {
       if (hasKey) {
+        // Campo com chave salva → mascarado
         input.value = '••••••••••••••••••••••••••';
         input.dataset.hasKey = 'true';
         input.placeholder = 'API key configurada (clique para alterar)';
@@ -194,12 +193,13 @@ class ApiKeyManager {
 
         console.log(`🔐 Campo ${provider}-api-key configurado como MASCARADO`);
       } else {
+        // Campo SEM chave → vazio e TEXT mode (permite digitação)
         input.value = '';
         input.dataset.hasKey = 'false';
         input.placeholder = 'Insira sua API key';
-        input.type = 'password';
+        input.type = 'text'; // 🔥 IMPORTANTE: sempre TEXT quando sem chave
 
-        console.log(`🔓 Campo ${provider}-api-key configurado como VAZIO`);
+        console.log(`🔓 Campo ${provider}-api-key configurado como VAZIO (text mode)`);
       }
     } else {
       console.warn(`⚠️ Input ${provider}-api-key não encontrado no DOM`);
@@ -218,9 +218,10 @@ class ApiKeyManager {
   #initApiKeyInputListeners() {
     console.log('📋 ApiKeyManager.#initApiKeyInputListeners()');
     document.querySelectorAll('.api-key-input').forEach((input) => {
-      // Ao digitar (input event), marca campo como tendo conteúdo
+      // Ao digitar (input event), garante que está em modo text
       input.addEventListener('input', (e) => {
         const hasContent = e.target.value && e.target.value.trim().length > 0;
+        // Se tem conteúdo digitado (não mascarado), muda para text mode
         if (hasContent && !e.target.value.includes('••••')) {
           e.target.type = 'text';
         }
@@ -229,35 +230,30 @@ class ApiKeyManager {
       // Quando o campo recebe foco
       input.addEventListener('focus', async (e) => {
         const hasKey = e.target.dataset.hasKey === 'true';
-        const isMasked = e.target.type === 'password';
-        if (hasKey && isMasked) {
+        const hasMaskedContent = e.target.value.includes('••••');
+
+        // Se tem chave salva E está mascarado → limpa para editar nova chave
+        if (hasKey && hasMaskedContent) {
           e.target.value = '';
           e.target.type = 'text';
           e.target.placeholder = 'Insira uma nova API key';
           console.log(`📝 Campo limpo para edição - provider: ${e.target.id}`);
-        } else if (!hasKey && e.target.value === '') {
-          e.target.type = 'text';
         }
       });
 
-      // Ao sair do campo sem alterar, restaura máscara
+      // Ao sair do campo, restaura máscara se tem chave salva
       input.addEventListener('blur', (e) => {
         const hasKey = e.target.dataset.hasKey === 'true';
         const isEmpty = e.target.value === '' || e.target.value.trim() === '';
 
+        // Se tem chave salva E campo vazio (usuário não digitou) → restaura máscara
         if (hasKey && isEmpty) {
           e.target.value = '••••••••••••••••••••••••••';
           e.target.type = 'password';
           e.target.placeholder = 'API key configurada (clique para alterar)';
           console.log(`🔒 Máscara restaurada após cancelamento`);
-        } else if (
-          !isEmpty &&
-          !hasKey &&
-          e.target.value.length > 0 &&
-          !e.target.value.includes('••••')
-        ) {
-          console.log(`📝 Novo valor digitado - aguardando salvar`);
         }
+        // Sem chave: mantém como text (já está assim desde updateApiKeyFieldStatus)
       });
 
       // Previne copiar valor mascarado

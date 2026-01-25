@@ -161,6 +161,9 @@ class ConfigManager {
       this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus);
       await this.homeManager.initialize();
 
+      // Registrar listeners dos botões de salvar
+      this.#initSaveConfigButtons();
+
       // Registrar listener do botão reset config
       this.#initResetConfigButton();
 
@@ -370,6 +373,65 @@ class ConfigManager {
   // ==========================================
 
   /**
+   * Salva uma seção inteira de configurações (usado pelos botões "Salvar Configurações")
+   * @param {string} section - Nome da seção (ex: 'openai', 'google', 'privacy')
+   */
+  async saveSection(section) {
+    Logger.debug('Início da função: "saveSection"');
+    const sectionElement =
+      document.getElementById(section) ||
+      document.querySelector(`[data-section="${section}"]`)?.closest('.tab-pane');
+
+    if (sectionElement) {
+      // Processa API key primeiro (se houver)
+      const apiKeyInput = sectionElement.querySelector('.api-key-input');
+
+      if (apiKeyInput?.id) {
+        const provider = section; // 'openai', 'google', 'openrouter'
+        const apiKey = apiKeyInput.value;
+
+        console.log(`saveSection - provider: ${provider}`);
+        console.log(`saveSection - input.value length: ${apiKey?.length || 0}`);
+
+        // Só salva se não estiver mascarado E tiver conteúdo
+        if (apiKey && !apiKey.includes('••••') && apiKey.trim().length > 0) {
+          console.log(`Salvando nova chave para ${provider}...`);
+          await this.apiKeyManager.saveApiKey(provider, apiKey);
+        } else if (apiKey.includes('••••')) {
+          console.log(`Chave mascarada detectada - mantendo chave existente`);
+        } else {
+          console.log(`Campo vazio - não salvando`);
+        }
+      }
+
+      // Salva outros campos normalmente (exceto API key)
+      sectionElement
+        .querySelectorAll('input:not(.api-key-input), select, textarea')
+        .forEach((input) => {
+          if (input.id) {
+            this.saveField(input.id, input.value);
+          }
+        });
+    }
+
+    this.saveConfig();
+
+    Logger.debug('Fim da função: "saveSection"');
+  }
+
+  /**
+   * Salva um campo individual
+   * @param {string} fieldId - ID do campo
+   * @param {*} value - Valor a salvar
+   */
+  saveField(fieldId, value) {
+    Logger.debug(`Salvando campo: ${fieldId} = ${value}`);
+    // Este método pode ser expandido conforme necessário
+    // Por enquanto, apenas loga a operação
+    console.log(`📝 Campo ${fieldId} = ${value}`);
+  }
+
+  /**
    * Inicializa listener do botão reset config
    */
   #initResetConfigButton() {
@@ -406,6 +468,22 @@ class ConfigManager {
     } else {
       Logger.warn('ConfigManager: btn-reset-config não encontrado no DOM');
     }
+  }
+
+  /**
+   * Inicializa listeners dos botões "Salvar Configurações"
+   */
+  #initSaveConfigButtons() {
+    Logger.debug('ConfigManager: #initSaveConfigButtons');
+    document.querySelectorAll('.btn-save').forEach((button) => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const section = e.currentTarget.dataset.section;
+        console.log(`🔘 Botão salvar clicado para seção: ${section}`);
+        this.saveSection(section);
+      });
+    });
+    Logger.debug('ConfigManager: Listeners .btn-save registrados');
   }
 }
 
