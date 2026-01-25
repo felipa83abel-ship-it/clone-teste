@@ -757,4 +757,5 @@ if (typeof globalThis !== 'undefined') {
   globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
   globalThis.eventBus = eventBus; // 🎭 Exporta EventBus singleton para todos os módulos
   globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock
+  globalThis._ipc = ipcRenderer; // 🎭 Exporta ipcRenderer para ConfigManager e Managers
 }
