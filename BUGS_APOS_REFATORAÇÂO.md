@@ -733,7 +733,7 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 
 - [ ] ⏳ Aguardando execução
 - [ ] 🔄 Em execução
-- [ ] ✅ Passou
+- [x] ✅ Passou
 - [ ] ❌ Falhou
 - [ ] 🟡 Parcialmente aprovado
 - [ ] 🚫 Bloqueado
@@ -741,12 +741,13 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 **Resultado:**
 
 - ✅ CORRIGIDO - Avisos eliminados
-- ✅ Eventos não utilizados removidos do EventBus
+- ✅ VU meter oscila ao iniciar a app
+- ✅ Dispositivos salvos e restaurados corretamente
 - ✅ Sem loops infinitos
 
-**Commit:** ""
+**Commit:** 75cfb25 - VU meter oscilando ao iniciar app
 
-**Status Atual:** ✅ CORRIGIDO - Aguardando teste manual para confirmação
+**Status Atual:** ✅ CORRIGIDO E COMMITADO
 
 <br>
 
