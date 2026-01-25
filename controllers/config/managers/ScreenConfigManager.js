@@ -28,12 +28,14 @@ class ScreenConfigManager {
     this.eventBus = eventBus;
     this.isRecording = false;
 
+    console.log('📸 ScreenConfigManager criado');
   }
 
   /**
    * Inicializa listeners e restaura estado
    */
   async initialize() {
+    console.log('🚀 ScreenConfigManager.initialize()');
     await this.restoreState();
     this.#initScreenConfigListeners();
   }
@@ -43,6 +45,7 @@ class ScreenConfigManager {
    */
   async restoreState() {
     Logger.debug('Início da função: "restoreState"');
+    console.log('📂 ScreenConfigManager.restoreState()');
     this.restoreScreenConfig();
   }
 
@@ -50,6 +53,7 @@ class ScreenConfigManager {
    * Reseta configurações padrão
    */
   async reset() {
+    console.log('🔄 ScreenConfigManager.reset()');
     const hotkeyInput = document.getElementById('screenshot-hotkey');
     const formatSelect = document.getElementById('screenshot-format');
     const excludeCheckbox = document.getElementById('exclude-app-from-screenshot');
@@ -79,11 +83,13 @@ class ScreenConfigManager {
    */
   restoreScreenConfig() {
     Logger.debug('Início da função: "restoreScreenConfig"');
+    console.log('🎬 Restaurando configurações de screenshot...');
 
     // Restaurar hotkey
     const hotkeyInput = document.getElementById('screenshot-hotkey');
     if (hotkeyInput) {
       hotkeyInput.value = this.configManager.config.screen?.screenshotHotkey || 'Ctrl+Shift+S';
+      console.log(`   ✅ Hotkey restaurado: ${hotkeyInput.value}`);
     } else {
       console.warn('   ⚠️ Input screenshot-hotkey não encontrado no DOM');
     }
@@ -92,6 +98,7 @@ class ScreenConfigManager {
     const formatSelect = document.getElementById('screenshot-format');
     if (formatSelect) {
       formatSelect.value = this.configManager.config.screen?.imageFormat || 'png';
+      console.log(`   ✅ Formato restaurado: ${formatSelect.value}`);
     } else {
       console.warn('   ⚠️ Select screenshot-format não encontrado no DOM');
     }
@@ -101,10 +108,12 @@ class ScreenConfigManager {
     if (excludeCheckbox) {
       excludeCheckbox.checked =
         this.configManager.config.screen?.excludeAppFromScreenshot !== false;
+      console.log(`   ✅ Exclusão do app: ${excludeCheckbox.checked ? 'Sim' : 'Não'}`);
     } else {
       console.warn('   ⚠️ Checkbox exclude-app-from-screenshot não encontrado no DOM');
     }
 
+    console.log('✅ Restauração concluída');
     Logger.debug('Fim da função: "restoreScreenConfig"');
   }
 
@@ -114,6 +123,7 @@ class ScreenConfigManager {
    */
   recordHotkey(button) {
     Logger.debug('Início da função: "recordHotkey"');
+    console.log('🎙️ Iniciando gravação de hotkey...');
 
     if (this.isRecording) {
       console.warn('   ⚠️ Já está gravando um hotkey');
@@ -140,6 +150,7 @@ class ScreenConfigManager {
       }
 
       const hotkey = keys.join('+');
+      console.log(`   📝 Hotkey capturado: ${hotkey}`);
 
       // Atualiza DOM e config
       const hotkeyInput = document.getElementById('screenshot-hotkey');
@@ -158,10 +169,12 @@ class ScreenConfigManager {
       this.isRecording = false;
       globalThis.removeEventListener('keydown', handleKeyDown);
 
+      console.log(`   ✅ Hotkey salvo com sucesso`);
       this.eventBus.emit('SCREENSHOT_CONFIG_CHANGED', { field: 'hotkey', value: hotkey });
     };
 
     globalThis.addEventListener('keydown', handleKeyDown);
+    console.log('✅ Aguardando pressionamento de tecla...');
 
     Logger.debug('Fim da função: "recordHotkey"');
   }
@@ -173,6 +186,7 @@ class ScreenConfigManager {
    */
   saveScreenField(field, value) {
     Logger.debug('Início da função: "saveScreenField"');
+    console.log(`💾 Salvando ${field}: ${value}`);
 
     if (field === 'screenshot-hotkey') {
       this.configManager.config.screen.screenshotHotkey = value;
@@ -185,6 +199,7 @@ class ScreenConfigManager {
     this.configManager.saveConfig();
     this.eventBus.emit('SCREENSHOT_CONFIG_CHANGED', { field, value });
 
+    console.log(`   ✅ Campo ${field} salvo`);
     Logger.debug('Fim da função: "saveScreenField"');
   }
 
@@ -196,6 +211,7 @@ class ScreenConfigManager {
    * Registra listeners em elementos de screenshot
    */
   #initScreenConfigListeners() {
+    console.log('🎯 ScreenConfigManager.#initScreenConfigListeners()');
 
     // Listener para botão de gravação de hotkey
     const recordHotkeyBtn = document.getElementById('recordHotkeyBtn');
@@ -203,6 +219,7 @@ class ScreenConfigManager {
       recordHotkeyBtn.addEventListener('click', () => {
         this.recordHotkey(recordHotkeyBtn);
       });
+      console.log('   ✅ Listener para recordHotkeyBtn registrado');
     } else {
       console.warn('   ⚠️ Botão recordHotkeyBtn não encontrado');
     }
@@ -212,7 +229,9 @@ class ScreenConfigManager {
     if (formatSelect) {
       formatSelect.addEventListener('change', (e) => {
         this.saveScreenField('screenshot-format', e.target.value);
+        console.log(`   📝 Formato alterado: ${e.target.value}`);
       });
+      console.log('   ✅ Listener para screenshot-format registrado');
     } else {
       console.warn('   ⚠️ Select screenshot-format não encontrado');
     }
@@ -222,7 +241,9 @@ class ScreenConfigManager {
     if (excludeCheckbox) {
       excludeCheckbox.addEventListener('change', (e) => {
         this.saveScreenField('exclude-app-from-screenshot', e.target.checked);
+        console.log(`   📝 Exclusão do app: ${e.target.checked ? 'Sim' : 'Não'}`);
       });
+      console.log('   ✅ Listener para exclude-app-from-screenshot registrado');
     } else {
       console.warn('   ⚠️ Checkbox exclude-app-from-screenshot não encontrado');
     }
@@ -238,15 +259,18 @@ class ScreenConfigManager {
 
         const count = globalThis.RendererAPI.getScreenshotCount?.() || 0;
         if (count === 0) {
+          console.log('   ℹ️ Nenhum screenshot para limpar');
           return;
         }
 
         const confirmed = confirm(`Deseja limpar ${count} screenshot(s)?`);
         if (confirmed) {
           globalThis.RendererAPI.clearScreenshots();
+          console.log('   ✅ Screenshots limpos pelo usuário');
           this.eventBus.emit('SCREENSHOTS_CLEARED', { count });
         }
       });
+      console.log('   ✅ Listener para clearScreenshotsBtn registrado');
     } else {
       console.warn('   ⚠️ Botão clearScreenshotsBtn não encontrado');
     }

@@ -28,12 +28,14 @@ class WindowConfigManager {
     this.ipc = ipc;
     this.eventBus = eventBus;
 
+    console.log('🪟 WindowConfigManager criado');
   }
 
   /**
    * Inicializa listeners e restaura estado
    */
   async initialize() {
+    console.log('🚀 WindowConfigManager.initialize()');
     await this.restoreState();
     this.#initWindowListeners();
   }
@@ -43,6 +45,7 @@ class WindowConfigManager {
    */
   async restoreState() {
     Logger.debug('Início da função: "restoreState"');
+    console.log('📂 WindowConfigManager.restoreState()');
     this.restoreUserPreferences();
   }
 
@@ -50,6 +53,7 @@ class WindowConfigManager {
    * Reseta configurações padrão
    */
   async reset() {
+    console.log('🔄 WindowConfigManager.reset()');
     this.configManager.config.other.darkMode = true;
     this.configManager.config.other.interviewMode = 'INTERVIEW';
     this.configManager.config.other.overlayOpacity = 0.75;
@@ -66,6 +70,7 @@ class WindowConfigManager {
    */
   restoreUserPreferences() {
     Logger.debug('Início da função: "restoreUserPreferences"');
+    console.log('🔄 RESTAURANDO PREFERÊNCIAS DA JANELA...');
 
     // 1️⃣ Restaurar Dark Mode
     const darkModeToggle = document.getElementById('darkModeToggle');
@@ -77,6 +82,7 @@ class WindowConfigManager {
       } else {
         document.body.classList.remove('dark-mode');
       }
+      console.log(`   ✅ Dark Mode restaurado: ${savedDarkMode ? 'ATIVADO' : 'DESATIVADO'}`);
     } else {
       console.warn('   ⚠️ darkModeToggle não encontrado no DOM');
     }
@@ -86,6 +92,7 @@ class WindowConfigManager {
     const savedInterviewMode = this.configManager.config.other?.interviewMode ?? 'INTERVIEW';
     if (interviewModeSelect) {
       interviewModeSelect.value = savedInterviewMode;
+      console.log(`   ✅ Interview Mode restaurado: ${savedInterviewMode}`);
     } else {
       console.warn('   ⚠️ interviewModeSelect não encontrado no DOM');
     }
@@ -96,6 +103,7 @@ class WindowConfigManager {
     if (opacityRange) {
       opacityRange.value = savedOpacity;
       this.applyOpacity(savedOpacity);
+      console.log(`   ✅ Opacidade restaurada: ${savedOpacity}`);
     } else {
       console.warn('   ⚠️ opacityRange não encontrado no DOM');
     }
@@ -104,10 +112,12 @@ class WindowConfigManager {
     const dragHandle = document.getElementById('dragHandle');
     if (dragHandle) {
       this.initDragHandle(dragHandle);
+      console.log(`   ✅ Drag handle inicializado`);
     } else {
       console.warn('   ⚠️ dragHandle não encontrado no DOM');
     }
 
+    console.log('✅ Preferências restauradas');
     Logger.debug('Fim da função: "restoreUserPreferences"');
   }
 
@@ -116,6 +126,7 @@ class WindowConfigManager {
    * @param {number} opacity - Valor de 0 a 1
    */
   applyOpacity(opacity) {
+    console.log(`🎨 Aplicando opacidade: ${opacity}`);
     const opacityValue = parseFloat(opacity);
 
     // Aplicar CSS na janela
@@ -133,6 +144,7 @@ class WindowConfigManager {
    * @param {HTMLElement} dragHandle - Elemento para arrastar
    */
   initDragHandle(dragHandle) {
+    console.log('🖱️ Inicializando drag handle...');
 
     dragHandle.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -147,6 +159,7 @@ class WindowConfigManager {
       });
     });
 
+    console.log('✅ Drag handle inicializado');
   }
 
   /**
@@ -156,6 +169,7 @@ class WindowConfigManager {
    */
   saveWindowField(field, value) {
     Logger.debug('Início da função: "saveWindowField"');
+    console.log(`💾 Salvando ${field}: ${value}`);
 
     if (field === 'darkModeToggle') {
       this.configManager.config.other.darkMode = value;
@@ -173,6 +187,7 @@ class WindowConfigManager {
     this.configManager.saveConfig();
     this.eventBus.emit('WINDOW_CONFIG_CHANGED', { field, value });
 
+    console.log(`   ✅ Campo ${field} salvo`);
     Logger.debug('Fim da função: "saveWindowField"');
   }
 
@@ -184,13 +199,16 @@ class WindowConfigManager {
    * Registra listeners em elementos de janela
    */
   #initWindowListeners() {
+    console.log('🎯 WindowConfigManager.#initWindowListeners()');
 
     // Listener para dark mode toggle
     const darkModeToggle = document.getElementById('darkModeToggle');
     if (darkModeToggle) {
       darkModeToggle.addEventListener('change', (e) => {
         this.saveWindowField('darkModeToggle', e.target.checked);
+        console.log(`   📝 Dark Mode: ${e.target.checked ? 'Ativado' : 'Desativado'}`);
       });
+      console.log('   ✅ Listener para darkModeToggle registrado');
     } else {
       console.warn('   ⚠️ darkModeToggle não encontrado');
     }
@@ -200,7 +218,9 @@ class WindowConfigManager {
     if (interviewModeSelect) {
       interviewModeSelect.addEventListener('change', (e) => {
         this.saveWindowField('interviewModeSelect', e.target.value);
+        console.log(`   📝 Interview Mode alterado: ${e.target.value}`);
       });
+      console.log('   ✅ Listener para interviewModeSelect registrado');
     } else {
       console.warn('   ⚠️ interviewModeSelect não encontrado');
     }
@@ -210,7 +230,9 @@ class WindowConfigManager {
     if (opacityRange) {
       opacityRange.addEventListener('input', (e) => {
         this.saveWindowField('opacityRange', e.target.value);
+        console.log(`   📝 Opacidade alterada: ${e.target.value}`);
       });
+      console.log('   ✅ Listener para opacityRange registrado');
     } else {
       console.warn('   ⚠️ opacityRange não encontrado');
     }

@@ -23,12 +23,14 @@ class AudioDeviceManager {
     this.eventBus = eventBus;
     this.rendererAPI = rendererAPI;
 
+    console.log('🎵 AudioDeviceManager criado');
   }
 
   /**
    * Inicializa carregamento de dispositivos e listeners
    */
   async initialize() {
+    console.log('🚀 AudioDeviceManager.initialize()');
     await this.loadDevices();
     await this.restoreDevices();
     this.#initDeviceSelectListeners();
@@ -38,6 +40,7 @@ class AudioDeviceManager {
    * Restaura estado salvo (dispositivos selecionados)
    */
   async restoreState() {
+    console.log('📂 AudioDeviceManager.restoreState()');
     await this.restoreDevices();
   }
 
@@ -45,6 +48,7 @@ class AudioDeviceManager {
    * Reseta tudo (limpa seleção de dispositivos)
    */
   async reset() {
+    console.log('🔄 AudioDeviceManager.reset()');
     this.stopMonitoring('input');
     this.stopMonitoring('output');
 
@@ -95,6 +99,7 @@ class AudioDeviceManager {
         outputSelect.appendChild(opt2);
       });
 
+      console.log('✅ Dispositivos de áudio carregados:', inputs.length);
     } catch (error) {
       console.error('❌ Erro ao carregar dispositivos de áudio:', error);
     }
@@ -116,6 +121,7 @@ class AudioDeviceManager {
 
       this.configManager.saveConfig();
 
+      console.log('💾 Dispositivos salvos:', {
         input: this.configManager.config.audio.inputDevice,
         output: this.configManager.config.audio.outputDevice,
       });
@@ -150,6 +156,7 @@ class AudioDeviceManager {
     inputSelect.value = inputExists ? savedInput : '';
     outputSelect.value = outputExists ? savedOutput : '';
 
+    console.log('🔄 Dispositivos restaurados:', {
       input: inputSelect.value,
       output: outputSelect.value,
     });
@@ -166,11 +173,14 @@ class AudioDeviceManager {
     const select = document.getElementById(`audio-${type}-device`);
 
     if (!select || !select.value) {
+      console.log(`ℹ️ ${type}: nenhum dispositivo selecionado (DESATIVADO)`);
       return;
     }
 
     try {
+      console.log(`📊 [startMonitoring] Iniciando monitoramento VOLUME (${type}):`, select.value);
       await this.rendererAPI?.startAudioVolumeMonitor(type, select.value);
+      console.log(`✅ ${type} monitor iniciado`);
     } catch (error) {
       console.error(`❌ Erro ao iniciar ${type} monitor:`, error);
     }
@@ -184,7 +194,9 @@ class AudioDeviceManager {
    */
   stopMonitoring(type) {
     Logger.debug(`Início da função: "stopMonitoring" - ${type}`);
+    console.log(`🛑 [stopMonitoring] Parando monitoramento de ${type}`);
     this.rendererAPI?.stopAudioVolumeMonitor(type);
+    console.log(`✅ ${type} monitor parado`);
     Logger.debug(`Fim da função: "stopMonitoring" - ${type}`);
   }
 
@@ -217,11 +229,13 @@ class AudioDeviceManager {
    * Registra listeners em selects de dispositivos
    */
   #initDeviceSelectListeners() {
+    console.log('🎵 AudioDeviceManager.#initDeviceSelectListeners()');
     const inputSelect = document.getElementById('audio-input-device');
     const outputSelect = document.getElementById('audio-output-device');
 
     if (inputSelect) {
       inputSelect.addEventListener('change', async () => {
+        console.log('🔄 Input device selecionado:', inputSelect.value);
         this.saveDevices();
 
         // Para monitoramento antigo e inicia novo
@@ -232,6 +246,7 @@ class AudioDeviceManager {
 
     if (outputSelect) {
       outputSelect.addEventListener('change', async () => {
+        console.log('🔄 Output device selecionado:', outputSelect.value);
         this.saveDevices();
 
         // Para monitoramento antigo e inicia novo
