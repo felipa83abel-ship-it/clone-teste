@@ -161,6 +161,9 @@ class ConfigManager {
       this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus);
       await this.homeManager.initialize();
 
+      // Registrar listener do botão reset config
+      this.#initResetConfigButton();
+
       console.log('✅ Todos os managers inicializados');
     } catch (error) {
       console.error('❌ Erro ao inicializar managers:', error);
@@ -360,6 +363,49 @@ class ConfigManager {
     }, 3000);
 
     Logger.debug('Fim da função: "showError"');
+  }
+
+  // ==========================================
+  // MÉTODOS PRIVADOS
+  // ==========================================
+
+  /**
+   * Inicializa listener do botão reset config
+   */
+  #initResetConfigButton() {
+    Logger.debug('ConfigManager: #initResetConfigButton');
+    const resetBtn = document.getElementById('btn-reset-config');
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        const confirmed = confirm(
+          '⚠️ AVISO: Isso vai restaurar TODAS as configurações ao padrão (factory reset).\n\n' +
+            'Dados que serão perdidos:\n' +
+            '- API keys salvas\n' +
+            '- Preferências de dispositivos de áudio\n' +
+            '- Configurações de transcrição\n' +
+            '- Tema e opacidade\n' +
+            '- Todas as outras configurações\n\n' +
+            'Tem certeza que deseja continuar?'
+        );
+        if (confirmed) {
+          this.resetConfig()
+            .then(() => {
+              this.showSaveFeedback('✅ Configurações restauradas ao padrão com sucesso!');
+              // Recarregar página para aplicar todas as mudanças
+              setTimeout(() => {
+                location.reload();
+              }, 1500);
+            })
+            .catch((err) => {
+              this.showError('Erro ao restaurar configurações');
+              Logger.error('Erro ao resetar config:', err);
+            });
+        }
+      });
+      Logger.debug('ConfigManager: Listener btn-reset-config registrado');
+    } else {
+      Logger.warn('ConfigManager: btn-reset-config não encontrado no DOM');
+    }
   }
 }
 

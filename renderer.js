@@ -51,6 +51,7 @@ const {
 // 🎯 CONTROLADORES (Fase 2 - Decomposição)
 const audioController = require('./controllers/audio/audio-controller.js');
 const questionController = require('./controllers/question/question-controller.js');
+const screenshotController = require('./controllers/screenshot/screenshot-controller.js');
 const rendererHelpers = require('./utils/renderer-helpers.js');
 const uiElementsRegistry = require('./utils/ui-elements-registry.js');
 
@@ -67,17 +68,29 @@ rendererHelpers.initRendererHelpers({
   eventBus,
 });
 
+// 🎯 Inicializar screenshot-controller com dependências
+const { initScreenshotController } = screenshotController;
+initScreenshotController({
+  ipcRenderer,
+  eventBus,
+  appState,
+});
+
+// 🎯 Atribuir funções de screenshot para exposição global
+const {
+  captureScreenshot: _captureScreenshot,
+  analyzeScreenshots: _analyzeScreenshots,
+  clearScreenshots: _clearScreenshots,
+} = screenshotController;
+
 // 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
 const _mockAutoPlayActive = false;
 const _mockScenarioIndex = 0;
 
-// 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (atribuídas por screenshotController)
-/** @type {Function} */
-let captureScreenshot;
-/** @type {Function} */
-let analyzeScreenshots;
-/** @type {Function} */
-let clearScreenshots;
+// 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (importadas do screenshot-controller)
+const captureScreenshot = _captureScreenshot;
+const analyzeScreenshots = _analyzeScreenshots;
+const clearScreenshots = _clearScreenshots;
 
 // 🎯 REGISTRAR MODOS
 modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
@@ -128,7 +141,6 @@ eventBus.on('llmBatchEnd', (data) => {
 
 eventBus.on('error', (error) => {
   Logger.error('Erro na eventBus', { error });
-  updateStatusMessage(`❌ ${error}`);
 });
 
 /* ================================ */

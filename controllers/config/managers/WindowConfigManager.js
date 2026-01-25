@@ -13,9 +13,8 @@
  * Interações:
  *   - DOM: darkModeToggle, interviewModeSelect, opacityRange, dragHandle
  *   - ConfigManager: salvar/restaurar estado
- *   - CSS: aplicar classe dark-mode
+ *   - CSS: aplicar classe dark (body.dark)
  *   - RendererAPI: setWindowOpacity(), startWindowDrag()
- *   - EventBus: WINDOW_CONFIG_CHANGED event
  */
 class WindowConfigManager {
   /**
@@ -79,9 +78,9 @@ class WindowConfigManager {
     if (darkModeToggle) {
       darkModeToggle.checked = savedDarkMode;
       if (savedDarkMode) {
-        document.body.classList.add('dark-mode');
+        document.body.classList.add('dark');
       } else {
-        document.body.classList.remove('dark-mode');
+        document.body.classList.remove('dark');
       }
       console.log(`   ✅ Dark Mode restaurado: ${savedDarkMode ? 'ATIVADO' : 'DESATIVADO'}`);
     } else {
@@ -220,9 +219,9 @@ class WindowConfigManager {
     if (field === 'darkModeToggle') {
       this.configManager.config.other.darkMode = value;
       if (value) {
-        document.body.classList.add('dark-mode');
+        document.body.classList.add('dark');
       } else {
-        document.body.classList.remove('dark-mode');
+        document.body.classList.remove('dark');
       }
     } else if (field === 'interviewModeSelect') {
       this.configManager.config.other.interviewMode = value;
@@ -231,7 +230,6 @@ class WindowConfigManager {
     }
 
     this.configManager.saveConfig();
-    this.eventBus.emit('WINDOW_CONFIG_CHANGED', { field, value });
 
     console.log(`   ✅ Campo ${field} salvo`);
     Logger.debug('Fim da função: "saveWindowField"');
@@ -274,9 +272,15 @@ class WindowConfigManager {
     // Listener para opacity range
     const opacityRange = document.getElementById('opacityRange');
     if (opacityRange) {
+      // Usar 'input' para feedback visual em tempo real
       opacityRange.addEventListener('input', (e) => {
+        this.applyOpacity(e.target.value);
+        console.log(`   📝 Opacidade visual alterada: ${e.target.value}`);
+      });
+      // Usar 'change' para salvar apenas no final (mouse up)
+      opacityRange.addEventListener('change', (e) => {
         this.saveWindowField('opacityRange', e.target.value);
-        console.log(`   📝 Opacidade alterada: ${e.target.value}`);
+        console.log(`   💾 Opacidade salva: ${e.target.value}`);
       });
       console.log('   ✅ Listener para opacityRange registrado');
     } else {

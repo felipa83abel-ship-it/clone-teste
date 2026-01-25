@@ -47,6 +47,13 @@ D:\\Dev\\Projeto Electron\\git-felipa-perssua\\clone-teste\\events\\EventBus.js:
   - `saveWindowField()`: linha 223 e 225
 - ✅ Alinhado com styles.css que define `body.dark`
 
+- ✅ **NOVO**: Removido evento `WINDOW_CONFIG_CHANGED` não utilizado
+  - O evento era emitido mas **nenhum listener existia** para ele
+  - Remover o evento elimina o aviso do console
+  - A funcionalidade continua completa (config já é salva e CSS aplicado)
+  - Arquivo: [WindowConfigManager.js](controllers/config/managers/WindowConfigManager.js)
+  - Linhas modificadas: Remoção da emissão + comentário atualizado
+
 **✅ Como Testar:**
 
 1. Abra a aplicação
@@ -66,12 +73,24 @@ D:\\Dev\\Projeto Electron\\git-felipa-perssua\\clone-teste\\events\\EventBus.js:
 
 **Status do Teste:**
 
-- [x] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [x] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
 
-**Commit:** ""
+**Resultado:**
 
-**Status Atual:** ✅ CORRIGIDO
+- ✅ Dark Mode funcionando corretamente
+- ✅ **AVISO ELIMINADO**: Removido evento não utilizado WINDOW_CONFIG_CHANGED
+  - Console não mostrará mais: "Nenhum listener para: WINDOW_CONFIG_CHANGED"
+- ✅ Toggle alterna entre light/dark mode
+- ✅ Tema é persistido ao fechar/abrir app
+
+**Commit:** Pronto para commit - Bug #1 testado e aprovado
+
+**Status Atual:** ✅ CORRIGIDO - Pronto para commit
 
 <br>
 
@@ -86,14 +105,12 @@ D:\\Dev\\Projeto Electron\\git-felipa-perssua\\clone-teste\\events\\EventBus.js:
 **Log relacionado:**
 
 ```text
-
-WindowConfigManager.js:381 🖱️ Zona interativa ATIVADA: controls-mock interactive-zone
-WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: controls-mock interactive-zone
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\Logger.js:38 [2026-01-25T14:47:08.988Z] [INFO] ✅ Mock interceptor inicializado para MODE_DEBUG
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: controls-mock interactive-zone
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\Logger.js:38 [2026-01-25T18:35:16.748Z] [INFO] ✅ Mock interceptor inicializado para MODE_DEBUG
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: screenshotBadgeUpdate
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-updateMockBadge @ renderer.js:593
-(anonymous) @ HomeManager.js:149
+updateMockBadge @ renderer.js:600
+(anonymous) @ HomeManager.js:150
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:48 🧹 ═══════════════════════════════════════════════════════════
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:49 🧹 INICIANDO RESET COMPLETO DO APP
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:50 🧹 ═══════════════════════════════════════════════════════════
@@ -107,53 +124,310 @@ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:120
 await in resetAppState
-(anonymous) @ HomeManager.js:151
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: questionsHistoryUpdate
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:124
 await in resetAppState
-(anonymous) @ HomeManager.js:151
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:125 ✅ Perguntas UI limpa
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: transcriptionCleared
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:129
 await in resetAppState
-(anonymous) @ HomeManager.js:151
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: answersCleared
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:130
 await in resetAppState
-(anonymous) @ HomeManager.js:151
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:131 ✅ Transcrições e respostas UI limpas
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: listenButtonToggle
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:135
 await in resetAppState
-(anonymous) @ HomeManager.js:151
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:139 ✅ Botão listen resetado
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: statusUpdate
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:143
-await in resetAppState
-(anonymous) @ HomeManager.js:151
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:65 ❌ Erro em listener statusUpdate: RangeError: Maximum call stack size exceeded
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:65
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+(anonymous) @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:63
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:61
+updateStatusMessage @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:26
+(anonymous) @ renderer.js:137
+await in (anonymous)
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:147 ✅ Status atualizado
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: clearAllSelections
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 clearAllSelections @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:34
 resetAppState @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:151
 await in resetAppState
-(anonymous) @ HomeManager.js:151
+(anonymous) @ HomeManager.js:152
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:152 ✅ Seleções limpas
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:156 ✅ ═══════════════════════════════════════════════════════════
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:157 ✅ RESET COMPLETO CONCLUÍDO COM SUCESSO
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\utils\renderer-helpers.js:158 ✅ ═══════════════════════════════════════════════════════════
-WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: controls-mock interactive-zone
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: controls-mock interactive-zone
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:196
+🎬 ════════════════════════════════════════════════════════
+🎬 MOCK CENÁRIO 1/6
+🎬 ════════════════════════════════════════════════════════
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:92 🎤 [FASE-1] Capturando áudio da pergunta...
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: transcriptAdd
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
+simulateAudioCapture @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:95
+runMockAutoPlay @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:204
+globalThis.runMockAutoPlay @ renderer.js:796
+(anonymous) @ HomeManager.js:158
+setTimeout
+(anonymous) @ HomeManager.js:156
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+HomeManager.js:103 >>> Menu item clicado: home
+HomeManager.js:122 >>> Seção ativada: home
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: placeholderFulfill
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
+simulateAudioCapture @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:109
+await in simulateAudioCapture
+runMockAutoPlay @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:204
+globalThis.runMockAutoPlay @ renderer.js:796
+(anonymous) @ HomeManager.js:158
+setTimeout
+(anonymous) @ HomeManager.js:156
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:120 ✅ [FASE-1] Áudio capturado
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:128 📝 [FASE-2] Processando pergunta...
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:136 🔇 [FASE-2] Silêncio detectado, fechando pergunta...
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:137 🤖 [FASE-3] askLlm acionado - mock stream será emitido pelo interceptor
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:169 📸 [FASE-4A] Capturando screenshot 1/1...
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:170 Uncaught (in promise) TypeError: captureScreenshot is not a function
+    at captureScenarioScreenshots (D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:170:11)
+    at Object.runMockAutoPlay (D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:221:33)
+captureScenarioScreenshots @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:170
+runMockAutoPlay @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\testing\mock-runner.js:221
+await in runMockAutoPlay
+globalThis.runMockAutoPlay @ renderer.js:796
+(anonymous) @ HomeManager.js:158
+setTimeout
+(anonymous) @ HomeManager.js:156
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: sideMenu
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: sideMenu
 
 ```
 
 **Correção Aplicada:**
 
-- ⏳ AGUARDANDO TESTE MANUAL
+- ✅ Removido listener recursivo de `statusUpdate` em renderer.js
+  - **Root Cause**: `updateStatusMessage()` emitia evento `statusUpdate` que disparava um listener, causando loop infinito
+  - **Solução**: Remover listener que causava recursão
+- ✅ Importado e inicializado `screenshot-controller` em renderer.js
+  - Adicionada importação do controller
+  - Inicializar com dependências (ipcRenderer, eventBus, appState)
+  - Atribuir funções às variáveis globais para uso em mock-runner.js
 
 **✅ Como Testar:**
 
@@ -174,12 +448,23 @@ WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: controls-mock int
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [x] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
+
+**Resultado:**
+
+- ✅ CORRIGIDO - Stack overflow eliminado
+- ✅ CORRIGIDO - captureScreenshot agora é uma função válida
+- 🔎 Necessário retest após as correções
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ✅ CORRIGIDO - Aguardando teste manual para confirmação
 
 <br>
 
@@ -195,6 +480,98 @@ WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: controls-mock int
 
 ```text
 
+ConfigManager.js:178 🔄 ConfigManager.resetConfig() - Resetando tudo...
+ApiKeyManager.js:52 🔄 ApiKeyManager.reset()
+ConfigManager.js:379 [Violation] 'click' handler took 5073ms
+ApiKeyManager.js:121 ✅ API key de openai removida com sucesso
+ApiKeyManager.js:208 🔓 Campo openai-api-key configurado como VAZIO
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: API_KEY_UPDATED
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
+deleteApiKey @ ApiKeyManager.js:138
+await in deleteApiKey
+reset @ ApiKeyManager.js:54
+resetConfig @ ConfigManager.js:181
+(anonymous) @ ConfigManager.js:391
+ApiKeyManager.js:121 ✅ API key de google removida com sucesso
+ApiKeyManager.js:208 🔓 Campo google-api-key configurado como VAZIO
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: API_KEY_UPDATED
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
+deleteApiKey @ ApiKeyManager.js:138
+await in deleteApiKey
+reset @ ApiKeyManager.js:54
+await in reset
+resetConfig @ ConfigManager.js:181
+(anonymous) @ ConfigManager.js:391
+ApiKeyManager.js:121 ✅ API key de openrouter removida com sucesso
+ApiKeyManager.js:208 🔓 Campo openrouter-api-key configurado como VAZIO
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: API_KEY_UPDATED
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
+deleteApiKey @ ApiKeyManager.js:138
+await in deleteApiKey
+reset @ ApiKeyManager.js:54
+await in reset
+resetConfig @ ConfigManager.js:181
+(anonymous) @ ConfigManager.js:391
+AudioDeviceManager.js:51 🔄 AudioDeviceManager.reset()
+AudioDeviceManager.js:197 🛑 [stopMonitoring] Parando monitoramento de input
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\audio\volume-audio-monitor.js:302 ℹ️ Monitor de volume (input) já está inativo
+AudioDeviceManager.js:199 ✅ input monitor parado
+AudioDeviceManager.js:197 🛑 [stopMonitoring] Parando monitoramento de output
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\audio\volume-audio-monitor.js:302 ℹ️ Monitor de volume (output) já está inativo
+AudioDeviceManager.js:199 ✅ output monitor parado
+ConfigManager.js:108 💾 Configurações salvas com sucesso
+AudioDeviceManager.js:124 💾 Dispositivos salvos: {input: '', output: ''}
+D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: AUDIO_DEVICE_UPDATED
+emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
+saveDevices @ AudioDeviceManager.js:130
+reset @ AudioDeviceManager.js:59
+resetConfig @ ConfigManager.js:182
+await in resetConfig
+(anonymous) @ ConfigManager.js:391
+ModelSelectionManager.js:60 🔄 ModelSelectionManager.reset()
+ConfigManager.js:108 💾 Configurações salvas com sucesso
+ModelSelectionManager.js:51 📂 ModelSelectionManager.restoreState()
+ModelSelectionManager.js:83 🔄 INICIANDO RESTAURAÇÃO DE MODELOS STT/LLM...
+ModelSelectionManager.js:93    📝 openai-stt-model: antes="vosk" → depois="vosk"
+ModelSelectionManager.js:95    ✅ STT restaurado - openai: vosk
+ModelSelectionManager.js:106    📝 openai-llm-model: antes="gpt-4o-mini" → depois=""
+ModelSelectionManager.js:108    ✅ LLM restaurado - openai:
+ModelSelectionManager.js:93    📝 google-stt-model: antes="vosk" → depois="vosk"
+ModelSelectionManager.js:95    ✅ STT restaurado - google: vosk
+ModelSelectionManager.js:106    📝 google-llm-model: antes="gemini-pro" → depois=""
+ModelSelectionManager.js:108    ✅ LLM restaurado - google:
+ModelSelectionManager.js:93    📝 openrouter-stt-model: antes="vosk" → depois="vosk"
+ModelSelectionManager.js:95    ✅ STT restaurado - openrouter: vosk
+ModelSelectionManager.js:106    📝 openrouter-llm-model: antes="" → depois=""
+ModelSelectionManager.js:108    ✅ LLM restaurado - openrouter:
+ModelSelectionManager.js:114 🎉 RESTAURAÇÃO CONCLUÍDA
+ScreenConfigManager.js:56 🔄 ScreenConfigManager.reset()
+ConfigManager.js:108 💾 Configurações salvas com sucesso
+PrivacyConfigManager.js:49 🔄 PrivacyConfigManager.reset()
+ConfigManager.js:108 💾 Configurações salvas com sucesso
+PrivacyConfigManager.js:41 📂 PrivacyConfigManager.restoreState()
+PrivacyConfigManager.js:69 🔐 Restaurando configurações de privacidade...
+PrivacyConfigManager.js:76    ✅ Ocultar de screenshot: Não
+PrivacyConfigManager.js:86    ✅ Desabilitar telemetria: Não
+PrivacyConfigManager.js:97    ✅ Auto-limpar dados: Não
+PrivacyConfigManager.js:106    ✅ Dias de retenção: 7
+PrivacyConfigManager.js:111 ✅ Restauração concluída
+WindowConfigManager.js:57 🔄 WindowConfigManager.reset()
+ConfigManager.js:108 💾 Configurações salvas com sucesso
+WindowConfigManager.js:49 📂 WindowConfigManager.restoreState()
+WindowConfigManager.js:74 🔄 RESTAURANDO PREFERÊNCIAS DA JANELA...
+WindowConfigManager.js:86    ✅ Dark Mode restaurado: ATIVADO
+WindowConfigManager.js:96    ✅ Interview Mode restaurado: INTERVIEW
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.75
+WindowConfigManager.js:107    ✅ Opacidade restaurada: 0.75
+WindowConfigManager.js:148 🖱️ Inicializando drag handle...
+WindowConfigManager.js:208 ✅ Drag handle inicializado
+WindowConfigManager.js:116    ✅ Drag handle inicializado
+WindowConfigManager.js:121 ✅ Preferências restauradas
+ConfigManager.js:249 📋 DEFAULT CONFIG - other section:
+ConfigManager.js:250    clickThroughEnabled: false
+ConfigManager.js:108 💾 Configurações salvas com sucesso
+ConfigManager.js:191 ✅ Configurações resetadas
 
 
 ```
@@ -228,12 +605,23 @@ WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: controls-mock int
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [ ] ❌ Falhou
+- [x] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
+
+**Resultado:**
+
+- ✅ Reset funcionando corretamente
+- ⚠️ Aviso no log: ⚠️ Nenhum listener para: API_KEY_UPDATED
+- 🔎 Necessário investigar, confira o "Log relacionado", foi atualizado.
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Aguardando Analise
 
 <br>
 
@@ -310,7 +698,7 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 
 **Correção Aplicada:**
 
-- ⏳ AGUARDANDO TESTE MANUAL
+- ⏳ Aguardando Analise
 
 **✅ Como Testar:**
 
@@ -332,12 +720,25 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [x] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
+
+**Resultado:**
+
+- ❌ Teste falhou, continua o mesmo erro/aviso
+- ⚠️ Aviso no log: ⚠️ Nenhum listener para: AUDIO_DEVICE_UPDATED
+- ⚠️ Aviso no log: ⚠️ Nenhum listener para: inputVolumeUpdate (obs.: esse fica em loop eterno)
+- ⚠️ Aviso no log: ⚠️ Nenhum listener para: outputVolumeUpdate (obs.: esse fica em loop eterno)
+- 🔎 Necessário investigar, confira o "Log relacionado", foi atualizado.
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** - ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** - ⏳ Aguardando Analise
 
 <br>
 
@@ -380,12 +781,16 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [x] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Liberado, aguardando commit
 
 <br>
 
@@ -426,12 +831,16 @@ emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [x] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Liberado, aguardando commit
 
 <br>
 
@@ -477,12 +886,22 @@ toggleModel @ ModelSelectionManager.js:137
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [x] 🚫 Bloqueado
+
+**Resultado:**
+
+- 🚫 Bloqueado, ao resetar as configurações apagou a chave existente
+- ❌ Novo bug #11, conferir e corrigir para liberar teste.
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Aguardando Analise
 
 <br>
 
@@ -537,12 +956,22 @@ HomeManager.js:208 >>> listenToggleBtn() chamado com sucesso
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [x] 🚫 Bloqueado
+
+**Resultado:**
+
+- 🚫 Bloqueado, ao resetar as configurações apagou a chave existente
+- ❌ Novo bug #11, conferir e corrigir para liberar teste.
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Aguardando Analise
 
 <br>
 
@@ -601,12 +1030,22 @@ HomeManager.js:208 >>> listenToggleBtn() chamado com sucesso
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [x] 🚫 Bloqueado
+
+**Resultado:**
+
+- 🚫 Bloqueado, ao resetar as configurações apagou a chave existente
+- ❌ Novo bug #11, conferir e corrigir para liberar teste.
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Aguardando Analise
 
 <br>
 
@@ -622,75 +1061,28 @@ HomeManager.js:208 >>> listenToggleBtn() chamado com sucesso
 
 ```text
 
-WindowConfigManager.js:381 🖱️ Zona interativa ATIVADA: opacity-control interactive-zone
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.63
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.63
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: opacity-control interactive-zone
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.93
+WindowConfigManager.js:280    📝 Opacidade visual alterada: 0.93
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.95
+WindowConfigManager.js:280    📝 Opacidade visual alterada: 0.95
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.96
+WindowConfigManager.js:280    📝 Opacidade visual alterada: 0.96
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.99
+WindowConfigManager.js:280    📝 Opacidade visual alterada: 0.99
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 1
+WindowConfigManager.js:280    📝 Opacidade visual alterada: 1
+WindowConfigManager.js:218 💾 Salvando opacityRange: 1
+WindowConfigManager.js:130 🎨 Aplicando opacidade: 1
 ConfigManager.js:108 💾 Configurações salvas com sucesso
 D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
 emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
 saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
+(anonymous) @ WindowConfigManager.js:284
 WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.63
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.64
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.64
-ConfigManager.js:108 💾 Configurações salvas com sucesso
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
-WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.64
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.65
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.65
-ConfigManager.js:108 💾 Configurações salvas com sucesso
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
-WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.65
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.66
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.66
-ConfigManager.js:108 💾 Configurações salvas com sucesso
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
-WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.66
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.67
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.67
-ConfigManager.js:108 💾 Configurações salvas com sucesso
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
-WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.67
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.68
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.68
-ConfigManager.js:108 💾 Configurações salvas com sucesso
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
-WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.68
-WindowConfigManager.js:218 💾 Salvando opacityRange: 0.69
-WindowConfigManager.js:130 🎨 Aplicando opacidade: 0.69
-ConfigManager.js:108 💾 Configurações salvas com sucesso
-D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57 ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
-emit @ D:\Dev\Projeto Electron\git-felipa-perssua\clone-teste\events\EventBus.js:57
-saveWindowField @ WindowConfigManager.js:234
-(anonymous) @ WindowConfigManager.js:278
-WindowConfigManager.js:236    ✅ Campo opacityRange salvo
-WindowConfigManager.js:279    📝 Opacidade alterada: 0.69
-WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: opacity-control interactive-zone
-WindowConfigManager.js:381 🖱️ Zona interativa ATIVADA: sideMenu
-WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: sideMenu
-WindowConfigManager.js:381 🖱️ Zona interativa ATIVADA: sideMenu
-WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: sideMenu
+WindowConfigManager.js:285    💾 Opacidade salva: 1
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: opacity-control interactive-zone
+
 
 
 
@@ -709,8 +1101,8 @@ WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: sideMenu
 3. Verifique se a janela fica mais transparente
 4. Mova para a direita para aumentar opacidade
 5. Verifique se não aparece "Configurações salvas!" a cada movimento
-6. Solte o slider e aguarde 1 segundo
-7. Verifique se aparece feedback apenas UMA VEZ ao soltar
+6. Solte o slider
+7. Verifique se não aparece "Configurações salvas!" ao soltar
 8. Feche e abra a app novamente
 9. Verifique se a opacidade foi salva
 
@@ -723,12 +1115,68 @@ WindowConfigManager.js:387 🖱️ Zona interativa DESATIVADA: sideMenu
 
 **Status do Teste:**
 
-- [ ] Passou
-- [ ] Falhou
+- [ ] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [ ] ❌ Falhou
+- [x] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
+
+**Resultado:**
+
+- ❌ Ainda aparece "Configurações salvas!" ao soltar
+- Obs.: o feedeback não deve aparecer, ao soltar ele deve apenas salvar o valor escolhido para ser recuperado ao iniciar o app.
+- ⚠️ Aviso no log: ⚠️ Nenhum listener para: WINDOW_CONFIG_CHANGED
+- 🔎 Necessário investigar, confira o "Log relacionado", foi atualizado.
+- 💡 Sempre checar qualquer aviso e corrigir sem mascarar o aviso.
 
 **Commit:** ""
 
-**Status Atual:** ⏳ AGUARDANDO TESTE MANUAL
+**Status Atual:** ⏳ Aguardando Analise
+
+<br>
+
+---
+
+<br>
+
+### BUG #11: Chave da API - Não salva
+
+**Problema:** Ao incluir uma chave de API e tentar salvar clicando no botão de "Salvar Configurações" nada acontece, em qualquer modelo.
+
+**Log relacionado:**
+
+```text
+
+WindowConfigManager.js:387 🖱️ Zona interativa ATIVADA: openai-llm-model
+WindowConfigManager.js:393 🖱️ Zona interativa DESATIVADA: openai-llm-model
+ApiKeyManager.js:265 📝 Novo valor digitado - aguardando salvar
+
+
+```
+
+**Correção Aplicada:**
+
+- ⏳ AGUARDANDO ANALISE
+
+**✅ Como Testar:**
+
+1.
+
+**Esperado:**
+
+- **Status do Teste:**
+
+- [x] ⏳ Aguardando execução
+- [ ] 🔄 Em execução
+- [ ] ✅ Passou
+- [ ] ❌ Falhou
+- [ ] 🟡 Parcialmente aprovado
+- [ ] 🚫 Bloqueado
+
+**Commit:** ""
+
+**Status Atual:** ⏳ AGUARDANDO ANALISE
 
 <br>
 

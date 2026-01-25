@@ -29,6 +29,7 @@ class HomeManager {
     console.log('🏠🏠🏠 HomeManager.initialize() INICIADO 🏠🏠🏠');
     Logger.debug('🏠 HomeManager: Iniciando');
     this.#initMenuNavigation();
+    this.#initTabSwitching();
     this.#initMockToggle();
     this.#initResetHomeButton();
     this.#initActionButtonListeners();
@@ -259,6 +260,63 @@ class HomeManager {
         }
       });
     }
+  }
+
+  /**
+   * Registra listeners para troca de abas dentro das seções
+   */
+  #initTabSwitching() {
+    Logger.debug('🏠 HomeManager: #initTabSwitching');
+    console.log('>>> #initTabSwitching INICIADO');
+
+    document.querySelectorAll('.tab-button').forEach((button) => {
+      button.addEventListener('click', (e) => {
+        try {
+          const tabId = e.currentTarget.dataset.tab;
+          console.log(`>>> Tab button clicado: ${tabId}`);
+
+          // Encontrar o container pai (tab-content ou config-tabs)
+          const tabButtons = e.currentTarget.closest('.tab-buttons');
+          if (!tabButtons) {
+            console.warn(`>>> Tab buttons container não encontrado para tab: ${tabId}`);
+            return;
+          }
+
+          const tabContent = tabButtons.closest('.config-tabs') || tabButtons.parentElement;
+          if (!tabContent) {
+            console.warn(`>>> Tab content não encontrado para tab: ${tabId}`);
+            return;
+          }
+
+          // Remover classe active de todos os botões neste container
+          tabContent.querySelectorAll('.tab-button').forEach((btn) => {
+            btn.classList.remove('active');
+          });
+
+          // Adicionar classe active ao botão clicado
+          e.currentTarget.classList.add('active');
+
+          // Ocultar todos os tab-pane neste container
+          tabContent.querySelectorAll('.tab-pane').forEach((pane) => {
+            pane.classList.remove('active');
+          });
+
+          // Mostrar tab-pane selecionado
+          const tabPane =
+            tabContent.querySelector(`#${tabId}`) || tabContent.querySelector(`[id="${tabId}"]`);
+          if (tabPane) {
+            tabPane.classList.add('active');
+            console.log(`>>> Tab pane ativado: ${tabId}`);
+          } else {
+            console.warn(`>>> Tab pane não encontrado: ${tabId}`);
+          }
+        } catch (error) {
+          console.error('>>> ERRO ao mudar tab:', error);
+        }
+      });
+    });
+
+    console.log('>>> #initTabSwitching COMPLETO');
   }
 }
 
