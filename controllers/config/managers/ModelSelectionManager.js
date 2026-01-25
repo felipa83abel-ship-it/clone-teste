@@ -132,9 +132,6 @@ class ModelSelectionManager {
         this.configManager.showSaveFeedback(`Modelo ${model} desativado`);
         this.updateModelStatusUI();
         this.configManager.saveConfig();
-
-        // Emite evento
-        this.eventBus.emit('MODEL_TOGGLED', { model, enabled: false });
         return;
       }
 
@@ -175,9 +172,6 @@ class ModelSelectionManager {
       if (model === 'openai') {
         await this.ipc.invoke('initialize-api-client', savedKey);
       }
-
-      // Emite evento
-      this.eventBus.emit('MODEL_TOGGLED', { model, enabled: true });
     } catch (error) {
       console.error(`❌ Erro ao alternar modelo ${model}:`, error);
       this.configManager.showError(`Erro ao alternar modelo: ${error.message}`);
