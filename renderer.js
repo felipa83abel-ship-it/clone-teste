@@ -919,4 +919,5 @@ if (typeof globalThis !== 'undefined') {
   globalThis.appState = appState; // 🎭 Exporta appState para audio-controller e outros
   globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock
   globalThis._ipc = ipcRenderer; // 🎭 Exporta ipcRenderer para ConfigManager e Managers
+  globalThis.Logger = Logger; // 🎭 Exporta Logger para classes carregadas via <script>
 }
