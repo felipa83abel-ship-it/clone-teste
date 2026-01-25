@@ -130,14 +130,16 @@ class ConfigManager {
       );
       await this.modelManager.initialize();
 
+      // Cria instância do ScreenConfigManager
+      this.screenManager = new ScreenConfigManager(this, _ipc, globalThis.eventBus);
+      await this.screenManager.initialize();
+
       // TODO: Criar instâncias dos outros managers
-      // this.screenManager = new ScreenConfigManager(this, _ipc, globalThis.eventBus)
       // this.privacyManager = new PrivacyConfigManager(this, _ipc, globalThis.eventBus)
       // this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus)
       // this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus)
 
       // TODO: Chamar initialize() em outros managers
-      // await this.screenManager.initialize()
       // await this.privacyManager.initialize()
       // await this.windowManager.initialize()
       // await this.homeManager.initialize()
