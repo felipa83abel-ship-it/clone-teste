@@ -159,16 +159,16 @@ EventBus         ModeManager │      │    │      │      │
   - [x] 2.2.4 - `reset()` - deleta todas as chaves ao resetar config
   - [x] 2.2.5 - Métodos privados `#initInputListeners()`, `#initVisibilityListeners()`
 
-- [ ] **2.3** Atualizar ConfigManager para usar ApiKeyManager
-  - [ ] 2.3.1 - `this.apiKeyManager = new ApiKeyManager(...)`
-  - [ ] 2.3.2 - Chamar `this.apiKeyManager.initialize()` no `initializeController()`
-  - [ ] 2.3.3 - Remover código de ApiKey do ConfigManager
+- [x] **2.3** Atualizar ConfigManager para usar ApiKeyManager
+  - [x] 2.3.1 - `this.apiKeyManager = new ApiKeyManager(...)`
+  - [x] 2.3.2 - Chamar `this.apiKeyManager.initialize()` no `initializeController()`
+  - [x] 2.3.3 - Remover código de ApiKey do ConfigManager
 
-- [ ] **2.4** Validação: ApiKeyManager funcional
-  - [ ] 2.4.1 - `npm start` com timeout e testar API key save/delete
-  - [ ] 2.4.2 - Verificar mascaramento, visibilidade, listeners
-  - [ ] 2.4.3 - `npm test` - executar sem erros
-  - [ ] 2.4.4 - Fazer commit: "refactor: extrair ApiKeyManager"
+- [x] **2.4** Validação: ApiKeyManager funcional
+  - [x] 2.4.1 - `npm start` com timeout e testar API key save/delete
+  - [x] 2.4.2 - Verificar mascaramento, visibilidade, listeners
+  - [x] 2.4.3 - `npm test` - executar sem erros
+  - [x] 2.4.4 - Fazer commit: "refactor: extrair ApiKeyManager"
 
 ---
 
