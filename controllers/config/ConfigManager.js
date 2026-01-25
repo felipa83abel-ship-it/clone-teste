@@ -121,17 +121,26 @@ class ConfigManager {
       );
       await this.audioManager.initialize();
 
+      // Cria instância do ModelSelectionManager
+      this.modelManager = new ModelSelectionManager(
+        this,
+        _ipc,
+        globalThis.eventBus,
+        this.apiKeyManager
+      );
+      await this.modelManager.initialize();
+
       // TODO: Criar instâncias dos outros managers
-      // this.modelManager = new ModelSelectionManager(this, _ipc, globalThis.eventBus, this.apiKeyManager)
       // this.screenManager = new ScreenConfigManager(this, _ipc, globalThis.eventBus)
       // this.privacyManager = new PrivacyConfigManager(this, _ipc, globalThis.eventBus)
       // this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus)
       // this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus)
 
       // TODO: Chamar initialize() em outros managers
-      // await this.modelManager.initialize()
       // await this.screenManager.initialize()
-      // ... etc
+      // await this.privacyManager.initialize()
+      // await this.windowManager.initialize()
+      // await this.homeManager.initialize()
 
       // TODO: Mover resto da lógica de inicialização
       console.log('✅ Todos os managers inicializados');
