@@ -11,6 +11,7 @@
 ### 1.1 Contexto de Isolamento (Context Isolation)
 
 **Status Atual:**
+
 ```javascript
 webPreferences: {
   contextIsolation: false,  // ⚠️ DESATIVADO
@@ -19,6 +20,7 @@ webPreferences: {
 ```
 
 **Análise:**
+
 - ❌ `contextIsolation: false` - Renderer tem acesso direto ao processo Node.js
 - ❌ `nodeIntegration: true` - Permite require() no renderer
 - ✅ Documentado como intencional (necessário para integração com módulos internos)
@@ -30,11 +32,13 @@ Migração para `contextBridge` é viável para **Fase 9 (Refinamentos)** como m
 ### 1.2 Proteção de Captura de Tela
 
 **Status Atual:**
+
 ```javascript
-mainWindow.setContentProtection(true);  // ✅ ATIVADO
+mainWindow.setContentProtection(true); // ✅ ATIVADO
 ```
 
 **Análise:**
+
 - ✅ Protege contra captura de tela externa (Windows/macOS)
 - ✅ Implementado corretamente
 - ✅ Funciona em conjunto com `skipTaskbar: true`
@@ -45,13 +49,13 @@ mainWindow.setContentProtection(true);  // ✅ ATIVADO
 
 **Configurações de Segurança:**
 
-| Configuração | Valor | Propósito |
-|---|---|---|
-| `transparent: true` | ✅ | Sem renderização desnecessária |
-| `skipTaskbar: true` | ✅ | Não aparece na barra de tarefas |
-| `alwaysOnTop: true` | ✅ | Necessário para overlay |
-| `frame: false` | ✅ | Sem bordas do sistema |
-| `paintWhenInitiallyHidden: false` | ✅ | Não renderiza antes de estar visível |
+| Configuração                      | Valor | Propósito                            |
+| --------------------------------- | ----- | ------------------------------------ |
+| `transparent: true`               | ✅    | Sem renderização desnecessária       |
+| `skipTaskbar: true`               | ✅    | Não aparece na barra de tarefas      |
+| `alwaysOnTop: true`               | ✅    | Necessário para overlay              |
+| `frame: false`                    | ✅    | Sem bordas do sistema                |
+| `paintWhenInitiallyHidden: false` | ✅    | Não renderiza antes de estar visível |
 
 **Análise:** Todas as configurações de discreção estão implementadas corretamente. ✅
 
@@ -86,6 +90,7 @@ mainWindow.setContentProtection(true);  // ✅ ATIVADO
 **Status:** ✅ PROTEGIDO
 
 **Proteções Implementadas:**
+
 - Renderer usa `innerHTML` em apenas 1 lugar (config-manager.js, para HTML renderizado)
 - Marked.js é usado para renderizar markdown (sanitização apropriada)
 - Entrada de usuário é escapada em event listeners
@@ -97,6 +102,7 @@ mainWindow.setContentProtection(true);  // ✅ ATIVADO
 **Status:** ✅ PROTEGIDO
 
 **Proteções Implementadas:**
+
 - Nenhum `eval()` no código
 - Nenhum `new Function()` no código
 - IPC handlers validam entrada antes de usar
@@ -109,12 +115,14 @@ mainWindow.setContentProtection(true);  // ✅ ATIVADO
 **Status:** ⚠️ MÉDIO RISCO
 
 **Análise:**
+
 - ✅ OpenAI API não executa código
 - ✅ Google Gemini API não executa código
 - ✅ Whisper API não executa código
 - ❌ Se um provider futuro permitir execução, seria risco
 
 **Recomendação:**
+
 - Nunca confiar em respostas de LLM como código executável
 - Sempre sanitizar respostas antes de usar em DOM
 - Adicionar validação de resposta de API se necessário no futuro
@@ -124,6 +132,7 @@ mainWindow.setContentProtection(true);  // ✅ ATIVADO
 **Status:** ✅ PROTEGIDO
 
 **Análise:**
+
 - Screenshots são salvos em `os.tmpdir()` (controlado pelo SO)
 - Nenhum path construído dinamicamente baseado em entrada de usuário
 - Arquivo de imagens usa nome aleatório
@@ -151,6 +160,7 @@ npm audit result:
 ```
 
 **Pacotes Críticos:**
+
 - ✅ electron@39.2.7 - Atualizado
 - ✅ openai@6.16.0 - Atualizado
 - ✅ @google/generative-ai@0.24.1 - Verificado
@@ -165,6 +175,7 @@ npm audit result:
 ### 4.1 SecureLogger Implementado ✅
 
 **Características:**
+
 - `SecureLogger.debug()` - Apenas em desenvolvimento
 - `SecureLogger.info()` - Sempre visível (sem dados sensíveis)
 - `SecureLogger.warn()` - Sempre visível
@@ -172,6 +183,7 @@ npm audit result:
 - `SecureLogger.maskSensitive()` - Máscara chaves API (8 primeiros chars visíveis)
 
 **Exemplo:**
+
 ```javascript
 // Em desenvolvimento:
 //   ℹ️ Inicializando cliente OpenAI com chave: sk-proj-abcdefgh...
@@ -185,12 +197,12 @@ npm audit result:
 
 ### 4.2 Dados Sensíveis Protegidos
 
-| Dado | Proteção |
-|---|---|
-| API Keys | ✅ Armazenadas em electron-store encriptado |
-| API Keys em logs | ✅ Mascaradas por SecureLogger |
-| Stack traces | ✅ Não mostrados em produção |
-| Respostas LLM | ⚠️ Armazenadas em memória (limpar após uso) |
+| Dado             | Proteção                                    |
+| ---------------- | ------------------------------------------- |
+| API Keys         | ✅ Armazenadas em electron-store encriptado |
+| API Keys em logs | ✅ Mascaradas por SecureLogger              |
+| Stack traces     | ✅ Não mostrados em produção                |
+| Respostas LLM    | ⚠️ Armazenadas em memória (limpar após uso) |
 
 **Recomendação:** Implementar limpeza de histórico após uso (Fase 9).
 
@@ -211,6 +223,7 @@ if (process.env.NODE_ENV === 'development') {
 ```
 
 **Como usar:**
+
 ```bash
 # Desenvolvimento
 NODE_ENV=development npm start
@@ -282,6 +295,7 @@ Antes de fazer release final:
 ### Por que contextIsolation = false?
 
 ✅ **Justificativa:**
+
 - Aplicação precisa de acesso direto a módulos Node.js
 - Apenas 1 janela renderer (não expõe surface de ataque grande)
 - Compensado com validações rigorosas em IPC handlers
@@ -290,6 +304,7 @@ Antes de fazer release final:
 ### Por que nodeIntegration = true?
 
 ✅ **Justificativa:**
+
 - Simplifica integração com módulos internos
 - Necessário para config-manager.js operar corretamente
 - Seguro pois o arquivo é próprio do app (não terceiros)
@@ -297,6 +312,7 @@ Antes de fazer release final:
 ### Por que sem preload script?
 
 ✅ **Justificativa:**
+
 - Lógica é simples e local
 - Preload script seria overhead desnecessário
 - Pode ser implementado se aplicação cresce
@@ -308,6 +324,7 @@ Antes de fazer release final:
 ### Status Geral: ✅ SEGURO PARA PRODUÇÃO
 
 **Pontos Fortes:**
+
 - ✅ Zero vulnerabilidades npm
 - ✅ Validação de entrada em todos os IPC handlers
 - ✅ Logging seguro (dados mascarados)
@@ -315,6 +332,7 @@ Antes de fazer release final:
 - ✅ Sem código potencialmente malicioso (eval, Function, etc)
 
 **Áreas de Melhoria:**
+
 - ⚠️ Migrar para contextBridge (Fase 9 - opcional)
 - ⚠️ Limpeza de histórico de LLM (Fase 9)
 - ⚠️ Adicionar política de privacidade (antes de produção)

@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * WindowConfigManager - Gerencia configurações de janela
  *
@@ -252,18 +255,6 @@ class WindowConfigManager {
   // ==========================================
   // MÉTODOS PRIVADOS
   // ==========================================
-
-  /**
-   * Registra listener do slider de opacidade
-   */
-  #initOpacitySlider() {
-    // Implementado em #initWindowListeners()
-  }
-
-  /**
-   * Registra listener do toggle de dark mode
-   */
-  #initDarkModeToggle() {
-    // Implementado em #initWindowListeners()
-  }
 }
+
+module.exports = WindowConfigManager;

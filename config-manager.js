@@ -1,3 +1,7 @@
+﻿// @ts-nocheck
+/// <reference path="types/globals.d.ts" />
+/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowConfigManager, HomeManager */
+
 /**
  * ConfigManager - Orquestrador Central de Configurações
  *

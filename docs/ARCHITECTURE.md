@@ -202,12 +202,12 @@ modeManager.handle('onAnswerRequest', questionId); // routing lógica
 
 ```javascript
 class WhisperSTT extends BaseSTT {
-	// Métodos principais:
-	// • initialize(model) - Inicializa cliente
-	// • startCapture(source, deviceId) - Abre stream de áudio
-	// • transcribe() - Converte áudio em texto
-	// • changeDevice(source, deviceId) - Troca entrada/saída
-	// • stop() - Cleanup
+  // Métodos principais:
+  // • initialize(model) - Inicializa cliente
+  // • startCapture(source, deviceId) - Abre stream de áudio
+  // • transcribe() - Converte áudio em texto
+  // • changeDevice(source, deviceId) - Troca entrada/saída
+  // • stop() - Cleanup
 }
 ```
 
@@ -240,15 +240,15 @@ class WhisperSTT extends BaseSTT {
 
 ```javascript
 class MyLLMHandler {
-	async initialize(apiKey) {
-		/* Cliente setup */
-	}
-	async complete(messages) {
-		/* Resposta completa (Promise<string>) */
-	}
-	async *stream(messages) {
-		/* Generator async para tokens */
-	}
+  async initialize(apiKey) {
+    /* Cliente setup */
+  }
+  async complete(messages) {
+    /* Resposta completa (Promise<string>) */
+  }
+  async *stream(messages) {
+    /* Generator async para tokens */
+  }
 }
 ```
 
@@ -328,8 +328,8 @@ const response = await llmManager.ask(messages);
 ```javascript
 // Inicialização em main.js
 const secureStore = new Store({
-	configName: 'secure-config',
-	encryptionKey: 'sua-chave-segura-aqui',
+  configName: 'secure-config',
+  encryptionKey: 'sua-chave-segura-aqui',
 });
 
 // Uso
@@ -411,19 +411,19 @@ const DEFAULT_LLM_PROVIDER = 'openai'; // ou 'gemini'
 
 ```json
 {
-	"devDependencies": {
-		"electron": "^39.2.7",
-		"electron-reload": "^2.0.0-alpha.1",
-		"cross-env": "^10.1.0"
-	},
-	"dependencies": {
-		"electron-store": "^11.0.2",
-		"openai": "^6.10.0",
-		"@google/generative-ai": "^0.x.x",
-		"marked": "^17.0.1",
-		"highlight.js": "^11.11.1",
-		"wav": "^1.0.2"
-	}
+  "devDependencies": {
+    "electron": "^39.2.7",
+    "electron-reload": "^2.0.0-alpha.1",
+    "cross-env": "^10.1.0"
+  },
+  "dependencies": {
+    "electron-store": "^11.0.2",
+    "openai": "^6.10.0",
+    "@google/generative-ai": "^0.x.x",
+    "marked": "^17.0.1",
+    "highlight.js": "^11.11.1",
+    "wav": "^1.0.2"
+  }
 }
 ```
 
@@ -438,7 +438,7 @@ const DEFAULT_LLM_PROVIDER = 'openai'; // ou 'gemini'
    ```javascript
    const Handler = require('./template-handler.js');
    class SeuProviderHandler extends Handler {
-   	// Implementar: initialize, complete, stream
+     // Implementar: initialize, complete, stream
    }
    module.exports = new SeuProviderHandler();
    ```
@@ -455,7 +455,7 @@ const DEFAULT_LLM_PROVIDER = 'openai'; // ou 'gemini'
    ```javascript
    let seuClient = null;
    function initializeSeuClient(apiKey) {
-   	/* setup */
+     /* setup */
    }
    // Atualizar handleSaveApiKey e handleDeleteApiKey
    ```

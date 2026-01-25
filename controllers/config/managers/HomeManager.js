@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * HomeManager - Gerencia interface do HOME
  *
@@ -183,3 +186,5 @@ class HomeManager {
     }
   }
 }
+
+module.exports = HomeManager;

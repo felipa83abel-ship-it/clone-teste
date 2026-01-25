@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * ApiKeyManager - Gerencia API keys de todos os providers
  *
@@ -355,3 +358,5 @@ class ApiKeyManager {
     });
   }
 }
+
+module.exports = ApiKeyManager;

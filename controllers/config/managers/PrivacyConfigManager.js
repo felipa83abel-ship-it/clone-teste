@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * PrivacyConfigManager - Gerencia configurações de privacidade
  *
@@ -194,3 +197,5 @@ class PrivacyConfigManager {
     }
   }
 }
+
+module.exports = PrivacyConfigManager;

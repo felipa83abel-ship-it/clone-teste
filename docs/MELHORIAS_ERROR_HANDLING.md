@@ -38,19 +38,20 @@ const wrappedFn = ErrorHandler.asyncHandler(asyncFn, 'functionName');
 
 ### 1.2 Tipos de Erro Suportados
 
-| Tipo | Quando | Mensagem ao Usuário |
-|---|---|---|
-| `VALIDATION_ERROR` | Entrada inválida | "Dados fornecidos inválidos..." |
-| `API_ERROR` | Erro de API | "Erro ao comunicar com a API..." |
-| `AUTH_ERROR` | Autenticação falhou | "Autenticação falhou..." |
-| `NETWORK_ERROR` | Sem conexão | "Erro de conexão..." |
-| `FILE_ERROR` | Arquivo não encontrado | "Erro ao acessar arquivo..." |
-| `CONFIG_ERROR` | Configuração inválida | "Erro de configuração..." |
-| `INTERNAL_ERROR` | Erro desconhecido | "Erro interno..." |
+| Tipo               | Quando                 | Mensagem ao Usuário              |
+| ------------------ | ---------------------- | -------------------------------- |
+| `VALIDATION_ERROR` | Entrada inválida       | "Dados fornecidos inválidos..."  |
+| `API_ERROR`        | Erro de API            | "Erro ao comunicar com a API..." |
+| `AUTH_ERROR`       | Autenticação falhou    | "Autenticação falhou..."         |
+| `NETWORK_ERROR`    | Sem conexão            | "Erro de conexão..."             |
+| `FILE_ERROR`       | Arquivo não encontrado | "Erro ao acessar arquivo..."     |
+| `CONFIG_ERROR`     | Configuração inválida  | "Erro de configuração..."        |
+| `INTERNAL_ERROR`   | Erro desconhecido      | "Erro interno..."                |
 
 ### 1.3 Exemplo de Uso em Handler IPC
 
 **Antes:**
+
 ```javascript
 async function handleSomeFunction(_, data) {
   try {
@@ -66,6 +67,7 @@ async function handleSomeFunction(_, data) {
 ```
 
 **Depois:**
+
 ```javascript
 async function handleSomeFunction(_, data) {
   try {
@@ -78,6 +80,7 @@ async function handleSomeFunction(_, data) {
 ```
 
 **Benefícios:**
+
 - ✅ Validação centralizada
 - ✅ Mensagens consistentes
 - ✅ Type checking automático
@@ -134,13 +137,13 @@ async function handleSomeFunction(_, data) {
 
 ### Melhorias
 
-| Aspecto | Antes | Depois |
-|---|---|---|
-| Mensagens de erro | Variadas, técnicas | Consistentes, amigáveis |
-| Logging | Espalhado | Centralizado |
-| Validação | Manual em cada handler | Automática |
-| Debug | Difícil | Fácil (contexto incluído) |
-| Produção | Stack traces vistos | Mensagens seguras |
+| Aspecto           | Antes                  | Depois                    |
+| ----------------- | ---------------------- | ------------------------- |
+| Mensagens de erro | Variadas, técnicas     | Consistentes, amigáveis   |
+| Logging           | Espalhado              | Centralizado              |
+| Validação         | Manual em cada handler | Automática                |
+| Debug             | Difícil                | Fácil (contexto incluído) |
+| Produção          | Stack traces vistos    | Mensagens seguras         |
 
 ### Métricas
 

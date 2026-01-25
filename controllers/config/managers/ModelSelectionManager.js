@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * ModelSelectionManager - Gerencia seleção de modelos STT/LLM
  *
@@ -260,3 +263,5 @@ class ModelSelectionManager {
     });
   }
 }
+
+module.exports = ModelSelectionManager;

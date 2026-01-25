@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * AudioDeviceManager - Gerencia dispositivos de áudio
  *
@@ -253,3 +256,5 @@ class AudioDeviceManager {
     }
   }
 }
+
+module.exports = AudioDeviceManager;

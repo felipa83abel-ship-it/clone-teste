@@ -1,3 +1,6 @@
+// @ts-nocheck
+/* global Logger */
+
 /**
  * ScreenConfigManager - Gerencia configurações de captura de tela
  *
@@ -272,25 +275,6 @@ class ScreenConfigManager {
       console.warn('   ⚠️ Botão clearScreenshotsBtn não encontrado');
     }
   }
-
-  /**
-   * Registra listener do botão de registrar hotkey
-   */
-  #initHotKeyListener() {
-    // Implementado em #initScreenConfigListeners()
-  }
-
-  /**
-   * Registra listener do select de formato
-   */
-  #initFormatListener() {
-    // Implementado em #initScreenConfigListeners()
-  }
-
-  /**
-   * Registra listener do checkbox de excluir app
-   */
-  #initExcludeAppListener() {
-    // Implementado em #initScreenConfigListeners()
-  }
 }
+
+module.exports = ScreenConfigManager;

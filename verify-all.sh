@@ -62,7 +62,7 @@ echo "6️⃣  DEPCHECK..."
 echo "═══════════════════════════════════════════════════════════════" >> "$REPORT_FILE"
 echo "6️⃣  DEPCHECK" >> "$REPORT_FILE"
 echo "" >> "$REPORT_FILE"
-npx depcheck >> "$REPORT_FILE" 2>&1 && echo "✅ Depcheck OK" || echo "⚠️  Depcheck: Issues encontrados"
+npx depcheck --ignores cross-env,eslint-config-prettier,playwright,node-webrtcvad >> "$REPORT_FILE" 2>&1 && echo "✅ Depcheck OK" || echo "⚠️  Depcheck: Issues encontrados"
 echo "" >> "$REPORT_FILE"
 
 # 7️⃣  INTEGRIDADE

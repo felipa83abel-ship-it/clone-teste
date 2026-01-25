@@ -7,6 +7,7 @@
 ## 🏠 Home - Transcrição e Perguntas/Respostas
 
 ### Transcrição de Áudio em Tempo Real
+
 - ✅ Captura de áudio via **microfone** (input)
 - ✅ Captura de áudio via **VoiceMeeter/speaker** (output - outros participantes)
 - ✅ Transcrição via **OpenAI Whisper** (modelo `whisper-1`)
@@ -19,6 +20,7 @@
 - ✅ Histórico de transcrições com timestamps
 
 **Exemplo de transcrição:**
+
 ```
 [14:23:15] Você: O que é POO em Java?
 [14:23:18] Outros: Como você implementaria herança múltipla?
@@ -26,6 +28,7 @@
 ```
 
 ### Sistema de Perguntas (Consolidação)
+
 - ✅ **Pergunta Atual** (destaque amarelo) - exibe pergunta sendo formada
 - ✅ **Histórico de Perguntas** (lista abaixo) - perguntas finalizadas
 - ✅ Detecção automática de perguntas (heurísticas):
@@ -40,6 +43,7 @@
 - ✅ Navegação por teclado (Ctrl+Shift+↑/↓) - planejado
 
 ### Sistema de Respostas GPT
+
 - ✅ **Modo Batch** (modo normal):
   - Envia pergunta completa ao GPT
   - Aguarda resposta completa
@@ -60,10 +64,12 @@
   - Blocos de código (` ```java `)
 
 **Exemplo de resposta GPT:**
-```markdown
+
+````markdown
 ### ✔️ Resposta
 
 POO (Programação Orientada a Objetos) é um paradigma baseado em 4 pilares:
+
 - **Encapsulamento**
 - **Herança**
 - **Polimorfismo**
@@ -72,12 +78,14 @@ POO (Programação Orientada a Objetos) é um paradigma baseado em 4 pilares:
 ```java
 public class Pessoa {
     private String nome;
-    
+
     public Pessoa(String nome) {
         this.nome = nome;
     }
 }
 ```
+````
+
 ```
 
 ### Controles de Áudio
@@ -137,12 +145,14 @@ public class Pessoa {
 
 **Exemplo de configuração:**
 ```
+
 Provider: OpenAI
 Status: Ativo ●
 Modelo STT: whisper-1
 Modelo GPT: gpt-4o-mini
 API Key: ••••••••••••••••••••••••
-```
+
+````
 
 ### Inicialização Automática
 - ✅ Ao abrir a aplicação:
@@ -339,9 +349,10 @@ Fundo principal: #f8fafccc (transparente)
 Fundo painel: #ffffffcc
 Texto: #111827
 Bordas: rgba(0, 0, 0, 0.15)
-```
+````
 
 ### Dark Theme
+
 ```css
 Fundo principal: #0f172acc (transparente)
 Fundo painel: #1e293bcc
@@ -350,6 +361,7 @@ Bordas: rgba(255, 255, 255, 0.18)
 ```
 
 ### Cores de Status
+
 - 🔵 Ativo: `#0d6efd`
 - 🟢 Sucesso: `#28a745`
 - 🔴 Erro: `#dc3545`
@@ -361,20 +373,24 @@ Bordas: rgba(255, 255, 255, 0.18)
 ## 🔄 Animações
 
 ### Fade In
+
 - Seções de configuração
 - Tab panels
 - Transição suave (0.3s ease)
 
 ### Slide In/Out
+
 - Save feedback (canto inferior direito)
 - Duração: 3 segundos
 
 ### Pulse
+
 - Botão de gravar atalho (quando ativo)
 - Mock badge (quando ativo)
 - Drag handle (quando arrastando)
 
 ### Hover Effects
+
 - Menu items (background + cor)
 - Botões (transform translateY -1px)
 - Inputs (border-color + box-shadow)
@@ -384,16 +400,19 @@ Bordas: rgba(255, 255, 255, 0.18)
 ## 📊 Métricas e Performance
 
 ### Transcrição
+
 - ⏱️ Latência típica: 300-800ms
 - ⏱️ Latência máxima aceitável: 2000ms
 - 📊 Taxa de acerto: 95%+ (Whisper)
 
 ### GPT Streaming
+
 - ⏱️ Primeiro token: 200-500ms
 - ⏱️ Tokens/segundo: 20-40
 - 📊 Respostas encurtadas: 2 sentenças
 
 ### Volume Monitoring
+
 - 🎯 FPS: 60 (requestAnimationFrame)
 - 🎯 Threshold input: 20
 - 🎯 Threshold output: 8
@@ -404,17 +423,20 @@ Bordas: rgba(255, 255, 255, 0.18)
 ## 🛡️ Segurança
 
 ### API Keys
+
 - ✅ Criptografadas em repouso (`electron-store`)
 - ✅ Nunca expostas em logs (apenas primeiros 8 caracteres)
 - ✅ Transmitidas apenas via IPC (não há requisições HTTP diretas)
 - ✅ Máscaras visuais (não copiáveis)
 
 ### Arquivos Temporários
+
 - ✅ Áudios `.webm` criados em `/temp-audio*.webm`
 - ✅ Deletados automaticamente após transcrição
 - ✅ Nunca persistidos em disco (exceto durante processamento)
 
 ### IPC (Inter-Process Communication)
+
 - ✅ Todas as operações sensíveis via `ipcRenderer.invoke` (async)
 - ✅ Validação de entrada no main process
 - ✅ Sem `nodeIntegration` exposta (apenas no renderer)
@@ -424,6 +446,7 @@ Bordas: rgba(255, 255, 255, 0.18)
 ## 🚀 Performance
 
 ### Otimizações
+
 - ✅ **Throttling** de volume updates (60fps)
 - ✅ **Debouncing** de transcrições parciais (120-180ms)
 - ✅ **Lazy loading** de configurações
@@ -431,6 +454,7 @@ Bordas: rgba(255, 255, 255, 0.18)
 - ✅ **Minimização de DOM updates** (via callbacks)
 
 ### Consumo de Recursos
+
 - 💾 RAM: 150-300MB (típico)
 - 💻 CPU: 5-15% (idle), 30-50% (transcrevendo)
 - 🔊 GPU: <5% (renderização overlay)
@@ -441,12 +465,12 @@ Bordas: rgba(255, 255, 255, 0.18)
 
 ```json
 {
-  "electron": "39.2.7",           // Framework
-  "openai": "6.10.0",             // SDK OpenAI
-  "electron-store": "11.0.2",     // Armazenamento seguro
-  "marked": "17.0.1",             // Markdown parser
-  "highlight.js": "11.11.1",      // Syntax highlighting
-  "wav": "1.0.2"                  // Manipulação de WAV (futuro)
+  "electron": "39.2.7", // Framework
+  "openai": "6.10.0", // SDK OpenAI
+  "electron-store": "11.0.2", // Armazenamento seguro
+  "marked": "17.0.1", // Markdown parser
+  "highlight.js": "11.11.1", // Syntax highlighting
+  "wav": "1.0.2" // Manipulação de WAV (futuro)
 }
 ```
 
@@ -455,6 +479,7 @@ Bordas: rgba(255, 255, 255, 0.18)
 ## 🎯 Casos de Uso
 
 ### Entrevista Técnica (Remota)
+
 1. Candidato inicia aplicação
 2. Seleciona microfone + VoiceMeeter (captura entrevistador)
 3. Ativa modo "Entrevista"
@@ -464,12 +489,14 @@ Bordas: rgba(255, 255, 255, 0.18)
 7. Candidato lê respostas em overlay transparente
 
 ### Revisão de Código (Pair Programming)
+
 1. Developer abre aplicação em modo "Normal"
 2. Pergunta manualmente: "Como implementar singleton thread-safe?"
 3. GPT responde com código + explicação
 4. Developer copia código e continua trabalhando
 
 ### Preparação para Entrevista (Solo)
+
 1. Candidato ativa modo "Mock"
 2. Sistema gera perguntas simuladas automaticamente
 3. GPT responde cada pergunta
