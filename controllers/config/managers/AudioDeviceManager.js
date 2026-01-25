@@ -172,7 +172,7 @@ class AudioDeviceManager {
     Logger.debug(`Início da função: "startMonitoring" - ${type}`);
     const select = document.getElementById(`audio-${type}-device`);
 
-    if (!select || !select.value) {
+    if (!select?.value) {
       console.log(`ℹ️ ${type}: nenhum dispositivo selecionado (DESATIVADO)`);
       return;
     }

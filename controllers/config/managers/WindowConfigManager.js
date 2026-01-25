@@ -127,7 +127,7 @@ class WindowConfigManager {
    */
   applyOpacity(opacity) {
     console.log(`🎨 Aplicando opacidade: ${opacity}`);
-    const opacityValue = parseFloat(opacity);
+    const opacityValue = Number.parseFloat(opacity);
 
     // Aplicar CSS na janela
     if (globalThis.RendererAPI?.setWindowOpacity) {
@@ -242,7 +242,7 @@ class WindowConfigManager {
    * Inicializa click-through controller
    */
   async initClickThroughController() {
-    // TODO: Implementar se necessário
+    // Implementado via IPC no main.js (SET_CLICK_THROUGH event)
   }
 
   /**

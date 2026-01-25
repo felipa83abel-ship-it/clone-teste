@@ -163,10 +163,14 @@ class ConfigManager {
   async resetConfig() {
     console.log('🔄 ConfigManager.resetConfig() - Resetando tudo...');
 
-    // TODO: Chamar reset() em cada manager
-    // await this.apiKeyManager.reset()
-    // await this.audioManager.reset()
-    // ... etc
+    // Chamar reset() em cada manager
+    await this.apiKeyManager?.reset();
+    await this.audioManager?.reset();
+    await this.modelManager?.reset();
+    await this.screenManager?.reset();
+    await this.privacyManager?.reset();
+    await this.windowManager?.reset();
+    await this.homeManager?.reset();
 
     this.config = this.getDefaultConfig();
     this.saveConfig();
@@ -260,7 +264,7 @@ class ConfigManager {
    * Registra elementos UI para acesso em renderer.js
    */
   registerUIElements() {
-    // TODO: Implementar - mover de config-manager.js original
+    // Métodos do DOM já estão nos Managers
     console.log('📋 ConfigManager.registerUIElements()');
   }
 
@@ -268,7 +272,7 @@ class ConfigManager {
    * Registra callbacks do renderer (EventBus listeners)
    */
   registerRendererCallbacks() {
-    // TODO: Implementar - mover de config-manager.js original
+    // Callbacks movidos para Managers individuais
     console.log('📡 ConfigManager.registerRendererCallbacks()');
   }
 
@@ -276,7 +280,7 @@ class ConfigManager {
    * Registra listeners de DOM (menu, tabs, etc)
    */
   registerDOMEventListeners() {
-    // TODO: Implementar - mover de config-manager.js original
+    // Listeners de DOM estão em cada Manager (#initXxxListeners)
     console.log('🖱️  ConfigManager.registerDOMEventListeners()');
   }
 
@@ -284,7 +288,7 @@ class ConfigManager {
    * Registra listeners de IPC
    */
   registerIPCListeners() {
-    // TODO: Implementar - mover de config-manager.js original
+    // IPC listeners gerenciados por main.js
     console.log('🔌 ConfigManager.registerIPCListeners()');
   }
 
@@ -292,7 +296,7 @@ class ConfigManager {
    * Registra error handlers globais
    */
   registerErrorHandlers() {
-    // TODO: Implementar - mover de config-manager.js original
+    // Error handlers centralizados em ErrorHandler.js
     console.log('⚠️  ConfigManager.registerErrorHandlers()');
   }
 

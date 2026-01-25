@@ -128,7 +128,7 @@ class PrivacyConfigManager {
     } else if (field === 'auto-clear-data') {
       this.configManager.config.privacy.autoClearData = value;
     } else if (field === 'data-retention-days') {
-      this.configManager.config.privacy.dataRetentionDays = parseInt(value);
+      this.configManager.config.privacy.dataRetentionDays = Number.parseInt(value);
     }
 
     this.configManager.saveConfig();

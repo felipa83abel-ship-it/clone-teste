@@ -49,7 +49,7 @@ class ModelSelectionManager {
    */
   async restoreState() {
     console.log('📂 ModelSelectionManager.restoreState()');
-    await this.restoreSTTLLMModels();
+    this.restoreSTTLLMModels();
     this.updateModelStatusUI();
   }
 
