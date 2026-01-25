@@ -144,20 +144,20 @@ EventBus         ModeManager │      │    │      │      │
 
 **Responsabilidades**: Tudo relacionado a API keys
 
-- [ ] **2.1** Mover código do config-manager.js para ApiKeyManager.js
-  - [ ] 2.1.1 - `saveApiKey(provider, apiKey)`
-  - [ ] 2.1.2 - `deleteApiKey(provider)`
-  - [ ] 2.1.3 - `checkApiKeysStatus()`
-  - [ ] 2.1.4 - `updateApiKeyFieldStatus(provider, hasKey)`
-  - [ ] 2.1.5 - Listeners de API key input (focus, blur, input, copy, cut)
-  - [ ] 2.1.6 - Listeners de visibilidade toggle
+- [x] **2.1** Mover código do config-manager.js para ApiKeyManager.js
+  - [x] 2.1.1 - `saveApiKey(provider, apiKey)`
+  - [x] 2.1.2 - `deleteApiKey(provider)`
+  - [x] 2.1.3 - `checkApiKeysStatus()`
+  - [x] 2.1.4 - `updateApiKeyFieldStatus(provider, hasKey)`
+  - [x] 2.1.5 - Listeners de API key input (focus, blur, input, copy, cut)
+  - [x] 2.1.6 - Listeners de visibilidade toggle
 
-- [ ] **2.2** Implementar métodos do Manager
-  - [ ] 2.2.1 - `constructor(configManager, ipc, eventBus)`
-  - [ ] 2.2.2 - `initialize()` - registra listeners
-  - [ ] 2.2.3 - `restoreState()` - restaura status de chaves salvas
-  - [ ] 2.2.4 - `reset()` - deleta todas as chaves ao resetar config
-  - [ ] 2.2.5 - Métodos privados `#initInputListeners()`, `#initVisibilityListeners()`
+- [x] **2.2** Implementar métodos do Manager
+  - [x] 2.2.1 - `constructor(configManager, ipc, eventBus)`
+  - [x] 2.2.2 - `initialize()` - registra listeners
+  - [x] 2.2.3 - `restoreState()` - restaura status de chaves salvas
+  - [x] 2.2.4 - `reset()` - deleta todas as chaves ao resetar config
+  - [x] 2.2.5 - Métodos privados `#initInputListeners()`, `#initVisibilityListeners()`
 
 - [ ] **2.3** Atualizar ConfigManager para usar ApiKeyManager
   - [ ] 2.3.1 - `this.apiKeyManager = new ApiKeyManager(...)`
