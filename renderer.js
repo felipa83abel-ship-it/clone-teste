@@ -149,10 +149,20 @@ eventBus.on('error', (error) => {
 
 // 🔥 NOVO: Listener para atualizar botão de listen
 eventBus.on('listenButtonToggle', ({ isRunning, buttonText }) => {
-  const listenBtn = document.getElementById('listen-btn');
+  const listenBtn = document.getElementById('listenBtn');
   if (listenBtn) {
     listenBtn.textContent = buttonText;
     listenBtn.classList.toggle('listening', isRunning);
+    console.log(`🎤 Botão atualizado: "${buttonText}" (listening: ${isRunning})`);
+  } else {
+    console.warn('⚠️ Elemento listenBtn não encontrado no DOM');
+  }
+
+  // 🔥 NOVO: Aplica efeito visual no home quando começa/para de ouvir
+  const homeVuMeters = document.querySelector('.home-vu-meters');
+  if (homeVuMeters) {
+    homeVuMeters.classList.toggle('listening', isRunning);
+    console.log(`🎨 .home-vu-meters atualizado (listening: ${isRunning})`);
   }
 });
 
@@ -170,10 +180,12 @@ eventBus.on('updateInterim', ({ id, speaker, text }) => {
 // 🔥 NOVO: Listener para atualizar mensagem de status
 eventBus.on('statusUpdate', ({ message }) => {
   // Atualiza a UI diretamente, sem chamar updateStatusMessage (que emitiria novamente)
-  const statusDiv =
-    document.getElementById('status-message') || document.querySelector('[data-status-message]');
-  if (statusDiv) {
-    statusDiv.textContent = message || '';
+  const statusSpan = document.getElementById('status');
+  if (statusSpan) {
+    statusSpan.textContent = message || '';
+    console.log(`📊 Status atualizado: "${message}"`);
+  } else {
+    console.warn('⚠️ Elemento #status não encontrado no DOM');
   }
 });
 
@@ -206,6 +218,23 @@ eventBus.on('clearInterim', ({ id }) => {
   const element = document.getElementById(id);
   if (element) {
     element.textContent = '';
+  }
+});
+
+// 🔥 NOVO: Listener para limpar seleções de perguntas
+eventBus.on('clearAllSelections', () => {
+  const currentQuestionBox = document.getElementById('currentQuestion');
+  if (currentQuestionBox) {
+    currentQuestionBox.classList.remove('selected-question');
+    console.log('🗑️ Seleção de pergunta atual removida');
+  }
+
+  const questionsHistoryBox = document.getElementById('questionsHistory');
+  if (questionsHistoryBox) {
+    questionsHistoryBox.querySelectorAll('.selected-question').forEach((el) => {
+      el.classList.remove('selected-question');
+    });
+    console.log('🗑️ Seleções do histórico de perguntas removidas');
   }
 });
 

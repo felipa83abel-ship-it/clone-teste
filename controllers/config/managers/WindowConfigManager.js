@@ -27,14 +27,14 @@ class WindowConfigManager {
     this.ipc = ipc;
     this.eventBus = eventBus;
 
-    console.log('🪟 WindowConfigManager criado');
+    Logger.debug('🪟 WindowConfigManager criado', false);
   }
 
   /**
    * Inicializa listeners e restaura estado
    */
   async initialize() {
-    console.log('🚀 WindowConfigManager.initialize()');
+    Logger.debug('🚀 WindowConfigManager.initialize()', false);
     await this.restoreState();
     this.#initWindowListeners();
     await this.initClickThroughController();
@@ -45,7 +45,7 @@ class WindowConfigManager {
    */
   async restoreState() {
     Logger.debug('Início da função: "restoreState"');
-    console.log('📂 WindowConfigManager.restoreState()');
+    Logger.debug('📂 WindowConfigManager.restoreState()', false);
     this.restoreUserPreferences();
   }
 
@@ -53,7 +53,7 @@ class WindowConfigManager {
    * Reseta configurações padrão
    */
   async reset() {
-    console.log('🔄 WindowConfigManager.reset()');
+    Logger.debug('🔄 WindowConfigManager.reset()', false);
     this.configManager.config.other.darkMode = true;
     this.configManager.config.other.interviewMode = 'INTERVIEW';
     this.configManager.config.other.overlayOpacity = 0.75;
@@ -70,7 +70,7 @@ class WindowConfigManager {
    */
   restoreUserPreferences() {
     Logger.debug('Início da função: "restoreUserPreferences"');
-    console.log('🔄 RESTAURANDO PREFERÊNCIAS DA JANELA...');
+    Logger.debug('🔄 RESTAURANDO PREFERÊNCIAS DA JANELA...', false);
 
     // 1️⃣ Restaurar Dark Mode
     const darkModeToggle = document.getElementById('darkModeToggle');
@@ -82,9 +82,12 @@ class WindowConfigManager {
       } else {
         document.body.classList.remove('dark');
       }
-      console.log(`   ✅ Dark Mode restaurado: ${savedDarkMode ? 'ATIVADO' : 'DESATIVADO'}`);
+      Logger.debug(
+        `   ✅ Dark Mode restaurado: ${savedDarkMode ? 'ATIVADO' : 'DESATIVADO'}`,
+        false
+      );
     } else {
-      console.warn('   ⚠️ darkModeToggle não encontrado no DOM');
+      Logger.debug('   ⚠️ darkModeToggle não encontrado no DOM', false);
     }
 
     // 2️⃣ Restaurar Interview Mode
@@ -92,9 +95,9 @@ class WindowConfigManager {
     const savedInterviewMode = this.configManager.config.other?.interviewMode ?? 'INTERVIEW';
     if (interviewModeSelect) {
       interviewModeSelect.value = savedInterviewMode;
-      console.log(`   ✅ Interview Mode restaurado: ${savedInterviewMode}`);
+      Logger.debug(`   ✅ Interview Mode restaurado: ${savedInterviewMode}`, false);
     } else {
-      console.warn('   ⚠️ interviewModeSelect não encontrado no DOM');
+      Logger.debug('   ⚠️ interviewModeSelect não encontrado no DOM', false);
     }
 
     // 3️⃣ Restaurar Opacity
@@ -103,21 +106,21 @@ class WindowConfigManager {
     if (opacityRange) {
       opacityRange.value = savedOpacity;
       this.applyOpacity(savedOpacity);
-      console.log(`   ✅ Opacidade restaurada: ${savedOpacity}`);
+      Logger.debug(`   ✅ Opacidade restaurada: ${savedOpacity}`, false);
     } else {
-      console.warn('   ⚠️ opacityRange não encontrado no DOM');
+      Logger.debug('   ⚠️ opacityRange não encontrado no DOM', false);
     }
 
     // 4️⃣ Inicializar drag handle
     const dragHandle = document.getElementById('dragHandle');
     if (dragHandle) {
       this.initDragHandle(dragHandle);
-      console.log(`   ✅ Drag handle inicializado`);
+      Logger.debug(`   ✅ Drag handle inicializado`, false);
     } else {
-      console.warn('   ⚠️ dragHandle não encontrado no DOM');
+      Logger.debug('   ⚠️ dragHandle não encontrado no DOM', false);
     }
 
-    console.log('✅ Preferências restauradas');
+    Logger.debug('✅ Preferências restauradas', false);
     Logger.debug('Fim da função: "restoreUserPreferences"');
   }
 
@@ -126,13 +129,13 @@ class WindowConfigManager {
    * @param {number} opacity - Valor de 0 a 1
    */
   applyOpacity(opacity) {
-    console.log(`🎨 Aplicando opacidade: ${opacity}`);
+    Logger.debug(`🎨 Aplicando opacidade: ${opacity}`, false);
     const opacityValue = Number.parseFloat(opacity);
 
     // Aplicar CSS na janela
     if (globalThis.RendererAPI?.setWindowOpacity) {
       globalThis.RendererAPI.setWindowOpacity(opacityValue).catch((err) => {
-        console.error('❌ Erro ao definir opacidade:', err);
+        Logger.debug(`❌ Erro ao definir opacidade: ${err}`, false);
       });
     }
 
@@ -144,7 +147,7 @@ class WindowConfigManager {
    * @param {HTMLElement} dragHandle - Elemento para arrastar
    */
   initDragHandle(dragHandle) {
-    console.log('🖱️ Inicializando drag handle...');
+    Logger.debug('🖱️ Inicializando drag handle...', false);
 
     dragHandle.addEventListener('mousedown', async (e) => {
       // Evita comportamento padrão e propagação
@@ -152,7 +155,7 @@ class WindowConfigManager {
       e.stopPropagation();
 
       if (!globalThis.RendererAPI?.startWindowDrag) {
-        console.warn('⚠️ RendererAPI.startWindowDrag não disponível');
+        Logger.debug('⚠️ RendererAPI.startWindowDrag não disponível', false);
         return;
       }
 
@@ -190,21 +193,21 @@ class WindowConfigManager {
           dragHandle.classList.remove('drag-active');
           document.removeEventListener('mousemove', onMouseMove);
           document.removeEventListener('mouseup', onMouseUp);
-          console.log('🪟 Drag finalizado');
+          Logger.debug('🪟 Drag finalizado', false);
         };
 
         // Registra listeners no document para capturar movimento fora do handle
         document.addEventListener('mousemove', onMouseMove);
         document.addEventListener('mouseup', onMouseUp);
 
-        console.log('🪟 Drag iniciado');
+        Logger.debug('🪟 Drag iniciado', false);
       } catch (err) {
-        console.error('❌ Erro durante o arraste da janela:', err);
+        Logger.debug(`❌ Erro durante o arraste da janela: ${err}`, false);
         dragHandle.classList.remove('drag-active');
       }
     });
 
-    console.log('✅ Drag handle inicializado');
+    Logger.debug('✅ Drag handle inicializado', false);
   }
 
   /**
@@ -214,7 +217,7 @@ class WindowConfigManager {
    */
   saveWindowField(field, value) {
     Logger.debug('Início da função: "saveWindowField"');
-    console.log(`💾 Salvando ${field}: ${value}`);
+    Logger.debug(`💾 Salvando ${field}: ${value}`, false);
 
     if (field === 'darkModeToggle') {
       this.configManager.config.other.darkMode = value;
@@ -234,7 +237,7 @@ class WindowConfigManager {
     const showFeedback = field !== 'opacityRange';
     this.configManager.saveConfig(showFeedback);
 
-    console.log(`   ✅ Campo ${field} salvo`);
+    Logger.debug(`   ✅ Campo ${field} salvo`, false);
     Logger.debug('Fim da função: "saveWindowField"');
   }
 
@@ -246,18 +249,18 @@ class WindowConfigManager {
    * Registra listeners em elementos de janela
    */
   #initWindowListeners() {
-    console.log('🎯 WindowConfigManager.#initWindowListeners()');
+    Logger.debug('🎯 WindowConfigManager.#initWindowListeners()', false);
 
     // Listener para dark mode toggle
     const darkModeToggle = document.getElementById('darkModeToggle');
     if (darkModeToggle) {
       darkModeToggle.addEventListener('change', (e) => {
         this.saveWindowField('darkModeToggle', e.target.checked);
-        console.log(`   📝 Dark Mode: ${e.target.checked ? 'Ativado' : 'Desativado'}`);
+        Logger.debug(`   📝 Dark Mode: ${e.target.checked ? 'Ativado' : 'Desativado'}`, false);
       });
-      console.log('   ✅ Listener para darkModeToggle registrado');
+      Logger.debug('   ✅ Listener para darkModeToggle registrado', false);
     } else {
-      console.warn('   ⚠️ darkModeToggle não encontrado');
+      Logger.debug('   ⚠️ darkModeToggle não encontrado', false);
     }
 
     // Listener para interview mode select
@@ -265,11 +268,11 @@ class WindowConfigManager {
     if (interviewModeSelect) {
       interviewModeSelect.addEventListener('change', (e) => {
         this.saveWindowField('interviewModeSelect', e.target.value);
-        console.log(`   📝 Interview Mode alterado: ${e.target.value}`);
+        Logger.debug(`   📝 Interview Mode alterado: ${e.target.value}`, false);
       });
-      console.log('   ✅ Listener para interviewModeSelect registrado');
+      Logger.debug('   ✅ Listener para interviewModeSelect registrado', false);
     } else {
-      console.warn('   ⚠️ interviewModeSelect não encontrado');
+      Logger.debug('   ⚠️ interviewModeSelect não encontrado', false);
     }
 
     // Listener para opacity range
@@ -278,16 +281,16 @@ class WindowConfigManager {
       // Usar 'input' para feedback visual em tempo real
       opacityRange.addEventListener('input', (e) => {
         this.applyOpacity(e.target.value);
-        console.log(`   📝 Opacidade visual alterada: ${e.target.value}`);
+        Logger.debug(`   📝 Opacidade visual alterada: ${e.target.value}`, false);
       });
       // Usar 'change' para salvar apenas no final (mouse up)
       opacityRange.addEventListener('change', (e) => {
         this.saveWindowField('opacityRange', e.target.value);
-        console.log(`   💾 Opacidade salva: ${e.target.value}`);
+        Logger.debug(`   💾 Opacidade salva: ${e.target.value}`, false);
       });
-      console.log('   ✅ Listener para opacityRange registrado');
+      Logger.debug('   ✅ Listener para opacityRange registrado', false);
     } else {
-      console.warn('   ⚠️ opacityRange não encontrado');
+      Logger.debug('   ⚠️ opacityRange não encontrado', false);
     }
   }
 
@@ -295,42 +298,44 @@ class WindowConfigManager {
    * Inicializa click-through controller
    */
   async initClickThroughController() {
-    console.log('🖱️ Inicializando click-through controller...');
+    Logger.debug('🖱️ Inicializando click-through controller...', false);
 
     const btnToggleClick = document.getElementById('btnToggleClick');
 
     if (!btnToggleClick) {
-      console.warn('   ⚠️ btnToggleClick não encontrado no DOM');
+      Logger.debug('   ⚠️ btnToggleClick não encontrado no DOM', false);
       return;
     }
 
     try {
       // ✅ SINCRONIZAR: Buscar estado ATUAL de main.js
       const currentClickThroughState = await this.ipc.invoke('GET_CLICK_THROUGH');
-      console.log(`   📡 Estado do click-through em main: ${currentClickThroughState}`);
+      Logger.debug(`   📡 Estado do click-through em main: ${currentClickThroughState}`, false);
 
       // ✅ RESTAURAR DECISÃO ANTERIOR DO USUÁRIO
       // Se o usuário fechou com click-through ativo, inicia ativo
       const savedClickThroughState = this.configManager.config.other?.clickThroughEnabled ?? false;
-      console.log(`   💾 Estado salvo em localStorage: ${savedClickThroughState}`);
+      Logger.debug(`   💾 Estado salvo em localStorage: ${savedClickThroughState}`, false);
 
       if (savedClickThroughState && !currentClickThroughState) {
         // User deixou ativado, mas main está desativado - sincronizar ativando
-        console.log('🔄 Restaurando click-through para estado anterior (ATIVADO)');
+        Logger.debug('🔄 Restaurando click-through para estado anterior (ATIVADO)', false);
         this.ipc.send('SET_CLICK_THROUGH', true);
       }
 
       // ✅ Usar estado sincronizado como referência
       let localClickThroughState = savedClickThroughState;
-      console.log(
-        `   ✅ Click-through iniciará como: ${localClickThroughState ? 'ATIVADO' : 'DESATIVADO'}`
+      Logger.debug(
+        `   ✅ Click-through iniciará como: ${localClickThroughState ? 'ATIVADO' : 'DESATIVADO'}`,
+        false
       );
 
       // ✅ ATUALIZAR VISUAL DO BOTÃO COM ESTADO RESTAURADO
       if (globalThis.RendererAPI?.updateClickThroughButton) {
         globalThis.RendererAPI.updateClickThroughButton(localClickThroughState, btnToggleClick);
-        console.log(
-          `   🎨 Visual do botão atualizado: opacity=${localClickThroughState ? '0.5' : '1'}`
+        Logger.debug(
+          `   🎨 Visual do botão atualizado: opacity=${localClickThroughState ? '0.5' : '1'}`,
+          false
         );
       }
 
@@ -339,7 +344,10 @@ class WindowConfigManager {
         try {
           // Toggle local
           localClickThroughState = !localClickThroughState;
-          console.log(`🖱️ Click-through: ${localClickThroughState ? 'ATIVANDO' : 'DESATIVANDO'}`);
+          Logger.debug(
+            `🖱️ Click-through: ${localClickThroughState ? 'ATIVANDO' : 'DESATIVANDO'}`,
+            false
+          );
 
           // Enviar para main via IPC (one-way)
           this.ipc.send('SET_CLICK_THROUGH', localClickThroughState);
@@ -353,9 +361,12 @@ class WindowConfigManager {
           this.configManager.config.other.clickThroughEnabled = localClickThroughState;
           this.configManager.saveConfig(false);
 
-          console.log(`   ✅ Click-through ${localClickThroughState ? 'ATIVADO' : 'DESATIVADO'}`);
+          Logger.debug(
+            `   ✅ Click-through ${localClickThroughState ? 'ATIVADO' : 'DESATIVADO'}`,
+            false
+          );
         } catch (error) {
-          console.error('❌ Erro ao toggle click-through:', error);
+          Logger.debug(`❌ Erro ao toggle click-through: ${error}`, false);
           // Reverter estado local em caso de erro
           localClickThroughState = !localClickThroughState;
         }
@@ -364,14 +375,14 @@ class WindowConfigManager {
       // ✅ ZONA INTERATIVA: Quando click-through está ativado, permitir cliques no botão
       btnToggleClick.addEventListener('mouseenter', () => {
         if (localClickThroughState) {
-          console.log('🖱️ Zona interativa ATIVADA (mouse sobre botão)');
+          Logger.debug('🖱️ Zona interativa ATIVADA (mouse sobre botão)', false);
           this.ipc.send('SET_INTERACTIVE_ZONE', true);
         }
       });
 
       btnToggleClick.addEventListener('mouseleave', () => {
         if (localClickThroughState) {
-          console.log('🖱️ Zona interativa DESATIVADA (mouse saiu do botão)');
+          Logger.debug('🖱️ Zona interativa DESATIVADA (mouse saiu do botão)', false);
           this.ipc.send('SET_INTERACTIVE_ZONE', false);
         }
       });
@@ -379,25 +390,25 @@ class WindowConfigManager {
       // ✅ ZONAS INTERATIVAS GLOBAIS: Monitorar TODOS os elementos com classe .interactive-zone
       // Nota: SET_INTERACTIVE_ZONE é sempre enviado, mas main.js só aplica se clickThroughEnabled=true
       const interactiveZones = document.querySelectorAll('.interactive-zone');
-      console.log(`🖱️ ${interactiveZones.length} zonas interativas encontradas`);
+      Logger.debug(`🖱️ ${interactiveZones.length} zonas interativas encontradas`, false);
 
       interactiveZones.forEach((zone) => {
         zone.addEventListener('mouseenter', () => {
           // Ativa zona interativa quando mouse entra (permite cliques se click-through ativo)
           this.ipc.send('SET_INTERACTIVE_ZONE', true);
-          console.log(`🖱️ Zona interativa ATIVADA: ${zone.id || zone.className}`);
+          Logger.debug(`🖱️ Zona interativa ATIVADA: ${zone.id || zone.className}`, false);
         });
 
         zone.addEventListener('mouseleave', () => {
           // Desativa zona interativa quando mouse sai (cliques passam através se CT ativo)
           this.ipc.send('SET_INTERACTIVE_ZONE', false);
-          console.log(`🖱️ Zona interativa DESATIVADA: ${zone.id || zone.className}`);
+          Logger.debug(`🖱️ Zona interativa DESATIVADA: ${zone.id || zone.className}`, false);
         });
       });
 
-      console.log('   ✅ Click-through controller inicializado');
+      Logger.debug('   ✅ Click-through controller inicializado', false);
     } catch (error) {
-      console.error('❌ Erro ao inicializar click-through:', error);
+      Logger.debug(`❌ Erro ao inicializar click-through: ${error}`, false);
     }
   }
 

@@ -1065,45 +1065,81 @@ function createWindow() {
  * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)
  */
 function registerGlobalShortcuts() {
-  // 🛠️ DevTools em desenvolvimento
-  if (!app.isPackaged) {
-    globalShortcut.register('Control+Shift+I', () => {
-      mainWindow.webContents.toggleDevTools();
-      console.log('🛠️ DevTools acionado via Ctrl+Shift+I');
-    });
+  if (!mainWindow) {
+    console.error('❌ mainWindow não está definida ao registrar atalhos');
+    return;
   }
 
-  // Começar/parar de ouvir (Ctrl+D)
-  globalShortcut.register('Control+D', () => {
-    mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
-  });
+  try {
+    // 🛠️ DevTools em desenvolvimento
+    if (!app.isPackaged) {
+      const devToolsRegistered = globalShortcut.register('Control+Shift+I', () => {
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.toggleDevTools();
+          console.log('🛠️ DevTools acionado via Ctrl+Shift+I');
+        }
+      });
+      console.log(`${devToolsRegistered ? '✅' : '❌'} Ctrl+Shift+I registrado`);
+    }
 
-  // Enviar pergunta ao LLM (Ctrl+Enter)
-  globalShortcut.register('Control+Enter', () => {
-    mainWindow.webContents.send('CMD_ASK_LLM');
-  });
+    // Começar/parar de ouvir (Ctrl+D)
+    const toggleAudioRegistered = globalShortcut.register('Control+D', () => {
+      if (mainWindow && mainWindow.webContents) {
+        console.log('🎤 Atalho Ctrl+D acionado - enviando CMD_TOGGLE_AUDIO');
+        mainWindow.webContents.send('CMD_TOGGLE_AUDIO');
+      }
+    });
+    console.log(`${toggleAudioRegistered ? '✅' : '❌'} Ctrl+D registrado`);
 
-  // Navegação de histórico de perguntas (Ctrl+Shift+ArrowUp)
-  globalShortcut.register('Control+Shift+Up', () => {
-    mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'up');
-  });
+    // Enviar pergunta ao LLM (Ctrl+Enter)
+    const askLLMRegistered = globalShortcut.register('Control+Enter', () => {
+      if (mainWindow && mainWindow.webContents) {
+        console.log('💡 Atalho Ctrl+Enter acionado - enviando CMD_ASK_LLM');
+        mainWindow.webContents.send('CMD_ASK_LLM');
+      }
+    });
+    console.log(`${askLLMRegistered ? '✅' : '❌'} Ctrl+Enter registrado`);
 
-  // Navegação de histórico de perguntas (Ctrl+Shift+ArrowDown)
-  globalShortcut.register('Control+Shift+Down', () => {
-    mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'down');
-  });
+    // Navegação de histórico de perguntas (Ctrl+Shift+ArrowUp)
+    const navUpRegistered = globalShortcut.register('Control+Shift+Up', () => {
+      if (mainWindow && mainWindow.webContents) {
+        console.log('⬆️ Atalho Ctrl+Shift+Up acionado');
+        mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'up');
+      }
+    });
+    console.log(`${navUpRegistered ? '✅' : '❌'} Ctrl+Shift+Up registrado`);
 
-  // 📸 Capturar screenshot (Ctrl+Shift+F)
-  globalShortcut.register('Control+Shift+F', () => {
-    mainWindow.webContents.send('CMD_CAPTURE_SCREENSHOT');
-  });
+    // Navegação de histórico de perguntas (Ctrl+Shift+ArrowDown)
+    const navDownRegistered = globalShortcut.register('Control+Shift+Down', () => {
+      if (mainWindow && mainWindow.webContents) {
+        console.log('⬇️ Atalho Ctrl+Shift+Down acionado');
+        mainWindow.webContents.send('CMD_NAVIGATE_QUESTIONS', 'down');
+      }
+    });
+    console.log(`${navDownRegistered ? '✅' : '❌'} Ctrl+Shift+Down registrado`);
 
-  // 🔍 Analisar screenshots (Ctrl+Shift+G)
-  globalShortcut.register('Control+Shift+G', () => {
-    mainWindow.webContents.send('CMD_ANALYZE_SCREENSHOTS');
-  });
+    // 📸 Capturar screenshot (Ctrl+Shift+F)
+    const screenshotRegistered = globalShortcut.register('Control+Shift+F', () => {
+      if (mainWindow && mainWindow.webContents) {
+        console.log('📸 Atalho Ctrl+Shift+F acionado');
+        mainWindow.webContents.send('CMD_CAPTURE_SCREENSHOT');
+      }
+    });
+    console.log(`${screenshotRegistered ? '✅' : '❌'} Ctrl+Shift+F registrado`);
 
-  console.log('✅ Atalhos globais registrados');
+    // 🔍 Analisar screenshots (Ctrl+Shift+G)
+    const analyzeRegistered = globalShortcut.register('Control+Shift+G', () => {
+      if (mainWindow && mainWindow.webContents) {
+        console.log('🔍 Atalho Ctrl+Shift+G acionado');
+        mainWindow.webContents.send('CMD_ANALYZE_SCREENSHOTS');
+      }
+    });
+    console.log(`${analyzeRegistered ? '✅' : '❌'} Ctrl+Shift+G registrado`);
+
+    console.log('✅ Atalhos globais registrados com sucesso');
+  } catch (error) {
+    console.error('❌ Erro ao registrar atalhos globais:', error);
+  }
 }
 
 /* ================================ */

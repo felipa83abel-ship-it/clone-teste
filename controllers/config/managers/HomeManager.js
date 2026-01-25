@@ -243,6 +243,46 @@ class HomeManager {
         console.error('>>> ERRO ao enviar APP_CLOSE:', error);
       }
     });
+
+    // ==========================================
+    // REGISTRAR LISTENERS DOS ATALHOS GLOBAIS
+    // ==========================================
+    console.log('>>> Registrando listeners dos atalhos globais (Ctrl+D, Ctrl+Enter)...');
+
+    // Atalho Ctrl+D: Toggle Audio (Começar/Parar de ouvir)
+    if (globalThis.RendererAPI?.onToggleAudio) {
+      globalThis.RendererAPI.onToggleAudio(() => {
+        console.log('🎤 Atalho Ctrl+D acionado via IPC - chamando listenToggleBtn()');
+        if (globalThis.RendererAPI?.listenToggleBtn) {
+          try {
+            globalThis.RendererAPI.listenToggleBtn();
+          } catch (error) {
+            console.error('❌ Erro ao chamar listenToggleBtn via atalho:', error);
+          }
+        }
+      });
+      console.log('   ✅ Listener para CMD_TOGGLE_AUDIO (Ctrl+D) registrado');
+    } else {
+      console.warn('   ⚠️ RendererAPI.onToggleAudio não disponível');
+    }
+
+    // Atalho Ctrl+Enter: Ask LLM (Enviar pergunta)
+    if (globalThis.RendererAPI?.onAskLlm) {
+      globalThis.RendererAPI.onAskLlm(() => {
+        console.log('💡 Atalho Ctrl+Enter acionado via IPC - chamando askLLM()');
+        if (globalThis.RendererAPI?.askLLM) {
+          try {
+            globalThis.RendererAPI.askLLM();
+          } catch (error) {
+            console.error('❌ Erro ao chamar askLLM via atalho:', error);
+          }
+        }
+      });
+      console.log('   ✅ Listener para CMD_ASK_LLM (Ctrl+Enter) registrado');
+    } else {
+      console.warn('   ⚠️ RendererAPI.onAskLlm não disponível');
+    }
+
     console.log('>>> #initActionButtonListeners COMPLETO');
   }
 
