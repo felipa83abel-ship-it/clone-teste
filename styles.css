@@ -257,6 +257,14 @@ body {
   padding: 0 8px;
   margin-left: var(--app-menu-width);
   user-select: none;
+  /* Permite arrastar pela topBar: -webkit-app-region: drag; */
+}
+
+/* Garante que elementos interativos na topBar não acionem o drag */
+#topBar select,
+#topBar input,
+#topBar button {
+  -webkit-app-region: no-drag;
 }
 
 .top-bar-title {
@@ -845,7 +853,6 @@ textarea:focus {
   max-width: 16px;
   height: 16px;
   background: rgba(255, 107, 107, 0.9); /* Vermelho alertante */
-  color: white;
   border: 1px solid rgba(200, 50, 50, 0.8);
   border-radius: 4px;
   cursor: pointer;
@@ -1166,7 +1173,6 @@ input:checked + .slider:before {
 /* 📸 SCREENSHOT BADGE */
 .screenshot-badge {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: #fff;
   padding: 6px 12px;
   font-size: 12px;
   font-weight: bold;

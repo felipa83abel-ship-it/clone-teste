@@ -666,7 +666,7 @@ function handleSetInteractiveZone(_, isInteractive) {
 function handleStartWindowDrag() {
   if (!mainWindow) return Promise.reject(new Error('MainWindow not available'));
   mainWindow.moveTop();
-  mainWindow.startDrag?.();
+  // mainWindow.startDrag?.(); // Removido: startDrag não é um método nativo de BrowserWindow
   return Promise.resolve();
 }
 
@@ -1045,10 +1045,10 @@ function createWindow() {
 //	INICIALIZAÇÃO DO APP
 /* ================================ */
 
-// sonarlint-disable javascript:S7785
-// NOSONAR javascript:S7785
-app.whenReady().then(() => {
-  // NOSONAR javascript:S7785
+// Inicializa a aplicação quando o Electron estiver pronto
+(async () => {
+  await app.whenReady();
+
   // Registra todos os handlers IPC
   registerIPCHandlers();
 
@@ -1059,8 +1059,7 @@ app.whenReady().then(() => {
   registerGlobalShortcuts();
 
   console.log('✅ Aplicação inicializada com sucesso');
-});
-// sonarlint-enable javascript:S7785
+})();
 
 /**
  * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)

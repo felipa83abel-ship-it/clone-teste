@@ -147,17 +147,62 @@ class WindowConfigManager {
   initDragHandle(dragHandle) {
     console.log('🖱️ Inicializando drag handle...');
 
-    dragHandle.addEventListener('mousedown', (e) => {
+    dragHandle.addEventListener('mousedown', async (e) => {
+      // Evita comportamento padrão e propagação
       e.preventDefault();
+      e.stopPropagation();
 
       if (!globalThis.RendererAPI?.startWindowDrag) {
         console.warn('⚠️ RendererAPI.startWindowDrag não disponível');
         return;
       }
 
-      globalThis.RendererAPI.startWindowDrag().catch((err) => {
-        console.error('❌ Erro ao iniciar drag:', err);
-      });
+      // Adicionar feedback visual
+      dragHandle.classList.add('drag-active');
+
+      try {
+        // Notifica o main process para preparar o arraste (ex: moveTop)
+        await globalThis.RendererAPI.startWindowDrag();
+
+        // Posição inicial do mouse na tela (absoluta)
+        const startCursor = { x: e.screenX, y: e.screenY };
+
+        // Posição inicial da janela
+        const startBounds = await this.ipc.invoke('GET_WINDOW_BOUNDS');
+
+        if (!startBounds) {
+          dragHandle.classList.remove('drag-active');
+          return;
+        }
+
+        const onMouseMove = (ev) => {
+          // Calcula o deslocamento
+          const dx = ev.screenX - startCursor.x;
+          const dy = ev.screenY - startCursor.y;
+
+          // Envia nova posição para o Main process
+          this.ipc.send('MOVE_WINDOW_TO', {
+            x: startBounds.x + dx,
+            y: startBounds.y + dy,
+          });
+        };
+
+        const onMouseUp = () => {
+          dragHandle.classList.remove('drag-active');
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          console.log('🪟 Drag finalizado');
+        };
+
+        // Registra listeners no document para capturar movimento fora do handle
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
+
+        console.log('🪟 Drag iniciado');
+      } catch (err) {
+        console.error('❌ Erro durante o arraste da janela:', err);
+        dragHandle.classList.remove('drag-active');
+      }
     });
 
     console.log('✅ Drag handle inicializado');
