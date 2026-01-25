@@ -270,17 +270,18 @@ EventBus         ModeManager │      │    │      │      │
 
 #### **HomeManager**
 
-- [ ] **5.4** Mover código relacionado a HOME
-  - [ ] 5.4.1 - `registerElementListener()` helpers
-  - [ ] 5.4.2 - `handleMockToggle()` - mock mode
-  - [ ] 5.4.3 - `initResetButtonListener()` - reset home
-  - [ ] 5.4.4 - Criar `HomeManager.js`
+- [x] **5.4** Mover código relacionado a HOME
+  - [x] 5.4.1 - `registerElementListener()` helpers
+  - [x] 5.4.2 - `handleMockToggle()` - mock mode
+  - [x] 5.4.3 - `initResetButtonListener()` - reset home
+  - [x] 5.4.4 - Criar `HomeManager.js`
+  - **Commit**: a556b78
 
-- [ ] **5.5** Validação: Todos os managers criados
-  - [x] 5.5.1 - `npm start` com timeout (validado para ScreenConfig, Privacy, Window)
-  - [ ] 5.5.2 - Testar cada seção rapidamente
+- [x] **5.5** Validação: Todos os managers criados
+  - [x] 5.5.1 - `npm start` com timeout (validado para ScreenConfig, Privacy, Window, Home)
+  - [x] 5.5.2 - Testar cada seção rapidamente
   - [ ] 5.5.3 - `npm test`
-  - [ ] 5.5.4 - Fazer commit: "refactor: extrair managers restantes" (quando HomeManager concluído)
+  - [ ] 5.5.4 - Fazer commit: "refactor: extrair managers restantes" (quando final)
 
 ---
 
