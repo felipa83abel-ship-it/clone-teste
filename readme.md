@@ -311,6 +311,15 @@ A documentação completa está organizada na pasta **`docs/`**.
   - Organizado por papel (Tester, Developer, Manager)
   - Links rápidos para cada seção
 
+### 🏛️ Arquitetura (PHASE 10 ✅)
+
+- **[ARCHITECTURE_FINAL.md](docs/ARCHITECTURE_FINAL.md)** - Arquitetura Final Implementada
+  - Princípios fundamentais (Separação de Responsabilidades, EventBus)
+  - Estrutura de managers e responsabilidades
+  - Como adicionar novas features
+  - Padrões de implementação
+  - **Garantia:** renderer.js NUNCA manipula DOM ✅
+
 ### 🧪 Centro de Testes
 
 - **[TESTING_INDEX.md](docs/TESTING_INDEX.md)** - Índice central de testes com 77 testes documentados
