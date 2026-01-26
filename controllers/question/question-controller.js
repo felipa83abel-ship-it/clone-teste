@@ -473,7 +473,18 @@ function handleCurrentQuestion(author, text, options = {}) {
 
     renderCurrentQuestion();
 
-    if (options.shouldFinalizeAskCurrent && !options.isInterim) {
+    // 🔥 FIX: Finalizar se:
+    // 1. shouldFinalizeAskCurrent=TRUE (caso normal), OU
+    // 2. É mensagem final (!isInterim) E há texto em CURRENT (Vosk pode ter enviado 2ª transcrição final)
+    const isFinalMessage = !options.isInterim;
+    const hasText = state.interview.currentQuestion.text?.trim();
+    const shouldFinalize =
+      (options.shouldFinalizeAskCurrent || (isFinalMessage && hasText)) && isFinalMessage;
+
+    if (shouldFinalize) {
+      console.log(
+        `🎯 [DEBUG handleCurrentQuestion] Finalizando - shouldFinalizeAskCurrent=${options.shouldFinalizeAskCurrent}, isFinal=${isFinalMessage}, hasText=${!!hasText}`
+      );
       finalizeCurrentQuestion();
     }
   }

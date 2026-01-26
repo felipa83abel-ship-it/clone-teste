@@ -70,15 +70,19 @@ async function resetAppState() {
       finalText: '',
       interimText: '',
     };
-    appState.history = [];
+    // Esvaziar completamente o histórico de perguntas
+    appState.interview.questionsHistory.splice(0);
     appState.interview.answeredQuestions.clear();
     appState.selectedId = null;
-    appState.interview.lastAskedQuestionNormalized = null;
     console.log('✅ Perguntas e respostas limpas');
+    console.log(
+      `📊 Histórico de perguntas: ${appState.interview.questionsHistory.length} item(ns)`
+    );
     await releaseThread();
 
     // 3️⃣ CHUNK 3: Limpar estado LLM e métricas
     appState.interview.interviewTurnId = 0;
+    appState.globalQuestionCounter = 0;
     appState.interview.llmAnsweredTurnId = null;
     appState.interview.llmRequestedTurnId = null;
     appState.interview.llmRequestedQuestionId = null;
@@ -91,6 +95,7 @@ async function resetAppState() {
     };
     console.log('✅ Estado de entrevista resetado');
     console.log('✅ Métricas resetadas');
+    console.log('✅ Contador global de perguntas zerado');
     await releaseThread();
 
     // 4️⃣ CHUNK 4: Limpar screenshots

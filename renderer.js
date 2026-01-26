@@ -295,6 +295,27 @@ eventBus.on('clearAllSelections', () => {
   }
 });
 
+// 🔥 NOVO: Listener para limpar transcrição
+eventBus.on('transcriptionCleared', () => {
+  const transcriptionContainer = document.getElementById('transcriptionContainer');
+  if (transcriptionContainer) {
+    const conversationDiv = transcriptionContainer.querySelector('#conversation');
+    if (conversationDiv) {
+      conversationDiv.innerHTML = '';
+      Logger.debug('🗑️ Transcrição limpa do UI', false);
+    }
+  }
+});
+
+// 🔥 NOVO: Listener para limpar respostas
+eventBus.on('answersCleared', () => {
+  const answersHistoryBox = document.getElementById('answersHistory');
+  if (answersHistoryBox) {
+    answersHistoryBox.innerHTML = '';
+    Logger.debug('🗑️ Respostas limpas do UI', false);
+  }
+});
+
 /* ================================ */
 //	LISTENERS PARA RENDERIZAÇÃO DE PERGUNTAS
 /* ================================ */
@@ -1104,11 +1125,9 @@ const RendererAPI = {
    * @param {number} opacity - Valor de 0 a 1
    */
   setWindowOpacity: (opacity) => {
-    // Aplicar CSS na janela/body
+    // Aplica opacidade no conteúdo geral (variável --app-opacity)
     const opacityValue = Math.max(0, Math.min(1, opacity));
-    if (document.body) {
-      document.body.style.opacity = opacityValue.toString();
-    }
+    document.documentElement.style.setProperty('--app-opacity', opacityValue.toFixed(2));
     return Promise.resolve();
   },
   /**

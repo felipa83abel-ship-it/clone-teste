@@ -138,7 +138,7 @@ class WindowConfigManager {
     Logger.debug(`🎨 Aplicando opacidade: ${opacity}`, false);
     const opacityValue = Number.parseFloat(opacity);
 
-    // Aplicar CSS na janela
+    // Delegar toda a lógica para setWindowOpacity (centraliza a responsabilidade)
     if (globalThis.RendererAPI?.setWindowOpacity) {
       globalThis.RendererAPI.setWindowOpacity(opacityValue).catch((err) => {
         Logger.debug(`❌ Erro ao definir opacidade: ${err}`, false);

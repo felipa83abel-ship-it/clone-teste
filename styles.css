@@ -14,12 +14,12 @@
   --text-muted: #444;
 
   /* Bordas */
-  --border-default: rgba(0, 0, 0, 0.15);
+  --border-default-rgb: 0, 0, 0;
+  --border-gray-rgb: 204, 204, 204; /* equivalente ao #ccc */
   --border-muted: rgba(0, 0, 0, 0.08);
 
   /* Opacidade */
   --app-opacity: 0.75;
-  --app-opacity-75: 0.75;
 
   /* Outros*/
   --app-menu-width: 60px;
@@ -63,7 +63,8 @@ body.dark {
   --text-muted: #9ca3af;
 
   /* Bordas */
-  --border-default: rgba(255, 255, 255, 0.18);
+  --border-default-rgb: 255, 255, 255;
+  --border-gray-rgb: 204, 204, 204; /* equivalente ao #ccc */
   --border-muted: rgba(255, 255, 255, 0.1);
 }
 
@@ -114,7 +115,7 @@ body {
   width: var(--app-menu-width);
   background: rgba(var(--bg-panel-rgb), var(--app-opacity));
   border-top-left-radius: 12px;
-  border-right: 1px solid var(--border-default);
+  border-right: 1px solid rgba(var(--border-default-rgb), 0.18);
   display: flex;
   flex-direction: column;
   z-index: 1000;
@@ -246,8 +247,8 @@ body {
   height: var(--app-top-bar-height);
   background: linear-gradient(
     135deg,
-    rgba(var(--color-topbar-grad-1-rgb), var(--app-opacity-75)),
-    rgba(var(--color-topbar-grad-2-rgb), var(--app-opacity-75))
+    rgba(var(--color-topbar-grad-1-rgb), max(var(--app-opacity), 0.75)),
+    rgba(var(--color-topbar-grad-2-rgb), max(var(--app-opacity), 0.75))
   );
   border-top-right-radius: 12px;
   color: rgba(var(--color-white-rgb), 1);
@@ -349,7 +350,7 @@ body {
   align-items: center;
   gap: 16px;
   background: rgba(var(--bg-panel-rgb), 0.5);
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   padding: 3px 4px 4px 4px;
 }
 
@@ -369,7 +370,7 @@ body {
   min-width: 16px;
   border-radius: 16px;
   margin: 0 !important;
-  border: 1px solid var(--border-default);
+  border: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
 }
 
 /* Efeito visual quando isRunning = true */
@@ -390,12 +391,12 @@ body {
 /* TRANSCRIÇÃO */
 #transcriptionContainer {
   height: 120px;
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   padding: 8px;
   overflow-y: auto;
   background: rgba(var(--bg-panel-rgb), var(--app-opacity));
   color: rgba(var(--text-main-rgb), var(--app-opacity));
-  border-top: 1px solid #ccc;
+  border-top: 1px solid rgba(var(--border-gray-rgb), var(--app-opacity));
 }
 
 .transcript-meta {
@@ -428,7 +429,7 @@ body {
 #questions {
   width: 45%;
   padding-bottom: 8px;
-  border-right: 1px solid var(--border-default);
+  border-right: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -438,7 +439,7 @@ body {
   min-height: 24px;
   padding: 8px;
   background: rgba(var(--bg-warning-rgb), var(--app-opacity));
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.3));
   font-weight: bold;
 }
 
@@ -593,7 +594,7 @@ body {
 
 .answer-content pre {
   background: rgba(var(--color-code-bg-rgb), var(--app-opacity));
-  border: 1px solid var(--border-default);
+  border: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   border-radius: 6px;
   padding: 12px;
   margin: 8px 0;
@@ -648,7 +649,7 @@ body {
 
 .answer-content table th,
 .answer-content table td {
-  border: 1px solid var(--border-default);
+  border: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   padding: 8px;
   text-align: left;
 }
@@ -685,7 +686,7 @@ body {
   align-items: center;
   gap: 12px;
   margin: 0 0 16px 0;
-  color: rgba(var(--text-main-rgb), 0.9);
+  color: rgba(var(--text-main-rgb), min(var(--app-opacity), 0.9));
   font-size: 20px;
 }
 
@@ -702,7 +703,7 @@ body {
 .tab-buttons {
   display: flex;
   background: rgba(var(--bg-panel-rgb), var(--app-opacity));
-  border-bottom: 1px solid var(--border-default);
+  border-bottom: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   padding: 8px 8px 0 8px;
   gap: 4px;
 }
@@ -777,7 +778,7 @@ select,
 textarea {
   width: 100%;
   padding: 10px 12px;
-  border: 1px solid var(--border-default);
+  border: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   border-radius: 6px;
   background: rgba(var(--bg-main-rgb), var(--app-opacity));
   color: rgba(var(--text-main-rgb), 0.9);
@@ -931,7 +932,7 @@ textarea:focus {
 
 .btn-toggle-visibility {
   background: rgba(var(--bg-highlight-rgb), 0.1);
-  border: 1px solid var(--border-default);
+  border: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.18));
   padding: 10px;
   color: rgba(var(--text-main-rgb), 0.7);
 }
@@ -1194,7 +1195,7 @@ input:checked + .slider:before {
 }
 
 .mock-badge {
-  background-color: rgba(var(--color-green-rgb), var(--app-opacity-75));
+  background-color: rgba(var(--color-green-rgb), max(var(--app-opacity), 0.75));
   color: rgba(var(--color-white-rgb), 1);
   padding: 6px 10px;
   font-size: 12px;
@@ -1317,8 +1318,8 @@ input:checked + .slider:before {
   cursor: grab;
   background: linear-gradient(
     135deg,
-    rgba(var(--color-topbar-grad-1-rgb), var(--app-opacity-75)),
-    rgba(var(--color-topbar-grad-2-rgb), var(--app-opacity-75))
+    rgba(var(--color-topbar-grad-1-rgb), max(var(--app-opacity), 0.75)),
+    rgba(var(--color-topbar-grad-2-rgb), max(var(--app-opacity), 0.75))
   );
   border: 0;
   border-top-left-radius: 12px;
@@ -1449,22 +1450,22 @@ input:checked + .slider:before {
    HEADER SECTIONS (Questions & Answers)
 ========================================================= */
 .questions-header {
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid rgba(var(--border-default-rgb), min(var(--app-opacity), 0.3));
   min-height: 32px;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  color: rgb(var(--text-main-rgb));
+  color: rgb(var(--text-main-rgb), var(--app-opacity));
 }
 
 .answers-header {
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid rgba(var(--border-gray-rgb), var(--app-opacity));
   height: 32px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 8px;
-  color: rgb(var(--text-main-rgb));
+  color: rgb(var(--text-main-rgb), var(--app-opacity));
 }
 
 /* =========================================================
@@ -1473,4 +1474,16 @@ input:checked + .slider:before {
 .form-group-flex {
   display: flex;
   gap: 16px;
+}
+
+/* =========================================================
+   Opacidade das seções
+========================================================= */
+#home,
+#api-models,
+#audio-screen,
+#privacy,
+#other,
+#info {
+  opacity: var(--app-opacity);
 }
