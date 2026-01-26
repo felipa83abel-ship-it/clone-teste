@@ -1077,9 +1077,11 @@ textarea:focus {
 /* TOGGLE SWITCH */
 .switch {
   position: relative;
-  display: inline-block;
-  width: 46px;
-  height: 24px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  height: auto;
 }
 
 .switch input {
@@ -1088,13 +1090,23 @@ textarea:focus {
   height: 0;
 }
 
+.switch-control {
+  margin-top: 8px;
+  position: relative;
+  width: 46px;
+  height: 24px;
+}
+
 .slider {
   position: absolute;
   cursor: pointer;
   inset: 0;
+  width: 46px;
+  height: 24px;
   background-color: rgba(var(--color-gray-slider-rgb), var(--app-opacity));
   transition: 0.25s;
   border-radius: 24px;
+  flex-shrink: 0;
 }
 
 .slider:before {
@@ -1114,6 +1126,13 @@ input:checked + .slider {
 }
 input:checked + .slider:before {
   transform: translateX(22px);
+}
+
+/* 🔥 Label do switch */
+.switch-label {
+  white-space: nowrap;
+  font-size: 13px;
+  color: rgba(var(--text-main-rgb), var(--app-opacity));
 }
 
 /* Opacidade Control */
