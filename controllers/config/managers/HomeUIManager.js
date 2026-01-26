@@ -580,6 +580,37 @@ class HomeManager {
       }
     });
 
+    // ==========================================
+    // LISTENER: sortAnswersByTurnId
+    // Reordena respostas por turnId (DESC)
+    // ==========================================
+    this.eventBus.on('sortAnswersByTurnId', () => {
+      const answersHistoryBox = document.getElementById('answersHistory');
+      if (!answersHistoryBox) return;
+
+      // Obter todos os blocos de resposta
+      const answerBlocks = Array.from(answersHistoryBox.querySelectorAll('.answer-block'));
+
+      // Ordenar por turnId (DESC)
+      answerBlocks.sort((a, b) => {
+        // Extrair turnId do badge
+        const aBadge = a.querySelector('.turn-id-badge.answer');
+        const bBadge = b.querySelector('.turn-id-badge.answer');
+
+        const aId = aBadge ? Number.parseInt(aBadge.textContent) : 0;
+        const bId = bBadge ? Number.parseInt(bBadge.textContent) : 0;
+
+        // Ordenar DESC (maior primeiro)
+        return bId - aId;
+      });
+
+      // Reinserir os blocos na ordem correta
+      answerBlocks.forEach((block) => {
+        answersHistoryBox.appendChild(block);
+      });
+      console.log('🔄 Respostas reordenadas por turnId');
+    });
+
     console.log('>>> #initUIEventBusListeners COMPLETO - Todos os listeners de DOM centralizados');
   }
 }

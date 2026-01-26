@@ -155,107 +155,21 @@ eventBus.on('error', (error) => {
 
 // 🔥 NOVO: Listener para atualizar transcrição interim (parcial)
 // 🔥 NOVO: Listener para atualizar transcrição interim (parcial) em tempo real
-eventBus.on('updateInterim', ({ id, speaker, text }) => {
-  let interimElement = document.getElementById(id);
-
-  // Se não existe, criar novo elemento interim
-  if (!interimElement) {
-    interimElement = document.createElement('div');
-    interimElement.id = id;
-    interimElement.className = 'transcript-item interim';
-    interimElement.style.color = '#888'; // Cor cinza para indicar interim/parcial
-
-    const transcriptionBox = document.getElementById('conversation');
-    if (transcriptionBox) {
-      transcriptionBox.appendChild(interimElement);
-      Logger.debug(`✨ Elemento interim criado: ${id}`, false);
-    }
-  }
-
-  // Atualizar o texto com timestamp
-  interimElement.innerHTML = `<strong>${speaker}:</strong> ${text}`;
-  Logger.debug(`📝 Interim atualizado: "${text.substring(0, 40)}..."`, false);
-
-  // 🔥 AUTO-SCROLL: Fazer scroll para o elemento interim criado
-  requestAnimationFrame(() => {
-    const container = document.getElementById('transcriptionContainer');
-    if (container) {
-      container.scrollTop = container.scrollHeight;
-      Logger.debug(`📜 Auto-scroll para interim`, false);
-    }
-  });
-});
+// ✅ REMOVIDO: updateInterim listener - DOM manipulação movida para HomeUIManager
 
 // ✅ REMOVIDO: listener 'statusUpdate' movido para HomeManager.js (#initUIEventBusListeners)
 
 // 🔥 NOVO: Listener para adicionar transcrição com placeholder
-eventBus.on('transcriptAdd', ({ author, text, timeStr, elementId, placeholderId }) => {
-  const container = document.getElementById(elementId);
-  if (container) {
-    const div = document.createElement('div');
-    div.id = placeholderId;
-    div.className = 'transcript-item';
-    div.dataset.speaker = author;
-    const timeStrHtml = timeStr ? ` <small>${timeStr}</small>` : '';
-    div.innerHTML = `<strong>${author}:</strong> <span class="transcript-text">${text}</span>${timeStrHtml}`;
-    container.appendChild(div);
-
-    // 🔥 AUTO-SCROLL: Fazer scroll para o novo item de transcrição
-    requestAnimationFrame(() => {
-      const container = document.getElementById('transcriptionContainer');
-      if (container) {
-        container.scrollTop = container.scrollHeight;
-        Logger.debug(`📜 Auto-scroll para transcriptAdd`, false);
-      }
-    });
-  }
-});
+// ✅ REMOVIDO: transcriptAdd - DOM movido para HomeUIManager
 
 // 🔥 NOVO: Listener para preencher placeholder de transcrição
-eventBus.on('placeholderFulfill', ({ _speaker, text, placeholderId, _showMeta }) => {
-  const element = document.getElementById(placeholderId);
-  if (element) {
-    const textSpan = element.querySelector('.transcript-text');
-    if (textSpan) {
-      textSpan.textContent = text;
-    }
-
-    // 🔥 AUTO-SCROLL: Fazer scroll para o item preenchido
-    const scrollContainer = document.getElementById('transcriptionContainer');
-    if (scrollContainer) {
-      requestAnimationFrame(() => {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-        Logger.debug(`📜 Auto-scroll para placeholderFulfill`, false);
-      });
-    }
-  }
-});
+// ✅ REMOVIDO: placeholderFulfill - DOM movido para HomeUIManager
 
 // 🔥 NOVO: Listener para limpar transcrição interim (remover o elemento)
-eventBus.on('clearInterim', ({ id }) => {
-  const interimElement = document.getElementById(id);
-  if (interimElement) {
-    interimElement.remove();
-    Logger.debug(`🗑️ Elemento interim removido: ${id}`, false);
-  }
-});
+// ✅ REMOVIDO: clearInterim - DOM movido para HomeUIManager
 
 // 🔥 NOVO: Listener para limpar seleções de perguntas
-eventBus.on('clearAllSelections', () => {
-  const currentQuestionBox = document.getElementById('currentQuestion');
-  if (currentQuestionBox) {
-    currentQuestionBox.classList.remove('selected-question');
-    Logger.debug('🗑️ Seleção de pergunta atual removida', false);
-  }
-
-  const questionsHistoryBox = document.getElementById('questionsHistory');
-  if (questionsHistoryBox) {
-    questionsHistoryBox.querySelectorAll('.selected-question').forEach((el) => {
-      el.classList.remove('selected-question');
-    });
-    Logger.debug('🗑️ Seleções do histórico de perguntas removidas', false);
-  }
-});
+// ✅ REMOVIDO: clearAllSelections - DOM movido para HomeUIManager
 
 // ✅ REMOVIDO: listener 'transcriptionCleared' movido para HomeManager.js (#initUIEventBusListeners)
 
@@ -273,53 +187,14 @@ eventBus.on('clearAllSelections', () => {
  * 🔥 LISTENER: scrollToQuestion
  * Emitido por question-controller.js para fazer scroll até pergunta específica
  */
-eventBus.on('scrollToQuestion', (data) => {
-  const { questionId } = data;
-  const questionsHistoryBox = document.getElementById('questionsHistory');
-  if (!questionsHistoryBox) return;
-
-  const el = questionsHistoryBox.querySelector(`.question-block[data-qid="${questionId}"]`);
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    Logger.debug(`📜 Scroll para pergunta: ${questionId}`, false);
-  }
-});
+// ✅ REMOVIDO: scrollToQuestion - DOM movido para HomeUIManager
 
 /**
  * 🔥 LISTENER: answerSelected
  * Emitido quando uma resposta é selecionada
  * Adiciona/remove classe CSS de seleção na resposta correspondente
  */
-eventBus.on('answerSelected', (payload) => {
-  if (!payload) return;
-
-  const { questionId, shouldScroll } = payload;
-  if (!questionId) return;
-
-  const answersBox = document.getElementById('answersHistory');
-  if (!answersBox) return;
-
-  // Remover seleção anterior
-  answersBox.querySelectorAll('.selected-answer').forEach((el) => {
-    el.classList.remove('selected-answer');
-  });
-
-  // Procurar resposta da pergunta
-  const answerEl = answersBox.querySelector(`[data-question-id="${questionId}"]`);
-  if (!answerEl) {
-    console.warn('⚠️ Resposta não encontrada para questionId:', questionId);
-    return;
-  }
-
-  // Marcar como selecionada
-  answerEl.classList.add('selected-answer');
-  Logger.debug(`✅ Resposta selecionada: questionId=${questionId}`, false);
-
-  // Fazer scroll se solicitado
-  if (shouldScroll) {
-    answerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }
-});
+// ✅ REMOVIDO: answerSelected - DOM movido para HomeUIManager
 
 /* ================================ */
 //	LISTENERS PARA LLM STREAMING E RESPOSTAS
@@ -420,35 +295,21 @@ const registerUIElements = (elements) => uiElementsRegistry.register(elements);
 
 /**
  * Escuta atualização de volume de entrada
- * 🔥 MODIFICADO: Só atualiza a home quando está capturando áudio (appState.audio.isRunning)
+ * ✅ REMOVIDO: VU meter update - DOM manipulação movida para AudioDeviceManager
  */
-eventBus.on('inputVolumeUpdate', (data) => {
-  const { percent } = data;
-  const inputVu = document.getElementById('inputVu');
-  if (inputVu) inputVu.style.width = percent + '%';
-
-  // 🔥 Só atualiza volume na home se estiver capturando áudio
-  if (appState.audio.isRunning) {
-    const inputVuHome = document.getElementById('inputVuHome');
-    if (inputVuHome) inputVuHome.style.width = percent + '%';
-  }
-});
+// eventBus.on('inputVolumeUpdate', (data) => {
+//   const { percent } = data;
+//   // DOM updates removed - now in AudioDeviceManager
+// });
 
 /**
  * Escuta atualização de volume de saída
- * 🔥 MODIFICADO: Só atualiza a home quando está capturando áudio (appState.audio.isRunning)
+ * ✅ REMOVIDO: VU meter update - DOM manipulação movida para AudioDeviceManager
  */
-eventBus.on('outputVolumeUpdate', (data) => {
-  const { percent } = data;
-  const outputVu = document.getElementById('outputVu');
-  if (outputVu) outputVu.style.width = percent + '%';
-
-  // 🔥 Só atualiza volume na home se estiver capturando áudio
-  if (appState.audio.isRunning) {
-    const outputVuHome = document.getElementById('outputVuHome');
-    if (outputVuHome) outputVuHome.style.width = percent + '%';
-  }
-});
+// eventBus.on('outputVolumeUpdate', (data) => {
+//   const { percent } = data;
+//   // DOM updates removed - now in AudioDeviceManager
+// });
 
 /**
  * Escuta evento de mudança de dispositivo
@@ -486,29 +347,9 @@ eventBus.on('audioDeviceChanged', async (_data) => {
  * Mantém a ordem decrescente baseada no ID da pergunta
  */
 function sortAnswersByTurnId() {
-  const answersHistoryBox = document.getElementById('answersHistory');
-  if (!answersHistoryBox) return;
-
-  // Obter todos os blocos de resposta
-  const answerBlocks = Array.from(answersHistoryBox.querySelectorAll('.answer-block'));
-
-  // Ordenar por turnId (DESC)
-  answerBlocks.sort((a, b) => {
-    // Extrair turnId do badge
-    const aBadge = a.querySelector('.turn-id-badge.answer');
-    const bBadge = b.querySelector('.turn-id-badge.answer');
-
-    const aId = aBadge ? Number.parseInt(aBadge.textContent) : 0;
-    const bId = bBadge ? Number.parseInt(bBadge.textContent) : 0;
-
-    // Ordenar DESC (maior primeiro)
-    return bId - aId;
-  });
-
-  // Reinserir os blocos na ordem correta
-  answerBlocks.forEach((block) => {
-    answersHistoryBox.appendChild(block);
-  });
+  // REMOVIDO: Manipulação DOM removida para deixar renderer cego para DOM
+  // Agora emite evento para HomeUIManager lidar com reordenação
+  eventBus.emit('sortAnswersByTurnId');
 }
 
 /**
@@ -883,12 +724,12 @@ const RendererAPI = {
   },
   /**
    * Define opacidade da janela
+   * ✅ REMOVIDO: DOM manipulation moved to WindowUIManager
    * @param {number} opacity - Valor de 0 a 1
    */
   setWindowOpacity: (opacity) => {
-    // Aplica opacidade no conteúdo geral (variável --app-opacity)
-    const opacityValue = Math.max(0, Math.min(1, opacity));
-    document.documentElement.style.setProperty('--app-opacity', opacityValue.toFixed(2));
+    // Emit event for WindowUIManager to handle DOM updates
+    eventBus.emit('windowOpacityUpdate', { opacity: Math.max(0, Math.min(1, opacity)) });
     return Promise.resolve();
   },
   /**

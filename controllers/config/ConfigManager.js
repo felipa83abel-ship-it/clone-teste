@@ -153,12 +153,12 @@ class ConfigManager {
       this.privacyManager = new PrivacyConfigManager(this, _ipc, globalThis.eventBus);
       await this.privacyManager.initialize();
 
-      // Cria instância do WindowConfigManager
-      this.windowManager = new WindowConfigManager(this, _ipc, globalThis.eventBus);
+      // Cria instância do WindowUIManager
+      this.windowManager = new WindowUIManager(this, _ipc, globalThis.eventBus);
       await this.windowManager.initialize();
 
-      // Cria instância do HomeManager
-      this.homeManager = new HomeManager(this, _ipc, globalThis.eventBus);
+      // Cria instância do HomeUIManager
+      this.homeManager = new HomeUIManager(this, _ipc, globalThis.eventBus);
       await this.homeManager.initialize();
 
       // Registrar listeners dos botões de salvar
@@ -172,6 +172,39 @@ class ConfigManager {
       console.error('❌ Erro ao inicializar managers:', error);
       throw error;
     }
+  }
+
+  /**
+   * Inicializa todos os managers de forma orquestrada
+   * @private
+   */
+  async #initializeAllManagers() {
+    console.log('🎯 ConfigManager.#initializeAllManagers() - Orquestração de managers');
+
+    const managers = [
+      { name: 'ApiKeyManager', instance: this.apiKeyManager },
+      { name: 'AudioDeviceManager', instance: this.audioManager },
+      { name: 'ModelSelectionManager', instance: this.modelManager },
+      { name: 'ScreenConfigManager', instance: this.screenManager },
+      { name: 'PrivacyConfigManager', instance: this.privacyManager },
+      { name: 'WindowUIManager', instance: this.windowManager },
+      { name: 'HomeUIManager', instance: this.homeManager },
+    ];
+
+    for (const { name, instance } of managers) {
+      if (!instance) {
+        console.warn(`⚠️ ${name} não foi inicializado`);
+        continue;
+      }
+      if (typeof instance.initialize !== 'function') {
+        console.warn(`⚠️ ${name} não tem método initialize()`);
+        continue;
+      }
+      console.log(`  📌 Inicializando ${name}...`);
+      await instance.initialize();
+      console.log(`  ✅ ${name} inicializado`);
+    }
+    console.log('✅ Orquestração de managers completa');
   }
 
   /**
