@@ -347,8 +347,7 @@ eventBus.on('audioDeviceChanged', async (_data) => {
  * Mantém a ordem decrescente baseada no ID da pergunta
  */
 function sortAnswersByTurnId() {
-  // REMOVIDO: Manipulação DOM removida para deixar renderer cego para DOM
-  // Agora emite evento para HomeUIManager lidar com reordenação
+  // Emite evento para HomeUIManager lidar com reordenação
   eventBus.emit('sortAnswersByTurnId');
 }
 
