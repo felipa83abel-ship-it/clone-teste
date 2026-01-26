@@ -612,7 +612,32 @@
         </section>
       </div>
     </div>
-    <script src="./renderer.js"></script>
+
+    <!-- ==================== UTILIDADES ==================== -->
+    <script src="./utils/Logger.js"></script>
+    <script src="./utils/ErrorHandler.js"></script>
+    <script src="./utils/SecureLogger.js"></script>
+
+    <!-- ==================== ESTADO CENTRAL ==================== -->
+    <script src="./state/AppState.js"></script>
+    <script src="./events/EventBus.js"></script>
+
+    <!-- ==================== ESTRATÉGIAS E ORQUESTRADORES ==================== -->
+    <script src="./strategies/STTStrategy.js"></script>
+    <script src="./llm/LLMManager.js"></script>
+
+    <!-- ==================== CONTROLLERS (Lógica pura) ==================== -->
+    <script src="./controllers/audio/audio-controller.js"></script>
+    <script src="./controllers/question/question-controller.js"></script>
+    <script src="./controllers/screenshot/screenshot-controller.js"></script>
+    <script src="./controllers/modes/mode-manager.js"></script>
+
+    <!-- ==================== UTILS DOM E HELPERS ==================== -->
+    <script src="./utils/DOM-Registry.js"></script>
+    <script src="./utils/ui-elements-registry.js"></script>
+    <script src="./utils/renderer-helpers.js"></script>
+
+    <!-- ==================== MANAGERS (ANTES de ConfigManager) ==================== -->
     <script src="./controllers/config/managers/ApiKeyManager.js"></script>
     <script src="./controllers/config/managers/AudioDeviceManager.js"></script>
     <script src="./controllers/config/managers/ModelSelectionManager.js"></script>
@@ -620,6 +645,38 @@
     <script src="./controllers/config/managers/PrivacyConfigManager.js"></script>
     <script src="./controllers/config/managers/WindowUIManager.js"></script>
     <script src="./controllers/config/managers/HomeUIManager.js"></script>
+
+    <!-- ==================== CONFIG MANAGER (Orquestrador) ==================== -->
     <script src="./controllers/config/ConfigManager.js"></script>
+
+    <!-- ==================== RENDERER (Lógica de Negócio) ==================== -->
+    <script src="./renderer.js"></script>
+
+    <!-- ==================== INICIALIZAÇÃO ==================== -->
+    <script>
+      document.addEventListener('DOMContentLoaded', async () => {
+        try {
+          // Registrar todos os elementos DOM no registry
+          if (globalThis.DOM && typeof globalThis.DOM.register === 'function') {
+            globalThis.DOM.register();
+            console.log('✅ DOM Registry inicializado');
+          }
+
+          // ConfigManager orquestra todos os managers
+          if (globalThis.ConfigManager) {
+            globalThis.configManager = new ConfigManager();
+            await globalThis.configManager.initializeController();
+            console.log('✅ Aplicação inicializada com sucesso via ConfigManager');
+          } else {
+            console.error('❌ ConfigManager não foi carregado');
+          }
+        } catch (error) {
+          console.error('❌ Erro ao inicializar aplicação:', error);
+          if (globalThis.Logger) {
+            globalThis.Logger.error('Erro ao inicializar', error);
+          }
+        }
+      });
+    </script>
   </body>
 </html>
