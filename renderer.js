@@ -151,35 +151,7 @@ eventBus.on('error', (error) => {
   }
 });
 
-// 🔥 NOVO: Listener para atualizar botão de listen
-eventBus.on('listenButtonToggle', ({ isRunning, buttonText }) => {
-  const listenBtn = document.getElementById('listenBtn');
-  if (listenBtn) {
-    listenBtn.textContent = buttonText;
-    listenBtn.classList.toggle('listening', isRunning);
-    console.log(`🎤 Botão atualizado: "${buttonText}" (listening: ${isRunning})`);
-  } else {
-    console.warn('⚠️ Elemento listenBtn não encontrado no DOM');
-  }
-
-  // 🔥 NOVO: Aplica efeito visual no home quando começa/para de ouvir
-  const homeVuMeters = document.querySelector('.home-vu-meters');
-  if (homeVuMeters) {
-    homeVuMeters.classList.toggle('listening', isRunning);
-    console.log(`🎨 .home-vu-meters atualizado (listening: ${isRunning})`);
-  }
-
-  // 🔥 Se parou de capturar, resetar volume na home para 0
-  if (!isRunning) {
-    const inputVuHome = document.getElementById('inputVuHome');
-    if (inputVuHome) inputVuHome.style.width = '0%';
-
-    const outputVuHome = document.getElementById('outputVuHome');
-    if (outputVuHome) outputVuHome.style.width = '0%';
-
-    console.log(`🔇 Volume resetado na home (parou de capturar)`);
-  }
-});
+// ✅ REMOVIDO: listener 'listenButtonToggle' movido para HomeManager.js (#initUIEventBusListeners)
 
 // 🔥 NOVO: Listener para atualizar transcrição interim (parcial)
 // 🔥 NOVO: Listener para atualizar transcrição interim (parcial) em tempo real
@@ -214,17 +186,7 @@ eventBus.on('updateInterim', ({ id, speaker, text }) => {
   });
 });
 
-// 🔥 NOVO: Listener para atualizar mensagem de status
-eventBus.on('statusUpdate', ({ message }) => {
-  // Atualiza a UI diretamente, sem chamar updateStatusMessage (que emitiria novamente)
-  const statusSpan = document.getElementById('status');
-  if (statusSpan) {
-    statusSpan.textContent = message || '';
-    Logger.debug(`📊 Status atualizado: "${message}"`, false);
-  } else {
-    console.warn('⚠️ Elemento #status não encontrado no DOM');
-  }
-});
+// ✅ REMOVIDO: listener 'statusUpdate' movido para HomeManager.js (#initUIEventBusListeners)
 
 // 🔥 NOVO: Listener para adicionar transcrição com placeholder
 eventBus.on('transcriptAdd', ({ author, text, timeStr, elementId, placeholderId }) => {
@@ -295,108 +257,17 @@ eventBus.on('clearAllSelections', () => {
   }
 });
 
-// 🔥 NOVO: Listener para limpar transcrição
-eventBus.on('transcriptionCleared', () => {
-  const transcriptionContainer = document.getElementById('transcriptionContainer');
-  if (transcriptionContainer) {
-    const conversationDiv = transcriptionContainer.querySelector('#conversation');
-    if (conversationDiv) {
-      conversationDiv.innerHTML = '';
-      Logger.debug('🗑️ Transcrição limpa do UI', false);
-    }
-  }
-});
+// ✅ REMOVIDO: listener 'transcriptionCleared' movido para HomeManager.js (#initUIEventBusListeners)
 
-// 🔥 NOVO: Listener para limpar respostas
-eventBus.on('answersCleared', () => {
-  const answersHistoryBox = document.getElementById('answersHistory');
-  if (answersHistoryBox) {
-    answersHistoryBox.innerHTML = '';
-    Logger.debug('🗑️ Respostas limpas do UI', false);
-  }
-});
+// ✅ REMOVIDO: listener 'answersCleared' movido para HomeManager.js (#initUIEventBusListeners)
 
 /* ================================ */
 //	LISTENERS PARA RENDERIZAÇÃO DE PERGUNTAS
 /* ================================ */
 
-/**
- * 🔥 LISTENER: currentQuestionUpdate
- * Emitido por question-controller.js quando a pergunta ATUAL é atualizada
- * Renderiza o texto no #currentQuestion e aplica CSS classes
- */
-eventBus.on('currentQuestionUpdate', (data) => {
-  const { text, isSelected } = data;
-  const currentQuestionBox = document.getElementById('currentQuestion');
+// ✅ REMOVIDO: listener 'currentQuestionUpdate' movido para HomeManager.js (#initUIEventBusListeners)
 
-  if (!currentQuestionBox) {
-    console.warn('⚠️ Elemento #currentQuestion não encontrado no DOM');
-    return;
-  }
-
-  // Procura por span dentro do elemento ou usa o próprio elemento
-  const textEl = currentQuestionBox.querySelector('span') || currentQuestionBox;
-  if (textEl) {
-    textEl.innerText = text;
-    Logger.debug(`✅ Pergunta atual atualizada: "${text.substring(0, 50)}..."`, false);
-  }
-
-  // Aplica/remove classe de seleção
-  if (isSelected) {
-    currentQuestionBox.classList.add('selected-question');
-  } else {
-    currentQuestionBox.classList.remove('selected-question');
-  }
-});
-
-/**
- * 🔥 LISTENER: questionsHistoryUpdate
- * Emitido por question-controller.js quando o histórico é atualizado
- * Renderiza todos os question-blocks no #questionsHistory com CSS classes
- */
-eventBus.on('questionsHistoryUpdate', (data) => {
-  const questionsHistoryBox = document.getElementById('questionsHistory');
-  if (!questionsHistoryBox) {
-    console.warn('⚠️ Elemento #questionsHistory não encontrado no DOM');
-    return;
-  }
-
-  // Limpar histórico anterior
-  questionsHistoryBox.innerHTML = '';
-
-  // Renderizar cada pergunta como um question-block
-  data.forEach((q) => {
-    const div = document.createElement('div');
-    div.className = 'question-block';
-    div.dataset.qid = q.id;
-
-    // Adicionar CSS classes conforme estado
-    if (q.isSelected) div.classList.add('selected-question');
-    if (q.isAnswered) div.classList.add('answered');
-    if (q.isIncomplete) div.classList.add('incomplete');
-
-    // Renderizar badge de turnId se existir
-    const turnIdBadge = q.turnId ? `<span class="turn-id-badge">${q.turnId}</span>` : '';
-    div.innerHTML = `${turnIdBadge}<span>${q.text}</span>`;
-
-    questionsHistoryBox.appendChild(div);
-  });
-
-  // 🔥 EVENT DELEGATION: Registrar handler de click para cada question-block
-  questionsHistoryBox.querySelectorAll('.question-block').forEach((block) => {
-    block.addEventListener('click', (evt) => {
-      evt.stopPropagation();
-      // @ts-ignore - dataset é disponível em HTMLElement
-      const questionId = block.dataset.qid;
-      if (questionId) {
-        handleQuestionClick(questionId);
-        Logger.debug(`🖱️ Pergunta clicada: ${questionId}`, false);
-      }
-    });
-  });
-
-  Logger.debug(`✅ Histórico renderizado com ${data.length} pergunta(s)`, false);
-});
+// ✅ REMOVIDO: listener 'questionsHistoryUpdate' movido para HomeManager.js (#initUIEventBusListeners)
 
 /**
  * 🔥 LISTENER: scrollToQuestion
@@ -454,121 +325,11 @@ eventBus.on('answerSelected', (payload) => {
 //	LISTENERS PARA LLM STREAMING E RESPOSTAS
 /* ================================ */
 
-/**
- * 🔥 LISTENER: answerStreamChunk
- * Emitido quando token chega do LLM em modo STREAMING
- * Acumula e renderiza tokens em tempo real (como ChatGPT)
- */
-eventBus.on('answerStreamChunk', (data) => {
-  const { questionId, turnId, accum } = data;
-  const answersHistoryBox = document.getElementById('answersHistory');
-  if (!answersHistoryBox) return;
+// ✅ REMOVIDO: listener 'answerStreamChunk' movido para HomeManager.js (#initUIEventBusListeners)
 
-  // Procurar wrapper de resposta existente
-  let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+// ✅ REMOVIDO: listener 'answerBatchEnd' movido para HomeManager.js (#initUIEventBusListeners)
 
-  // Se não existe, criar novo bloco de resposta
-  if (!wrapper) {
-    Logger.debug(`⚡ [STREAM] Criando novo bloco para questionId: ${questionId}`, false);
-
-    wrapper = document.createElement('div');
-    wrapper.className = 'answer-block';
-    // @ts-ignore - dataset é disponível em HTMLElement
-    wrapper.dataset.questionId = questionId;
-
-    // Badge de turnId se existir
-    const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
-    wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
-
-    // Inserir no topo do histórico
-    answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
-
-    // Remover seleção anterior
-    answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach((el) => {
-      el.classList.remove('selected-answer');
-    });
-    wrapper.classList.add('selected-answer');
-
-    // Auto-scroll para topo
-    answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
-  }
-
-  // Atualizar conteúdo com markdown renderizado
-  const answerContent = wrapper.querySelector('.answer-content');
-  if (answerContent && marked !== undefined) {
-    // 🔥 Renderizar como markdown em tempo real (estilo ChatGPT)
-    // @ts-ignore - marked.parse retorna string
-    const htmlContent = marked.parse(accum);
-    // @ts-ignore - innerHTML aceita string
-    answerContent.innerHTML = htmlContent;
-    Logger.debug(`📝 [STREAM] Tokens acumulados (${accum.length} chars)`, false);
-  }
-
-  // 🔥 Reordenar respostas por turnId DESC
-  sortAnswersByTurnId();
-});
-
-/**
- * 🔥 LISTENER: answerBatchEnd
- * Emitido quando resposta completa chega em modo NÃO-STREAMING (batch)
- * Renderiza a resposta formatada de uma vez
- */
-eventBus.on('answerBatchEnd', (data) => {
-  const { questionId, response, turnId } = data;
-  const answersHistoryBox = document.getElementById('answersHistory');
-  if (!answersHistoryBox) return;
-
-  Logger.debug(`📊 [BATCH] Resposta completa para questionId: ${questionId}`, true);
-
-  // Procurar bloco existente ou criar novo
-  let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
-
-  if (!wrapper) {
-    wrapper = document.createElement('div');
-    wrapper.className = 'answer-block';
-    // @ts-ignore - dataset é disponível em HTMLElement
-    wrapper.dataset.questionId = questionId;
-
-    // Badge de turnId se existir
-    const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
-    wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
-
-    // Inserir no topo
-    answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
-
-    // Remover seleção anterior
-    answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach((el) => {
-      el.classList.remove('selected-answer');
-    });
-    wrapper.classList.add('selected-answer');
-
-    // Auto-scroll
-    answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
-  }
-
-  // Renderizar resposta como markdown
-  const answerContent = wrapper.querySelector('.answer-content');
-  if (answerContent && marked !== undefined) {
-    // @ts-ignore - marked.parse retorna string
-    const htmlContent = marked.parse(response);
-    // @ts-ignore - innerHTML aceita string
-    answerContent.innerHTML = htmlContent;
-    Logger.debug(`✅ [BATCH] Resposta renderizada: ${response.substring(0, 50)}...`, false);
-  }
-
-  // 🔥 Reordenar respostas por turnId DESC
-  sortAnswersByTurnId();
-});
-
-/**
- * 🔥 LISTENER: answerStreamEnd
- * Emitido quando stream de LLM termina
- * Pode fazer limpeza ou marcar como finalizado
- */
-eventBus.on('answerStreamEnd', (_) => {
-  Logger.debug('✅ [STREAM_END] LLM streaming finalizado', false);
-  // Pode fazer limpeza de states temporários aqui se necessário
-});
+// ✅ REMOVIDO: listener 'answerStreamEnd' movido para HomeManager.js (#initUIEventBusListeners)
 
 /* ================================ */
 //	PROTEÇÃO CONTRA CAPTURA DE TELA
