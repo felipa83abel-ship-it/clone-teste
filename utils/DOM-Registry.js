@@ -6,6 +6,10 @@
  */
 
 class DOMRegistry {
+  /**
+   * Obtém um único elemento DOM por chave
+   * @returns {HTMLElement|null}
+   */
   static get(key) {
     const selector = this.registry[key];
     if (!selector) {
@@ -15,21 +19,34 @@ class DOMRegistry {
     return document.querySelector(selector);
   }
 
+  /**
+   * Obtém múltiplos elementos DOM por chave
+   * @returns {NodeListOf<Element>|[]}
+   */
   static getAll(key) {
     const selector = this.registry[key];
     if (!selector) {
       console.warn(`⚠️ DOM-Registry: '${key}' não registrado`);
       return [];
     }
-    return document.querySelectorAll(selector);
+    const result = document.querySelectorAll(selector);
+    return result.length > 0 ? result : [];
   }
 
+  /**
+   * Obtém elemento obrigatório (lança erro se não encontrado)
+   * @returns {HTMLElement}
+   */
   static getRequired(key) {
     const elem = this.get(key);
     if (!elem) throw new Error(`❌ DOM-Registry: '${key}' obrigatório não encontrado`);
     return elem;
   }
 
+  /**
+   * Verifica se elemento existe
+   * @returns {boolean}
+   */
   static exists(key) {
     return !!this.get(key);
   }

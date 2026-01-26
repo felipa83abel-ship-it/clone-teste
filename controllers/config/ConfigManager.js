@@ -1,6 +1,6 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
 /// <reference path="../../types/globals.d.ts" />
-/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowConfigManager, HomeManager */
+/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowUIManager, HomeUIManager */
 
 /**
  * ConfigManager - Orquestrador Central de Configurações
@@ -176,10 +176,9 @@ class ConfigManager {
 
   /**
    * Inicializa todos os managers de forma orquestrada
-   * @private
    */
-  async #initializeAllManagers() {
-    console.log('🎯 ConfigManager.#initializeAllManagers() - Orquestração de managers');
+  async initializeAllManagers() {
+    console.log('🎯 ConfigManager.initializeAllManagers() - Orquestração de managers');
 
     const managers = [
       { name: 'ApiKeyManager', instance: this.apiKeyManager },

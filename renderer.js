@@ -294,24 +294,6 @@ const registerUIElements = (elements) => uiElementsRegistry.register(elements);
 /* ================================ */
 
 /**
- * Escuta atualização de volume de entrada
- * ✅ REMOVIDO: VU meter update - DOM manipulação movida para AudioDeviceManager
- */
-// eventBus.on('inputVolumeUpdate', (data) => {
-//   const { percent } = data;
-//   // DOM updates removed - now in AudioDeviceManager
-// });
-
-/**
- * Escuta atualização de volume de saída
- * ✅ REMOVIDO: VU meter update - DOM manipulação movida para AudioDeviceManager
- */
-// eventBus.on('outputVolumeUpdate', (data) => {
-//   const { percent } = data;
-//   // DOM updates removed - now in AudioDeviceManager
-// });
-
-/**
  * Escuta evento de mudança de dispositivo
  * Emitido pelo config-manager
  */
@@ -346,7 +328,7 @@ eventBus.on('audioDeviceChanged', async (_data) => {
  * 🔥 Reordena os blocos de resposta por turnId (DESC - maior primeiro)
  * Mantém a ordem decrescente baseada no ID da pergunta
  */
-function sortAnswersByTurnId() {
+function _sortAnswersByTurnId() {
   // Emite evento para HomeUIManager lidar com reordenação
   eventBus.emit('sortAnswersByTurnId');
 }

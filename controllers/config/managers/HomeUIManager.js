@@ -439,7 +439,7 @@ class HomeManager {
     // LISTENER: transcriptionAdd
     // Adiciona transcrição ao UI
     // ==========================================
-    this.eventBus.on('transcriptionAdd', ({ questionId, text }) => {
+    this.eventBus.on('transcriptionAdd', ({ _questionId, text }) => {
       const transcriptBox = document.getElementById('transcriptBox');
       if (!transcriptBox) {
         console.warn('⚠️ Elemento transcriptBox não encontrado');
@@ -551,7 +551,7 @@ class HomeManager {
         if (answerEl) {
           answerEl.innerHTML = response;
           if (turnId) {
-            answerEl.setAttribute('data-turn-id', turnId);
+            answerEl.dataset.turnId = turnId;
           }
         } else {
           const badge = turnId ? `<span class="turn-id-badge">${turnId}</span>` : '';
