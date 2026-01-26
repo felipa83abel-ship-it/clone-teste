@@ -44,7 +44,10 @@ function initQuestionController(deps) {
 function renderQuestionsHistory() {
   Logger.debug('Início da função: "renderQuestionsHistory"');
 
-  const historyData = [...appState.history].reverse().map((q) => {
+  const state = appState || globalThis.appState;
+  const eventBusGlobal = eventBus || globalThis.eventBus;
+
+  const historyData = [...state.history].reverse().map((q) => {
     let label = q.text;
     if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && q.lastUpdateTime) {
       const time = new Date(q.lastUpdateTime).toLocaleTimeString();
@@ -57,13 +60,13 @@ function renderQuestionsHistory() {
       text: label,
       isIncomplete: q.incomplete,
       isAnswered: q.answered,
-      isSelected: q.id === appState.selectedId,
+      isSelected: q.id === state.selectedId,
     };
   });
 
-  eventBus.emit('questionsHistoryUpdate', historyData);
-  eventBus.emit('scrollToQuestion', {
-    questionId: appState.selectedId,
+  eventBusGlobal.emit('questionsHistoryUpdate', historyData);
+  eventBusGlobal.emit('scrollToQuestion', {
+    questionId: state.selectedId,
   });
 
   Logger.debug('Fim da função: "renderQuestionsHistory"');
@@ -75,27 +78,30 @@ function renderQuestionsHistory() {
 function renderCurrentQuestion() {
   Logger.debug('Início da função: "renderCurrentQuestion"');
 
-  if (!appState.interview.currentQuestion.text) {
-    eventBus.emit('currentQuestionUpdate', { text: '', isSelected: false });
+  const state = appState || globalThis.appState;
+  const eventBusGlobal = eventBus || globalThis.eventBus;
+
+  if (!state.interview.currentQuestion.text) {
+    eventBusGlobal.emit('currentQuestionUpdate', { text: '', isSelected: false });
     return;
   }
 
-  let label = appState.interview.currentQuestion.text;
+  let label = state.interview.currentQuestion.text;
 
-  if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && appState.interview.currentQuestion.lastUpdateTime) {
-    const time = new Date(appState.interview.currentQuestion.lastUpdateTime).toLocaleTimeString();
+  if (ENABLE_INTERVIEW_TIMING_DEBUG_METRICS && state.interview.currentQuestion.lastUpdateTime) {
+    const time = new Date(state.interview.currentQuestion.lastUpdateTime).toLocaleTimeString();
     label = `⏱️ ${time} — ${label}`;
   }
 
   const questionData = {
     text: label,
-    isSelected: appState.selectedId === CURRENT_QUESTION_ID,
-    rawText: appState.interview.currentQuestion.text,
-    createdAt: appState.interview.currentQuestion.createdAt,
-    lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime,
+    isSelected: state.selectedId === CURRENT_QUESTION_ID,
+    rawText: state.interview.currentQuestion.text,
+    createdAt: state.interview.currentQuestion.createdAt,
+    lastUpdateTime: state.interview.currentQuestion.lastUpdateTime,
   };
 
-  eventBus.emit('currentQuestionUpdate', questionData);
+  eventBusGlobal.emit('currentQuestionUpdate', questionData);
 
   Logger.debug('Fim da função: "renderCurrentQuestion"');
 }
@@ -109,13 +115,17 @@ function renderCurrentQuestion() {
 function checkIfAnswered(questionId) {
   if (questionId === CURRENT_QUESTION_ID) return false;
 
-  const existingAnswer = findAnswerByQuestionId(appState, questionId);
+  const state = appState || globalThis.appState;
+  const eventBusGlobal = eventBus || globalThis.eventBus;
+  const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
+
+  const existingAnswer = findAnswerByQuestionId(state, questionId);
   if (existingAnswer) {
-    eventBus.emit('answerSelected', {
+    eventBusGlobal.emit('answerSelected', {
       questionId: questionId,
       shouldScroll: true,
     });
-    updateStatusMessage('📌 Essa pergunta já foi respondida');
+    updateStatusGlobal('📌 Essa pergunta já foi respondida');
     return true;
   }
   return false;
@@ -127,9 +137,12 @@ function checkIfAnswered(questionId) {
 function checkIfIncomplete(questionId) {
   if (questionId === CURRENT_QUESTION_ID) return false;
 
-  const q = appState.history.find((q) => q.id === questionId);
+  const state = appState || globalThis.appState;
+  const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
+
+  const q = state.history.find((q) => q.id === questionId);
   if (q?.incomplete) {
-    updateStatusMessage('⚠️ Pergunta incompleta — pressione o botão de responder');
+    updateStatusGlobal('⚠️ Pergunta incompleta — pressione o botão de responder');
     return true;
   }
   return false;
@@ -139,12 +152,17 @@ function checkIfIncomplete(questionId) {
  * Verifica se o LLM já respondeu esse turno
  */
 function checkIfLLMAlreadyAnswered(questionId) {
+  const state = appState || globalThis.appState;
+  const modeManagerGlobal = modeManager || globalThis.modeManager;
+  const MODESGlobal = MODES || globalThis.MODES;
+  const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
+
   if (
-    modeManager.is(MODES.INTERVIEW) &&
+    modeManagerGlobal.is(MODESGlobal.INTERVIEW) &&
     questionId === CURRENT_QUESTION_ID &&
-    appState.interview.llmAnsweredTurnId === appState.interview.interviewTurnId
+    state.interview.llmAnsweredTurnId === state.interview.interviewTurnId
   ) {
-    updateStatusMessage('⛔ LLM já respondeu esse turno');
+    updateStatusGlobal('⛔ LLM já respondeu esse turno');
     return true;
   }
   return false;
@@ -156,44 +174,55 @@ function checkIfLLMAlreadyAnswered(questionId) {
 function processCurrentQuestion(questionId) {
   if (questionId !== CURRENT_QUESTION_ID) return false;
 
-  if (!appState.interview.currentQuestion.text?.trim()) {
-    updateStatusMessage('⚠️ Pergunta vazia - nada a responder');
+  const state = appState || globalThis.appState;
+  const modeManagerGlobal = modeManager || globalThis.modeManager;
+  const MODESGlobal = MODES || globalThis.MODES;
+  const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
+  const askLLMGlobal = askLLM || globalThis.askLLM;
+
+  if (!state.interview.currentQuestion.text?.trim()) {
+    updateStatusGlobal('⚠️ Pergunta vazia - nada a responder');
     return false;
   }
 
-  if (!appState.interview.currentQuestion.finalized) {
-    appState.interview.currentQuestion.text = finalizeQuestion(
-      appState.interview.currentQuestion.text
-    );
-    appState.interview.currentQuestion.lastUpdateTime = Date.now();
-    appState.interview.currentQuestion.finalized = true;
+  if (!state.interview.currentQuestion.finalized) {
+    state.interview.currentQuestion.text = finalizeQuestion(state.interview.currentQuestion.text);
+    state.interview.currentQuestion.lastUpdateTime = Date.now();
+    state.interview.currentQuestion.finalized = true;
 
-    const newId = String(appState.history.length + 1);
+    // 🔥 CRÍTICO: Usar getNextQuestionId() para garantir IDs únicos e sequenciais
+    const newId = state.getNextQuestionId();
 
-    if (modeManager.is(MODES.INTERVIEW)) {
-      appState.interview.interviewTurnId++;
-      appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
-    } else {
-      appState.interview.currentQuestion.turnId = Number.parseInt(newId);
+    // 🔥 UNIFICADO: Usar o mesmo contador global (newId) para turnId em TODOS os modos
+    // Evita duplicação entre INTERVIEW e NORMAL modes
+    const globalTurnId = Number.parseInt(newId);
+
+    if (modeManagerGlobal.is(MODESGlobal.INTERVIEW)) {
+      state.interview.interviewTurnId++;
     }
+    // Não precisa usar interviewTurnId em NORMAL mode - usa globalTurnId para ambos
+    state.interview.currentQuestion.turnId = globalTurnId;
 
-    appState.history.push({
+    state.history.push({
       id: newId,
-      text: appState.interview.currentQuestion.text,
-      turnId: appState.interview.currentQuestion.turnId,
-      createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-      lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || Date.now(),
+      text: state.interview.currentQuestion.text,
+      turnId: globalTurnId, // 🔥 ID unificado baseado no contador global
+      createdAt: state.interview.currentQuestion.createdAt || Date.now(),
+      lastUpdateTime: state.interview.currentQuestion.lastUpdateTime || Date.now(),
     });
 
-    appState.interview.currentQuestion.promotedToHistory = true;
-    resetCurrentQuestion(appState);
-    appState.selectedId = newId;
+    state.interview.currentQuestion.promotedToHistory = true;
+    resetCurrentQuestion(state);
+    state.selectedId = newId;
     renderQuestionsHistory();
     renderCurrentQuestion();
 
     Logger.debug('🔥 CURRENT promovido para histórico');
 
-    askLLM(newId);
+    // 🔥 CRÍTICO: Só responder automaticamente em modo ENTREVISTA quando clicado
+    // (Em modo PADRÃO, o clique SEM silêncio não deve responder)
+    // Mas quando vem do clique do usuário em handleQuestionClick(), sempre responde
+    askLLMGlobal(newId);
     return true;
   }
   return false;
@@ -201,8 +230,17 @@ function processCurrentQuestion(questionId) {
 
 function handleQuestionClick(questionId) {
   Logger.debug('Início da função: "handleQuestionClick"');
-  appState.selectedId = questionId;
-  clearAllSelections();
+  const state = appState || globalThis.appState;
+  state.selectedId = questionId;
+  const clearFunc = clearAllSelections || globalThis.clearAllSelections;
+  const eventBusGlobal = eventBus || globalThis.eventBus;
+
+  if (typeof clearFunc === 'function') {
+    clearFunc();
+  } else if (eventBusGlobal) {
+    eventBusGlobal.emit('clearAllSelections', {});
+  }
+
   renderQuestionsHistory();
   renderCurrentQuestion();
 
@@ -227,7 +265,8 @@ function handleQuestionClick(questionId) {
     return;
   }
 
-  askLLM();
+  const askLLMGlobal = askLLM || globalThis.askLLM;
+  askLLMGlobal();
   Logger.debug('Fim da função: "handleQuestionClick"');
 }
 
@@ -237,20 +276,22 @@ function handleQuestionClick(questionId) {
 function getSelectedQuestionText() {
   Logger.debug('Início da função: "getSelectedQuestionText"');
 
-  if (appState.selectedId === CURRENT_QUESTION_ID) {
-    return appState.interview.currentQuestion.text;
+  const state = appState || globalThis.appState;
+
+  if (state.selectedId === CURRENT_QUESTION_ID) {
+    return state.interview.currentQuestion.text;
   }
 
-  if (appState.selectedId) {
-    const q = appState.history.find((q) => q.id === appState.selectedId);
+  if (state.selectedId) {
+    const q = state.history.find((q) => q.id === state.selectedId);
     if (q?.text) return q.text;
   }
 
   if (
-    appState.interview.currentQuestion.text &&
-    appState.interview.currentQuestion.text.trim().length > 0
+    state.interview.currentQuestion.text &&
+    state.interview.currentQuestion.text.trim().length > 0
   ) {
-    return appState.interview.currentQuestion.text;
+    return state.interview.currentQuestion.text;
   }
 
   Logger.debug('Fim da função: "getSelectedQuestionText"');
@@ -261,75 +302,87 @@ function getSelectedQuestionText() {
  * Finaliza a pergunta atual para histórico
  */
 function finalizeCurrentQuestion() {
-  Logger.debug('Início da função: "finalizeCurrentQuestion"');
+  Logger.debug(`🎯 finalizeCurrentQuestion() CHAMADA - shouldFinalizeAskCurrent recebido`, true);
 
-  if (!appState.interview.currentQuestion.text?.trim()) {
+  const state = appState || globalThis.appState;
+  const modeManagerGlobal = modeManager || globalThis.modeManager;
+  const MODESGlobal = MODES || globalThis.MODES;
+  const askLLMGlobal = askLLM || globalThis.askLLM;
+
+  // 🔥 DEBUG: Verificar qual modo está ativo
+  const currentModeCheck = modeManagerGlobal.is(MODESGlobal.INTERVIEW);
+  console.log(
+    `🎯 [DEBUG finalizeCurrentQuestion] Modo: ${modeManagerGlobal.getMode()} | isINTERVIEW=${currentModeCheck}`
+  );
+
+  if (!state.interview.currentQuestion.text?.trim()) {
     console.log('⚠️ Sem texto para finalizar');
     return;
   }
 
-  if (appState.interview.currentQuestion.finalized) {
+  if (state.interview.currentQuestion.finalized) {
     console.log('⛔ Pergunta já finalizada');
     return;
   }
 
-  if (modeManager.is(MODES.INTERVIEW)) {
-    appState.interview.currentQuestion.text = finalizeQuestion(
-      appState.interview.currentQuestion.text
-    );
-    appState.interview.currentQuestion.lastUpdateTime = Date.now();
-    appState.interview.currentQuestion.finalized = true;
+  if (modeManagerGlobal.is(MODESGlobal.INTERVIEW)) {
+    state.interview.currentQuestion.text = finalizeQuestion(state.interview.currentQuestion.text);
+    state.interview.currentQuestion.lastUpdateTime = Date.now();
+    state.interview.currentQuestion.finalized = true;
 
-    const newId = String(appState.history.length + 1);
+    // 🔥 CRÍTICO: Usar getNextQuestionId() para garantir IDs únicos e sequenciais
+    const newId = state.getNextQuestionId();
 
-    appState.interview.interviewTurnId++;
-    appState.interview.currentQuestion.turnId = appState.interview.interviewTurnId;
+    // 🔥 UNIFICADO: Usar o mesmo contador global (newId) para turnId em TODOS os modos
+    const globalTurnId = Number.parseInt(newId);
+    state.interview.interviewTurnId++;
+    state.interview.currentQuestion.turnId = globalTurnId;
 
-    appState.history.push({
+    state.history.push({
       id: newId,
-      text: appState.interview.currentQuestion.text,
-      turnId: appState.interview.currentQuestion.turnId,
-      createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
-      lastUpdateTime: appState.interview.currentQuestion.lastUpdateTime || Date.now(),
+      text: state.interview.currentQuestion.text,
+      turnId: globalTurnId, // 🔥 ID unificado baseado no contador global
+      createdAt: state.interview.currentQuestion.createdAt || Date.now(),
+      lastUpdateTime: state.interview.currentQuestion.lastUpdateTime || Date.now(),
     });
 
-    appState.interview.currentQuestion.promotedToHistory = true;
-    resetCurrentQuestion(appState);
+    state.interview.currentQuestion.promotedToHistory = true;
+    resetCurrentQuestion(state);
 
-    appState.selectedId = newId;
+    state.selectedId = newId;
     renderQuestionsHistory();
     renderCurrentQuestion();
 
     if (
-      appState.interview.llmRequestedTurnId !== appState.interview.interviewTurnId &&
-      appState.interview.llmAnsweredTurnId !== appState.interview.interviewTurnId
+      state.interview.llmRequestedTurnId !== state.interview.interviewTurnId &&
+      state.interview.llmAnsweredTurnId !== state.interview.interviewTurnId
     ) {
-      askLLM(newId);
+      askLLMGlobal(newId);
     }
 
-    Logger.debug('Fim da função: "finalizeCurrentQuestion"');
     return;
   }
 
-  if (!modeManager.is(MODES.INTERVIEW)) {
-    const newId = String(appState.history.length + 1);
-    appState.history.push({
+  if (!modeManagerGlobal.is(MODESGlobal.INTERVIEW)) {
+    // 🔥 CRÍTICO: Usar getNextQuestionId() para garantir IDs únicos e sequenciais
+    const newId = state.getNextQuestionId();
+    const globalTurnId = Number.parseInt(newId); // 🔥 Usar o mesmo contador global
+
+    state.history.push({
       id: newId,
-      text: appState.interview.currentQuestion.text,
-      turnId: Number.parseInt(newId),
-      createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
+      text: state.interview.currentQuestion.text,
+      turnId: globalTurnId, // 🔥 ID unificado baseado no contador global
+      createdAt: state.interview.currentQuestion.createdAt || Date.now(),
       lastUpdateTime:
-        appState.interview.currentQuestion.lastUpdateTime ||
-        appState.interview.currentQuestion.createdAt ||
+        state.interview.currentQuestion.lastUpdateTime ||
+        state.interview.currentQuestion.createdAt ||
         Date.now(),
     });
 
-    appState.selectedId = newId;
-    resetCurrentQuestion(appState);
+    state.selectedId = newId;
+    resetCurrentQuestion(state);
     renderQuestionsHistory();
     renderCurrentQuestion();
-
-    Logger.debug('Fim da função: "finalizeCurrentQuestion"');
   }
 }
 
@@ -337,33 +390,32 @@ function finalizeCurrentQuestion() {
  * Força o fechamento da pergunta atual
  */
 function closeCurrentQuestionForced() {
-  Logger.debug('Início da função: "closeCurrentQuestionForced"');
+  const state = appState || globalThis.appState;
 
-  console.log('🚪 Fechando pergunta:', appState.interview.currentQuestion.text);
+  Logger.debug('🚪 Fechando pergunta:', state.interview.currentQuestion.text, true);
 
-  if (!appState.interview.currentQuestion.text) return;
+  if (!state.interview.currentQuestion.text) return;
 
-  appState.history.push({
+  state.history.push({
     id: crypto.randomUUID(),
-    text: finalizeQuestion(appState.interview.currentQuestion.text),
-    createdAt: appState.interview.currentQuestion.createdAt || Date.now(),
+    text: finalizeQuestion(state.interview.currentQuestion.text),
+    createdAt: state.interview.currentQuestion.createdAt || Date.now(),
   });
 
-  appState.interview.currentQuestion.text = '';
-  appState.selectedId = null;
+  state.interview.currentQuestion.text = '';
+  state.selectedId = null;
   renderQuestionsHistory();
   renderCurrentQuestion();
-
-  Logger.debug('Fim da função: "closeCurrentQuestionForced"');
 }
 
 /**
  * Obtém IDs navegáveis de perguntas
  */
 function getNavigableQuestionIds() {
+  const state = appState || globalThis.appState;
   const ids = [];
-  if (appState.currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
-  [...appState.history].reverse().forEach((q) => ids.push(q.id));
+  if (state.interview.currentQuestion.text) ids.push(CURRENT_QUESTION_ID);
+  [...state.history].reverse().forEach((q) => ids.push(q.id));
   return ids;
 }
 
@@ -371,7 +423,8 @@ function getNavigableQuestionIds() {
  * Consolida texto de fala (interim vs final)
  */
 function consolidateQuestionText(cleaned, isInterim) {
-  const q = appState.interview.currentQuestion;
+  const state = appState || globalThis.appState;
+  const q = state.interview.currentQuestion;
 
   if (isInterim) {
     q.interimText = cleaned;
@@ -387,25 +440,35 @@ function consolidateQuestionText(cleaned, isInterim) {
  * Manipula entrada de pergunta do OTHER
  */
 function handleCurrentQuestion(author, text, options = {}) {
-  Logger.debug('Início da função: "handleCurrentQuestion"');
+  Logger.debug(
+    `📝 handleCurrentQuestion chamado: author=${author}, text="${text}", isInterim=${options.isInterim}`,
+    false
+  );
 
+  const state = appState || globalThis.appState;
+  const clearFunc = clearAllSelections || globalThis.clearAllSelections;
+  const eventBusGlobal = eventBus || globalThis.eventBus;
   const cleaned = text.replaceAll(/Ê+|hum|ahn/gi, '').trim();
   const now = Date.now();
-  const OTHER = 'OTHER';
+  const OTHER = 'Outros';
 
   if (author === OTHER) {
-    if (!appState.interview.currentQuestion.text) {
-      appState.interview.currentQuestion.createdAt = now;
+    if (!state.interview.currentQuestion.text) {
+      state.interview.currentQuestion.createdAt = now;
     }
 
-    appState.interview.currentQuestion.lastUpdateTime = now;
-    appState.interview.currentQuestion.lastUpdate = now;
+    state.interview.currentQuestion.lastUpdateTime = now;
+    state.interview.currentQuestion.lastUpdate = now;
 
     consolidateQuestionText(cleaned, options.isInterim);
 
-    if (!appState.selectedId) {
-      appState.selectedId = CURRENT_QUESTION_ID;
-      clearAllSelections();
+    if (!state.selectedId) {
+      state.selectedId = CURRENT_QUESTION_ID;
+      if (typeof clearFunc === 'function') {
+        clearFunc();
+      } else if (eventBusGlobal) {
+        eventBusGlobal.emit('clearAllSelections', {});
+      }
     }
 
     renderCurrentQuestion();
@@ -414,16 +477,17 @@ function handleCurrentQuestion(author, text, options = {}) {
       finalizeCurrentQuestion();
     }
   }
-
-  Logger.debug('Fim da função: "handleCurrentQuestion"');
 }
 
 /**
  * Rola para pergunta selecionada
  */
 function scrollToSelectedQuestion() {
-  eventBus.emit('scrollToQuestion', {
-    questionId: appState.selectedId,
+  const state = appState || globalThis.appState;
+  const eventBusGlobal = eventBus || globalThis.eventBus;
+
+  eventBusGlobal.emit('scrollToQuestion', {
+    questionId: state.selectedId,
   });
 }
 

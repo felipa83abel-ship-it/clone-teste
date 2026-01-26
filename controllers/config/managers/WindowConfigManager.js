@@ -96,6 +96,12 @@ class WindowConfigManager {
     if (interviewModeSelect) {
       interviewModeSelect.value = savedInterviewMode;
       Logger.debug(`   ✅ Interview Mode restaurado: ${savedInterviewMode}`, false);
+
+      // 🔥 CRÍTICO: Sincronizar com modeManager quando página carrega
+      if (globalThis.RendererAPI?.changeMode) {
+        globalThis.RendererAPI.changeMode(savedInterviewMode);
+        console.log(`🎯 [BOOT] Modo sincronizado na inicialização: ${savedInterviewMode}`);
+      }
     } else {
       Logger.debug('   ⚠️ interviewModeSelect não encontrado no DOM', false);
     }
@@ -267,8 +273,14 @@ class WindowConfigManager {
     const interviewModeSelect = document.getElementById('interviewModeSelect');
     if (interviewModeSelect) {
       interviewModeSelect.addEventListener('change', (e) => {
-        this.saveWindowField('interviewModeSelect', e.target.value);
-        Logger.debug(`   📝 Interview Mode alterado: ${e.target.value}`, false);
+        const newMode = e.target.value;
+        this.saveWindowField('interviewModeSelect', newMode);
+        // 🔥 CRÍTICO: Mudar o modo no modeManager quando o dropdown muda
+        if (globalThis.RendererAPI?.changeMode) {
+          globalThis.RendererAPI.changeMode(newMode);
+          console.log(`🎯 Modo alterado via dropdown: ${newMode}`);
+        }
+        Logger.debug(`   📝 Interview Mode alterado: ${newMode}`, false);
       });
       Logger.debug('   ✅ Listener para interviewModeSelect registrado', false);
     } else {

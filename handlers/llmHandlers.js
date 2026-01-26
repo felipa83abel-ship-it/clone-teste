@@ -60,7 +60,11 @@ async function handleLLMStream(
   llmManager,
   turnId = null
 ) {
-  Logger.info('Iniciando stream LLM', { questionId, textLength: text.length, turnId });
+  Logger.debug(
+    'Inicializando Stream LLM',
+    { questionId, turnId, text, textLength: text.length },
+    false
+  );
 
   let streamedText = '';
   appState.metrics.llmStartTime = Date.now();
@@ -95,9 +99,13 @@ async function handleLLMStream(
     appState.metrics.llmEndTime = Date.now();
     appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
 
-    Logger.info('Stream LLM finalizado', {
-      duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
-    });
+    Logger.debug(
+      '⚡ Stream LLM finalizado',
+      {
+        duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
+      },
+      true
+    );
 
     eventBus.emit('llmStreamEnd', {
       questionId,
@@ -114,7 +122,7 @@ async function handleLLMStream(
  * Manipula resposta em modo batch (normal)
  */
 async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
-  Logger.info('Iniciando batch LLM', { questionId, textLength: text.length });
+  Logger.debug('Inicializando Batch LLM', { questionId, text, textLength: text.length }, true);
 
   appState.metrics.llmStartTime = Date.now();
 
@@ -131,9 +139,13 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 
     appState.metrics.llmEndTime = Date.now();
 
-    Logger.info('Batch LLM finalizado', {
-      duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
-    });
+    Logger.debug(
+      '⚡ Batch LLM finalizado',
+      {
+        duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
+      },
+      true
+    );
 
     eventBus.emit('llmBatchEnd', {
       questionId,

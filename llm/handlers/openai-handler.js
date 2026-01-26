@@ -127,10 +127,15 @@ class OpenAIHandler {
     ipcRenderer.once('LLM_STREAM_ERROR', onError);
 
     try {
-      Logger.info('📤 OpenAI stream() iniciado', {
-        model: this.model,
-        messagesCount: messages.length,
-      });
+      Logger.debug(
+        '📤 OpenAI stream() iniciado',
+        {
+          model: this.model,
+          messagesCount: messages.length,
+          messages,
+        },
+        true
+      );
 
       // Invocar stream no main process
       ipcRenderer.invoke('ask-llm-stream', messages).catch((err) => {
@@ -159,7 +164,7 @@ class OpenAIHandler {
         }
       }
 
-      Logger.info('✅ OpenAI stream() concluído');
+      Logger.debug('✅ OpenAI stream() concluído', false);
     } finally {
       // Limpar listeners para evitar memory leaks
       ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);

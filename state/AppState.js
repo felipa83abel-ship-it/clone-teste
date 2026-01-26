@@ -61,6 +61,10 @@ class AppState {
       isDraggingWindow: false,
     };
 
+    // 🔥 CRÍTICO: Contador GLOBAL de questões para gerar IDs únicos e sequenciais
+    // Nunca reinicia, aumenta a cada nova pergunta consolidada
+    this.globalQuestionCounter = 0;
+
     this.interview = {
       currentQuestion: {
         text: '',
@@ -93,6 +97,20 @@ class AppState {
     this.llm = {
       selectedProvider: 'openai', // Provider padrão
     };
+  }
+
+  // ============================================
+  // MÉTODO PARA GERAR ID SEQUENCIAL ÚNICO
+  // ============================================
+
+  /**
+   * Retorna o próximo ID sequencial global para uma pergunta
+   * Garante que IDs nunca se repetem ou reiniciam
+   * @returns {string} ID sequencial como string
+   */
+  getNextQuestionId() {
+    this.globalQuestionCounter++;
+    return String(this.globalQuestionCounter);
   }
 
   // ============================================

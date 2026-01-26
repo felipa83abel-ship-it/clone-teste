@@ -103,7 +103,7 @@ llmManager.register('google', geminiHandler);
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
 eventBus.on('llmStreamEnd', (data) => {
-  Logger.info('LLM Stream finalizado', { questionId: data.questionId });
+  Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
 
   // 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
   appState.interview.answeredQuestions.add(data.questionId);
@@ -120,10 +120,14 @@ eventBus.on('llmStreamEnd', (data) => {
 });
 
 eventBus.on('llmBatchEnd', (data) => {
-  Logger.info('LLM Batch finalizado', {
-    questionId: data.questionId,
-    responseLength: data.response?.length || 0,
-  });
+  Logger.debug(
+    'LLM Batch finalizado',
+    {
+      questionId: data.questionId,
+      responseLength: data.response?.length || 0,
+    },
+    false
+  );
 
   // 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
   appState.interview.answeredQuestions.add(data.questionId);
@@ -164,17 +168,50 @@ eventBus.on('listenButtonToggle', ({ isRunning, buttonText }) => {
     homeVuMeters.classList.toggle('listening', isRunning);
     console.log(`🎨 .home-vu-meters atualizado (listening: ${isRunning})`);
   }
+
+  // 🔥 Se parou de capturar, resetar volume na home para 0
+  if (!isRunning) {
+    const inputVuHome = document.getElementById('inputVuHome');
+    if (inputVuHome) inputVuHome.style.width = '0%';
+
+    const outputVuHome = document.getElementById('outputVuHome');
+    if (outputVuHome) outputVuHome.style.width = '0%';
+
+    console.log(`🔇 Volume resetado na home (parou de capturar)`);
+  }
 });
 
 // 🔥 NOVO: Listener para atualizar transcrição interim (parcial)
+// 🔥 NOVO: Listener para atualizar transcrição interim (parcial) em tempo real
 eventBus.on('updateInterim', ({ id, speaker, text }) => {
-  const element = document.getElementById(id);
-  if (element) {
-    element.textContent = text || '';
-    if (speaker) {
-      element.dataset.speaker = speaker;
+  let interimElement = document.getElementById(id);
+
+  // Se não existe, criar novo elemento interim
+  if (!interimElement) {
+    interimElement = document.createElement('div');
+    interimElement.id = id;
+    interimElement.className = 'transcript-item interim';
+    interimElement.style.color = '#888'; // Cor cinza para indicar interim/parcial
+
+    const transcriptionBox = document.getElementById('conversation');
+    if (transcriptionBox) {
+      transcriptionBox.appendChild(interimElement);
+      Logger.debug(`✨ Elemento interim criado: ${id}`, false);
     }
   }
+
+  // Atualizar o texto com timestamp
+  interimElement.innerHTML = `<strong>${speaker}:</strong> ${text}`;
+  Logger.debug(`📝 Interim atualizado: "${text.substring(0, 40)}..."`, false);
+
+  // 🔥 AUTO-SCROLL: Fazer scroll para o elemento interim criado
+  requestAnimationFrame(() => {
+    const container = document.getElementById('transcriptionContainer');
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+      Logger.debug(`📜 Auto-scroll para interim`, false);
+    }
+  });
 });
 
 // 🔥 NOVO: Listener para atualizar mensagem de status
@@ -183,7 +220,7 @@ eventBus.on('statusUpdate', ({ message }) => {
   const statusSpan = document.getElementById('status');
   if (statusSpan) {
     statusSpan.textContent = message || '';
-    console.log(`📊 Status atualizado: "${message}"`);
+    Logger.debug(`📊 Status atualizado: "${message}"`, false);
   } else {
     console.warn('⚠️ Elemento #status não encontrado no DOM');
   }
@@ -197,27 +234,47 @@ eventBus.on('transcriptAdd', ({ author, text, timeStr, elementId, placeholderId 
     div.id = placeholderId;
     div.className = 'transcript-item';
     div.dataset.speaker = author;
-    div.innerHTML = `<strong>${author}:</strong> <span class="transcript-text">${text}</span>${timeStr ? ` <small>${timeStr}</small>` : ''}`;
+    const timeStrHtml = timeStr ? ` <small>${timeStr}</small>` : '';
+    div.innerHTML = `<strong>${author}:</strong> <span class="transcript-text">${text}</span>${timeStrHtml}`;
     container.appendChild(div);
+
+    // 🔥 AUTO-SCROLL: Fazer scroll para o novo item de transcrição
+    requestAnimationFrame(() => {
+      const container = document.getElementById('transcriptionContainer');
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+        Logger.debug(`📜 Auto-scroll para transcriptAdd`, false);
+      }
+    });
   }
 });
 
 // 🔥 NOVO: Listener para preencher placeholder de transcrição
-eventBus.on('placeholderFulfill', ({ speaker, text, placeholderId, showMeta }) => {
+eventBus.on('placeholderFulfill', ({ _speaker, text, placeholderId, _showMeta }) => {
   const element = document.getElementById(placeholderId);
   if (element) {
     const textSpan = element.querySelector('.transcript-text');
     if (textSpan) {
       textSpan.textContent = text;
     }
+
+    // 🔥 AUTO-SCROLL: Fazer scroll para o item preenchido
+    const scrollContainer = document.getElementById('transcriptionContainer');
+    if (scrollContainer) {
+      requestAnimationFrame(() => {
+        scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        Logger.debug(`📜 Auto-scroll para placeholderFulfill`, false);
+      });
+    }
   }
 });
 
-// 🔥 NOVO: Listener para limpar transcrição interim
+// 🔥 NOVO: Listener para limpar transcrição interim (remover o elemento)
 eventBus.on('clearInterim', ({ id }) => {
-  const element = document.getElementById(id);
-  if (element) {
-    element.textContent = '';
+  const interimElement = document.getElementById(id);
+  if (interimElement) {
+    interimElement.remove();
+    Logger.debug(`🗑️ Elemento interim removido: ${id}`, false);
   }
 });
 
@@ -226,7 +283,7 @@ eventBus.on('clearAllSelections', () => {
   const currentQuestionBox = document.getElementById('currentQuestion');
   if (currentQuestionBox) {
     currentQuestionBox.classList.remove('selected-question');
-    console.log('🗑️ Seleção de pergunta atual removida');
+    Logger.debug('🗑️ Seleção de pergunta atual removida', false);
   }
 
   const questionsHistoryBox = document.getElementById('questionsHistory');
@@ -234,8 +291,262 @@ eventBus.on('clearAllSelections', () => {
     questionsHistoryBox.querySelectorAll('.selected-question').forEach((el) => {
       el.classList.remove('selected-question');
     });
-    console.log('🗑️ Seleções do histórico de perguntas removidas');
+    Logger.debug('🗑️ Seleções do histórico de perguntas removidas', false);
   }
+});
+
+/* ================================ */
+//	LISTENERS PARA RENDERIZAÇÃO DE PERGUNTAS
+/* ================================ */
+
+/**
+ * 🔥 LISTENER: currentQuestionUpdate
+ * Emitido por question-controller.js quando a pergunta ATUAL é atualizada
+ * Renderiza o texto no #currentQuestion e aplica CSS classes
+ */
+eventBus.on('currentQuestionUpdate', (data) => {
+  const { text, isSelected } = data;
+  const currentQuestionBox = document.getElementById('currentQuestion');
+
+  if (!currentQuestionBox) {
+    console.warn('⚠️ Elemento #currentQuestion não encontrado no DOM');
+    return;
+  }
+
+  // Procura por span dentro do elemento ou usa o próprio elemento
+  const textEl = currentQuestionBox.querySelector('span') || currentQuestionBox;
+  if (textEl) {
+    textEl.innerText = text;
+    Logger.debug(`✅ Pergunta atual atualizada: "${text.substring(0, 50)}..."`, false);
+  }
+
+  // Aplica/remove classe de seleção
+  if (isSelected) {
+    currentQuestionBox.classList.add('selected-question');
+  } else {
+    currentQuestionBox.classList.remove('selected-question');
+  }
+});
+
+/**
+ * 🔥 LISTENER: questionsHistoryUpdate
+ * Emitido por question-controller.js quando o histórico é atualizado
+ * Renderiza todos os question-blocks no #questionsHistory com CSS classes
+ */
+eventBus.on('questionsHistoryUpdate', (data) => {
+  const questionsHistoryBox = document.getElementById('questionsHistory');
+  if (!questionsHistoryBox) {
+    console.warn('⚠️ Elemento #questionsHistory não encontrado no DOM');
+    return;
+  }
+
+  // Limpar histórico anterior
+  questionsHistoryBox.innerHTML = '';
+
+  // Renderizar cada pergunta como um question-block
+  data.forEach((q) => {
+    const div = document.createElement('div');
+    div.className = 'question-block';
+    div.dataset.qid = q.id;
+
+    // Adicionar CSS classes conforme estado
+    if (q.isSelected) div.classList.add('selected-question');
+    if (q.isAnswered) div.classList.add('answered');
+    if (q.isIncomplete) div.classList.add('incomplete');
+
+    // Renderizar badge de turnId se existir
+    const turnIdBadge = q.turnId ? `<span class="turn-id-badge">${q.turnId}</span>` : '';
+    div.innerHTML = `${turnIdBadge}<span>${q.text}</span>`;
+
+    questionsHistoryBox.appendChild(div);
+  });
+
+  // 🔥 EVENT DELEGATION: Registrar handler de click para cada question-block
+  questionsHistoryBox.querySelectorAll('.question-block').forEach((block) => {
+    block.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+      // @ts-ignore - dataset é disponível em HTMLElement
+      const questionId = block.dataset.qid;
+      if (questionId) {
+        handleQuestionClick(questionId);
+        Logger.debug(`🖱️ Pergunta clicada: ${questionId}`, false);
+      }
+    });
+  });
+
+  Logger.debug(`✅ Histórico renderizado com ${data.length} pergunta(s)`, false);
+});
+
+/**
+ * 🔥 LISTENER: scrollToQuestion
+ * Emitido por question-controller.js para fazer scroll até pergunta específica
+ */
+eventBus.on('scrollToQuestion', (data) => {
+  const { questionId } = data;
+  const questionsHistoryBox = document.getElementById('questionsHistory');
+  if (!questionsHistoryBox) return;
+
+  const el = questionsHistoryBox.querySelector(`.question-block[data-qid="${questionId}"]`);
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    Logger.debug(`📜 Scroll para pergunta: ${questionId}`, false);
+  }
+});
+
+/**
+ * 🔥 LISTENER: answerSelected
+ * Emitido quando uma resposta é selecionada
+ * Adiciona/remove classe CSS de seleção na resposta correspondente
+ */
+eventBus.on('answerSelected', (payload) => {
+  if (!payload) return;
+
+  const { questionId, shouldScroll } = payload;
+  if (!questionId) return;
+
+  const answersBox = document.getElementById('answersHistory');
+  if (!answersBox) return;
+
+  // Remover seleção anterior
+  answersBox.querySelectorAll('.selected-answer').forEach((el) => {
+    el.classList.remove('selected-answer');
+  });
+
+  // Procurar resposta da pergunta
+  const answerEl = answersBox.querySelector(`[data-question-id="${questionId}"]`);
+  if (!answerEl) {
+    console.warn('⚠️ Resposta não encontrada para questionId:', questionId);
+    return;
+  }
+
+  // Marcar como selecionada
+  answerEl.classList.add('selected-answer');
+  Logger.debug(`✅ Resposta selecionada: questionId=${questionId}`, false);
+
+  // Fazer scroll se solicitado
+  if (shouldScroll) {
+    answerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+});
+
+/* ================================ */
+//	LISTENERS PARA LLM STREAMING E RESPOSTAS
+/* ================================ */
+
+/**
+ * 🔥 LISTENER: answerStreamChunk
+ * Emitido quando token chega do LLM em modo STREAMING
+ * Acumula e renderiza tokens em tempo real (como ChatGPT)
+ */
+eventBus.on('answerStreamChunk', (data) => {
+  const { questionId, turnId, accum } = data;
+  const answersHistoryBox = document.getElementById('answersHistory');
+  if (!answersHistoryBox) return;
+
+  // Procurar wrapper de resposta existente
+  let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+
+  // Se não existe, criar novo bloco de resposta
+  if (!wrapper) {
+    Logger.debug(`⚡ [STREAM] Criando novo bloco para questionId: ${questionId}`, false);
+
+    wrapper = document.createElement('div');
+    wrapper.className = 'answer-block';
+    // @ts-ignore - dataset é disponível em HTMLElement
+    wrapper.dataset.questionId = questionId;
+
+    // Badge de turnId se existir
+    const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
+    wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
+
+    // Inserir no topo do histórico
+    answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
+
+    // Remover seleção anterior
+    answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach((el) => {
+      el.classList.remove('selected-answer');
+    });
+    wrapper.classList.add('selected-answer');
+
+    // Auto-scroll para topo
+    answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }
+
+  // Atualizar conteúdo com markdown renderizado
+  const answerContent = wrapper.querySelector('.answer-content');
+  if (answerContent && marked !== undefined) {
+    // 🔥 Renderizar como markdown em tempo real (estilo ChatGPT)
+    // @ts-ignore - marked.parse retorna string
+    const htmlContent = marked.parse(accum);
+    // @ts-ignore - innerHTML aceita string
+    answerContent.innerHTML = htmlContent;
+    Logger.debug(`📝 [STREAM] Tokens acumulados (${accum.length} chars)`, false);
+  }
+
+  // 🔥 Reordenar respostas por turnId DESC
+  sortAnswersByTurnId();
+});
+
+/**
+ * 🔥 LISTENER: answerBatchEnd
+ * Emitido quando resposta completa chega em modo NÃO-STREAMING (batch)
+ * Renderiza a resposta formatada de uma vez
+ */
+eventBus.on('answerBatchEnd', (data) => {
+  const { questionId, response, turnId } = data;
+  const answersHistoryBox = document.getElementById('answersHistory');
+  if (!answersHistoryBox) return;
+
+  Logger.debug(`📊 [BATCH] Resposta completa para questionId: ${questionId}`, true);
+
+  // Procurar bloco existente ou criar novo
+  let wrapper = answersHistoryBox.querySelector(`.answer-block[data-question-id="${questionId}"]`);
+
+  if (!wrapper) {
+    wrapper = document.createElement('div');
+    wrapper.className = 'answer-block';
+    // @ts-ignore - dataset é disponível em HTMLElement
+    wrapper.dataset.questionId = questionId;
+
+    // Badge de turnId se existir
+    const turnIdBadge = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
+    wrapper.innerHTML = `${turnIdBadge}<div class="answer-content"></div>`;
+
+    // Inserir no topo
+    answersHistoryBox.insertBefore(wrapper, answersHistoryBox.firstChild);
+
+    // Remover seleção anterior
+    answersHistoryBox.querySelectorAll('.answer-block.selected-answer').forEach((el) => {
+      el.classList.remove('selected-answer');
+    });
+    wrapper.classList.add('selected-answer');
+
+    // Auto-scroll
+    answersHistoryBox.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }
+
+  // Renderizar resposta como markdown
+  const answerContent = wrapper.querySelector('.answer-content');
+  if (answerContent && marked !== undefined) {
+    // @ts-ignore - marked.parse retorna string
+    const htmlContent = marked.parse(response);
+    // @ts-ignore - innerHTML aceita string
+    answerContent.innerHTML = htmlContent;
+    Logger.debug(`✅ [BATCH] Resposta renderizada: ${response.substring(0, 50)}...`, false);
+  }
+
+  // 🔥 Reordenar respostas por turnId DESC
+  sortAnswersByTurnId();
+});
+
+/**
+ * 🔥 LISTENER: answerStreamEnd
+ * Emitido quando stream de LLM termina
+ * Pode fazer limpeza ou marcar como finalizado
+ */
+eventBus.on('answerStreamEnd', (_) => {
+  Logger.debug('✅ [STREAM_END] LLM streaming finalizado', false);
+  // Pode fazer limpeza de states temporários aqui se necessário
 });
 
 /* ================================ */
@@ -327,26 +638,34 @@ const registerUIElements = (elements) => uiElementsRegistry.register(elements);
 
 /**
  * Escuta atualização de volume de entrada
+ * 🔥 MODIFICADO: Só atualiza a home quando está capturando áudio (appState.audio.isRunning)
  */
 eventBus.on('inputVolumeUpdate', (data) => {
   const { percent } = data;
   const inputVu = document.getElementById('inputVu');
   if (inputVu) inputVu.style.width = percent + '%';
 
-  const inputVuHome = document.getElementById('inputVuHome');
-  if (inputVuHome) inputVuHome.style.width = percent + '%';
+  // 🔥 Só atualiza volume na home se estiver capturando áudio
+  if (appState.audio.isRunning) {
+    const inputVuHome = document.getElementById('inputVuHome');
+    if (inputVuHome) inputVuHome.style.width = percent + '%';
+  }
 });
 
 /**
  * Escuta atualização de volume de saída
+ * 🔥 MODIFICADO: Só atualiza a home quando está capturando áudio (appState.audio.isRunning)
  */
 eventBus.on('outputVolumeUpdate', (data) => {
   const { percent } = data;
   const outputVu = document.getElementById('outputVu');
   if (outputVu) outputVu.style.width = percent + '%';
 
-  const outputVuHome = document.getElementById('outputVuHome');
-  if (outputVuHome) outputVuHome.style.width = percent + '%';
+  // 🔥 Só atualiza volume na home se estiver capturando áudio
+  if (appState.audio.isRunning) {
+    const outputVuHome = document.getElementById('outputVuHome');
+    if (outputVuHome) outputVuHome.style.width = percent + '%';
+  }
 });
 
 /**
@@ -379,6 +698,36 @@ eventBus.on('audioDeviceChanged', async (_data) => {
 /* ================================ */
 //	FUNÇÕES UTILITÁRIAS (HELPERS)
 /* ================================ */
+
+/**
+ * 🔥 Reordena os blocos de resposta por turnId (DESC - maior primeiro)
+ * Mantém a ordem decrescente baseada no ID da pergunta
+ */
+function sortAnswersByTurnId() {
+  const answersHistoryBox = document.getElementById('answersHistory');
+  if (!answersHistoryBox) return;
+
+  // Obter todos os blocos de resposta
+  const answerBlocks = Array.from(answersHistoryBox.querySelectorAll('.answer-block'));
+
+  // Ordenar por turnId (DESC)
+  answerBlocks.sort((a, b) => {
+    // Extrair turnId do badge
+    const aBadge = a.querySelector('.turn-id-badge.answer');
+    const bBadge = b.querySelector('.turn-id-badge.answer');
+
+    const aId = aBadge ? Number.parseInt(aBadge.textContent) : 0;
+    const bId = bBadge ? Number.parseInt(bBadge.textContent) : 0;
+
+    // Ordenar DESC (maior primeiro)
+    return bId - aId;
+  });
+
+  // Reinserir os blocos na ordem correta
+  answerBlocks.forEach((block) => {
+    answersHistoryBox.appendChild(block);
+  });
+}
 
 /**
  * Obtém o modelo STT configurado via config-manager
@@ -614,7 +963,7 @@ async function askLLM(questionId = null) {
       text,
       isCurrent,
     } = validateLLMRequest(appState, targetQuestionId, getSelectedQuestionText);
-    Logger.info('Pergunta válida', { questionId: validatedId, textLength: text.length });
+    Logger.debug('Pergunta válida', { questionId: validatedId, textLength: text.length }, false);
 
     // Rastreamento antigo (compatibilidade)
     const normalizedText = normalizeForCompare(text);
@@ -706,6 +1055,10 @@ const RendererAPI = {
   changeMode: (mode) => {
     modeManager.setMode(mode);
     console.log(`📌 Modo alterado via RendererAPI: ${mode}`);
+    // 🔥 NOTA: STT continua rodando em ambos modos
+    // ENTREVISTA: Auto-responde quando silêncio detectado
+    // PADRÃO: Espera clique/Ctrl+Enter para responder
+    // A mudança de modo não deve parar o STT
   },
   getMode: () => modeManager.getMode(),
 
@@ -920,4 +1273,11 @@ if (typeof globalThis !== 'undefined') {
   globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock
   globalThis._ipc = ipcRenderer; // 🎭 Exporta ipcRenderer para ConfigManager e Managers
   globalThis.Logger = Logger; // 🎭 Exporta Logger para classes carregadas via <script>
+  globalThis.clearAllSelections = clearAllSelections; // 🎭 Exporta clearAllSelections como fallback
+  globalThis.modeManager = modeManager; // 🎭 Exporta modeManager para question-controller e outros
+  globalThis.MODES = MODES; // 🎭 Exporta MODES para acesso em contextos de fallback
+  globalThis.updateStatusMessage = updateStatusMessage; // 🎭 Exporta updateStatusMessage para question-controller
+  globalThis.askLLM = askLLM; // 🎭 Exporta askLLM para question-controller
+  globalThis.renderCurrentQuestion = renderCurrentQuestion; // 🎭 Exporta renderCurrentQuestion para listeners
+  globalThis.renderQuestionsHistory = renderQuestionsHistory; // 🎭 Exporta renderQuestionsHistory para listeners
 }

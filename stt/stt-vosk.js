@@ -533,7 +533,17 @@ function handleSilenceDetectionVosk(source, percent) {
       vars.shouldFinalizeAskCurrent = true;
       vars.noiseStopTime = Date.now();
 
-      debugLogVosk(`🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`, true);
+      const timestamp = new Date().toLocaleTimeString('pt-BR', {
+        hour12: false,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        fractionalSecondDigits: 3,
+      });
+      debugLogVosk(
+        `⏰ [${timestamp}] 🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) - shouldFinalizeAskCurrent=TRUE *****`,
+        true
+      );
 
       // Dispara finalize apenas uma vez
       sendVoskFinalize(source);
@@ -575,7 +585,17 @@ function handleInterimVoskMessage(source, transcript) {
 
 // Processa mensagens finais do Vosk (transcrições completas)
 function handleFinalVoskMessage(source, transcript) {
-  debugLogVosk(`📝 🟢 Handle FINAL [${source.toUpperCase()}]: "${transcript}"`, false);
+  const timestamp = new Date().toLocaleTimeString('pt-BR', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    fractionalSecondDigits: 3,
+  });
+  debugLogVosk(
+    `⏰ [${timestamp}] 📝 🟢 Handle FINAL [${source.toUpperCase()}]: "${transcript}"`,
+    false
+  );
 
   const vars = voskState[source];
   vars.lastTranscript = transcript.trim() ? transcript : vars.lastTranscript;

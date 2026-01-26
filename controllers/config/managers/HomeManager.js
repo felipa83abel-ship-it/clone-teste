@@ -269,18 +269,42 @@ class HomeManager {
     // Atalho Ctrl+Enter: Ask LLM (Enviar pergunta)
     if (globalThis.RendererAPI?.onAskLlm) {
       globalThis.RendererAPI.onAskLlm(() => {
-        console.log('💡 Atalho Ctrl+Enter acionado via IPC - chamando askLLM()');
-        if (globalThis.RendererAPI?.askLLM) {
+        console.log('💡 Atalho Ctrl+Enter acionado - chamando handleQuestionClick');
+        // 🔥 CORRIGIDO: Chamar handleQuestionClick() em vez de askLLM()
+        // Isso garante que passa por todas as validações: pergunta já respondida, incompleta, etc
+        // Mesma regra que o clique do mouse
+        if (globalThis.RendererAPI?.handleQuestionClick) {
           try {
-            globalThis.RendererAPI.askLLM();
+            // Usar selectedId da API (que sincroniza navegação) ou fallback para CURRENT
+            const selectedId = globalThis.RendererAPI?.selectedId || 'CURRENT';
+            globalThis.RendererAPI.handleQuestionClick(selectedId);
           } catch (error) {
-            console.error('❌ Erro ao chamar askLLM via atalho:', error);
+            console.error('❌ Erro ao chamar handleQuestionClick via atalho:', error);
           }
         }
       });
       console.log('   ✅ Listener para CMD_ASK_LLM (Ctrl+Enter) registrado');
     } else {
       console.warn('   ⚠️ RendererAPI.onAskLlm não disponível');
+    }
+
+    // 🔥 NOVO: Atalho Ctrl+Shift+Up/Down: Navegar entre perguntas
+    if (globalThis.RendererAPI?.onNavigateQuestions) {
+      globalThis.RendererAPI.onNavigateQuestions((direction) => {
+        console.log(
+          `🧭 Atalho Ctrl+Shift+${direction === 'up' ? '↑' : '↓'} acionado - navegando ${direction}`
+        );
+        if (globalThis.RendererAPI?.navigateQuestions) {
+          try {
+            globalThis.RendererAPI.navigateQuestions(direction);
+          } catch (error) {
+            console.error('❌ Erro ao navegar perguntas:', error);
+          }
+        }
+      });
+      console.log('   ✅ Listener para CMD_NAVIGATE_QUESTIONS (Ctrl+Shift+Up/Down) registrado');
+    } else {
+      console.warn('   ⚠️ RendererAPI.onNavigateQuestions não disponível');
     }
 
     console.log('>>> #initActionButtonListeners COMPLETO');
