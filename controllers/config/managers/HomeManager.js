@@ -34,6 +34,7 @@ class HomeManager {
     this.#initResetHomeButton();
     this.#initActionButtonListeners();
     this.#initQuestionsHistoryListener();
+    this.#initUIEventBusListeners();
     await this.restoreState();
     Logger.debug('🏠 HomeManager: Inicialização completa');
     console.log('🏠🏠🏠 HomeManager.initialize() COMPLETO 🏠🏠🏠');
@@ -381,6 +382,205 @@ class HomeManager {
     });
 
     console.log('>>> #initTabSwitching COMPLETO');
+  }
+
+  /**
+   * 🔥 NOVO: Registra listeners de EventBus para atualizar UI
+   * Isto centraliza TODOS os listeners de DOM que estavam espalhados em renderer.js
+   */
+  #initUIEventBusListeners() {
+    console.log('>>> #initUIEventBusListeners INICIADO - Centralizando listeners de DOM');
+    Logger.debug('🏠 HomeManager: #initUIEventBusListeners');
+
+    // ==========================================
+    // LISTENER: listenButtonToggle
+    // Atualiza botão listen quando áudio começa/para
+    // ==========================================
+    this.eventBus.on('listenButtonToggle', ({ isRunning, buttonText }) => {
+      const listenBtn = document.getElementById('listenBtn');
+      if (listenBtn) {
+        listenBtn.textContent = buttonText;
+        listenBtn.classList.toggle('listening', isRunning);
+        console.log(`🎨 Botão listen atualizado: "${buttonText}" (listening: ${isRunning})`);
+      } else {
+        console.warn('⚠️ Elemento listenBtn não encontrado no DOM');
+      }
+
+      // 🔥 Aplicar efeito visual no home quando começa/para de ouvir
+      const homeVuMeters = document.querySelector('.home-vu-meters');
+      if (homeVuMeters) {
+        homeVuMeters.classList.toggle('listening', isRunning);
+        console.log(`🎨 .home-vu-meters atualizado (listening: ${isRunning})`);
+      }
+
+      // Se parou de capturar, resetar volume na home para 0
+      if (!isRunning) {
+        const inputVuHome = document.getElementById('inputVuHome');
+        if (inputVuHome) inputVuHome.style.width = '0%';
+
+        const outputVuHome = document.getElementById('outputVuHome');
+        if (outputVuHome) outputVuHome.style.width = '0%';
+      }
+    });
+
+    // ==========================================
+    // LISTENER: statusUpdate
+    // Atualiza mensagem de status
+    // ==========================================
+    this.eventBus.on('statusUpdate', ({ message }) => {
+      const statusDiv = document.getElementById('status-div');
+      if (statusDiv) {
+        statusDiv.textContent = message;
+        console.log(`📊 Status atualizado: "${message}"`);
+      }
+    });
+
+    // ==========================================
+    // LISTENER: transcriptionAdd
+    // Adiciona transcrição ao UI
+    // ==========================================
+    this.eventBus.on('transcriptionAdd', ({ questionId, text }) => {
+      const transcriptBox = document.getElementById('transcriptBox');
+      if (!transcriptBox) {
+        console.warn('⚠️ Elemento transcriptBox não encontrado');
+        return;
+      }
+      transcriptBox.innerHTML += `<p>${text}</p>`;
+      console.log(`📝 Transcrição adicionada (${text.substring(0, 30)}...)`);
+    });
+
+    // ==========================================
+    // LISTENER: transcriptionCleared
+    // Limpa transcrições do UI
+    // ==========================================
+    this.eventBus.on('transcriptionCleared', () => {
+      const transcriptBox = document.getElementById('transcriptBox');
+      if (transcriptBox) {
+        transcriptBox.innerHTML = '';
+        Logger.debug('🗑️ Transcrição limpa do UI', false);
+      }
+    });
+
+    // ==========================================
+    // LISTENER: answersCleared
+    // Limpa respostas do UI
+    // ==========================================
+    this.eventBus.on('answersCleared', () => {
+      const answersHistoryBox = document.getElementById('answersHistory');
+      if (answersHistoryBox) {
+        answersHistoryBox.innerHTML = '';
+        Logger.debug('🗑️ Respostas limpas do UI', false);
+      }
+    });
+
+    // ==========================================
+    // LISTENER: currentQuestionUpdate
+    // Renderiza pergunta atual
+    // ==========================================
+    this.eventBus.on('currentQuestionUpdate', (data) => {
+      const { text, isSelected } = data;
+      const currentQuestionBox = document.getElementById('currentQuestion');
+
+      if (!currentQuestionBox) {
+        console.warn('⚠️ Elemento #currentQuestion não encontrado no DOM');
+        return;
+      }
+
+      currentQuestionBox.innerHTML = `<strong>Pergunta Atual:</strong> ${text || '(vazio)'}`;
+      currentQuestionBox.classList.toggle('selected', isSelected);
+      console.log(`🎯 Pergunta atual atualizada: "${text?.substring(0, 30) || '(vazio)'}..."`);
+    });
+
+    // ==========================================
+    // LISTENER: questionsHistoryUpdate
+    // Renderiza histórico de perguntas
+    // ==========================================
+    this.eventBus.on('questionsHistoryUpdate', (data) => {
+      const { questionId } = data;
+      const questionsHistoryBox = document.getElementById('questionsHistory');
+
+      if (!questionsHistoryBox) {
+        console.warn('⚠️ Elemento #questionsHistory não encontrado');
+        return;
+      }
+
+      // Renderizar a lista novamente
+      if (globalThis.renderQuestionsHistory) {
+        globalThis.renderQuestionsHistory();
+        console.log(`📋 Histórico de perguntas renderizado (questionId: ${questionId})`);
+      } else {
+        console.warn('⚠️ globalThis.renderQuestionsHistory não está disponível');
+      }
+    });
+
+    // ==========================================
+    // LISTENER: answerStreamChunk
+    // Streaming de resposta (token por token)
+    // ==========================================
+    this.eventBus.on('answerStreamChunk', (data) => {
+      const { chunk, questionId } = data;
+      const answersHistory = document.getElementById('answersHistory');
+
+      if (answersHistory) {
+        // Adicionar chunk ao fim (streaming)
+        const answerEl = answersHistory.querySelector(
+          `[data-question-id="${questionId}"] .answer-content`
+        );
+        if (answerEl) {
+          answerEl.innerHTML += chunk;
+        } else {
+          answersHistory.innerHTML += `<div data-question-id="${questionId}" class="answer-block">
+            <div class="answer-content">${chunk}</div>
+          </div>`;
+        }
+      }
+    });
+
+    // ==========================================
+    // LISTENER: answerBatchEnd
+    // Resposta completa (batch/completions)
+    // ==========================================
+    this.eventBus.on('answerBatchEnd', (data) => {
+      const { questionId, response, turnId } = data;
+      const answersHistory = document.getElementById('answersHistory');
+
+      if (answersHistory) {
+        const answerEl = answersHistory.querySelector(
+          `[data-question-id="${questionId}"] .answer-content`
+        );
+        if (answerEl) {
+          answerEl.innerHTML = response;
+          if (turnId) {
+            answerEl.setAttribute('data-turn-id', turnId);
+          }
+        } else {
+          const badge = turnId ? `<span class="turn-id-badge">${turnId}</span>` : '';
+          answersHistory.innerHTML += `${badge}<div data-question-id="${questionId}" class="answer-block">
+            <div class="answer-content" ${turnId ? `data-turn-id="${turnId}"` : ''}>${response}</div>
+          </div>`;
+        }
+        console.log(
+          `✅ Resposta completa renderizada (questionId: ${questionId}, turnId: ${turnId})`
+        );
+      }
+    });
+
+    // ==========================================
+    // LISTENER: answerStreamEnd
+    // Indica fim do streaming
+    // ==========================================
+    this.eventBus.on('answerStreamEnd', (_) => {
+      const answersHistory = document.getElementById('answersHistory');
+      if (answersHistory) {
+        const lastAnswer = answersHistory.querySelector('.answer-block:last-child');
+        if (lastAnswer) {
+          lastAnswer.classList.add('complete');
+          console.log('✅ Stream de resposta finalizado');
+        }
+      }
+    });
+
+    console.log('>>> #initUIEventBusListeners COMPLETO - Todos os listeners de DOM centralizados');
   }
 }
 
