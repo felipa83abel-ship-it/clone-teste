@@ -28,6 +28,7 @@ class InfoManager {
   async initialize() {
     console.log('🚀 InfoManager.initialize()');
     this.#initListeners();
+    this.#initElements();
     await this.restoreState();
   }
 

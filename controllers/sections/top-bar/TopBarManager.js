@@ -30,6 +30,7 @@ class TopBarManager {
   async initialize() {
     console.log('🚀 TopBarManager.initialize()');
     this.#initListeners();
+    this.#initElements();
     await this.restoreState();
   }
 
@@ -44,6 +45,7 @@ class TopBarManager {
       // Restaurar opacidade (se salva)
       const savedOpacity = this.configManager.config.ui?.opacity || 0.75;
       this.#updateOpacityUI(savedOpacity);
+      this.applyOpacity(savedOpacity);
 
       // Restaurar modo de entrevista
       const savedMode = this.configManager.config.ui?.interviewMode || 'INTERVIEW';
@@ -122,6 +124,9 @@ class TopBarManager {
         if (!this.configManager.config.ui) this.configManager.config.ui = {};
         this.configManager.config.ui.opacity = opacity;
 
+        // Aplicar opacidade visual
+        this.applyOpacity(opacity);
+
         // Emitir para sincronizar
         this.eventBus.emit('windowOpacityUpdate', { opacity });
       });
@@ -149,6 +154,32 @@ class TopBarManager {
       });
     }
   }
+
+  /**
+   * Aplica opacidade real na janela (muda transparência)
+   */
+  applyOpacity(opacity) {
+    try {
+      // Aplica opacidade em elementos opacos (data-opaque="true")
+      const opaqueElements = document.querySelectorAll('[data-opaque="true"]');
+      opaqueElements.forEach((el) => {
+        el.style.opacity = opacity;
+      });
+
+      // Também aplica no body como fallback
+      const htmlElement = document.documentElement;
+      if (htmlElement) {
+        htmlElement.style.opacity = opacity;
+      }
+
+      console.log(`✨ Opacidade aplicada: ${(opacity * 100).toFixed(0)}%`);
+    } catch (error) {
+      console.error('❌ Erro ao aplicar opacidade:', error);
+    }
+  }
+
+  /**
+   * A
 
   /**
    * Atualiza slider de opacidade (UI)

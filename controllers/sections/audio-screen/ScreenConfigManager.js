@@ -36,8 +36,8 @@ class ScreenConfigManager {
    */
   async initialize() {
     console.log('🚀 ScreenConfigManager.initialize()');
-    await this.restoreState();
     this.#initScreenConfigListeners();
+    await this.restoreState();
   }
 
   /**

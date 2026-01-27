@@ -28,6 +28,7 @@ class OtherConfigManager {
   async initialize() {
     console.log('🚀 OtherConfigManager.initialize()');
     this.#initListeners();
+    this.#initElements();
     await this.restoreState();
   }
 
@@ -99,15 +100,18 @@ class OtherConfigManager {
   }
 
   /**
-   * Atualiza toggle de dark mode (UI)
+   * Atualiza toggle de dark mode (UI) e aplica classe CSS
    */
   #updateDarkModeUI(enabled) {
     const darkModeToggle = document.getElementById('darkModeToggle');
     if (darkModeToggle) {
       darkModeToggle.checked = enabled;
-      document.documentElement.classList.toggle('dark-mode', enabled);
-      console.log('💾 Dark mode atualizado:', enabled ? 'ativado' : 'desativado');
     }
+    // Aplicar classe CSS em body (conforme estilos)
+    document.body.classList.toggle('dark', enabled);
+    // Também aplicar em documentElement para compatibilidade
+    document.documentElement.classList.toggle('dark-mode', enabled);
+    console.log('💾 Dark mode atualizado:', enabled ? 'ativado' : 'desativado');
   }
 }
 

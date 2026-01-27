@@ -29,8 +29,8 @@ class PrivacyConfigManager {
    */
   async initialize() {
     console.log('🚀 PrivacyConfigManager.initialize()');
-    await this.restoreState();
     this.#initPrivacyListeners();
+    await this.restoreState();
   }
 
   /**

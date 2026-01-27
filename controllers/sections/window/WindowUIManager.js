@@ -34,10 +34,10 @@ class WindowUIManager {
    */
   async initialize() {
     Logger.debug('🚀 WindowUIManager.initialize()', false);
-    await this.restoreState();
     this.#initEventBusListeners();
     this.#initWindowListeners();
     await this.initClickThroughController();
+    await this.restoreState();
   }
 
   /**
