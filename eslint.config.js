@@ -9,7 +9,7 @@ module.exports = [
       'dist/**',
       'out/**',
       '.git/**',
-      'stt/models-stt/vosk/vosk-model-small-pt-0.3/**',
+      'services/stt/models-stt/vosk/vosk-model-small-pt-0.3/**',
       'docs/**',
       'coverage/**',
     ],

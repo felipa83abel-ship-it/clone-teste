@@ -1,4 +1,4 @@
-const AppState = require('../../state/AppState');
+const AppState = require('../../infra/state/AppState');
 
 describe('AppState', () => {
   let appState;

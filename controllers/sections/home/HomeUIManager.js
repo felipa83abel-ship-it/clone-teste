@@ -2,7 +2,7 @@
 /* global Logger */
 
 /**
- * HomeManager - Gerencia interface do HOME
+ * HomeUIManager - Gerencia interface do HOME
  *
  * Responsabilidades:
  *   - Botão de toggle mock mode
@@ -10,7 +10,7 @@
  *   - Listeners de botões de ação (listen, ask llm)
  *   - Questions history click handling
  */
-class HomeManager {
+class HomeUIManager {
   /**
    * @param {ConfigManager} configManager - Referência ao orquestrador
    * @param {IpcRenderer} ipc - Comunicação com main.js
@@ -233,18 +233,6 @@ class HomeManager {
       }
     });
 
-    // Close button
-    console.log('>>> Registrando btnClose...');
-    this.registerElementListener('btnClose', 'click', () => {
-      try {
-        console.log('>>> btnClose CLICADO - enviando APP_CLOSE IPC');
-        this.ipc.send('APP_CLOSE');
-        console.log('>>> APP_CLOSE IPC enviado com sucesso');
-      } catch (error) {
-        console.error('>>> ERRO ao enviar APP_CLOSE:', error);
-      }
-    });
-
     // ==========================================
     // REGISTRAR LISTENERS DOS ATALHOS GLOBAIS
     // ==========================================
@@ -391,6 +379,34 @@ class HomeManager {
   #initUIEventBusListeners() {
     console.log('>>> #initUIEventBusListeners INICIADO - Centralizando listeners de DOM');
     Logger.debug('🏠 HomeManager: #initUIEventBusListeners');
+
+    // ==========================================
+    // LISTENER: inputVolumeUpdate
+    // Atualiza VU meter de entrada em tempo real
+    // ==========================================
+    this.eventBus.on('inputVolumeUpdate', ({ percent }) => {
+      const inputVu = document.getElementById('inputVu');
+      if (inputVu) inputVu.style.width = percent + '%';
+
+      const inputVuHome = document.getElementById('inputVuHome');
+      if (inputVuHome) inputVuHome.style.width = percent + '%';
+
+      Logger.debug(`📊 Input Volume atualizado: ${percent}%`, false);
+    });
+
+    // ==========================================
+    // LISTENER: outputVolumeUpdate
+    // Atualiza VU meter de saída em tempo real
+    // ==========================================
+    this.eventBus.on('outputVolumeUpdate', ({ percent }) => {
+      const outputVu = document.getElementById('outputVu');
+      if (outputVu) outputVu.style.width = percent + '%';
+
+      const outputVuHome = document.getElementById('outputVuHome');
+      if (outputVuHome) outputVuHome.style.width = percent + '%';
+
+      Logger.debug(`📊 Output Volume atualizado: ${percent}%`, false);
+    });
 
     // ==========================================
     // LISTENER: listenButtonToggle
@@ -615,4 +631,4 @@ class HomeManager {
   }
 }
 
-module.exports = HomeManager;
+module.exports = HomeUIManager;

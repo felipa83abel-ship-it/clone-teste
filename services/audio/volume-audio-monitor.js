@@ -38,7 +38,7 @@ if (!globalThis._volumeAudioMonitorLoaded) {
 
   // AudioWorkletProcessor
   const VOLUME_MONITOR_WORKLET = 'volume-audio-worklet-processor';
-  const VOLUME_MONITOR_WORKLET_PATH = './audio/volume-audio-worklet-processor.js'; // Path relativo a index.html
+  const VOLUME_MONITOR_WORKLET_PATH = './services/audio/volume-audio-worklet-processor.js'; // Path relativo a index.html
 
   /* ================================ */
   //	ESTADO GLOBAL DO MONITOR

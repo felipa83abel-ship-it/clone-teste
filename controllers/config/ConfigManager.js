@@ -1,18 +1,18 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
 /// <reference path="../../types/globals.d.ts" />
-/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowUIManager, HomeUIManager */
+/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowUIManager, HomeUIManager, TopBarManager, OtherConfigManager, InfoManager */
 
 /**
  * ConfigManager - Orquestrador Central de Configurações
  *
  * Responsabilidades:
  *   - Carregar/salvar configuração do localStorage
- *   - Inicializar todos os managers
+ *   - Inicializar todos os managers das seções
  *   - Coordenar reset de configuração
  *   - Expor globalThis.configManager
  *
  * Este é o ponto de entrada para toda a lógica de configuração.
- * Cada manager cuida de sua funcionalidade específica.
+ * Cada manager de seção cuida de sua funcionalidade específica.
  */
 class ConfigManager {
   constructor() {
@@ -161,6 +161,18 @@ class ConfigManager {
       this.homeManager = new HomeUIManager(this, _ipc, globalThis.eventBus);
       await this.homeManager.initialize();
 
+      // Cria instância do TopBarManager
+      this.topBarManager = new TopBarManager(this, _ipc, globalThis.eventBus);
+      await this.topBarManager.initialize();
+
+      // Cria instância do OtherConfigManager
+      this.otherManager = new OtherConfigManager(this, _ipc, globalThis.eventBus);
+      await this.otherManager.initialize();
+
+      // Cria instância do InfoManager
+      this.infoManager = new InfoManager(this, _ipc, globalThis.eventBus);
+      await this.infoManager.initialize();
+
       // Registrar listeners dos botões de salvar
       this.#initSaveConfigButtons();
 
@@ -188,6 +200,9 @@ class ConfigManager {
       { name: 'PrivacyConfigManager', instance: this.privacyManager },
       { name: 'WindowUIManager', instance: this.windowManager },
       { name: 'HomeUIManager', instance: this.homeManager },
+      { name: 'TopBarManager', instance: this.topBarManager },
+      { name: 'OtherConfigManager', instance: this.otherManager },
+      { name: 'InfoManager', instance: this.infoManager },
     ];
 
     for (const { name, instance } of managers) {
@@ -220,6 +235,9 @@ class ConfigManager {
     await this.privacyManager?.reset();
     await this.windowManager?.reset();
     await this.homeManager?.reset();
+    await this.topBarManager?.reset();
+    await this.otherManager?.reset();
+    await this.infoManager?.reset();
 
     this.config = this.getDefaultConfig();
     this.saveConfig();
@@ -518,59 +536,3 @@ class ConfigManager {
     Logger.debug('ConfigManager: Listeners .btn-save registrados');
   }
 }
-
-// ==========================================
-// INICIALIZAÇÃO NO DOMContentLoaded
-// ==========================================
-
-document.addEventListener('DOMContentLoaded', async () => {
-  console.log('📖 DOMContentLoaded - Inicializando ConfigManager...');
-
-  // Aguarda RendererAPI estar disponível
-  let attempts = 0;
-  while (!globalThis.RendererAPI && attempts < 50) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    attempts++;
-  }
-
-  if (!globalThis.RendererAPI) {
-    console.error('❌ RendererAPI não foi carregado após timeout');
-    return;
-  }
-
-  // Cria e inicializa ConfigManager
-  globalThis.configManager = new ConfigManager();
-  await globalThis.configManager.initializeController();
-
-  console.log('✅ ConfigManager inicializado com sucesso');
-
-  // ==========================================
-  // INICIALIZAR AUDIO CONTROLLER COM DEPENDÊNCIAS
-  // ==========================================
-  if (globalThis.RendererAPI?.initAudioController) {
-    // 🔥 Popula UIElements com seletores reais do DOM
-    const uiElements = {
-      inputSelect: document.getElementById('audio-input-device'),
-      outputSelect: document.getElementById('audio-output-device'),
-      listeningBtn: document.getElementById('listening-btn'),
-      listenBtn: document.getElementById('listen-btn'),
-    };
-
-    const audioControllerDeps = {
-      appState: globalThis.appState,
-      eventBus: globalThis.eventBus,
-      sttStrategy: globalThis.RendererAPI.sttStrategy,
-      globalConfig: globalThis.configManager,
-      UIElements: uiElements, // ✅ Agora com seletores reais
-      CURRENT_QUESTION_ID: 'CURRENT',
-      modeManager: globalThis.RendererAPI.modeManager,
-      MODES: globalThis.RendererAPI.MODES,
-      getConfiguredSTTModel: globalThis.RendererAPI.getConfiguredSTTModel,
-      closeCurrentQuestionForced: globalThis.RendererAPI.closeCurrentQuestionForced,
-      updateStatusMessage: globalThis.RendererAPI.updateStatusMessage,
-      findAnswerByQuestionId: globalThis.RendererAPI.findAnswerByQuestionId,
-    };
-    globalThis.RendererAPI.initAudioController(audioControllerDeps);
-    console.log('✅ AudioController inicializado com sucesso');
-  }
-});

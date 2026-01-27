@@ -5,16 +5,15 @@
  * WindowUIManager - Gerencia configurações de janela
  *
  * Responsabilidades:
- *   - Dark mode toggle
- *   - Interview mode selection
- *   - Overlay opacity control
- *   - Drag handle initialization
+ *   - Drag handle initialization (mover janela)
+ *   - Click-through toggle (cliques passam através)
+ *   - Close application button (btnClose)
+ *   - Interactive zones management
  *
  * Interações:
- *   - DOM: darkModeToggle, interviewModeSelect, opacityRange, dragHandle
+ *   - DOM: dragHandle, btnToggleClick, btnClose
+ *   - IPC: SET_CLICK_THROUGH, SET_INTERACTIVE_ZONE, GET_CLICK_THROUGH
  *   - ConfigManager: salvar/restaurar estado
- *   - CSS: aplicar classe dark (body.dark)
- *   - RendererAPI: setWindowOpacity(), startWindowDrag()
  */
 class WindowUIManager {
   /**
@@ -36,6 +35,7 @@ class WindowUIManager {
   async initialize() {
     Logger.debug('🚀 WindowUIManager.initialize()', false);
     await this.restoreState();
+    this.#initEventBusListeners();
     this.#initWindowListeners();
     await this.initClickThroughController();
   }
@@ -53,10 +53,8 @@ class WindowUIManager {
    * Reseta configurações padrão
    */
   async reset() {
-    Logger.debug('🔄 WindowConfigManager.reset()', false);
-    this.configManager.config.other.darkMode = true;
-    this.configManager.config.other.interviewMode = 'INTERVIEW';
-    this.configManager.config.other.overlayOpacity = 0.75;
+    Logger.debug('🔄 WindowUIManager.reset()', false);
+    this.configManager.config.other.clickThroughEnabled = false;
     this.configManager.saveConfig(false);
     await this.restoreState();
   }
@@ -72,52 +70,7 @@ class WindowUIManager {
     Logger.debug('Início da função: "restoreUserPreferences"');
     Logger.debug('🔄 RESTAURANDO PREFERÊNCIAS DA JANELA...', false);
 
-    // 1️⃣ Restaurar Dark Mode
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const savedDarkMode = this.configManager.config.other?.darkMode ?? false;
-    if (darkModeToggle) {
-      darkModeToggle.checked = savedDarkMode;
-      if (savedDarkMode) {
-        document.body.classList.add('dark');
-      } else {
-        document.body.classList.remove('dark');
-      }
-      Logger.debug(
-        `   ✅ Dark Mode restaurado: ${savedDarkMode ? 'ATIVADO' : 'DESATIVADO'}`,
-        false
-      );
-    } else {
-      Logger.debug('   ⚠️ darkModeToggle não encontrado no DOM', false);
-    }
-
-    // 2️⃣ Restaurar Interview Mode
-    const interviewModeSelect = document.getElementById('interviewModeSelect');
-    const savedInterviewMode = this.configManager.config.other?.interviewMode ?? 'INTERVIEW';
-    if (interviewModeSelect) {
-      interviewModeSelect.value = savedInterviewMode;
-      Logger.debug(`   ✅ Interview Mode restaurado: ${savedInterviewMode}`, false);
-
-      // 🔥 CRÍTICO: Sincronizar com modeManager quando página carrega
-      if (globalThis.RendererAPI?.changeMode) {
-        globalThis.RendererAPI.changeMode(savedInterviewMode);
-        console.log(`🎯 [BOOT] Modo sincronizado na inicialização: ${savedInterviewMode}`);
-      }
-    } else {
-      Logger.debug('   ⚠️ interviewModeSelect não encontrado no DOM', false);
-    }
-
-    // 3️⃣ Restaurar Opacity
-    const opacityRange = document.getElementById('opacityRange');
-    const savedOpacity = this.configManager.config.other?.overlayOpacity ?? 0.75;
-    if (opacityRange) {
-      opacityRange.value = savedOpacity;
-      this.applyOpacity(savedOpacity);
-      Logger.debug(`   ✅ Opacidade restaurada: ${savedOpacity}`, false);
-    } else {
-      Logger.debug('   ⚠️ opacityRange não encontrado no DOM', false);
-    }
-
-    // 4️⃣ Inicializar drag handle
+    // 1️⃣ Inicializar drag handle
     const dragHandle = document.getElementById('dragHandle');
     if (dragHandle) {
       this.initDragHandle(dragHandle);
@@ -126,27 +79,24 @@ class WindowUIManager {
       Logger.debug('   ⚠️ dragHandle não encontrado no DOM', false);
     }
 
+    // 2️⃣ Inicializar click-through (restaura com initClickThroughController)
+    Logger.debug('   ✅ Click-through será inicializado em initClickThroughController', false);
+
+    // 3️⃣ Inicializar botão de fechar
+    const btnClose = document.getElementById('btnClose');
+    if (btnClose) {
+      Logger.debug(`   ✅ btnClose inicializado`, false);
+    } else {
+      Logger.debug('   ⚠️ btnClose não encontrado no DOM', false);
+    }
+
     Logger.debug('✅ Preferências restauradas', false);
     Logger.debug('Fim da função: "restoreUserPreferences"');
   }
 
-  /**
-   * Aplica opacidade na janela
-   * @param {number} opacity - Valor de 0 a 1
-   */
-  applyOpacity(opacity) {
-    Logger.debug(`🎨 Aplicando opacidade: ${opacity}`, false);
-    const opacityValue = Number.parseFloat(opacity);
-
-    // Delegar toda a lógica para setWindowOpacity (centraliza a responsabilidade)
-    if (globalThis.RendererAPI?.setWindowOpacity) {
-      globalThis.RendererAPI.setWindowOpacity(opacityValue).catch((err) => {
-        Logger.debug(`❌ Erro ao definir opacidade: ${err}`, false);
-      });
-    }
-
-    this.configManager.config.other.overlayOpacity = opacityValue;
-  }
+  // ==========================================
+  // MÉTODOS PÚBLICOS
+  // ==========================================
 
   /**
    * Inicializa drag handle da janela
@@ -216,37 +166,6 @@ class WindowUIManager {
     Logger.debug('✅ Drag handle inicializado', false);
   }
 
-  /**
-   * Salva campo de janela
-   * @param {string} field - Campo a salvar
-   * @param {*} value - Novo valor
-   */
-  saveWindowField(field, value) {
-    Logger.debug('Início da função: "saveWindowField"');
-    Logger.debug(`💾 Salvando ${field}: ${value}`, false);
-
-    if (field === 'darkModeToggle') {
-      this.configManager.config.other.darkMode = value;
-      if (value) {
-        document.body.classList.add('dark');
-      } else {
-        document.body.classList.remove('dark');
-      }
-    } else if (field === 'interviewModeSelect') {
-      this.configManager.config.other.interviewMode = value;
-    } else if (field === 'opacityRange') {
-      this.applyOpacity(value);
-    }
-
-    // Para opacityRange: salvar silenciosamente (sem feedback visual)
-    // Para outros campos: mostrar feedback visual
-    const showFeedback = field !== 'opacityRange';
-    this.configManager.saveConfig(showFeedback);
-
-    Logger.debug(`   ✅ Campo ${field} salvo`, false);
-    Logger.debug('Fim da função: "saveWindowField"');
-  }
-
   // ==========================================
   // MÉTODOS PRIVADOS
   // ==========================================
@@ -255,54 +174,51 @@ class WindowUIManager {
    * Registra listeners em elementos de janela
    */
   #initWindowListeners() {
-    Logger.debug('🎯 WindowConfigManager.#initWindowListeners()', false);
+    Logger.debug('🎯 WindowUIManager.#initWindowListeners()', false);
 
-    // Listener para dark mode toggle
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    if (darkModeToggle) {
-      darkModeToggle.addEventListener('change', (e) => {
-        this.saveWindowField('darkModeToggle', e.target.checked);
-        Logger.debug(`   📝 Dark Mode: ${e.target.checked ? 'Ativado' : 'Desativado'}`, false);
-      });
-      Logger.debug('   ✅ Listener para darkModeToggle registrado', false);
-    } else {
-      Logger.debug('   ⚠️ darkModeToggle não encontrado', false);
-    }
+    // Listener para botão de fechar app
+    const btnClose = document.getElementById('btnClose');
+    if (btnClose) {
+      btnClose.addEventListener('click', () => {
+        Logger.debug('🪟 btnClose clicado - enviando APP_CLOSE IPC', false);
+        console.log('>>> btnClose CLICADO - enviando APP_CLOSE IPC');
 
-    // Listener para interview mode select
-    const interviewModeSelect = document.getElementById('interviewModeSelect');
-    if (interviewModeSelect) {
-      interviewModeSelect.addEventListener('change', (e) => {
-        const newMode = e.target.value;
-        this.saveWindowField('interviewModeSelect', newMode);
-        // 🔥 CRÍTICO: Mudar o modo no modeManager quando o dropdown muda
-        if (globalThis.RendererAPI?.changeMode) {
-          globalThis.RendererAPI.changeMode(newMode);
-          console.log(`🎯 Modo alterado via dropdown: ${newMode}`);
+        try {
+          // Enviar comando para main.js fechar a app
+          if (this.ipc) {
+            this.ipc.send('APP_CLOSE');
+          } else {
+            Logger.error('IPC não disponível para APP_CLOSE', {});
+          }
+        } catch (error) {
+          Logger.error('Erro ao enviar APP_CLOSE', { error: error.message });
         }
-        Logger.debug(`   📝 Interview Mode alterado: ${newMode}`, false);
       });
-      Logger.debug('   ✅ Listener para interviewModeSelect registrado', false);
+      Logger.debug('   ✅ Listener para btnClose registrado', false);
     } else {
-      Logger.debug('   ⚠️ interviewModeSelect não encontrado', false);
+      Logger.debug('   ⚠️ btnClose não encontrado', false);
     }
+  }
 
-    // Listener para opacity range
-    const opacityRange = document.getElementById('opacityRange');
-    if (opacityRange) {
-      // Usar 'input' para feedback visual em tempo real
-      opacityRange.addEventListener('input', (e) => {
-        this.applyOpacity(e.target.value);
-        Logger.debug(`   📝 Opacidade visual alterada: ${e.target.value}`, false);
+  /**
+   * Inicializa listeners do EventBus
+   */
+  #initEventBusListeners() {
+    Logger.debug('🎯 WindowUIManager.#initEventBusListeners()', false);
+
+    // Listener para evento de atualização de opacidade do EventBus
+    if (globalThis.eventBus) {
+      globalThis.eventBus.on('windowOpacityUpdate', (data) => {
+        const opacityRange = document.getElementById('opacityRange');
+        if (opacityRange) {
+          // Sincronizar o valor do input com o valor enviado pelo evento
+          opacityRange.value = data.opacity;
+          Logger.debug(`   📝 Opacidade sincronizada via EventBus: ${data.opacity}`, false);
+        }
       });
-      // Usar 'change' para salvar apenas no final (mouse up)
-      opacityRange.addEventListener('change', (e) => {
-        this.saveWindowField('opacityRange', e.target.value);
-        Logger.debug(`   💾 Opacidade salva: ${e.target.value}`, false);
-      });
-      Logger.debug('   ✅ Listener para opacityRange registrado', false);
+      Logger.debug('   ✅ Listener para windowOpacityUpdate registrado', false);
     } else {
-      Logger.debug('   ⚠️ opacityRange não encontrado', false);
+      Logger.debug('   ⚠️ EventBus não encontrado para registrar listeners', false);
     }
   }
 

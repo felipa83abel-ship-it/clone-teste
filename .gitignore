@@ -55,8 +55,8 @@ Thumbs.db
 # =============================== 
 # Outros
 # ===============================
-stt/models-stt/vosk/*
-stt/models-stt/whisper/*
-audio/samples/*
+services/stt/models-stt/vosk/*
+services/stt/models-stt/whisper/*
+utils/audio/samples/*
 backup/
 temp/

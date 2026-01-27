@@ -9,7 +9,7 @@
  * se for uma mensagem final (isFinal/!isInterim) e houver texto
  */
 
-const AppState = require('../../state/AppState');
+const AppState = require('../../infra/state/AppState');
 
 describe('Fix: Pergunta dividida permanecendo em CURRENT', () => {
   let appState;

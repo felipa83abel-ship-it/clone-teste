@@ -1,5 +1,5 @@
-const EventBus = require('../../events/EventBus');
-const AppState = require('../../state/AppState');
+const EventBus = require('../../infra/bus/EventBus');
+const AppState = require('../../infra/state/AppState');
 const {
   ModeManager,
   MODES,

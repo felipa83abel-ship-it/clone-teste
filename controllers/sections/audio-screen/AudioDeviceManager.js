@@ -256,6 +256,19 @@ class AudioDeviceManager {
         await this.startMonitoring('output');
       });
     }
+
+    // ==========================================
+    // EVENT BUS LISTENERS: Volume Updates
+    // ==========================================
+    this.eventBus.on('inputVolumeUpdate', ({ percent }) => {
+      const inputVu = document.getElementById('inputVu');
+      if (inputVu) inputVu.style.width = percent + '%';
+    });
+
+    this.eventBus.on('outputVolumeUpdate', ({ percent }) => {
+      const outputVu = document.getElementById('outputVu');
+      if (outputVu) outputVu.style.width = percent + '%';
+    });
   }
 }
 

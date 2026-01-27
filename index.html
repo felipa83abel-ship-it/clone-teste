@@ -619,47 +619,65 @@
     <script src="./utils/ErrorHandler.js"></script>
     <script src="./utils/SecureLogger.js"></script>
 
-    <!-- ==================== ESTADO CENTRAL ==================== -->
-    <script src="./state/AppState.js"></script>
-    <script src="./events/EventBus.js"></script>
+    <!-- ==================== INFRAESTRUTURA ==================== -->
+    <!-- Estado central e bus de eventos -->
+    <script src="./infra/state/AppState.js"></script>
+    <script src="./infra/bus/EventBus.js"></script>
 
-    <!-- ==================== ESTRATÉGIAS E ORQUESTRADORES ==================== -->
-    <script src="./strategies/STTStrategy.js"></script>
-    <script src="./llm/LLMManager.js"></script>
-    <script src="./llm/handlers/openai-handler.js"></script>
-    <script src="./llm/handlers/gemini-handler.js"></script>
+    <!-- ==================== SERVICES (Orquestradores & Adapters) ==================== -->
+    <!-- STT Service -->
+    <script src="./services/stt/STTStrategy.js"></script>
+    <script src="./services/stt/stt-deepgram.js"></script>
+    <script src="./services/stt/stt-vosk.js"></script>
+    <script src="./services/stt/stt-whisper.js"></script>
 
-    <!-- ==================== STT PROVIDERS ==================== -->
-    <script src="./stt/stt-deepgram.js"></script>
-    <script src="./stt/stt-vosk.js"></script>
-    <script src="./stt/stt-whisper.js"></script>
+    <!-- LLM Service -->
+    <script src="./services/llm/LLMManager.js"></script>
+    <script src="./services/llm/handlers/openai-handler.js"></script>
+    <script src="./services/llm/handlers/gemini-handler.js"></script>
+    <script src="./services/llm/llmHandlers.js"></script>
 
-    <!-- ==================== AUDIO MONITOR ==================== -->
-    <script src="./audio/volume-audio-monitor.js"></script>
-
-    <!-- ==================== LLM HANDLERS ==================== -->
-    <script src="./handlers/llmHandlers.js"></script>
+    <!-- Audio Service -->
+    <script src="./services/audio/volume-audio-monitor.js"></script>
 
     <!-- ==================== UTILS DOM E HELPERS ==================== -->
     <script src="./utils/DOM-Registry.js"></script>
     <script src="./utils/ui-elements-registry.js"></script>
     <script src="./utils/renderer-helpers.js"></script>
 
-    <!-- ==================== CONTROLLERS (Lógica pura) ==================== -->
-    <script src="./controllers/audio/audio-controller.js"></script>
-    <script src="./controllers/question/question-helpers.js"></script>
-    <script src="./controllers/question/question-controller.js"></script>
-    <script src="./controllers/screenshot/screenshot-controller.js"></script>
-    <script src="./controllers/modes/mode-manager.js"></script>
+    <!-- ==================== CONTROLLERS (Lógica pura - GLOBAL) ==================== -->
+    <script src="./controllers/global/audio/audio-controller.js"></script>
+    <script src="./controllers/global/modes/mode-manager.js"></script>
 
-    <!-- ==================== MANAGERS (ANTES de ConfigManager) ==================== -->
-    <script src="./controllers/config/managers/ApiKeyManager.js"></script>
-    <script src="./controllers/config/managers/AudioDeviceManager.js"></script>
-    <script src="./controllers/config/managers/ModelSelectionManager.js"></script>
-    <script src="./controllers/config/managers/ScreenConfigManager.js"></script>
-    <script src="./controllers/config/managers/PrivacyConfigManager.js"></script>
-    <script src="./controllers/config/managers/WindowUIManager.js"></script>
-    <script src="./controllers/config/managers/HomeUIManager.js"></script>
+    <!-- ==================== SECTIONS (UI Controllers & Managers) ==================== -->
+    <!-- HOME Section -->
+    <script src="./controllers/sections/home/question-helpers.js"></script>
+    <script src="./controllers/sections/home/question-controller.js"></script>
+    <script src="./controllers/sections/home/screenshot-controller.js"></script>
+    <script src="./controllers/sections/home/HomeUIManager.js"></script>
+
+    <!-- TOP BAR Section -->
+    <script src="./controllers/sections/top-bar/TopBarManager.js"></script>
+
+    <!-- API & MODELOS Section -->
+    <script src="./controllers/sections/api-models/ApiKeyManager.js"></script>
+    <script src="./controllers/sections/api-models/ModelSelectionManager.js"></script>
+
+    <!-- ÁUDIO & TELA Section -->
+    <script src="./controllers/sections/audio-screen/AudioDeviceManager.js"></script>
+    <script src="./controllers/sections/audio-screen/ScreenConfigManager.js"></script>
+
+    <!-- PRIVACIDADE Section -->
+    <script src="./controllers/sections/privacy/PrivacyConfigManager.js"></script>
+
+    <!-- OUTROS Section -->
+    <script src="./controllers/sections/others/OtherConfigManager.js"></script>
+
+    <!-- INFO Section -->
+    <script src="./controllers/sections/info/InfoManager.js"></script>
+
+    <!-- WINDOW Section -->
+    <script src="./controllers/sections/window/WindowUIManager.js"></script>
 
     <!-- ==================== CONFIG MANAGER (Orquestrador) ==================== -->
     <script src="./controllers/config/ConfigManager.js"></script>
@@ -670,6 +688,7 @@
     <!-- ==================== INICIALIZAÇÃO ==================== -->
     <script>
       document.addEventListener('DOMContentLoaded', async () => {
+        console.log('📖 DOMContentLoaded - Inicializando aplicação...');
         try {
           // Registrar todos os elementos DOM no registry
           if (globalThis.DOM && typeof globalThis.DOM.register === 'function') {
@@ -677,14 +696,54 @@
             console.log('✅ DOM Registry inicializado');
           }
 
-          // ConfigManager orquestra todos os managers
-          if (globalThis.ConfigManager) {
-            globalThis.configManager = new ConfigManager();
-            await globalThis.configManager.initializeController();
-            console.log('✅ Aplicação inicializada com sucesso via ConfigManager');
-          } else {
-            console.error('❌ ConfigManager não foi carregado');
+          // Aguarda RendererAPI estar disponível
+          let attempts = 0;
+          while (!globalThis.RendererAPI && attempts < 50) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            attempts++;
           }
+
+          if (!globalThis.RendererAPI) {
+            console.error('❌ RendererAPI não foi carregado após timeout');
+            return;
+          }
+
+          // ConfigManager orquestra todos os managers
+          globalThis.configManager = new ConfigManager();
+          await globalThis.configManager.initializeController();
+          console.log('✅ ConfigManager inicializado com sucesso');
+
+          // ==========================================
+          // INICIALIZAR AUDIO CONTROLLER COM DEPENDÊNCIAS
+          // ==========================================
+          if (globalThis.RendererAPI?.initAudioController) {
+            // 🔥 Popula UIElements com seletores reais do DOM
+            const uiElements = {
+              inputSelect: document.getElementById('audio-input-device'),
+              outputSelect: document.getElementById('audio-output-device'),
+              listeningBtn: document.getElementById('listening-btn'),
+              listenBtn: document.getElementById('listen-btn'),
+            };
+
+            const audioControllerDeps = {
+              appState: globalThis.appState,
+              eventBus: globalThis.eventBus,
+              sttStrategy: globalThis.RendererAPI.sttStrategy,
+              globalConfig: globalThis.configManager,
+              UIElements: uiElements, // ✅ Agora com seletores reais
+              CURRENT_QUESTION_ID: 'CURRENT',
+              modeManager: globalThis.RendererAPI.modeManager,
+              MODES: globalThis.RendererAPI.MODES,
+              getConfiguredSTTModel: globalThis.RendererAPI.getConfiguredSTTModel,
+              closeCurrentQuestionForced: globalThis.RendererAPI.closeCurrentQuestionForced,
+              updateStatusMessage: globalThis.RendererAPI.updateStatusMessage,
+              findAnswerByQuestionId: globalThis.RendererAPI.findAnswerByQuestionId,
+            };
+            globalThis.RendererAPI.initAudioController(audioControllerDeps);
+            console.log('✅ AudioController inicializado com sucesso');
+          }
+
+          console.log('✅ Aplicação inicializada com sucesso');
         } catch (error) {
           console.error('❌ Erro ao inicializar aplicação:', error);
           if (globalThis.Logger) {

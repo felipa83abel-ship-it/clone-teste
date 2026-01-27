@@ -30,7 +30,7 @@ const eventBus = globalThis.eventBus;
 
 // Configuração Vosk
 const VOSK_CONFIG = {
-  MODEL: process.env.VOSK_MODEL || '../stt/models-stt/vosk/vosk-model-small-pt-0.3',
+  MODEL: process.env.VOSK_MODEL || './models-stt/vosk/vosk-model-small-pt-0.3',
 };
 
 /* ================================ */
@@ -219,7 +219,7 @@ function initVoskProcess(source) {
   debugLogVosk(`🚀 Iniciando Vosk (${source}) com modelo: ${VOSK_CONFIG.MODEL}...`, true);
 
   vars._voskProcess = spawn('python', ['server-vosk.py', VOSK_CONFIG.MODEL], {
-    cwd: __dirname, // server-vosk.py agora está em stt/
+    cwd: __dirname, // server-vosk.py está em services/stt/
     stdio: ['pipe', 'pipe', 'pipe'],
   });
 

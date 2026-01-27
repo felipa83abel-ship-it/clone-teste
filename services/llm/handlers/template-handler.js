@@ -27,7 +27,7 @@
  *    converta em initialize() ou nos métodos complete/stream.
  *
  * 4. **Registrar no renderer.js** (após implementação):
- *    const myHandler = require('./llm/handlers/seu-provider-handler.js');
+ *    const myHandler = require('./services/llm/handlers/seu-provider-handler.js');
  *    llmManager.register('seu-provider', myHandler);
  *
  *    E adicionar na UI config-manager.js com input para API key

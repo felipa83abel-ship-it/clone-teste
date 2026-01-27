@@ -91,7 +91,7 @@ const geminiHandler = new globalThis.GeminiHandler(ipcRenderer);
 
 globalThis.llmManager.register('openai', openaiHandler);
 globalThis.llmManager.register('google', geminiHandler);
-// NOSONAR // Futuro: globalThis.llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
+// NOSONAR // Futuro: globalThis.llmManager.register('anthropic', require('./services/llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
 globalThis.eventBus.on('llmStreamEnd', (data) => {

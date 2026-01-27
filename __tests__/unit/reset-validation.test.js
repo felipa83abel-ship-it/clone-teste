@@ -3,7 +3,7 @@
  * Simula: 2 perguntas -> reset -> verificar limpeza
  */
 
-const AppState = require('../../state/AppState');
+const AppState = require('../../infra/state/AppState');
 
 describe('Reset de histórico de perguntas', () => {
   let appState;

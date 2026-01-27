@@ -1,4 +1,4 @@
-const EventBus = require('../../events/EventBus');
+const EventBus = require('../../infra/bus/EventBus');
 
 describe('EventBus', () => {
   let eventBus;
