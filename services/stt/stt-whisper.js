@@ -18,9 +18,21 @@
  */
 
 // ⚠️ Proteção contra redeclaração (quando carregado via <script> tag múltiplas vezes)
-if (typeof globalThis !== 'undefined' && globalThis._sttWhisperLoaded) {
-  console.warn('⚠️ stt-whisper.js já foi carregado, ignorando redeclaração');
-} else if (typeof globalThis !== 'undefined') {
+// Usar IIFE para preservar escopo das funções
+const {
+  startAudioWhisper: startAudioWhisperFunc,
+  stopAudioWhisper: stopAudioWhisperFunc,
+  switchDeviceWhisper: switchDeviceWhisperFunc,
+} = (() => {
+  if (globalThis._sttWhisperLoaded) {
+    // Retorna funções já carregadas da primeira execução
+    return {
+      startAudioWhisper: globalThis._startAudioWhisperFunc,
+      stopAudioWhisper: globalThis._stopAudioWhisperFunc,
+      switchDeviceWhisper: globalThis._switchDeviceWhisperFunc,
+    };
+  }
+
   globalThis._sttWhisperLoaded = true;
 
   /* ================================ */
@@ -808,17 +820,6 @@ if (typeof globalThis !== 'undefined' && globalThis._sttWhisperLoaded) {
     getEventBus().emit('clearInterim', { id: interimId });
   }
 
-  // Atualiza interim transcript no UI
-  function _updateInterim(source, transcript, author) {
-    const interimId =
-      source === globalThis.INPUT ? 'whisper-interim-input' : 'whisper-interim-output';
-    getEventBus().emit('updateInterim', {
-      id: interimId,
-      speaker: author,
-      text: transcript,
-    });
-  }
-
   // Atualiza CURRENT question (apenas para output)
   function updateCurrentQuestion(source, transcript, isInterim = false) {
     const vars = whisperState[source];
@@ -1081,20 +1082,32 @@ if (typeof globalThis !== 'undefined' && globalThis._sttWhisperLoaded) {
     }
   }
 
-  /* ================================ */
-  //	EXPORTS (CommonJS)
-  /* ================================ */
+  // Armazena referências em globalThis para acesso em segunda carga
+  globalThis._startAudioWhisperFunc = startAudioWhisper;
+  globalThis._stopAudioWhisperFunc = stopAudioWhisper;
+  globalThis._switchDeviceWhisperFunc = switchDeviceWhisper;
 
-  module.exports = {
+  // Retorna as referências do IIFE
+  return {
     startAudioWhisper,
     stopAudioWhisper,
     switchDeviceWhisper,
   };
+})();
 
-  // ✅ Exportar para globalThis dentro do bloco de inicialização
-  if (typeof globalThis !== 'undefined') {
-    globalThis.startAudioWhisper = startAudioWhisper;
-    globalThis.stopAudioWhisper = stopAudioWhisper;
-    globalThis.switchDeviceWhisper = switchDeviceWhisper;
-  }
-} // Fim da proteção contra redeclaração
+/* ================================ */
+//	EXPORTS (CommonJS)
+/* ================================ */
+
+module.exports = {
+  startAudioWhisper: startAudioWhisperFunc,
+  stopAudioWhisper: stopAudioWhisperFunc,
+  switchDeviceWhisper: switchDeviceWhisperFunc,
+};
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.startAudioWhisper = startAudioWhisperFunc;
+  globalThis.stopAudioWhisper = stopAudioWhisperFunc;
+  globalThis.switchDeviceWhisper = switchDeviceWhisperFunc;
+}

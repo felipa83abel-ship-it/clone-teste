@@ -17,9 +17,21 @@
  */
 
 // ⚠️ Proteção contra redeclaração (quando carregado via <script> tag múltiplas vezes)
-if (typeof globalThis !== 'undefined' && globalThis._sttDeepgramLoaded) {
-  console.warn('⚠️ stt-deepgram.js já foi carregado, ignorando redeclaração');
-} else if (typeof globalThis !== 'undefined') {
+// Usar IIFE para preservar escopo das funções
+const {
+  startAudioDeepgram: startAudioDeepgramFunc,
+  stopAudioDeepgram: stopAudioDeepgramFunc,
+  switchDeviceDeepgram: switchDeviceDeepgramFunc,
+} = (() => {
+  if (globalThis._sttDeepgramLoaded) {
+    // Retorna funções já carregadas da primeira execução
+    return {
+      startAudioDeepgram: globalThis._startAudioDeepgramFunc,
+      stopAudioDeepgram: globalThis._stopAudioDeepgramFunc,
+      switchDeviceDeepgram: globalThis._switchDeviceDeepgramFunc,
+    };
+  }
+
   globalThis._sttDeepgramLoaded = true;
 
   /* ================================ */
@@ -1126,20 +1138,32 @@ if (typeof globalThis !== 'undefined' && globalThis._sttDeepgramLoaded) {
     }
   }
 
-  /* ================================ */
-  //	EXPORTS (CommonJS)
-  /* ================================ */
+  // Armazena referências em globalThis para acesso em segunda carga
+  globalThis._startAudioDeepgramFunc = startAudioDeepgram;
+  globalThis._stopAudioDeepgramFunc = stopAudioDeepgram;
+  globalThis._switchDeviceDeepgramFunc = switchDeviceDeepgram;
 
-  module.exports = {
+  // Retorna as referências do IIFE
+  return {
     startAudioDeepgram,
     stopAudioDeepgram,
     switchDeviceDeepgram,
   };
+})();
 
-  // Exportar para globalThis (para acesso de scripts carregados via <script> tag)
-  if (typeof globalThis !== 'undefined') {
-    globalThis.startAudioDeepgram = startAudioDeepgram;
-    globalThis.stopAudioDeepgram = stopAudioDeepgram;
-    globalThis.switchDeviceDeepgram = switchDeviceDeepgram;
-  }
-} // Fim do bloco de proteção contra redeclaração
+/* ================================ */
+//	EXPORTS (CommonJS)
+/* ================================ */
+
+module.exports = {
+  startAudioDeepgram: startAudioDeepgramFunc,
+  stopAudioDeepgram: stopAudioDeepgramFunc,
+  switchDeviceDeepgram: switchDeviceDeepgramFunc,
+};
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.startAudioDeepgram = startAudioDeepgramFunc;
+  globalThis.stopAudioDeepgram = stopAudioDeepgramFunc;
+  globalThis.switchDeviceDeepgram = switchDeviceDeepgramFunc;
+}

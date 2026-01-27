@@ -15,9 +15,21 @@
  */
 
 // ⚠️ Proteção contra redeclaração (quando carregado via <script> tag múltiplas vezes)
-if (typeof globalThis !== 'undefined' && globalThis._sttVoskLoaded) {
-  console.warn('⚠️ stt-vosk.js já foi carregado, ignorando redeclaração');
-} else if (typeof globalThis !== 'undefined') {
+// Usar IIFE para preservar escopo das funções
+const {
+  startAudioVosk: startAudioVoskFunc,
+  stopAudioVosk: stopAudioVoskFunc,
+  switchDeviceVosk: switchDeviceVoskFunc,
+} = (() => {
+  if (globalThis._sttVoskLoaded) {
+    // Retorna funções já carregadas da primeira execução
+    return {
+      startAudioVosk: globalThis._startAudioVoskFunc,
+      stopAudioVosk: globalThis._stopAudioVoskFunc,
+      switchDeviceVosk: globalThis._switchDeviceVoskFunc,
+    };
+  }
+
   globalThis._sttVoskLoaded = true;
 
   /* ================================ */
@@ -29,9 +41,7 @@ if (typeof globalThis !== 'undefined' && globalThis._sttVoskLoaded) {
   // ipcRenderer será inicializado por renderer.js
   // Usar função getter para lazy evaluation
   const getVADEngine = () => globalThis.vadEngine;
-
-  // 🔥 INSTÂNCIA DE EVENTBUS LOCAL
-  const eventBus = globalThis.eventBus;
+  const getEventBus = () => globalThis.eventBus;
 
   /* ================================ */
   //	CONSTANTES
@@ -622,12 +632,12 @@ if (typeof globalThis !== 'undefined' && globalThis._sttVoskLoaded) {
   function handleVolumeUpdate(source, percent) {
     // Emite volume para UI
     const ev = source === globalThis.INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-    eventBus.emit(ev, { percent });
+    getEventBus().emit(ev, { percent });
   }
 
   // Adiciona transcrição com placeholder ao UI
   function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-    eventBus.emit('transcriptAdd', {
+    getEventBus().emit('transcriptAdd', {
       author,
       text: '...',
       timeStr,
@@ -638,7 +648,7 @@ if (typeof globalThis !== 'undefined' && globalThis._sttVoskLoaded) {
 
   // Preenche placeholder com transcrição final
   function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-    eventBus.emit('placeholderFulfill', {
+    getEventBus().emit('placeholderFulfill', {
       speaker: author,
       text: transcript,
       placeholderId,
@@ -650,13 +660,13 @@ if (typeof globalThis !== 'undefined' && globalThis._sttVoskLoaded) {
   // Limpa interim transcript do UI
   function clearInterim(source) {
     const interimId = source === globalThis.INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-    eventBus.emit('clearInterim', { id: interimId });
+    getEventBus().emit('clearInterim', { id: interimId });
   }
 
   // Atualiza interim transcript no UI
   function updateInterim(source, transcript, author) {
     const interimId = source === globalThis.INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-    eventBus.emit('updateInterim', {
+    getEventBus().emit('updateInterim', {
       id: interimId,
       speaker: author,
       text: transcript,
@@ -908,20 +918,32 @@ if (typeof globalThis !== 'undefined' && globalThis._sttVoskLoaded) {
     }
   }
 
-  /* ================================ */
-  //	EXPORTS (CommonJS)
-  /* ================================ */
+  // Armazena referências em globalThis para acesso em segunda carga
+  globalThis._startAudioVoskFunc = startAudioVosk;
+  globalThis._stopAudioVoskFunc = stopAudioVosk;
+  globalThis._switchDeviceVoskFunc = switchDeviceVosk;
 
-  module.exports = {
+  // Retorna as referências do IIFE
+  return {
     startAudioVosk,
     stopAudioVosk,
     switchDeviceVosk,
   };
+})();
 
-  // Exportar para globalThis (para acesso de scripts carregados via <script> tag)
-  if (typeof globalThis !== 'undefined') {
-    globalThis.startAudioVosk = startAudioVosk;
-    globalThis.stopAudioVosk = stopAudioVosk;
-    globalThis.switchDeviceVosk = switchDeviceVosk;
-  }
-} // Fim do bloco de proteção contra redeclaração
+/* ================================ */
+//	EXPORTS (CommonJS)
+/* ================================ */
+
+module.exports = {
+  startAudioVosk: startAudioVoskFunc,
+  stopAudioVosk: stopAudioVoskFunc,
+  switchDeviceVosk: switchDeviceVoskFunc,
+};
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.startAudioVosk = startAudioVoskFunc;
+  globalThis.stopAudioVosk = stopAudioVoskFunc;
+  globalThis.switchDeviceVosk = switchDeviceVoskFunc;
+}

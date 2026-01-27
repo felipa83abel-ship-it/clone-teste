@@ -22,10 +22,21 @@
  */
 
 // ⚠️ Proteção contra redeclaração (quando carregado via <script> tag múltiplas vezes)
-if (typeof globalThis !== 'undefined' && globalThis._vadEngineLoaded) {
-  // Arquivo já foi carregado, pular redefinição
-  console.warn('⚠️ vad-engine.js já foi carregado, ignorando redeclaração');
-} else if (typeof globalThis !== 'undefined') {
+// Usar IIFE para preservar escopo das funções
+const {
+  VADEngine: VADEngineClass,
+  getVADEngine: getVADEngineFunc,
+  resetVADEngine: resetVADEngineFunc,
+} = (() => {
+  if (globalThis._vadEngineLoaded) {
+    // Retorna funções já carregadas da primeira execução
+    return {
+      VADEngine: globalThis._VADEngineClass,
+      getVADEngine: globalThis._getVADEngineFunc,
+      resetVADEngine: globalThis._resetVADEngineFunc,
+    };
+  }
+
   globalThis._vadEngineLoaded = true;
 
   /* ================================ */
@@ -288,20 +299,32 @@ if (typeof globalThis !== 'undefined' && globalThis._vadEngineLoaded) {
     vadEngineInstance = null;
   }
 
-  /* ================================ */
-  //	EXPORTS
-  /* ================================ */
+  // Armazena referências em globalThis para acesso em segunda carga
+  globalThis._VADEngineClass = VADEngine;
+  globalThis._getVADEngineFunc = getVADEngine;
+  globalThis._resetVADEngineFunc = resetVADEngine;
 
-  module.exports = {
+  // Retorna as referências do IIFE
+  return {
     VADEngine,
     getVADEngine,
     resetVADEngine,
   };
+})();
 
-  // Exportar para globalThis (para acesso de scripts carregados via <script> tag)
-  if (typeof globalThis !== 'undefined') {
-    globalThis.getVADEngine = getVADEngine;
-    globalThis.VADEngine = VADEngine;
-    globalThis.resetVADEngine = resetVADEngine;
-  }
-} // Fim do bloco de proteção contra redeclaração
+/* ================================ */
+//	EXPORTS (CommonJS)
+/* ================================ */
+
+module.exports = {
+  VADEngine: VADEngineClass,
+  getVADEngine: getVADEngineFunc,
+  resetVADEngine: resetVADEngineFunc,
+};
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.getVADEngine = getVADEngineFunc;
+  globalThis.VADEngine = VADEngineClass;
+  globalThis.resetVADEngine = resetVADEngineFunc;
+}
