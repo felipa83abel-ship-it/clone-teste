@@ -1,5 +1,5 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+/* global Logger, DOM */
 
 /**
  * AudioDeviceManager - Gerencia dispositivos de áudio
@@ -52,8 +52,8 @@ class AudioDeviceManager {
     this.stopMonitoring('input');
     this.stopMonitoring('output');
 
-    const inputSelect = document.getElementById('audio-input-device');
-    const outputSelect = document.getElementById('audio-output-device');
+    const inputSelect = DOM.get('audioInputDevice');
+    const outputSelect = DOM.get('audioOutputDevice');
     if (inputSelect) inputSelect.value = '';
     if (outputSelect) outputSelect.value = '';
     this.saveDevices();
@@ -72,8 +72,8 @@ class AudioDeviceManager {
       const devices = await navigator.mediaDevices.enumerateDevices();
       const inputs = devices.filter((d) => d.kind === 'audioinput');
 
-      const inputSelect = document.getElementById('audio-input-device');
-      const outputSelect = document.getElementById('audio-output-device');
+      const inputSelect = DOM.get('audioInputDevice');
+      const outputSelect = DOM.get('audioOutputDevice');
 
       if (!inputSelect || !outputSelect) {
         console.warn('⚠️ Selects de áudio não encontrados no DOM');
@@ -112,8 +112,8 @@ class AudioDeviceManager {
    */
   saveDevices() {
     Logger.debug('Início da função: "saveDevices"');
-    const inputSelect = document.getElementById('audio-input-device');
-    const outputSelect = document.getElementById('audio-output-device');
+    const inputSelect = DOM.get('audioInputDevice');
+    const outputSelect = DOM.get('audioOutputDevice');
 
     if (inputSelect && outputSelect) {
       this.configManager.config.audio.inputDevice = inputSelect.value || '';
@@ -135,8 +135,8 @@ class AudioDeviceManager {
    */
   async restoreDevices() {
     Logger.debug('Início da função: "restoreDevices"');
-    const inputSelect = document.getElementById('audio-input-device');
-    const outputSelect = document.getElementById('audio-output-device');
+    const inputSelect = DOM.get('audioInputDevice');
+    const outputSelect = DOM.get('audioOutputDevice');
 
     if (!inputSelect || !outputSelect) return;
 
@@ -172,7 +172,7 @@ class AudioDeviceManager {
    */
   async startMonitoring(type) {
     Logger.debug(`Início da função: "startMonitoring" - ${type}`);
-    const select = document.getElementById(`audio-${type}-device`);
+    const select = DOM.get(`audio${type === 'input' ? 'Input' : 'Output'}Device`);
 
     if (!select?.value) {
       console.log(`ℹ️ ${type}: nenhum dispositivo selecionado (DESATIVADO)`);
@@ -207,8 +207,8 @@ class AudioDeviceManager {
    * @returns {{input: string, output: string}}
    */
   getSelectedDevices() {
-    const inputSelect = document.getElementById('audio-input-device');
-    const outputSelect = document.getElementById('audio-output-device');
+    const inputSelect = DOM.get('audioInputDevice');
+    const outputSelect = DOM.get('audioOutputDevice');
     return {
       input: inputSelect?.value || '',
       output: outputSelect?.value || '',
@@ -232,8 +232,8 @@ class AudioDeviceManager {
    */
   #initDeviceSelectListeners() {
     console.log('🎵 AudioDeviceManager.#initDeviceSelectListeners()');
-    const inputSelect = document.getElementById('audio-input-device');
-    const outputSelect = document.getElementById('audio-output-device');
+    const inputSelect = DOM.get('audioInputDevice');
+    const outputSelect = DOM.get('audioOutputDevice');
 
     if (inputSelect) {
       inputSelect.addEventListener('change', async () => {
@@ -261,12 +261,12 @@ class AudioDeviceManager {
     // EVENT BUS LISTENERS: Volume Updates
     // ==========================================
     this.eventBus.on('inputVolumeUpdate', ({ percent }) => {
-      const inputVu = document.getElementById('inputVu');
+      const inputVu = DOM.get('inputVu');
       if (inputVu) inputVu.style.width = percent + '%';
     });
 
     this.eventBus.on('outputVolumeUpdate', ({ percent }) => {
-      const outputVu = document.getElementById('outputVu');
+      const outputVu = DOM.get('outputVu');
       if (outputVu) outputVu.style.width = percent + '%';
     });
   }

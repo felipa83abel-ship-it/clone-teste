@@ -1,5 +1,6 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+
+/* global Logger, DOM */
 
 /**
  * ScreenConfigManager - Gerencia configurações de captura de tela
@@ -54,9 +55,9 @@ class ScreenConfigManager {
    */
   async reset() {
     console.log('🔄 ScreenConfigManager.reset()');
-    const hotkeyInput = document.getElementById('screenshot-hotkey');
-    const formatSelect = document.getElementById('screenshot-format');
-    const excludeCheckbox = document.getElementById('exclude-app-from-screenshot');
+    const hotkeyInput = DOM.get('screenshotHotkey');
+    const formatSelect = DOM.get('screenshotFormat');
+    const excludeCheckbox = DOM.get('excludeAppFromScreenshot');
 
     if (hotkeyInput) {
       hotkeyInput.value = 'Ctrl+Shift+S';
@@ -86,7 +87,7 @@ class ScreenConfigManager {
     console.log('🎬 Restaurando configurações de screenshot...');
 
     // Restaurar hotkey
-    const hotkeyInput = document.getElementById('screenshot-hotkey');
+    const hotkeyInput = DOM.get('screenshotHotkey');
     if (hotkeyInput) {
       hotkeyInput.value = this.configManager.config.screen?.screenshotHotkey || 'Ctrl+Shift+S';
       console.log(`   ✅ Hotkey restaurado: ${hotkeyInput.value}`);
@@ -95,7 +96,7 @@ class ScreenConfigManager {
     }
 
     // Restaurar formato
-    const formatSelect = document.getElementById('screenshot-format');
+    const formatSelect = DOM.get('screenshotFormat');
     if (formatSelect) {
       formatSelect.value = this.configManager.config.screen?.imageFormat || 'png';
       console.log(`   ✅ Formato restaurado: ${formatSelect.value}`);
@@ -104,7 +105,7 @@ class ScreenConfigManager {
     }
 
     // Restaurar checkbox de exclusão
-    const excludeCheckbox = document.getElementById('exclude-app-from-screenshot');
+    const excludeCheckbox = DOM.get('excludeAppFromScreenshot');
     if (excludeCheckbox) {
       excludeCheckbox.checked =
         this.configManager.config.screen?.excludeAppFromScreenshot !== false;
@@ -153,7 +154,7 @@ class ScreenConfigManager {
       console.log(`   📝 Hotkey capturado: ${hotkey}`);
 
       // Atualiza DOM e config
-      const hotkeyInput = document.getElementById('screenshot-hotkey');
+      const hotkeyInput = DOM.get('screenshotHotkey');
       if (hotkeyInput) {
         hotkeyInput.value = hotkey;
         this.configManager.config.screen.screenshotHotkey = hotkey;
@@ -214,7 +215,7 @@ class ScreenConfigManager {
     console.log('🎯 ScreenConfigManager.#initScreenConfigListeners()');
 
     // Listener para botão de gravação de hotkey
-    const recordHotkeyBtn = document.getElementById('recordHotkeyBtn');
+    const recordHotkeyBtn = DOM.get('recordHotkeyBtn');
     if (recordHotkeyBtn) {
       recordHotkeyBtn.addEventListener('click', () => {
         this.recordHotkey(recordHotkeyBtn);
@@ -225,7 +226,7 @@ class ScreenConfigManager {
     }
 
     // Listener para mudança de formato
-    const formatSelect = document.getElementById('screenshot-format');
+    const formatSelect = DOM.get('screenshotFormat');
     if (formatSelect) {
       formatSelect.addEventListener('change', (e) => {
         this.saveScreenField('screenshot-format', e.target.value);
@@ -237,7 +238,7 @@ class ScreenConfigManager {
     }
 
     // Listener para checkbox de exclusão
-    const excludeCheckbox = document.getElementById('exclude-app-from-screenshot');
+    const excludeCheckbox = DOM.get('excludeAppFromScreenshot');
     if (excludeCheckbox) {
       excludeCheckbox.addEventListener('change', (e) => {
         this.saveScreenField('exclude-app-from-screenshot', e.target.checked);
@@ -249,7 +250,7 @@ class ScreenConfigManager {
     }
 
     // Listener para botão de limpar screenshots (se existir)
-    const clearScreenshotsBtn = document.getElementById('clearScreenshotsBtn');
+    const clearScreenshotsBtn = DOM.get('clearScreenshotsBtn');
     if (clearScreenshotsBtn) {
       clearScreenshotsBtn.addEventListener('click', () => {
         if (!globalThis.RendererAPI?.clearScreenshots) {

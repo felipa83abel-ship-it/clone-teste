@@ -1,5 +1,5 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+/* global Logger, DOM */
 
 /**
  * HomeUIManager - Gerencia interface do HOME
@@ -45,7 +45,7 @@ class HomeUIManager {
    */
   async restoreState() {
     Logger.debug('🏠 HomeManager: Restaurando estado');
-    const mockToggle = document.getElementById('mockToggle');
+    const mockToggle = DOM.get('mockToggle');
     if (mockToggle && globalThis.RendererAPI) {
       const currentConfig = globalThis.RendererAPI.getAppConfig?.();
       if (currentConfig?.isMockDebugMode) {
@@ -59,7 +59,7 @@ class HomeUIManager {
    */
   async reset() {
     Logger.debug('🏠 HomeManager: Resete');
-    const mockToggle = document.getElementById('mockToggle');
+    const mockToggle = DOM.get('mockToggle');
     if (mockToggle) {
       mockToggle.checked = false;
     }
@@ -76,7 +76,7 @@ class HomeUIManager {
    * @param {function} callback - Função callback
    */
   registerElementListener(elementId, eventType, callback) {
-    const element = document.getElementById(elementId);
+    const element = DOM.get(elementId);
     if (element) {
       element.addEventListener(eventType, callback);
       console.log(`   ✅ Listener registrado: ${elementId}`);
@@ -117,7 +117,7 @@ class HomeUIManager {
           });
 
           // Mostrar a seção correspondente
-          const targetSection = document.getElementById(tabName);
+          const targetSection = DOM.get(tabName);
           if (targetSection) {
             targetSection.classList.add('active');
             console.log(`>>> Seção ativada: ${tabName}`);
@@ -134,7 +134,7 @@ class HomeUIManager {
   }
   #initMockToggle() {
     Logger.debug('🏠 HomeManager: #initMockToggle');
-    const mockToggle = document.getElementById('mockToggle');
+    const mockToggle = DOM.get('mockToggle');
     if (mockToggle) {
       mockToggle.addEventListener('change', async () => {
         if (!globalThis.RendererAPI) return;
@@ -174,7 +174,7 @@ class HomeUIManager {
    */
   #initResetHomeButton() {
     Logger.debug('🏠 HomeManager: #initResetHomeButton');
-    const resetBtn = document.getElementById('resetHomeBtn');
+    const resetBtn = DOM.get('resetHomeBtn');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         const confirmed = confirm(
@@ -304,7 +304,7 @@ class HomeUIManager {
    */
   #initQuestionsHistoryListener() {
     Logger.debug('🏠 HomeManager: #initQuestionsHistoryListener');
-    const questionsHistoryBox = document.getElementById('questionsHistory');
+    const questionsHistoryBox = DOM.get('questionsHistory');
     if (questionsHistoryBox) {
       questionsHistoryBox.addEventListener('click', (e) => {
         const questionBlock = e.target.closest('.question-block');
@@ -385,10 +385,10 @@ class HomeUIManager {
     // Atualiza VU meter de entrada em tempo real
     // ==========================================
     this.eventBus.on('inputVolumeUpdate', ({ percent }) => {
-      const inputVu = document.getElementById('inputVu');
+      const inputVu = DOM.get('inputVu');
       if (inputVu) inputVu.style.width = percent + '%';
 
-      const inputVuHome = document.getElementById('inputVuHome');
+      const inputVuHome = DOM.get('inputVuHome');
       if (inputVuHome) inputVuHome.style.width = percent + '%';
 
       Logger.debug(`📊 Input Volume atualizado: ${percent}%`, false);
@@ -399,10 +399,10 @@ class HomeUIManager {
     // Atualiza VU meter de saída em tempo real
     // ==========================================
     this.eventBus.on('outputVolumeUpdate', ({ percent }) => {
-      const outputVu = document.getElementById('outputVu');
+      const outputVu = DOM.get('outputVu');
       if (outputVu) outputVu.style.width = percent + '%';
 
-      const outputVuHome = document.getElementById('outputVuHome');
+      const outputVuHome = DOM.get('outputVuHome');
       if (outputVuHome) outputVuHome.style.width = percent + '%';
 
       Logger.debug(`📊 Output Volume atualizado: ${percent}%`, false);
@@ -413,7 +413,7 @@ class HomeUIManager {
     // Atualiza botão listen quando áudio começa/para
     // ==========================================
     this.eventBus.on('listenButtonToggle', ({ isRunning, buttonText }) => {
-      const listenBtn = document.getElementById('listenBtn');
+      const listenBtn = DOM.get('listenBtn');
       if (listenBtn) {
         listenBtn.textContent = buttonText;
         listenBtn.classList.toggle('listening', isRunning);
@@ -431,10 +431,10 @@ class HomeUIManager {
 
       // Se parou de capturar, resetar volume na home para 0
       if (!isRunning) {
-        const inputVuHome = document.getElementById('inputVuHome');
+        const inputVuHome = DOM.get('inputVuHome');
         if (inputVuHome) inputVuHome.style.width = '0%';
 
-        const outputVuHome = document.getElementById('outputVuHome');
+        const outputVuHome = DOM.get('outputVuHome');
         if (outputVuHome) outputVuHome.style.width = '0%';
       }
     });
@@ -444,7 +444,7 @@ class HomeUIManager {
     // Atualiza mensagem de status
     // ==========================================
     this.eventBus.on('statusUpdate', ({ message }) => {
-      const statusDiv = document.getElementById('status-div');
+      const statusDiv = DOM.get('statusDiv');
       if (statusDiv) {
         statusDiv.textContent = message;
         console.log(`📊 Status atualizado: "${message}"`);
@@ -456,7 +456,7 @@ class HomeUIManager {
     // Adiciona transcrição ao UI
     // ==========================================
     this.eventBus.on('transcriptionAdd', ({ _questionId, text }) => {
-      const transcriptBox = document.getElementById('transcriptBox');
+      const transcriptBox = DOM.get('transcriptBox');
       if (!transcriptBox) {
         console.warn('⚠️ Elemento transcriptBox não encontrado');
         return;
@@ -470,7 +470,7 @@ class HomeUIManager {
     // Limpa transcrições do UI
     // ==========================================
     this.eventBus.on('transcriptionCleared', () => {
-      const transcriptBox = document.getElementById('transcriptBox');
+      const transcriptBox = DOM.get('transcriptBox');
       if (transcriptBox) {
         transcriptBox.innerHTML = '';
         Logger.debug('🗑️ Transcrição limpa do UI', false);
@@ -482,7 +482,7 @@ class HomeUIManager {
     // Limpa respostas do UI
     // ==========================================
     this.eventBus.on('answersCleared', () => {
-      const answersHistoryBox = document.getElementById('answersHistory');
+      const answersHistoryBox = DOM.get('answersHistory');
       if (answersHistoryBox) {
         answersHistoryBox.innerHTML = '';
         Logger.debug('🗑️ Respostas limpas do UI', false);
@@ -495,7 +495,7 @@ class HomeUIManager {
     // ==========================================
     this.eventBus.on('currentQuestionUpdate', (data) => {
       const { text, isSelected } = data;
-      const currentQuestionBox = document.getElementById('currentQuestion');
+      const currentQuestionBox = DOM.get('currentQuestion');
 
       if (!currentQuestionBox) {
         console.warn('⚠️ Elemento #currentQuestion não encontrado no DOM');
@@ -513,7 +513,7 @@ class HomeUIManager {
     // ==========================================
     this.eventBus.on('questionsHistoryUpdate', (data) => {
       const { questionId } = data;
-      const questionsHistoryBox = document.getElementById('questionsHistory');
+      const questionsHistoryBox = DOM.get('questionsHistory');
 
       if (!questionsHistoryBox) {
         console.warn('⚠️ Elemento #questionsHistory não encontrado');
@@ -535,7 +535,7 @@ class HomeUIManager {
     // ==========================================
     this.eventBus.on('answerStreamChunk', (data) => {
       const { chunk, questionId } = data;
-      const answersHistory = document.getElementById('answersHistory');
+      const answersHistory = DOM.get('answersHistory');
 
       if (answersHistory) {
         // Adicionar chunk ao fim (streaming)
@@ -558,7 +558,7 @@ class HomeUIManager {
     // ==========================================
     this.eventBus.on('answerBatchEnd', (data) => {
       const { questionId, response, turnId } = data;
-      const answersHistory = document.getElementById('answersHistory');
+      const answersHistory = DOM.get('answersHistory');
 
       if (answersHistory) {
         const answerEl = answersHistory.querySelector(
@@ -586,7 +586,7 @@ class HomeUIManager {
     // Indica fim do streaming
     // ==========================================
     this.eventBus.on('answerStreamEnd', (_) => {
-      const answersHistory = document.getElementById('answersHistory');
+      const answersHistory = DOM.get('answersHistory');
       if (answersHistory) {
         const lastAnswer = answersHistory.querySelector('.answer-block:last-child');
         if (lastAnswer) {
@@ -601,7 +601,7 @@ class HomeUIManager {
     // Reordena respostas por turnId (DESC)
     // ==========================================
     this.eventBus.on('sortAnswersByTurnId', () => {
-      const answersHistoryBox = document.getElementById('answersHistory');
+      const answersHistoryBox = DOM.get('answersHistory');
       if (!answersHistoryBox) return;
 
       // Obter todos os blocos de resposta

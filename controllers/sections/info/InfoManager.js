@@ -1,5 +1,5 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+/* global Logger, DOM */
 
 /**
  * InfoManager - Gerencia seção de informações

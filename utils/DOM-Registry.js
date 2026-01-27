@@ -94,7 +94,11 @@ class DOMRegistry {
     audioInputDevice: '#audio-input-device',
     audioOutputDevice: '#audio-output-device',
 
-    // API KEYS
+    // API KEYS (com aliases para diferentes nomes usados)
+    openaiApiKey: '#openai-api-key',
+    googleApiKey: '#google-api-key',
+    openrouterApiKey: '#openrouter-api-key',
+    // Aliases para compatibilidade
     openaiApiKeyInput: '#openai-api-key',
     googleApiKeyInput: '#google-api-key',
     openrouterApiKeyInput: '#openrouter-api-key',
@@ -103,7 +107,14 @@ class DOMRegistry {
     sttModelSelect: '#stt-model-select',
     llmModelSelect: '#llm-model-select',
 
-    // CONFIG SECTIONS
+    // CONFIG SECTIONS (usando IDs reais do HTML)
+    home: '#home',
+    'api-models': '#api-models',
+    'audio-screen': '#audio-screen',
+    privacy: '#privacy',
+    other: '#other',
+    info: '#info',
+    // Aliases para nomes verbosos
     homeSection: '#home',
     apiModelsSection: '#api-models',
     audioScreenSection: '#audio-screen',
@@ -111,12 +122,21 @@ class DOMRegistry {
     otherSection: '#other',
     infoSection: '#info',
 
+    // SCREENSHOT CONFIG
+    screenshotHotkey: '#screenshot-hotkey',
+    screenshotFormat: '#screenshot-format',
+    excludeAppFromScreenshot: '#exclude-app-from-screenshot',
+    recordHotkeyBtn: '#recordHotkeyBtn',
+
     // TOGGLES
     darkModeToggle: '#darkModeToggle',
     mockToggle: '#mockToggle',
     analyticsToggle: '#analytics-toggle',
     autoClearDataCheckbox: '#auto-clear-data',
     autoUpdateCheckbox: '#auto-update',
+    hideFromScreenCapture: '#hide-from-screen-capture',
+    disableTelemetry: '#disable-telemetry',
+    dataRetentionDays: '#data-retention-days',
 
     // BUTTONS
     resetHomeBtn: '#resetHomeBtn',

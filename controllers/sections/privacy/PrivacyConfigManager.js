@@ -1,5 +1,6 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+
+/* global Logger, DOM */
 
 /**
  * PrivacyConfigManager - Gerencia configurações de privacidade
@@ -149,7 +150,7 @@ class PrivacyConfigManager {
     console.log('🎯 PrivacyConfigManager.#initPrivacyListeners()');
 
     // Listener para checkbox: ocultar de screenshot
-    const hideFromScreenCheckbox = document.getElementById('hide-from-screen-capture');
+    const hideFromScreenCheckbox = DOM.get('hideFromScreenCapture');
     if (hideFromScreenCheckbox) {
       hideFromScreenCheckbox.addEventListener('change', (e) => {
         this.savePrivacyField('hide-from-screen-capture', e.target.checked);
@@ -161,7 +162,7 @@ class PrivacyConfigManager {
     }
 
     // Listener para checkbox: desabilitar telemetria
-    const disableTelemetryCheckbox = document.getElementById('disable-telemetry');
+    const disableTelemetryCheckbox = DOM.get('disableTelemetry');
     if (disableTelemetryCheckbox) {
       disableTelemetryCheckbox.addEventListener('change', (e) => {
         this.savePrivacyField('disable-telemetry', e.target.checked);
@@ -173,7 +174,7 @@ class PrivacyConfigManager {
     }
 
     // Listener para checkbox: auto-limpar dados
-    const autoClearCheckbox = document.getElementById('auto-clear-data');
+    const autoClearCheckbox = DOM.get('autoClearDataCheckbox');
     if (autoClearCheckbox) {
       autoClearCheckbox.addEventListener('change', (e) => {
         this.savePrivacyField('auto-clear-data', e.target.checked);
@@ -185,7 +186,7 @@ class PrivacyConfigManager {
     }
 
     // Listener para slider: dias de retenção
-    const retentionSlider = document.getElementById('data-retention-days');
+    const retentionSlider = DOM.get('dataRetentionDays');
     if (retentionSlider) {
       retentionSlider.addEventListener('change', (e) => {
         this.savePrivacyField('data-retention-days', e.target.value);

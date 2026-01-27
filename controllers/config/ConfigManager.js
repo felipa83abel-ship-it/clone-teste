@@ -1,6 +1,6 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
 /// <reference path="../../types/globals.d.ts" />
-/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowUIManager, HomeUIManager, TopBarManager, OtherConfigManager, InfoManager */
+/* global Logger, _ipc, ApiKeyManager, AudioDeviceManager, ModelSelectionManager, ScreenConfigManager, PrivacyConfigManager, WindowUIManager, HomeUIManager, TopBarManager, OtherConfigManager, InfoManager, DOM */
 
 /**
  * ConfigManager - Orquestrador Central de Configurações
@@ -389,7 +389,7 @@ class ConfigManager {
   async saveSection(section) {
     Logger.debug('Início da função: "saveSection"');
     const sectionElement =
-      document.getElementById(section) ||
+      DOM.get(section) ||
       document.querySelector(`[data-section="${section}"]`)?.closest('.tab-pane');
 
     if (sectionElement) {
@@ -434,7 +434,7 @@ class ConfigManager {
    */
   #initResetConfigButton() {
     Logger.debug('ConfigManager: #initResetConfigButton');
-    const resetBtn = document.getElementById('btn-reset-config');
+    const resetBtn = DOM.get('resetConfigBtn');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
         const confirmed = confirm(

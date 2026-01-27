@@ -1,5 +1,6 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+
+/* global Logger, DOM */
 
 /**
  * OtherConfigManager - Gerencia configurações diversas
@@ -83,7 +84,7 @@ class OtherConfigManager {
   #initElements() {
     console.log('🎨 OtherConfigManager #initElements');
 
-    const darkModeToggle = document.getElementById('darkModeToggle');
+    const darkModeToggle = DOM.get('darkModeToggle');
 
     if (darkModeToggle) {
       darkModeToggle.addEventListener('change', (e) => {
@@ -105,7 +106,7 @@ class OtherConfigManager {
    * Atualiza toggle de dark mode (UI) e aplica classe CSS
    */
   #updateDarkModeUI(enabled) {
-    const darkModeToggle = document.getElementById('darkModeToggle');
+    const darkModeToggle = DOM.get('darkModeToggle');
     if (darkModeToggle) {
       darkModeToggle.checked = enabled;
     }

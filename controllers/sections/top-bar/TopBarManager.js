@@ -1,5 +1,5 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+/* global Logger, DOM */
 
 /**
  * TopBarManager - Gerencia a barra superior (top bar) da aplicação
@@ -112,7 +112,7 @@ class TopBarManager {
     console.log('🎨 TopBarManager #initElements');
 
     // Opacidade: input listener
-    const opacityRange = document.getElementById('opacityRange');
+    const opacityRange = DOM.get('opacityRange');
     if (opacityRange) {
       opacityRange.addEventListener('input', (e) => {
         const opacity = Number.parseFloat(e.target.value);
@@ -140,7 +140,7 @@ class TopBarManager {
     }
 
     // Modo de entrevista: select listener
-    const interviewModeSelect = document.getElementById('interviewModeSelect');
+    const interviewModeSelect = DOM.get('interviewModeSelect');
     if (interviewModeSelect) {
       interviewModeSelect.addEventListener('change', (e) => {
         const mode = e.target.value;
@@ -182,7 +182,7 @@ class TopBarManager {
    * Atualiza slider de opacidade (UI)
    */
   #updateOpacityUI(opacity) {
-    const opacityRange = document.getElementById('opacityRange');
+    const opacityRange = DOM.get('opacityRange');
     if (opacityRange) {
       opacityRange.value = opacity.toString();
       console.log('💾 Opacidade atualizada:', opacity);
@@ -193,7 +193,7 @@ class TopBarManager {
    * Atualiza select de modo (UI)
    */
   #updateModeUI(mode) {
-    const interviewModeSelect = document.getElementById('interviewModeSelect');
+    const interviewModeSelect = DOM.get('interviewModeSelect');
     if (interviewModeSelect) {
       interviewModeSelect.value = mode.toString();
       console.log('💾 Modo atualizado:', mode);
@@ -204,7 +204,7 @@ class TopBarManager {
    * Atualiza badge de screenshots
    */
   #updateScreenshotBadge(count) {
-    const screenshotBadge = document.getElementById('screenshotBadge');
+    const screenshotBadge = DOM.get('screenshotBadge');
     if (screenshotBadge) {
       screenshotBadge.textContent = `📸 ${count} screenshots`;
       screenshotBadge.classList.toggle('hidden', count === 0);
@@ -216,7 +216,7 @@ class TopBarManager {
    * Atualiza badge de mock
    */
   #updateMockBadge(enabled) {
-    const mockBadge = document.getElementById('mockBadge');
+    const mockBadge = DOM.get('mockBadge');
     if (mockBadge) {
       mockBadge.classList.toggle('hidden', !enabled);
       console.log('💾 Mock badge atualizado:', enabled ? 'visível' : 'escondido');

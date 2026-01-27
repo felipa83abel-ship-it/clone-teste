@@ -1,5 +1,5 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+/* global Logger, DOM */
 
 /**
  * ApiKeyManager - Gerencia API keys de todos os providers
@@ -181,7 +181,7 @@ class ApiKeyManager {
    */
   updateApiKeyFieldStatus(provider, hasKey) {
     Logger.debug('Início da função: "updateApiKeyFieldStatus"');
-    const input = document.getElementById(`${provider}-api-key`);
+    const input = DOM.get(`${provider}ApiKey`);
 
     if (input) {
       if (hasKey) {
@@ -285,7 +285,7 @@ class ApiKeyManager {
         e.stopPropagation();
 
         const targetId = e.currentTarget.dataset.target;
-        const input = document.getElementById(targetId);
+        const input = DOM.get(targetId);
         const btn = e.currentTarget;
 
         if (!input) {

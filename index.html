@@ -693,72 +693,7 @@
     <!-- ==================== RENDERER (Orquestração & RendererAPI) ==================== -->
     <script src="./renderer.js"></script>
 
-    <!-- ==================== INICIALIZAÇÃO ==================== -->
-    <script>
-      document.addEventListener('DOMContentLoaded', async () => {
-        console.log('📖 DOMContentLoaded - Inicializando aplicação...');
-        try {
-          // Registrar todos os elementos DOM no registry
-          if (globalThis.DOM && typeof globalThis.DOM.register === 'function') {
-            globalThis.DOM.register();
-            console.log('✅ DOM Registry inicializado');
-          }
-
-          // Aguarda RendererAPI estar disponível
-          let attempts = 0;
-          while (!globalThis.RendererAPI && attempts < 50) {
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            attempts++;
-          }
-
-          if (!globalThis.RendererAPI) {
-            console.error('❌ RendererAPI não foi carregado após timeout');
-            return;
-          }
-
-          // ConfigManager orquestra todos os managers
-          globalThis.configManager = new ConfigManager();
-          await globalThis.configManager.initializeController();
-          console.log('✅ ConfigManager inicializado com sucesso');
-
-          // ==========================================
-          // INICIALIZAR AUDIO CONTROLLER COM DEPENDÊNCIAS
-          // ==========================================
-          if (globalThis.RendererAPI?.initAudioController) {
-            // 🔥 Popula UIElements com seletores reais do DOM
-            const uiElements = {
-              inputSelect: document.getElementById('audio-input-device'),
-              outputSelect: document.getElementById('audio-output-device'),
-              listeningBtn: document.getElementById('listening-btn'),
-              listenBtn: document.getElementById('listen-btn'),
-            };
-
-            const audioControllerDeps = {
-              appState: globalThis.appState,
-              eventBus: globalThis.eventBus,
-              sttStrategy: globalThis.RendererAPI.sttStrategy,
-              globalConfig: globalThis.configManager,
-              UIElements: uiElements, // ✅ Agora com seletores reais
-              CURRENT_QUESTION_ID: 'CURRENT',
-              modeManager: globalThis.RendererAPI.modeManager,
-              MODES: globalThis.RendererAPI.MODES,
-              getConfiguredSTTModel: globalThis.RendererAPI.getConfiguredSTTModel,
-              closeCurrentQuestionForced: globalThis.RendererAPI.closeCurrentQuestionForced,
-              updateStatusMessage: globalThis.RendererAPI.updateStatusMessage,
-              findAnswerByQuestionId: globalThis.RendererAPI.findAnswerByQuestionId,
-            };
-            globalThis.RendererAPI.initAudioController(audioControllerDeps);
-            console.log('✅ AudioController inicializado com sucesso');
-          }
-
-          console.log('✅ Aplicação inicializada com sucesso');
-        } catch (error) {
-          console.error('❌ Erro ao inicializar aplicação:', error);
-          if (globalThis.Logger) {
-            globalThis.Logger.error('Erro ao inicializar', error);
-          }
-        }
-      });
-    </script>
+    <!-- ==================== INICIALIZAÇÃO (DOM - após renderer estar pronto) ==================== -->
+    <script src="./initialization.js"></script>
   </body>
 </html>

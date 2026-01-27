@@ -1,5 +1,5 @@
 // @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
-/* global Logger */
+/* global Logger, DOM */
 
 /**
  * WindowUIManager - Gerencia configurações de janela
@@ -71,7 +71,7 @@ class WindowUIManager {
     Logger.debug('🔄 RESTAURANDO PREFERÊNCIAS DA JANELA...', false);
 
     // 1️⃣ Inicializar drag handle
-    const dragHandle = document.getElementById('dragHandle');
+    const dragHandle = DOM.get('dragHandle');
     if (dragHandle) {
       this.initDragHandle(dragHandle);
       Logger.debug(`   ✅ Drag handle inicializado`, false);
@@ -83,7 +83,7 @@ class WindowUIManager {
     Logger.debug('   ✅ Click-through será inicializado em initClickThroughController', false);
 
     // 3️⃣ Inicializar botão de fechar
-    const btnClose = document.getElementById('btnClose');
+    const btnClose = DOM.get('btnClose');
     if (btnClose) {
       Logger.debug(`   ✅ btnClose inicializado`, false);
     } else {
@@ -177,7 +177,7 @@ class WindowUIManager {
     Logger.debug('🎯 WindowUIManager.#initWindowListeners()', false);
 
     // Listener para botão de fechar app
-    const btnClose = document.getElementById('btnClose');
+    const btnClose = DOM.get('btnClose');
     if (btnClose) {
       btnClose.addEventListener('click', () => {
         Logger.debug('🪟 btnClose clicado - enviando APP_CLOSE IPC', false);
@@ -209,7 +209,7 @@ class WindowUIManager {
     // Listener para evento de atualização de opacidade do EventBus
     if (globalThis.eventBus) {
       globalThis.eventBus.on('windowOpacityUpdate', (data) => {
-        const opacityRange = document.getElementById('opacityRange');
+        const opacityRange = DOM.get('opacityRange');
         if (opacityRange) {
           // Sincronizar o valor do input com o valor enviado pelo evento
           opacityRange.value = data.opacity;
@@ -228,7 +228,7 @@ class WindowUIManager {
   async initClickThroughController() {
     Logger.debug('🖱️ Inicializando click-through controller...', false);
 
-    const btnToggleClick = document.getElementById('btnToggleClick');
+    const btnToggleClick = DOM.get('btnToggleClick');
 
     if (!btnToggleClick) {
       Logger.debug('   ⚠️ btnToggleClick não encontrado no DOM', false);
