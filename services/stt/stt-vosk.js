@@ -37,6 +37,7 @@ const {
   /* ================================ */
 
   const { spawn } = require('node:child_process');
+  const path = require('path');
 
   // ipcRenderer será inicializado por renderer.js
   // Usar função getter para lazy evaluation
@@ -49,7 +50,9 @@ const {
 
   // Configuração Vosk
   const VOSK_CONFIG = {
-    MODEL: process.env.VOSK_MODEL || './models-stt/vosk/vosk-model-small-pt-0.3',
+    MODEL:
+      process.env.VOSK_MODEL ||
+      path.join(__dirname, 'services', 'stt', 'models-stt', 'vosk', 'vosk-model-small-pt-0.3'),
   };
 
   /* ================================ */
@@ -237,8 +240,8 @@ const {
 
     debugLogVosk(`🚀 Iniciando Vosk (${source}) com modelo: ${VOSK_CONFIG.MODEL}...`, true);
 
-    vars._voskProcess = spawn('python', ['server-vosk.py', VOSK_CONFIG.MODEL], {
-      cwd: __dirname, // server-vosk.py está em services/stt/
+    const serverVoskPath = path.join(__dirname, 'services', 'stt', 'server-vosk.py');
+    vars._voskProcess = spawn('python', [serverVoskPath, VOSK_CONFIG.MODEL], {
       stdio: ['pipe', 'pipe', 'pipe'],
     });
 
@@ -371,6 +374,15 @@ const {
     try {
       // Obtém o dispositivo selecionado no UI
       const deviceId = UIElements[cfg.deviceKey]?.value;
+
+      // 🔥 VALIDAÇÃO CRÍTICA: Se device está vazio (desativado), NÃO INICIA
+      if (!deviceId || deviceId.trim() === '') {
+        debugLogVosk(
+          `⛔ Dispositivo ${source.toUpperCase()} desativado (vazio) - NÃO INICIANDO`,
+          true
+        );
+        return;
+      }
 
       debugLogVosk(
         `🔊 Iniciando captura ${source.toUpperCase()} com dispositivo: ${deviceId}`,
@@ -637,7 +649,13 @@ const {
 
   // Adiciona transcrição com placeholder ao UI
   function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-    getEventBus().emit('transcriptAdd', {
+    const eventBus = getEventBus();
+    if (!eventBus) {
+      console.warn('⚠️ EventBus não disponível em addTranscriptPlaceholder');
+      return;
+    }
+
+    eventBus.emit('transcriptAdd', {
       author,
       text: '...',
       timeStr,
@@ -666,7 +684,15 @@ const {
   // Atualiza interim transcript no UI
   function updateInterim(source, transcript, author) {
     const interimId = source === globalThis.INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-    getEventBus().emit('updateInterim', {
+
+    // Verifica se eventBus está disponível e DOM também
+    const eventBus = getEventBus();
+    if (!eventBus) {
+      console.warn('⚠️ EventBus não disponível em updateInterim');
+      return;
+    }
+
+    eventBus.emit('updateInterim', {
       id: interimId,
       speaker: author,
       text: transcript,

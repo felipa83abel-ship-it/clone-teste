@@ -193,7 +193,7 @@ globalThis.eventBus.on('llmStreamEnd', (data) => {
 
   if (globalThis.modeManager.is(globalThis.MODES.INTERVIEW)) {
     globalThis.appState.interview.llmAnsweredTurnId = globalThis.appState.interview.interviewTurnId;
-    globalThis.resetCurrentQuestion();
+    globalThis.appState.resetCurrentQuestion();
     globalThis.renderCurrentQuestion();
   }
 
@@ -413,6 +413,11 @@ const RendererAPI = {
   initAudioController: (deps) => {
     if (typeof globalThis.initAudioController === 'function') {
       globalThis.initAudioController(deps);
+    }
+  },
+  initQuestionController: (deps) => {
+    if (typeof globalThis.initQuestionController === 'function') {
+      globalThis.initQuestionController(deps);
     }
   },
 };

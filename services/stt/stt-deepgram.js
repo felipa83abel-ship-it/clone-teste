@@ -544,6 +544,15 @@ const {
       // Obtém o dispositivo selecionado no UI
       const deviceId = UIElements[cfg.deviceKey]?.value;
 
+      // 🔥 VALIDAÇÃO CRÍTICA: Se device está vazio (desativado), NÃO INICIA
+      if (!deviceId || deviceId.trim() === '') {
+        debugLogDeepgram(
+          `⛔ Dispositivo ${source.toUpperCase()} desativado (vazio) - NÃO INICIANDO`,
+          true
+        );
+        return;
+      }
+
       debugLogDeepgram(
         `🔊 Iniciando captura ${source.toUpperCase()} com dispositivo: ${deviceId}`,
         false

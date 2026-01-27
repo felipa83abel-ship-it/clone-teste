@@ -309,7 +309,9 @@ class HomeUIManager {
       questionsHistoryBox.addEventListener('click', (e) => {
         const questionBlock = e.target.closest('.question-block');
         if (questionBlock && globalThis.RendererAPI?.handleQuestionClick) {
-          globalThis.RendererAPI.handleQuestionClick(questionBlock);
+          // Extrair o questionId do dataset
+          const questionId = questionBlock.dataset.questionId;
+          globalThis.RendererAPI.handleQuestionClick(questionId);
         }
       });
     }
@@ -452,17 +454,77 @@ class HomeUIManager {
     });
 
     // ==========================================
-    // LISTENER: transcriptionAdd
-    // Adiciona transcrição ao UI
+    // LISTENER: transcriptAdd
+    // Adiciona transcrição ao UI com placeholder
     // ==========================================
-    this.eventBus.on('transcriptionAdd', ({ _questionId, text }) => {
-      const transcriptBox = DOM.get('transcriptBox');
+    this.eventBus.on('transcriptAdd', ({ author, text, timeStr, elementId, placeholderId }) => {
+      const transcriptBox = DOM.get(elementId || 'conversation');
       if (!transcriptBox) {
-        console.warn('⚠️ Elemento transcriptBox não encontrado');
+        console.warn(`⚠️ Elemento ${elementId || 'conversation'} não encontrado`);
         return;
       }
-      transcriptBox.innerHTML += `<p>${text}</p>`;
-      console.log(`📝 Transcrição adicionada (${text.substring(0, 30)}...)`);
+      // Adiciona placeholder vazio que será preenchido depois
+      const div = document.createElement('div');
+      div.id = placeholderId;
+      div.className = 'transcript-item placeholder';
+      div.setAttribute('data-is-placeholder', 'true');
+      div.innerHTML = `<span style="color:#999">[${timeStr}]</span> <strong>${author}:</strong> <span class="placeholder-text">...</span>`;
+      transcriptBox.appendChild(div);
+      console.log(`📝 Transcrição placeholder adicionado (${author})`);
+    });
+
+    // ==========================================
+    // LISTENER: updateInterim
+    // Atualiza transcrição interim em tempo real
+    // ==========================================
+    this.eventBus.on('updateInterim', ({ id, speaker, text }) => {
+      let interimElement = document.getElementById(id);
+      if (!interimElement) {
+        // Cria elemento interim se não existir
+        const transcriptBox = DOM.get('conversation');
+        if (!transcriptBox) {
+          console.warn('⚠️ Elemento conversation não encontrado');
+          return;
+        }
+        interimElement = document.createElement('div');
+        interimElement.id = id;
+        interimElement.className = 'transcript-item interim';
+        transcriptBox.appendChild(interimElement);
+      }
+      // Atualiza texto interim
+      const ts = new Date().toLocaleTimeString();
+      interimElement.innerHTML = `<span style="color:#999">[${ts}]</span> <strong>${speaker}:</strong> <span style="font-style:italic;color:#888">${text}</span>`;
+      console.log(`⏳ Interim atualizado (${speaker}): ${text.substring(0, 30)}...`);
+    });
+
+    // ==========================================
+    // LISTENER: placeholderFulfill
+    // Preenche placeholder com transcrição final
+    // ==========================================
+    this.eventBus.on('placeholderFulfill', ({ placeholderId, text, speaker }) => {
+      const placeholder = document.getElementById(placeholderId);
+      if (placeholder) {
+        placeholder.classList.remove('placeholder');
+        placeholder.classList.add('final');
+        placeholder.setAttribute('data-is-placeholder', 'false');
+        const ts = new Date().toLocaleTimeString();
+        placeholder.innerHTML = `<span style="color:#999">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
+        console.log(`✅ Placeholder preenchido (${speaker}): ${text.substring(0, 30)}...`);
+      } else {
+        console.warn(`⚠️ Placeholder ${placeholderId} não encontrado`);
+      }
+    });
+
+    // ==========================================
+    // LISTENER: clearInterim
+    // Remove elemento interim do DOM
+    // ==========================================
+    this.eventBus.on('clearInterim', ({ id }) => {
+      const interimElement = document.getElementById(id);
+      if (interimElement) {
+        interimElement.remove();
+        console.log(`🗑️ Interim removido: ${id}`);
+      }
     });
 
     // ==========================================
@@ -502,17 +564,26 @@ class HomeUIManager {
         return;
       }
 
-      currentQuestionBox.innerHTML = `<strong>Pergunta Atual:</strong> ${text || '(vazio)'}`;
-      currentQuestionBox.classList.toggle('selected', isSelected);
+      // Classe base com seleção
+      let className = 'current-question-block';
+      if (isSelected) {
+        className += ' selected-question';
+      }
+
+      currentQuestionBox.className = className;
+      currentQuestionBox.innerHTML = `
+        <div class="question-content">
+          <span class="question-text">${text}</span>
+        </div>
+      `;
       console.log(`🎯 Pergunta atual atualizada: "${text?.substring(0, 30) || '(vazio)'}..."`);
     });
 
     // ==========================================
     // LISTENER: questionsHistoryUpdate
-    // Renderiza histórico de perguntas
+    // Renderiza histórico de perguntas no DOM
     // ==========================================
-    this.eventBus.on('questionsHistoryUpdate', (data) => {
-      const { questionId } = data;
+    this.eventBus.on('questionsHistoryUpdate', (historyData) => {
       const questionsHistoryBox = DOM.get('questionsHistory');
 
       if (!questionsHistoryBox) {
@@ -520,12 +591,87 @@ class HomeUIManager {
         return;
       }
 
-      // Renderizar a lista novamente
-      if (globalThis.renderQuestionsHistory) {
-        globalThis.renderQuestionsHistory();
-        console.log(`📋 Histórico de perguntas renderizado (questionId: ${questionId})`);
-      } else {
-        console.warn('⚠️ globalThis.renderQuestionsHistory não está disponível');
+      // Limpar histórico anterior
+      questionsHistoryBox.innerHTML = '';
+
+      // Renderizar cada pergunta no DOM
+      if (Array.isArray(historyData)) {
+        historyData.forEach((question) => {
+          const questionBlock = document.createElement('div');
+
+          // Classe base: question-block
+          let className = 'question-block';
+
+          // Adicionar class 'answered' se respondida (estilos com bordas verdes)
+          if (question.isAnswered) {
+            className += ' answered';
+          }
+
+          // Adicionar class 'selected' se selecionada (bordas azuis)
+          if (question.isSelected) {
+            className += ' selected-question';
+          }
+
+          questionBlock.className = className;
+          questionBlock.dataset.questionId = question.id;
+
+          // Construir badges
+          let badgesHtml = '';
+
+          // Badge turn-id (número da pergunta) - vermelho por padrão
+          if (question.turnId) {
+            badgesHtml += `<span class="turn-id-badge">${question.turnId}</span>`;
+          }
+
+          // Badge answered (checkmark verde)
+          if (question.isAnswered) {
+            badgesHtml += `<span class="badge answered" title="Respondida">✓</span>`;
+          }
+
+          // Badge incomplete (warning amarelo)
+          if (question.isIncomplete) {
+            badgesHtml += `<span class="badge incomplete" title="Incompleta">⚠️</span>`;
+          }
+
+          questionBlock.innerHTML = `
+            ${badgesHtml}
+            <span class="question-text">${question.text}</span>
+          `;
+
+          questionsHistoryBox.appendChild(questionBlock);
+        });
+        console.log(`📋 Histórico de perguntas renderizado (${historyData.length} perguntas)`);
+      }
+    });
+
+    // ==========================================
+    // LISTENER: scrollToQuestion
+    // Rola para pergunta selecionada
+    // ==========================================
+    this.eventBus.on('scrollToQuestion', ({ questionId }) => {
+      const questionsHistoryBox = DOM.get('questionsHistory');
+      if (questionsHistoryBox) {
+        const questionBlock = questionsHistoryBox.querySelector(
+          `[data-question-id="${questionId}"]`
+        );
+        if (questionBlock) {
+          questionBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          console.log(`📍 Rolou para pergunta: ${questionId}`);
+        }
+      }
+    });
+
+    // ==========================================
+    // LISTENER: clearAllSelections
+    // Limpa seleção de todas as perguntas
+    // ==========================================
+    this.eventBus.on('clearAllSelections', () => {
+      const questionsHistoryBox = DOM.get('questionsHistory');
+      if (questionsHistoryBox) {
+        questionsHistoryBox.querySelectorAll('.question-block').forEach((block) => {
+          block.classList.remove('selected');
+        });
+        console.log('🧹 Seleção de perguntas limpa');
       }
     });
 
@@ -534,20 +680,41 @@ class HomeUIManager {
     // Streaming de resposta (token por token)
     // ==========================================
     this.eventBus.on('answerStreamChunk', (data) => {
-      const { chunk, questionId } = data;
+      const { token, questionId, turnId } = data;
       const answersHistory = DOM.get('answersHistory');
 
+      if (!token) return; // Ignorar tokens vazios
+
       if (answersHistory) {
-        // Adicionar chunk ao fim (streaming)
-        const answerEl = answersHistory.querySelector(
-          `[data-question-id="${questionId}"] .answer-content`
-        );
-        if (answerEl) {
-          answerEl.innerHTML += chunk;
+        // Procurar elemento de resposta existente
+        let answerBlock = answersHistory.querySelector(`[data-question-id="${questionId}"]`);
+
+        if (!answerBlock) {
+          // Criar novo bloco se não existir
+          answerBlock = document.createElement('div');
+          answerBlock.className = 'answer-block active';
+          answerBlock.dataset.questionId = questionId;
+          if (turnId) {
+            answerBlock.dataset.turnId = turnId;
+          }
+
+          // Adicionar badge turn-id
+          const turnIdBadgeHtml = turnId
+            ? `<span class="turn-id-badge answer">${turnId}</span>`
+            : '';
+
+          answerBlock.innerHTML = `
+            ${turnIdBadgeHtml}
+            <div class="answer-content">${token}</div>
+          `;
+
+          answersHistory.appendChild(answerBlock);
         } else {
-          answersHistory.innerHTML += `<div data-question-id="${questionId}" class="answer-block">
-            <div class="answer-content">${chunk}</div>
-          </div>`;
+          // Adicionar token ao fim (streaming)
+          const answerContent = answerBlock.querySelector('.answer-content');
+          if (answerContent) {
+            answerContent.innerHTML += token;
+          }
         }
       }
     });
@@ -564,17 +731,35 @@ class HomeUIManager {
         const answerEl = answersHistory.querySelector(
           `[data-question-id="${questionId}"] .answer-content`
         );
+
         if (answerEl) {
+          // Atualizar resposta existente
           answerEl.innerHTML = response;
           if (turnId) {
             answerEl.dataset.turnId = turnId;
           }
         } else {
-          const badge = turnId ? `<span class="turn-id-badge">${turnId}</span>` : '';
-          answersHistory.innerHTML += `${badge}<div data-question-id="${questionId}" class="answer-block">
-            <div class="answer-content" ${turnId ? `data-turn-id="${turnId}"` : ''}>${response}</div>
-          </div>`;
+          // Criar novo bloco de resposta
+          const answerBlock = document.createElement('div');
+          answerBlock.className = 'answer-block active';
+          answerBlock.dataset.questionId = questionId;
+
+          // Construir HTML com badge turn-id
+          let turnIdBadgeHtml = '';
+          if (turnId) {
+            turnIdBadgeHtml = `<span class="turn-id-badge answer">${turnId}</span>`;
+          }
+
+          answerBlock.innerHTML = `
+            ${turnIdBadgeHtml}
+            <div class="answer-content" ${turnId ? `data-turn-id="${turnId}"` : ''}>
+              ${response}
+            </div>
+          `;
+
+          answersHistory.appendChild(answerBlock);
         }
+
         console.log(
           `✅ Resposta completa renderizada (questionId: ${questionId}, turnId: ${turnId})`
         );
@@ -625,6 +810,34 @@ class HomeUIManager {
         answersHistoryBox.appendChild(block);
       });
       console.log('🔄 Respostas reordenadas por turnId');
+    });
+
+    // ==========================================
+    // LISTENER: answerSelected
+    // Marca resposta como selecionada quando pergunta já foi respondida
+    // ==========================================
+    this.eventBus.on('answerSelected', ({ questionId, shouldScroll }) => {
+      const answersHistory = DOM.get('answersHistory');
+      if (!answersHistory) return;
+
+      // Remover seleção anterior
+      answersHistory.querySelectorAll('.answer-block').forEach((block) => {
+        block.classList.remove('selected-answer');
+      });
+
+      // Adicionar seleção na resposta da pergunta
+      const answerBlock = answersHistory.querySelector(`[data-question-id="${questionId}"]`);
+      if (answerBlock) {
+        answerBlock.classList.add('selected-answer');
+
+        // Rolar para resposta se solicitado
+        if (shouldScroll) {
+          answerBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          console.log(`📌 Resposta selecionada e visível: ${questionId}`);
+        } else {
+          console.log(`📌 Resposta selecionada: ${questionId}`);
+        }
+      }
     });
 
     console.log('>>> #initUIEventBusListeners COMPLETO - Todos os listeners de DOM centralizados');

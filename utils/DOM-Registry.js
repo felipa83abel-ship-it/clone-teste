@@ -51,8 +51,18 @@ class DOMRegistry {
     return !!this.get(key);
   }
 
+  /**
+   * Registra o DOM-Registry (inicializa)
+   * @returns {void}
+   */
+  static register() {
+    // Simply initialize the registry
+    console.log('✅ DOM-Registry inicializado com sucesso');
+  }
+
   static registry = {
     // HOME / TRANSCRIÇÃO
+    conversation: '#conversation',
     transcriptBox: '#conversation',
     transcriptionContainer: '#transcriptionContainer',
     interimElement: '.interim',

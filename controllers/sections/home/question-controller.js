@@ -33,7 +33,7 @@ if (!globalThis._questionControllerLoaded) {
 
   const updateStatusMessage = globalThis?.updateStatusMessage;
   const Logger = globalThis?.Logger;
-  const state = globalThis?.appState;
+  const getAppState = () => globalThis?.appState; // Usar getter para lazy evaluation
 
   // MODES, CURRENT_QUESTION_ID, ENABLE_INTERVIEW_TIMING_DEBUG_METRICS vêm de globalThis ou deps
 
@@ -54,6 +54,7 @@ if (!globalThis._questionControllerLoaded) {
   function renderQuestionsHistory() {
     Logger.debug('Início da função: "renderQuestionsHistory"');
 
+    const state = getAppState();
     const eventBusGlobal = globalThis.eventBus;
 
     const historyData = [...state.history].reverse().map((q) => {
@@ -90,6 +91,7 @@ if (!globalThis._questionControllerLoaded) {
   function renderCurrentQuestion() {
     Logger.debug('Início da função: "renderCurrentQuestion"');
 
+    const state = getAppState();
     const eventBusGlobal = globalThis.eventBus;
 
     if (!state.interview.currentQuestion.text) {
@@ -129,6 +131,7 @@ if (!globalThis._questionControllerLoaded) {
   function checkIfAnswered(questionId) {
     if (questionId === globalThis._questionControllerDeps.CURRENT_QUESTION_ID) return false;
 
+    const state = getAppState();
     const eventBusGlobal = globalThis.eventBus;
 
     const existingAnswer = _findAnswerByQuestionId(state, questionId);
@@ -149,6 +152,7 @@ if (!globalThis._questionControllerLoaded) {
   function checkIfIncomplete(questionId) {
     if (questionId === globalThis._questionControllerDeps.CURRENT_QUESTION_ID) return false;
 
+    const state = getAppState();
     const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
 
     const q = state.history.find((q) => q.id === questionId);
@@ -163,6 +167,7 @@ if (!globalThis._questionControllerLoaded) {
    * Verifica se o LLM já respondeu esse turno
    */
   function checkIfLLMAlreadyAnswered(questionId) {
+    const state = getAppState();
     const modeManagerGlobal = globalThis.modeManager;
     const MODESGlobal = globalThis.MODES;
     const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
@@ -184,6 +189,7 @@ if (!globalThis._questionControllerLoaded) {
   function processCurrentQuestion(questionId) {
     if (questionId !== globalThis._questionControllerDeps.CURRENT_QUESTION_ID) return false;
 
+    const state = getAppState();
     const modeManagerGlobal = globalThis.modeManager;
     const MODESGlobal = globalThis.MODES;
     const updateStatusGlobal = updateStatusMessage || globalThis.updateStatusMessage;
@@ -241,6 +247,7 @@ if (!globalThis._questionControllerLoaded) {
 
   function handleQuestionClick(questionId) {
     Logger.debug('Início da função: "handleQuestionClick"');
+    const state = getAppState();
     state.selectedId = questionId;
     const clearFunc = globalThis.clearAllSelections;
     const eventBusGlobal = globalThis.eventBus;
@@ -286,6 +293,7 @@ if (!globalThis._questionControllerLoaded) {
   function getSelectedQuestionText() {
     Logger.debug('Início da função: "getSelectedQuestionText"');
 
+    const state = getAppState();
     if (state.selectedId === globalThis._questionControllerDeps.CURRENT_QUESTION_ID) {
       return state.interview.currentQuestion.text;
     }
@@ -312,6 +320,7 @@ if (!globalThis._questionControllerLoaded) {
   function finalizeCurrentQuestion() {
     Logger.debug(`🎯 finalizeCurrentQuestion() CHAMADA - shouldFinalizeAskCurrent recebido`, true);
 
+    const state = getAppState();
     const modeManagerGlobal = globalThis.modeManager;
     const MODESGlobal = globalThis.MODES;
     const askLLMGlobal = globalThis.askLLM;
@@ -399,6 +408,7 @@ if (!globalThis._questionControllerLoaded) {
    * Força o fechamento da pergunta atual
    */
   function closeCurrentQuestionForced() {
+    const state = getAppState();
     Logger.debug('🚪 Fechando pergunta:', state.interview.currentQuestion.text, true);
 
     if (!state.interview.currentQuestion.text) return;
@@ -419,7 +429,7 @@ if (!globalThis._questionControllerLoaded) {
    * Obtém IDs navegáveis de perguntas
    */
   function getNavigableQuestionIds() {
-    const state = globalThis.appState;
+    const state = getAppState();
     const ids = [];
     if (state.interview.currentQuestion.text)
       ids.push(globalThis._questionControllerDeps.CURRENT_QUESTION_ID);
@@ -431,6 +441,7 @@ if (!globalThis._questionControllerLoaded) {
    * Consolida texto de fala (interim vs final)
    */
   function consolidateQuestionText(cleaned, isInterim) {
+    const state = getAppState();
     const q = state.interview.currentQuestion;
 
     if (isInterim) {
@@ -457,6 +468,9 @@ if (!globalThis._questionControllerLoaded) {
     const cleaned = text.replaceAll(/Ê+|hum|ahn/gi, '').trim();
     const now = Date.now();
     const OTHER = 'Outros';
+    const state = getAppState(); // Lazy evaluation
+    const modeManagerGlobal = globalThis.modeManager;
+    const MODESGlobal = globalThis.MODES;
 
     if (author === OTHER) {
       if (!state.interview.currentQuestion.text) {
@@ -479,17 +493,28 @@ if (!globalThis._questionControllerLoaded) {
 
       renderCurrentQuestion();
 
-      // 🔥 FIX: Finalizar se:
-      // 1. shouldFinalizeAskCurrent=TRUE (caso normal), OU
-      // 2. É mensagem final (!isInterim) E há texto em CURRENT (Vosk pode ter enviado 2ª transcrição final)
+      // 🔥 CRÍTICO: Respeitar modo ao decidir se finaliza com silêncio
+      // INTERVIEW: Finaliza automaticamente ao detectar silêncio (shouldFinalizeAskCurrent=TRUE)
+      // STANDARD: Só finaliza com clique/atalho, NÃO com silêncio
       const isFinalMessage = !options.isInterim;
       const hasText = state.interview.currentQuestion.text?.trim();
-      const shouldFinalize =
-        (options.shouldFinalizeAskCurrent || (isFinalMessage && hasText)) && isFinalMessage;
+      const isInterviewMode = modeManagerGlobal?.is(MODESGlobal.INTERVIEW);
+
+      // 🔥 FIX: Em STANDARD mode, ignora shouldFinalizeAskCurrent (silêncio)
+      // Só finaliza se chegou via clique/atalho (options.fromUserAction=true)
+      let shouldFinalize = false;
+      if (isInterviewMode) {
+        // INTERVIEW: Finaliza com silêncio OU se é mensagem final com texto
+        shouldFinalize =
+          (options.shouldFinalizeAskCurrent || (isFinalMessage && hasText)) && isFinalMessage;
+      } else {
+        // STANDARD: Só finaliza se explicitamente requisitado (não por silêncio)
+        shouldFinalize = options.fromUserAction && isFinalMessage && hasText;
+      }
 
       if (shouldFinalize) {
         console.log(
-          `🎯 [DEBUG handleCurrentQuestion] Finalizando - shouldFinalizeAskCurrent=${options.shouldFinalizeAskCurrent}, isFinal=${isFinalMessage}, hasText=${!!hasText}`
+          `🎯 [DEBUG handleCurrentQuestion] Modo=${isInterviewMode ? 'INTERVIEW' : 'STANDARD'} Finalizando - shouldFinalizeAskCurrent=${options.shouldFinalizeAskCurrent}, fromUserAction=${options.fromUserAction}, isFinal=${isFinalMessage}, hasText=${!!hasText}`
         );
         finalizeCurrentQuestion();
       }
@@ -527,6 +552,7 @@ if (!globalThis._questionControllerLoaded) {
 
   // ✅ Exportar para globalThis dentro do bloco de inicialização
   if (typeof globalThis !== 'undefined') {
+    globalThis.initQuestionController = initQuestionController;
     globalThis.renderQuestionsHistory = renderQuestionsHistory;
     globalThis.renderCurrentQuestion = renderCurrentQuestion;
     globalThis.handleQuestionClick = handleQuestionClick;

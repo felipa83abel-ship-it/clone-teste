@@ -17,9 +17,16 @@ document.addEventListener('DOMContentLoaded', async () => {
     // ==========================================
     // 1️⃣ Registrar DOM-Registry
     // ==========================================
-    if (globalThis.DOM && typeof globalThis.DOM.register === 'function') {
-      globalThis.DOM.register();
-      Logger?.debug('✅ DOM Registry registrado');
+    if (globalThis.DOM) {
+      console.log('✅ globalThis.DOM está disponível');
+      if (typeof globalThis.DOM.register === 'function') {
+        globalThis.DOM.register();
+        Logger?.debug('✅ DOM Registry registrado');
+      } else {
+        console.warn('⚠️ globalThis.DOM.register não é função');
+      }
+    } else {
+      console.warn('⚠️ globalThis.DOM não disponível em DOMContentLoaded');
     }
 
     // ==========================================
@@ -72,6 +79,20 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       globalThis.RendererAPI.initAudioController(audioControllerDeps);
       Logger?.debug('✅ AudioController inicializado');
+    }
+
+    // ==========================================
+    // 5️⃣ Inicializar QuestionController
+    // ==========================================
+    if (globalThis.RendererAPI?.initQuestionController) {
+      const questionControllerDeps = {
+        CURRENT_QUESTION_ID: 'CURRENT',
+        ENABLE_INTERVIEW_TIMING_DEBUG_METRICS: false,
+        MODES: globalThis.RendererAPI.MODES,
+      };
+
+      globalThis.RendererAPI.initQuestionController(questionControllerDeps);
+      Logger?.debug('✅ QuestionController inicializado');
     }
 
     Logger?.debug('✅ Aplicação pronta para uso');

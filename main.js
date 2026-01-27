@@ -1035,6 +1035,13 @@ function createWindow() {
 
   console.log('🪟 Janela criada em modo overlay');
 
+  /**
+  // Captura logs do renderer e joga no terminal
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer:${level}] ${message} (${sourceId}:${line})`);
+  });
+   */
+
   // Eventos da janela
   mainWindow.on('closed', () => {
     console.log('❌ Janela principal fechada');
