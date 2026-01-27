@@ -1,33 +1,34 @@
 // @ts-nocheck
 // ffmpeg import causa erros de type em node_modules
 
-// ⚠️ Evitar redeclaração de variáveis do módulo
-// Se já foi carregado, pular apenas a inicialização, mas exportar as funções
-if (!globalThis._sttWhisperLoaded) {
-  globalThis._sttWhisperLoaded = true;
+/**
+ * 🎤 WHISPER STT (Speech-to-Text) - MÓDULO INDEPENDENTE
+ *
+ * Implementação isolada de transcrição com Whisper (Local).
+ * ✅ FASE 4.1: Removido whisper-1 (OpenAI/Cloud)
+ * - Suporte a whisper-cpp-local (offline, alta precisão)
+ * - Captura de áudio via MediaRecorder + AudioWorklet
+ * - Detecção de silêncio automática (sem streaming, mas com VAD)
+ * - Transcrição batch com auto-trigger por silêncio
+ *
+ * Uso:
+ * - startAudioWhisper(UIElements)
+ * - stopAudioWhisper()
+ * - switchDeviceWhisper(INPUT|OUTPUT, newDeviceId)
+ */
 
-  /**
-   * 🎤 WHISPER STT (Speech-to-Text) - MÓDULO INDEPENDENTE
-   *
-   * Implementação isolada de transcrição com Whisper (Local).
-   * ✅ FASE 4.1: Removido whisper-1 (OpenAI/Cloud)
-   * - Suporte a whisper-cpp-local (offline, alta precisão)
-   * - Captura de áudio via MediaRecorder + AudioWorklet
-   * - Detecção de silêncio automática (sem streaming, mas com VAD)
-   * - Transcrição batch com auto-trigger por silêncio
-   *
-   * Uso:
-   * - startAudioWhisper(UIElements)
-   * - stopAudioWhisper()
-   * - switchDeviceWhisper(INPUT|OUTPUT, newDeviceId)
-   */
+// ⚠️ Proteção contra redeclaração (quando carregado via <script> tag múltiplas vezes)
+if (typeof globalThis !== 'undefined' && globalThis._sttWhisperLoaded) {
+  console.warn('⚠️ stt-whisper.js já foi carregado, ignorando redeclaração');
+} else if (typeof globalThis !== 'undefined') {
+  globalThis._sttWhisperLoaded = true;
 
   /* ================================ */
   //	IMPORTS
   /* ================================ */
 
   // ipcRenderer será inicializado por renderer.js
-
+  // Usar função getter para lazy evaluation
   const getVADEngine = () => globalThis.vadEngine;
 
   // 🔥 USA INSTÂNCIA GLOBAL CRIADA EM RENDERER.JS

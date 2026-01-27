@@ -55,6 +55,15 @@ globalThis.sttStrategy = new globalThis.STTStrategy();
 globalThis.llmManager = new globalThis.LLMManager();
 globalThis.modeManager = new globalThis.ModeManager(globalThis.MODES.INTERVIEW);
 
+// Inicializar VAD Engine (singleton para STT)
+try {
+  const { getVADEngine } = require('./services/stt/vad-engine');
+  globalThis.vadEngine = getVADEngine();
+  console.log('✅ VAD Engine inicializado');
+} catch (err) {
+  console.error('❌ Erro ao inicializar VAD Engine:', err);
+}
+
 console.log('✅ Classes principais instanciadas');
 
 // ================================
