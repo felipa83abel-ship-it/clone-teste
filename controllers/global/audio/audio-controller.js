@@ -23,6 +23,16 @@ let _findAnswerByQuestionId;
 function initAudioController(deps) {
   // Guardar referências em globalThis
   globalThis._audioControllerDeps = deps;
+
+  // Atribuir dependências às variáveis locais
+  globalConfig = deps.globalConfig;
+  UIElements = deps.UIElements;
+  _CURRENT_QUESTION_ID = deps.CURRENT_QUESTION_ID;
+  _modeManager = deps.modeManager;
+  _MODES = deps.MODES;
+  _findAnswerByQuestionId = deps.findAnswerByQuestionId;
+
+  Logger.debug('✅ AudioController inicializado com dependências');
 }
 
 /**
