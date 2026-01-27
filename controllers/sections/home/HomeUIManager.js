@@ -48,7 +48,7 @@ class HomeUIManager {
     const mockToggle = document.getElementById('mockToggle');
     if (mockToggle && globalThis.RendererAPI) {
       const currentConfig = globalThis.RendererAPI.getAppConfig?.();
-      if (currentConfig?.MODE_DEBUG) {
+      if (currentConfig?.isMockDebugMode) {
         mockToggle.checked = true;
       }
     }
@@ -143,7 +143,7 @@ class HomeUIManager {
         if (globalThis.RendererAPI?.setAppConfig) {
           globalThis.RendererAPI.setAppConfig({
             ...globalThis.RendererAPI.getAppConfig(),
-            MODE_DEBUG: isEnabled,
+            isMockDebugMode: isEnabled,
           });
         }
 

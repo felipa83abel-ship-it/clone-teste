@@ -2,16 +2,15 @@
  * MOCK RUNNER - Sistema de testes automatizados
  *
  * Isolado de renderer.js para facilitar remoção em produção
- * Ativado apenas quando APP_CONFIG.MODE_DEBUG === true
+ * Ativado apenas quando globalThis.isMockDebugMode === true
  *
  * Responsabilidades:
  * - Simular perguntas e respostas de IA
  * - Interceptar IPC para ANALYZE_SCREENSHOTS e ask-llm-stream
  * - Rodar cenários automáticos (runMockAutoPlay)
  */
-/* global APP_CONFIG */
 // @ts-nocheck
-// Arquivo de teste que usa variáveis globais dinâmicas (APP_CONFIG)
+// Arquivo de teste que usa variáveis globais dinâmicas
 
 /**
  * Respostas mockadas por pergunta
@@ -52,7 +51,7 @@ let rendererContext = {
   eventBus: null,
   captureScreenshot: null,
   analyzeScreenshots: null,
-  APP_CONFIG: null,
+  isMockDebugMode: false,
 };
 
 /**
@@ -124,11 +123,11 @@ async function simulateAudioCapture(eventBus, scenario, placeholderId) {
 /**
  * Simula FASE 2-3: Processa pergunta e aguarda resposta
  */
-async function simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive) {
+async function simulateQuestionProcessing(isMockDebugMode, mockAutoPlayActive) {
   console.log(`📝 [FASE-2] Processando pergunta...`);
   await new Promise((resolve) => setTimeout(resolve, 800));
 
-  if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+  if (!isMockDebugMode || !mockAutoPlayActive) {
     console.log('🛑 [PARADA] Modo debug desativado - parando mock autoplay');
     return false;
   }
@@ -154,14 +153,14 @@ async function waitForMockResponse(scenario) {
  */
 async function captureScenarioScreenshots(
   scenario,
-  APP_CONFIG,
+  isMockDebugMode,
   mockAutoPlayActive,
   captureScreenshot
 ) {
   if (!scenario.screenshotsCount || scenario.screenshotsCount <= 0) return true;
 
   for (let i = 1; i <= scenario.screenshotsCount; i++) {
-    if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+    if (!isMockDebugMode || !mockAutoPlayActive) {
       console.log(`🛑 [PARADA] Captura de screenshot ${i}/${scenario.screenshotsCount} cancelada`);
       return false;
     }
@@ -187,11 +186,11 @@ async function runMockAutoPlay() {
     return;
   }
 
-  const { eventBus, captureScreenshot, analyzeScreenshots, APP_CONFIG } = rendererContext;
+  const { eventBus, captureScreenshot, analyzeScreenshots, isMockDebugMode } = rendererContext;
 
   mockAutoPlayActive = true;
 
-  while (mockScenarioIndex < MOCK_SCENARIOS.length && APP_CONFIG.MODE_DEBUG && mockAutoPlayActive) {
+  while (mockScenarioIndex < MOCK_SCENARIOS.length && isMockDebugMode && mockAutoPlayActive) {
     const scenario = MOCK_SCENARIOS[mockScenarioIndex];
     console.log(
       `\n🎬 ════════════════════════════════════════════════════════\n🎬 MOCK CENÁRIO ${mockScenarioIndex + 1}/${
@@ -204,7 +203,7 @@ async function runMockAutoPlay() {
     await simulateAudioCapture(eventBus, scenario, placeholderId);
 
     // 🔥 CHECK: Continua se debug ainda está ativo
-    if (!(await simulateQuestionProcessing(APP_CONFIG, mockAutoPlayActive))) {
+    if (!(await simulateQuestionProcessing(isMockDebugMode, mockAutoPlayActive))) {
       break;
     }
 
@@ -212,7 +211,7 @@ async function runMockAutoPlay() {
     await waitForMockResponse(scenario);
 
     // 🔥 CHECK: Se modo debug foi desativado, para imediatamente SEM TIRAR SCREENSHOT
-    if (!APP_CONFIG.MODE_DEBUG || !mockAutoPlayActive) {
+    if (!isMockDebugMode || !mockAutoPlayActive) {
       console.log('🛑 [PARADA] Modo debug desativado - parando sem capturar screenshot');
       break;
     }
@@ -220,7 +219,7 @@ async function runMockAutoPlay() {
     // FASE 4 (Opcional): Captura N screenshots REAIS e depois aciona análise
     const screenshotsOk = await captureScenarioScreenshots(
       scenario,
-      APP_CONFIG,
+      isMockDebugMode,
       mockAutoPlayActive,
       captureScreenshot
     );
@@ -246,7 +245,7 @@ async function runMockAutoPlay() {
 
 /**
  * Inicializa o interceptor de IPC para modo mock
- * Deve ser chamado de renderer.js quando APP_CONFIG.MODE_DEBUG === true
+ * Deve ser chamado de renderer.js quando isMockDebugMode === true
  */
 function initMockInterceptor(context) {
   // Define o contexto do renderer
@@ -258,7 +257,7 @@ function initMockInterceptor(context) {
   ipcRenderer.invoke = function (channel, ...args) {
     // Intercepta análise de screenshots quando MODE_DEBUG
     // IMPORTANTE: CAPTURE_SCREENSHOT é REAL (tira foto mesmo), ANALYZE_SCREENSHOTS é MOCK (simula resposta)
-    if (channel === 'ANALYZE_SCREENSHOTS' && APP_CONFIG.MODE_DEBUG) {
+    if (channel === 'ANALYZE_SCREENSHOTS' && rendererContext.isMockDebugMode) {
       console.log('📸 [MOCK] Interceptando ANALYZE_SCREENSHOTS...');
       const filepaths = args[0] || [];
       const screenshotCount = filepaths.length;
@@ -317,7 +316,7 @@ function initMockInterceptor(context) {
     }
 
     // Intercepta ask-llm-stream quando MODE_DEBUG
-    if (channel === 'ask-llm-stream' && APP_CONFIG.MODE_DEBUG) {
+    if (channel === 'ask-llm-stream' && rendererContext.isMockDebugMode) {
       console.log('🎭 [MOCK] Interceptando ask-llm-stream...');
 
       // Obtém a pergunta do primeiro argumento (array de mensagens)

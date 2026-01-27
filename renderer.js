@@ -138,12 +138,11 @@ console.log('✅ Registries inicializados');
 })();
 
 // ================================
-// SEÇÃO 6: CONSTANTES
+// SEÇÃO 6: VARIÁVEIS GLOBAIS DE CONTROLE
 // ================================
 
-const APP_CONFIG = {
-  MODE_DEBUG: false, // Alterado via config-manager.js
-};
+// Modo debug para mock testing
+globalThis.isMockDebugMode = false;
 
 // ================================
 // SEÇÃO 7: LISTENERS DE EVENTOS (EventBus)
@@ -270,7 +269,7 @@ const RendererAPI = {
     globalThis.eventBus.emit('screenshotBadgeUpdate', { visible: show });
   },
   setMockToggle: (checked) => {
-    APP_CONFIG.MODE_DEBUG = checked;
+    globalThis.isMockDebugMode = checked;
   },
   setModeSelect: (mode) => {
     globalThis.eventBus.emit('modeSelectUpdate', { mode });
@@ -297,25 +296,23 @@ const RendererAPI = {
       : 'Click-through INATIVO (clique para ativar)';
   },
 
-  // UI Registry
-  registerUIElements: (elements) => {
-    globalThis.uiElementsRegistry?.register(elements);
-  },
-
   // Config
   setAppConfig: (config) => {
-    Object.assign(APP_CONFIG, config);
-    if (APP_CONFIG.MODE_DEBUG && globalThis.mockRunner) {
-      globalThis.mockRunner.initMockInterceptor({
-        eventBus: globalThis.eventBus,
-        captureScreenshot: globalThis.captureScreenshot,
-        analyzeScreenshots: globalThis.analyzeScreenshots,
-        APP_CONFIG,
-      });
-      globalThis.Logger.info('✅ Mock interceptor inicializado');
+    if (config.MODE_DEBUG !== undefined) {
+      globalThis.isMockDebugMode = config.MODE_DEBUG;
+      if (globalThis.isMockDebugMode && globalThis.mockRunner) {
+        globalThis.mockRunner.initMockInterceptor({
+          eventBus: globalThis.eventBus,
+          captureScreenshot: globalThis.captureScreenshot,
+          analyzeScreenshots: globalThis.analyzeScreenshots,
+        });
+        globalThis.Logger.info('✅ Mock interceptor inicializado');
+      }
     }
   },
-  getAppConfig: () => APP_CONFIG,
+  getAppConfig: () => ({
+    MODE_DEBUG: globalThis.isMockDebugMode || false,
+  }),
 
   // Navegação
   navigateQuestions: (direction) => {
@@ -335,7 +332,7 @@ const RendererAPI = {
     globalThis.renderQuestionsHistory();
     globalThis.renderCurrentQuestion();
 
-    if (APP_CONFIG.MODE_DEBUG) {
+    if (globalThis.isMockDebugMode) {
       const msg = direction === 'up' ? '🧪 Ctrl+Up' : '🧪 Ctrl+Down';
       globalThis.updateStatusMessage(msg);
     }
