@@ -346,10 +346,6 @@ class WindowUIManager {
   restoreTheme() {
     // Implementado em restoreUserPreferences()
   }
-
-  // ==========================================
-  // MÉTODOS PRIVADOS
-  // ==========================================
 }
 
 // Exportar classe para CommonJS

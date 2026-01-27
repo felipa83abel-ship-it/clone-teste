@@ -42,8 +42,8 @@ class TopBarManager {
     console.log('📂 TopBarManager.restoreState()');
 
     try {
-      // Restaurar opacidade (se salva)
-      const savedOpacity = this.configManager.config.ui?.opacity || 0.75;
+      // Restaurar opacidade (se salva)this.configManager.config.other.
+      const savedOpacity = this.configManager.config.ui?.opacity ?? 0.75;
       this.#updateOpacityUI(savedOpacity);
       this.applyOpacity(savedOpacity);
 
@@ -111,18 +111,17 @@ class TopBarManager {
   #initElements() {
     console.log('🎨 TopBarManager #initElements');
 
-    const opacityRange = document.getElementById('opacityRange');
-    const interviewModeSelect = document.getElementById('interviewModeSelect');
-
     // Opacidade: input listener
+    const opacityRange = document.getElementById('opacityRange');
     if (opacityRange) {
       opacityRange.addEventListener('input', (e) => {
-        const opacity = parseFloat(e.target.value);
+        const opacity = Number.parseFloat(e.target.value);
         console.log('🎚️ opacityRange input:', opacity);
 
-        // Salvar estado
+        // Salvar estado em config.ui
         if (!this.configManager.config.ui) this.configManager.config.ui = {};
         this.configManager.config.ui.opacity = opacity;
+        this.configManager.saveConfig(false);
 
         // Aplicar opacidade visual
         this.applyOpacity(opacity);
@@ -133,21 +132,24 @@ class TopBarManager {
 
       // Change listener (quando mouse libera)
       opacityRange.addEventListener('change', (e) => {
-        const opacity = parseFloat(e.target.value);
+        const opacity = Number.parseFloat(e.target.value);
         console.log('🎚️ opacityRange change:', opacity);
-        // Salvar estado persistente se necessário
+        // Persistência ocorre em 'input', apenas sync aqui
+        this.configManager.saveConfig(false);
       });
     }
 
     // Modo de entrevista: select listener
+    const interviewModeSelect = document.getElementById('interviewModeSelect');
     if (interviewModeSelect) {
       interviewModeSelect.addEventListener('change', (e) => {
         const mode = e.target.value;
         console.log('📌 interviewModeSelect changed:', mode);
 
-        // Salvar estado
+        // Salvar estado em config.ui
         if (!this.configManager.config.ui) this.configManager.config.ui = {};
         this.configManager.config.ui.interviewMode = mode;
+        this.configManager.saveConfig(false);
 
         // Emitir para sincronizar
         this.eventBus.emit('interviewModeChanged', { mode });
@@ -160,16 +162,14 @@ class TopBarManager {
    */
   applyOpacity(opacity) {
     try {
-      // Aplica opacidade em elementos opacos (data-opaque="true")
-      const opaqueElements = document.querySelectorAll('[data-opaque="true"]');
-      opaqueElements.forEach((el) => {
-        el.style.opacity = opacity;
-      });
-
-      // Também aplica no body como fallback
       const htmlElement = document.documentElement;
       if (htmlElement) {
-        htmlElement.style.opacity = opacity;
+        // aplica opacidade no conteúdo geral
+        htmlElement.style.setProperty('--app-opacity', opacity.toFixed(2));
+
+        // topBar nunca abaixo de 0.75
+        const topbarOpacity = Math.max(opacity, 0.75);
+        document.documentElement.style.setProperty('--app-opacity-75', topbarOpacity.toFixed(2));
       }
 
       console.log(`✨ Opacidade aplicada: ${(opacity * 100).toFixed(0)}%`);
@@ -187,7 +187,7 @@ class TopBarManager {
   #updateOpacityUI(opacity) {
     const opacityRange = document.getElementById('opacityRange');
     if (opacityRange) {
-      opacityRange.value = opacity;
+      opacityRange.value = opacity.toString();
       console.log('💾 Opacidade atualizada:', opacity);
     }
   }
@@ -198,7 +198,7 @@ class TopBarManager {
   #updateModeUI(mode) {
     const interviewModeSelect = document.getElementById('interviewModeSelect');
     if (interviewModeSelect) {
-      interviewModeSelect.value = mode;
+      interviewModeSelect.value = mode.toString();
       console.log('💾 Modo atualizado:', mode);
     }
   }

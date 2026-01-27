@@ -40,8 +40,8 @@ class OtherConfigManager {
     console.log('📂 OtherConfigManager.restoreState()');
 
     try {
-      // Restaurar dark mode
-      const isDarkMode = this.configManager.config.ui?.darkMode ?? false;
+      // Restaurar dark mode de config.other
+      const isDarkMode = this.configManager.config.other?.darkMode ?? false;
       this.#updateDarkModeUI(isDarkMode);
 
       // Restaurar outros estados (quando implementar)
@@ -55,8 +55,9 @@ class OtherConfigManager {
    */
   async reset() {
     console.log('🔄 OtherConfigManager.reset()');
-    if (!this.configManager.config.ui) this.configManager.config.ui = {};
-    this.configManager.config.ui.darkMode = false;
+    if (!this.configManager.config.other) this.configManager.config.other = {};
+    this.configManager.config.other.darkMode = false;
+    this.configManager.saveConfig();
     this.#updateDarkModeUI(false);
   }
 
@@ -89,9 +90,10 @@ class OtherConfigManager {
         const enabled = e.target.checked;
         console.log('🌙 darkModeToggle changed:', enabled);
 
-        // Salvar estado
-        if (!this.configManager.config.ui) this.configManager.config.ui = {};
-        this.configManager.config.ui.darkMode = enabled;
+        // Salvar estado em config.other
+        if (!this.configManager.config.other) this.configManager.config.other = {};
+        this.configManager.config.other.darkMode = enabled;
+        this.configManager.saveConfig(false);
 
         // Emitir para sincronizar
         this.eventBus.emit('darkModeToggled', { enabled });

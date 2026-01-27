@@ -28,7 +28,7 @@ class ConfigManager {
     this.screenManager = null;
     this.privacyManager = null;
     this.windowManager = null;
-    this.homeManager = null;
+    this.homeUiManager = null;
   }
 
   // ==========================================
@@ -70,6 +70,7 @@ class ConfigManager {
         if (parsed.screen) merged.screen = { ...defaultConfig.screen, ...parsed.screen };
         if (parsed.privacy) merged.privacy = { ...defaultConfig.privacy, ...parsed.privacy };
         if (parsed.other) merged.other = { ...defaultConfig.other, ...parsed.other };
+        if (parsed.ui) merged.ui = { ...defaultConfig.ui, ...parsed.ui };
 
         console.log('📊 CONFIG MERGED - other section:');
         console.log(
@@ -158,8 +159,8 @@ class ConfigManager {
       await this.windowManager.initialize();
 
       // Cria instância do HomeUIManager
-      this.homeManager = new HomeUIManager(this, _ipc, globalThis.eventBus);
-      await this.homeManager.initialize();
+      this.homeUiManager = new HomeUIManager(this, _ipc, globalThis.eventBus);
+      await this.homeUiManager.initialize();
 
       // Cria instância do TopBarManager
       this.topBarManager = new TopBarManager(this, _ipc, globalThis.eventBus);
@@ -199,7 +200,7 @@ class ConfigManager {
       { name: 'ScreenConfigManager', instance: this.screenManager },
       { name: 'PrivacyConfigManager', instance: this.privacyManager },
       { name: 'WindowUIManager', instance: this.windowManager },
-      { name: 'HomeUIManager', instance: this.homeManager },
+      { name: 'HomeUIManager', instance: this.homeUiManager },
       { name: 'TopBarManager', instance: this.topBarManager },
       { name: 'OtherConfigManager', instance: this.otherManager },
       { name: 'InfoManager', instance: this.infoManager },
@@ -234,7 +235,7 @@ class ConfigManager {
     await this.screenManager?.reset();
     await this.privacyManager?.reset();
     await this.windowManager?.reset();
-    await this.homeManager?.reset();
+    await this.homeUiManager?.reset();
     await this.topBarManager?.reset();
     await this.otherManager?.reset();
     await this.infoManager?.reset();
@@ -291,11 +292,13 @@ class ConfigManager {
       other: {
         language: 'pt-BR',
         theme: 'dark',
+        darkMode: true,
         autoUpdate: true,
         logLevel: 'info',
-        darkMode: true,
+      },
+      ui: {
         interviewMode: 'INTERVIEW',
-        overlayOpacity: 0.75,
+        opacity: 0.75,
         clickThroughEnabled: false,
       },
     };

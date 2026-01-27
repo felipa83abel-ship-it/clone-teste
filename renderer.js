@@ -143,61 +143,6 @@ globalThis.eventBus.on('error', (error) => {
   }
 });
 
-// ✅ REMOVIDO: listener 'listenButtonToggle' movido para HomeManager.js (#initUIEventBusListeners)
-
-// 🔥 NOVO: Listener para atualizar transcrição interim (parcial)
-// 🔥 NOVO: Listener para atualizar transcrição interim (parcial) em tempo real
-// ✅ REMOVIDO: updateInterim listener - DOM manipulação movida para HomeUIManager
-
-// ✅ REMOVIDO: listener 'statusUpdate' movido para HomeManager.js (#initUIEventBusListeners)
-
-// 🔥 NOVO: Listener para adicionar transcrição com placeholder
-// ✅ REMOVIDO: transcriptAdd - DOM movido para HomeUIManager
-
-// 🔥 NOVO: Listener para preencher placeholder de transcrição
-// ✅ REMOVIDO: placeholderFulfill - DOM movido para HomeUIManager
-
-// 🔥 NOVO: Listener para limpar transcrição interim (remover o elemento)
-// ✅ REMOVIDO: clearInterim - DOM movido para HomeUIManager
-
-// 🔥 NOVO: Listener para limpar seleções de perguntas
-// ✅ REMOVIDO: clearAllSelections - DOM movido para HomeUIManager
-
-// ✅ REMOVIDO: listener 'transcriptionCleared' movido para HomeManager.js (#initUIEventBusListeners)
-
-// ✅ REMOVIDO: listener 'answersCleared' movido para HomeManager.js (#initUIEventBusListeners)
-
-/* ================================ */
-//	LISTENERS PARA RENDERIZAÇÃO DE PERGUNTAS
-/* ================================ */
-
-// ✅ REMOVIDO: listener 'currentQuestionUpdate' movido para HomeManager.js (#initUIEventBusListeners)
-
-// ✅ REMOVIDO: listener 'questionsHistoryUpdate' movido para HomeManager.js (#initUIEventBusListeners)
-
-/**
- * 🔥 LISTENER: scrollToQuestion
- * Emitido por question-controller.js para fazer scroll até pergunta específica
- */
-// ✅ REMOVIDO: scrollToQuestion - DOM movido para HomeUIManager
-
-/**
- * 🔥 LISTENER: answerSelected
- * Emitido quando uma resposta é selecionada
- * Adiciona/remove classe CSS de seleção na resposta correspondente
- */
-// ✅ REMOVIDO: answerSelected - DOM movido para HomeUIManager
-
-/* ================================ */
-//	LISTENERS PARA LLM STREAMING E RESPOSTAS
-/* ================================ */
-
-// ✅ REMOVIDO: listener 'answerStreamChunk' movido para HomeManager.js (#initUIEventBusListeners)
-
-// ✅ REMOVIDO: listener 'answerBatchEnd' movido para HomeManager.js (#initUIEventBusListeners)
-
-// ✅ REMOVIDO: listener 'answerStreamEnd' movido para HomeManager.js (#initUIEventBusListeners)
-
 /* ================================ */
 //	PROTEÇÃO CONTRA CAPTURA DE TELA
 /* ================================ */
@@ -248,8 +193,6 @@ globalThis.eventBus.on('error', (error) => {
 /* ================================ */
 //	CONSTANTES
 /* ================================ */
-
-const _ENABLE_INTERVIEW_TIMING_DEBUG_METRICS = true; // ← desligar depois se não quiser mostrar time = false
 
 const SYSTEM_PROMPT = `
 Você é um assistente para entrevistas técnicas de Java. Responda como candidato.
@@ -316,51 +259,6 @@ globalThis.eventBus.on('audioDeviceChanged', async (_data) => {
 //	FUNÇÕES UTILITÁRIAS (HELPERS)
 /* ================================ */
 
-/**
- * 🔥 Reordena os blocos de resposta por turnId (DESC - maior primeiro)
- * Mantém a ordem decrescente baseada no ID da pergunta
- */
-function _sortAnswersByTurnId() {
-  // Emite evento para HomeUIManager lidar com reordenação
-  globalThis.eventBus.emit('sortAnswersByTurnId');
-}
-
-/**
- * Obtém o modelo STT configurado via config-manager
- * DELEGADO: Função disponível em globalThis.RendererAPI.getConfiguredSTTModel
- * (Implementação em ConfigManager)
- */
-
-/**
- * Reseta o estado da pergunta atual (CURRENT)
- * DELEGADO: resetCurrentQuestion está em question-helpers.js e exportado em globalThis
- */
-
-/**
- * Funções de pergunta (delegadas ao question-controller)
- * Disponíveis em globalThis após carregamento de question-controller.js
- */
-// Não fazer destructuring - usar globalThis diretamente
-// renderQuestionsHistory, renderCurrentQuestion, handleQuestionClick, handleCurrentQuestion, findAnswerByQuestionId
-
-/**
- * Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
- * DELEGADO: getSelectedQuestionText está em question-controller.js e exportado em globalThis
- */
-
-/**
- * Normaliza texto para comparação
- * DELEGADO: normalizeForCompare está em question-helpers.js e exportado em globalThis
- */
-
-/**
-/**
- * Funções utilitárias (delegadas ao renderer-helpers e question-controller)
- * Disponíveis em globalThis após carregamento dos respectivos arquivos
- */
-// Não fazer destructuring - usar globalThis diretamente
-// updateStatusMessage, clearAllSelections, closeCurrentQuestionForced, getNavigableQuestionIds
-
 /* ================================ */
 //	🎯 REGISTRAR STTs (Refatoração Fase 2)
 /* ================================ */
@@ -398,27 +296,6 @@ globalThis.sttStrategy.register('whisper-cpp-local', {
 /* ================================ */
 
 /**
- * Renderiza a pergunta atual (CURRENT)
- */
-// ✅ DELEGADO para questionController
-
-/**
- * Manipula clique em pergunta
- * @param {string} questionId - ID da pergunta selecionada
- */
-// ✅ DELEGADO para questionController
-
-/**
- * Aplica opacidade na interface
- * MOVIDA PARA: config-manager.js
- */
-
-/**
- * Rola a lista de perguntas para a pergunta selecionada
- */
-// ✅ DELEGADO para questionController
-
-/**
  * Configuração do Marked.js para renderização de Markdown
  * @type {any}
  */
@@ -438,29 +315,6 @@ const _markedOptions = {
 if (globalThis.marked?.setOptions) {
   globalThis.marked.setOptions(_markedOptions);
 }
-
-/* ================================ */
-//	CONSOLIDAÇÃO E FINALIZAÇÃO DE PERGUNTAS
-/* ================================ */
-
-/**
- * Fluxo para consolidar transcrições no CURRENT
- * Concatena transcrição interims e finais
- * @param {string} author - Autor da fala (YOU ou OTHER)
- * @param {string} text - Texto da fala
- * @param {object} options - Opções (isInterim, shouldFinalizeAskCurrent)
- */
-/**
- * Consolida texto de fala (interim vs final)
- * Reduz Cognitive Complexity de handleCurrentQuestion
- */
-// ✅ DELEGADO para questionController
-
-// ✅ DELEGADO para questionController
-
-// ✅ DELEGADO para questionController
-
-// ✅ DELEGADO para questionController
 
 /* ================================ */
 //	SISTEMA LLM
@@ -539,28 +393,6 @@ async function askLLM(questionId = null) {
     globalThis.updateStatusMessage(`❌ ${error.message}`);
   }
 }
-
-/* ================================ */
-//	SCREENSHOT E ANÁLISE (delegado ao screenshot-controller)
-/* ================================ */
-
-/* ================================ */
-//	RESET COMPLETO
-/* ================================ */
-
-/**
- * Libera a thread e reseta o app (delegado ao renderer-helpers)
- * Disponível em globalThis após carregamento de renderer-helpers.js
- */
-
-//	DEBUG LOG RENDERER
-/* ================================ */
-
-/**
- * Log de debug padronizado para renderer
- * Último argumento opcional é booleano para mostrar ou não o log
- * @param {...any} args - Argumentos a logar
- */
 
 /* ================================ */
 //	EXPORTAÇÃO PUBLIC API (RendererAPI)
