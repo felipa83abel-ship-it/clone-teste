@@ -106,6 +106,11 @@ class Logger {
   }
 }
 
+// Exportar globalmente para uso em scripts do navegador
+if (typeof globalThis !== 'undefined') {
+  globalThis.Logger = Logger;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Logger;
 }

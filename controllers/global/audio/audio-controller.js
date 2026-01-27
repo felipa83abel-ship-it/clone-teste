@@ -3,6 +3,7 @@
 // Gerencia captura, processamento e métricas de áudio
 /* ================================ */
 // @ts-nocheck
+/* global Logger */
 // Dependências carregadas globalmente via index.html
 
 let globalConfig; // Referência ao configManager global
@@ -29,12 +30,12 @@ function initAudioController(deps) {
  */
 async function startAudio() {
   const sttModel = globalThis.RendererAPI?.getConfiguredSTTModel?.() || 'error';
-  globalThis.Logger.info('startAudio', { model: sttModel });
+  Logger.info('startAudio', { model: sttModel });
 
   try {
     await globalThis.sttStrategy.start(sttModel, UIElements);
   } catch (error) {
-    globalThis.Logger.error('Erro ao iniciar áudio', { error: error.message });
+    Logger.error('Erro ao iniciar áudio', { error: error.message });
     throw error;
   }
 }
@@ -47,12 +48,12 @@ async function stopAudio() {
   if (globalThis.appState.interview.currentQuestion.text) globalThis.closeCurrentQuestionForced();
 
   const sttModel = globalThis.RendererAPI?.getConfiguredSTTModel?.() || 'error';
-  globalThis.Logger.info('stopAudio', { model: sttModel });
+  Logger.info('stopAudio', { model: sttModel });
 
   try {
     await globalThis.sttStrategy.stop(sttModel);
   } catch (error) {
-    globalThis.Logger.error('Erro ao parar áudio', { error: error.message });
+    Logger.error('Erro ao parar áudio', { error: error.message });
   }
 }
 
@@ -60,17 +61,14 @@ async function stopAudio() {
  * Toggle do botão de iniciar/parar escuta (Ctrl+D)
  */
 async function listenToggleBtn() {
-  globalThis.Logger.debug('Início da função: "listenToggleBtn"');
+  Logger.debug('Início da função: "listenToggleBtn"');
 
   if (!globalThis.appState.audio.isRunning) {
-    globalThis.Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
+    Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
 
     // 🔥 VALIDAÇÃO 1: Modelo de IA ativo
     const { active: hasModel, model: activeModel } = hasActiveModel();
-    globalThis.Logger.debug(
-      `📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`,
-      false
-    );
+    Logger.debug(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`, false);
 
     if (!hasModel) {
       const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
@@ -80,12 +78,12 @@ async function listenToggleBtn() {
 
     // 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
     const hasOutputDevice = UIElements?.outputSelect?.value;
-    globalThis.Logger.debug(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
+    Logger.debug(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
 
     if (!hasOutputDevice) {
       const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
-      globalThis.Logger.warn(`⚠️ ${errorMsg}`);
-      globalThis.Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
+      Logger.warn(`⚠️ ${errorMsg}`);
+      Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
       globalThis.eventBus.emit('error', errorMsg);
       return;
     }
@@ -109,7 +107,7 @@ async function listenToggleBtn() {
 
   await (globalThis.appState.audio.isRunning ? startAudio() : stopAudio());
 
-  globalThis.Logger.debug('Fim da função: "listenToggleBtn"');
+  Logger.debug('Fim da função: "listenToggleBtn"');
 }
 
 /**
@@ -117,7 +115,7 @@ async function listenToggleBtn() {
  * @returns {object} { active: boolean, model: string|null }
  */
 function hasActiveModel() {
-  globalThis.Logger.debug('Início da função: "hasActiveModel"');
+  Logger.debug('Início da função: "hasActiveModel"');
   if (!globalConfig) {
     console.warn('⚠️ ConfigManager não inicializado ainda');
     return { active: false, model: null };
@@ -138,7 +136,7 @@ function hasActiveModel() {
     }
   }
 
-  globalThis.Logger.debug('Fim da função: "hasActiveModel"');
+  Logger.debug('Fim da função: "hasActiveModel"');
   return { active: false, model: null };
 }
 
@@ -161,8 +159,8 @@ function logTranscriptionMetrics() {
     `❌ Falhas: ${metrics.sttFailures}\n` +
     `🔄 Última atualização: ${new Date(metrics.lastUpdate).toLocaleTimeString()}\n`;
 
-  // @ts-ignore - globalThis.Logger.info tem overloads, aceitando (title, message)
-  globalThis.Logger.info('Métricas de Transcrição', message);
+  // @ts-ignore - Logger.info tem overloads, aceitando (title, message)
+  Logger.info('Métricas de Transcrição', message);
   globalThis.eventBus.emit('metricsUpdated', metrics);
 }
 

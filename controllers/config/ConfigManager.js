@@ -14,6 +14,7 @@
  * Este é o ponto de entrada para toda a lógica de configuração.
  * Cada manager de seção cuida de sua funcionalidade específica.
  */
+// eslint-disable-next-line no-unused-vars
 class ConfigManager {
   constructor() {
     console.log('🔧 ConfigManager iniciando...');

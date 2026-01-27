@@ -1,5 +1,5 @@
-// @ts-check
-/* global HTMLElement */
+// @ts-nocheck
+/* global Logger, HTMLElement */
 
 /**
  * ================================
@@ -36,13 +36,13 @@ globalThis.ipcRenderer = ipcRenderer;
 try {
   globalThis.marked = require('marked');
 } catch (err) {
-  globalThis.Logger?.warn('marked não carregado via CommonJS', err);
+  Logger?.warn('marked não carregado via CommonJS', err);
 }
 
 try {
   globalThis.hljs = require('highlight.js');
 } catch (err) {
-  globalThis.Logger?.warn('highlight.js não carregado via CommonJS', err);
+  Logger?.warn('highlight.js não carregado via CommonJS', err);
 }
 
 // ================================
@@ -155,21 +155,21 @@ globalThis.isMockDebugMode = false;
 globalThis.eventBus.on('audioDeviceChanged', async (_data) => {
   try {
     const sttModel = globalThis.RendererAPI?.getConfiguredSTTModel?.() || 'error';
-    globalThis.Logger.info('audioDeviceChanged', { model: sttModel, type: _data.type });
+    Logger.info('audioDeviceChanged', { model: sttModel, type: _data.type });
 
     if (!_data?.type) {
-      globalThis.Logger.warn('Dados inválidos para mudança de dispositivo', _data);
+      Logger.warn('Dados inválidos para mudança de dispositivo', _data);
       return;
     }
 
     if (!globalThis.appState.audio.isRunning) {
-      globalThis.Logger.warn('STT não está ativo, ignorando mudança');
+      Logger.warn('STT não está ativo, ignorando mudança');
       return;
     }
 
     await globalThis.sttStrategy.switchDevice(sttModel, _data.type, _data.deviceId);
   } catch (error) {
-    globalThis.Logger.error('Erro ao processar mudança de dispositivo', error);
+    Logger.error('Erro ao processar mudança de dispositivo', error);
   }
 });
 
@@ -178,7 +178,7 @@ globalThis.eventBus.on('audioDeviceChanged', async (_data) => {
  * Disparado quando streaming de LLM termina
  */
 globalThis.eventBus.on('llmStreamEnd', (data) => {
-  globalThis.Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
+  Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
 
   globalThis.appState.interview.answeredQuestions.add(data.questionId);
 
@@ -196,7 +196,7 @@ globalThis.eventBus.on('llmStreamEnd', (data) => {
  * Disparado quando batch de LLM termina
  */
 globalThis.eventBus.on('llmBatchEnd', (data) => {
-  globalThis.Logger.debug('LLM Batch finalizado', {
+  Logger.debug('LLM Batch finalizado', {
     questionId: data.questionId,
     responseLength: data.response?.length || 0,
   });
@@ -218,7 +218,7 @@ globalThis.eventBus.on('llmBatchEnd', (data) => {
  * Disparado quando erro ocorre na eventBus
  */
 globalThis.eventBus.on('error', (error) => {
-  globalThis.Logger.error('Erro na eventBus', { error });
+  Logger.error('Erro na eventBus', { error });
   if (globalThis.configManager?.showError) {
     globalThis.configManager.showError(error);
   }
@@ -306,7 +306,7 @@ const RendererAPI = {
           captureScreenshot: globalThis.captureScreenshot,
           analyzeScreenshots: globalThis.analyzeScreenshots,
         });
-        globalThis.Logger.info('✅ Mock interceptor inicializado');
+        Logger.info('✅ Mock interceptor inicializado');
       }
     }
   },
@@ -394,7 +394,7 @@ const RendererAPI = {
       const activeProvider = config.api?.activeProvider;
       return config.api?.[activeProvider]?.selectedSTTModel || 'error';
     } catch (err) {
-      globalThis.Logger?.error('Erro ao obter STT model:', err);
+      Logger?.error('Erro ao obter STT model:', err);
       return 'error';
     }
   },

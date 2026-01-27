@@ -2,6 +2,8 @@
 // RENDERER HELPERS
 // Funções utilitárias gerais do renderer
 /* ================================ */
+// @ts-nocheck
+/* global Logger */
 // ipcRenderer passado em deps.ipcRenderer
 // Logger é carregado como script global no index.html
 
@@ -17,9 +19,9 @@ function initRendererHelpers(deps) {
  * Atualiza a mensagem de status na UI
  */
 function updateStatusMessage(message) {
-  globalThis.globalThis.Logger.debug('Início da função: "updateStatusMessage"');
+  globalThis.Logger?.debug('Início da função: "updateStatusMessage"');
   globalThis.eventBus.emit('statusUpdate', { message });
-  globalThis.globalThis.Logger.debug('Fim da função: "updateStatusMessage"');
+  globalThis.Logger?.debug('Fim da função: "updateStatusMessage"');
 }
 
 /**
