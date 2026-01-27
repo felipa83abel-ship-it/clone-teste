@@ -150,9 +150,6 @@ class TopBarManager {
         if (!this.configManager.config.ui) this.configManager.config.ui = {};
         this.configManager.config.ui.interviewMode = mode;
         this.configManager.saveConfig(false);
-
-        // Emitir para sincronizar
-        this.eventBus.emit('interviewModeChanged', { mode });
       });
     }
   }

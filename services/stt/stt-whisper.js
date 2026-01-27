@@ -27,8 +27,6 @@ if (!globalThis._sttWhisperLoaded) {
   /* ================================ */
 
   // ipcRenderer será inicializado por renderer.js
-  // Usar função getter para lazy evaluation
-  const getIpcRenderer = () => globalThis.ipcRenderer;
 
   const getVADEngine = () => globalThis.vadEngine;
 
@@ -39,7 +37,6 @@ if (!globalThis._sttWhisperLoaded) {
   const os = require('node:os');
   const { promisify } = require('node:util');
   const ffmpeg = require('fluent-ffmpeg');
-  const OpenAI = require('openai');
 
   const { execFile } = require('node:child_process');
   const execFileAsync = promisify(execFile);
@@ -76,8 +73,7 @@ if (!globalThis._sttWhisperLoaded) {
   // VAD Engine
   let vad = null;
 
-  // Cliente OpenAI
-  let openaiClient = null;
+  // Estado de readiness do Whisper Local
   let whisperLocalReady = false;
   let whisperLocalWarmupPromise = null;
 
@@ -270,30 +266,6 @@ if (!globalThis._sttWhisperLoaded) {
   /* ================================ */
   //	SERVIÇO WHISPER
   /* ================================ */
-
-  // Garante que o cliente OpenAI esteja inicializado
-  async function _ensureOpenAIClient() {
-    if (openaiClient) return true;
-    return initializeOpenAIClient();
-  }
-
-  // Inicializa o cliente OpenAI
-  async function initializeOpenAIClient(apiKey = null) {
-    const key = apiKey || (await getIpcRenderer().invoke('GET_API_KEY', 'openai'));
-    if (!key || key.trim().length < 10) {
-      throw new Error('Chave OpenAI não encontrada ou inválida');
-    }
-
-    // @ts-ignore - OpenAI constructor pode ter diferentes assinaturas
-    openaiClient = new OpenAI({ apiKey: key.trim() });
-    debugLogWhisper('✅ Cliente OpenAI inicializado dentro do Whisper', false);
-    return true;
-  }
-
-  // Reseta o cliente OpenAI (para reautenticação)
-  function _resetOpenAIClient() {
-    openaiClient = null;
-  }
 
   // Verifica se os arquivos do Whisper.cpp existem
   function checkWhisperFiles() {

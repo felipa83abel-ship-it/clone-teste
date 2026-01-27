@@ -1046,8 +1046,7 @@ function createWindow() {
 /* ================================ */
 
 // Inicializa a aplicação quando o Electron estiver pronto
-// NOSONAR javascript:S7785
-(async () => {
+async function bootstrapApp() {
   await app.whenReady();
 
   // Registra todos os handlers IPC
@@ -1060,7 +1059,8 @@ function createWindow() {
   registerGlobalShortcuts();
 
   console.log('✅ Aplicação inicializada com sucesso');
-})();
+}
+bootstrapApp();
 
 /**
  * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)

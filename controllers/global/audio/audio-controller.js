@@ -84,9 +84,7 @@ async function listenToggleBtn() {
 
     if (!hasOutputDevice) {
       const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
-      // @ts-ignore - globalThis.Logger.warn aceita string ou boolean, segundo signature
       globalThis.Logger.warn(`⚠️ ${errorMsg}`);
-      // @ts-ignore - globalThis.Logger.debug também tem overloads
       globalThis.Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
       globalThis.eventBus.emit('error', errorMsg);
       return;
