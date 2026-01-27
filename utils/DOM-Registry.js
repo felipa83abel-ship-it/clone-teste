@@ -122,6 +122,32 @@ class DOMRegistry {
     otherSection: '#other',
     infoSection: '#info',
 
+    // OPENAI SECTION
+    openai: '#openai',
+    'openai-api-key': '#openai-api-key',
+    'openai-model-status': '#openai-model-status',
+    'openai-stt-model': '#openai-stt-model',
+    'openai-llm-model': '#openai-llm-model',
+
+    // GOOGLE SECTION
+    google: '#google',
+    'google-api-key': '#google-api-key',
+    'google-model-status': '#google-model-status',
+    'google-stt-model': '#google-stt-model',
+    'google-llm-model': '#google-llm-model',
+
+    // OPENROUTER SECTION
+    openrouter: '#openrouter',
+    'openrouter-api-key': '#openrouter-api-key',
+    'openrouter-model-status': '#openrouter-model-status',
+    'openrouter-stt-model': '#openrouter-stt-model',
+    'openrouter-llm-model': '#openrouter-llm-model',
+
+    // API KEY MANAGEMENT BUTTONS
+    'btn-toggle-visibility': '.btn-toggle-visibility',
+    'btn-delete-api-key': '.btn-delete-api-key',
+    'btn-activate': '.btn-activate',
+
     // SCREENSHOT CONFIG
     screenshotHotkey: '#screenshot-hotkey',
     screenshotFormat: '#screenshot-format',

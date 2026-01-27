@@ -25,10 +25,6 @@ if (!globalThis._volumeAudioMonitorLoaded) {
   //	IMPORTS
   /* ================================ */
 
-  const EventBus = globalThis.EventBus;
-  if (!globalThis.eventBus) {
-    globalThis.eventBus = new EventBus();
-  }
   // 🔥 USA INSTÂNCIA GLOBAL CRIADA EM RENDERER.JS
   // Não criar nova instância, usar a que já existe em globalThis.eventBus
 
@@ -329,7 +325,7 @@ if (!globalThis._volumeAudioMonitorLoaded) {
 
       // 4️⃣ Emite volume zerado para UI
       const ev = source === globalThis.INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-      EventBus.emit(ev, { percent: 0 });
+      globalThis.eventBus.emit(ev, { percent: 0 });
 
       vars.setActive(false);
       console.log(`✅ Monitor de volume (${source}) parado`);

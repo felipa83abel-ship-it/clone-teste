@@ -331,16 +331,82 @@ class ConfigManager {
     this.saveConfig();
   }
 
+  /**
+   * Salva um campo individual de configuração
+   * @param {string} fieldId - ID do elemento no HTML
+   * @param {*} value - Valor a salvar
+   */
+  saveField(fieldId, value) {
+    Logger.debug(`saveField("${fieldId}", "${value}")`);
+
+    // Mapeia IDs de campos para caminhos de config
+    const fieldMap = {
+      // Audio
+      'audio-input-device': 'audio.inputDevice',
+      'audio-output-device': 'audio.outputDevice',
+
+      // OpenAI Models
+      'openai-stt-model': 'api.openai.models.stt',
+      'openai-llm-model': 'api.openai.models.llm',
+
+      // Google Models
+      'google-stt-model': 'api.google.models.stt',
+      'google-llm-model': 'api.google.models.llm',
+
+      // OpenRouter Models
+      'openrouter-stt-model': 'api.openrouter.models.stt',
+      'openrouter-llm-model': 'api.openrouter.models.llm',
+
+      // Screenshot
+      'screenshot-hotkey': 'screen.hotkey',
+      'screenshot-format': 'screen.format',
+      'exclude-app-from-screenshot': 'screen.excludeApp',
+
+      // Privacy
+      'hide-from-screen-capture': 'privacy.hideFromCapture',
+      'disable-telemetry': 'privacy.disableTelemetry',
+      'data-retention-days': 'privacy.dataRetention',
+
+      // Other
+      darkModeToggle: 'other.darkMode',
+      mockToggle: 'other.mockEnabled',
+      'analytics-toggle': 'other.analyticsEnabled',
+      'auto-clear-data': 'other.autoClearData',
+      'auto-update': 'other.autoUpdate',
+
+      // UI
+      opacityRange: 'ui.opacity',
+      interviewModeSelect: 'ui.interviewMode',
+    };
+
+    const path = fieldMap[fieldId];
+    if (path) {
+      Logger.debug(`Salvando ${fieldId} em ${path}`);
+      this.set(path, value);
+    } else {
+      console.warn(`⚠️ saveField: fieldId "${fieldId}" não mapeado`);
+    }
+  }
+
   // ==========================================
   // UTILITÁRIOS
   // ==========================================
 
   /**
    * Mostra feedback visual de salvamento
+   * Remove feedback anterior se existir
    * @param {string} message - Mensagem custom (opcional)
    */
   showSaveFeedback(message = 'Configurações salvas com sucesso!') {
     Logger.debug('Início da função: "showSaveFeedback"');
+
+    // Remove feedback anterior se existir
+    const existing = document.querySelector('.save-feedback');
+    if (existing) {
+      clearTimeout(existing._timeoutId);
+      existing.remove();
+    }
+
     const feedback = document.createElement('div');
     feedback.className = 'save-feedback';
     feedback.innerHTML = `
@@ -349,19 +415,31 @@ class ConfigManager {
     `;
     document.body.appendChild(feedback);
 
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       feedback.remove();
     }, 3000);
+
+    // Guarda o ID do timeout no elemento para poder limpar depois
+    feedback._timeoutId = timeoutId;
 
     Logger.debug('Fim da função: "showSaveFeedback"');
   }
 
   /**
    * Mostra erro visual
+   * Remove erro anterior se existir
    * @param {string} message - Mensagem de erro
    */
   showError(message) {
     Logger.debug('Início da função: "showError"');
+
+    // Remove erro anterior se existir
+    const existing = document.querySelector('.save-feedback');
+    if (existing) {
+      clearTimeout(existing._timeoutId);
+      existing.remove();
+    }
+
     const error = document.createElement('div');
     error.className = 'save-feedback';
     error.style.background = '#dc3545';
@@ -371,9 +449,12 @@ class ConfigManager {
     `;
     document.body.appendChild(error);
 
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       error.remove();
     }, 3000);
+
+    // Guarda o ID do timeout no elemento para poder limpar depois
+    error._timeoutId = timeoutId;
 
     Logger.debug('Fim da função: "showError"');
   }
