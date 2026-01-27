@@ -1,8 +1,10 @@
 /**
  * ErrorHandler - Tratamento centralizado de erros
  *
+ * Usa globalThis.SecureLogger que é carregado em index.html
+ *
  * Uso:
- *   const ErrorHandler = require('./utils/ErrorHandler.js');
+ *   const ErrorHandler = globalThis.ErrorHandler;
  *
  *   // Em handlers sync:
  *   try {
@@ -19,7 +21,7 @@
  *   }
  */
 
-const SecureLogger = require('./SecureLogger.js');
+// SecureLogger é carregado globalmente em index.html
 
 class ErrorHandler {
   /**
@@ -46,11 +48,13 @@ class ErrorHandler {
     const errorType = this.getErrorType(error);
 
     // Log apenas em desenvolvimento
-    SecureLogger.debug(`Erro em ${context}:`, {
-      message: errorMessage,
-      type: errorType,
-      stack: error?.stack,
-    });
+    if (globalThis.SecureLogger) {
+      globalThis.SecureLogger.debug(`Erro em ${context}:`, {
+        message: errorMessage,
+        type: errorType,
+        stack: error?.stack,
+      });
+    }
 
     // Mensagem segura para usuário (sem detalhes técnicos em produção)
     const userMessage = this.getUserFriendlyMessage(errorType, errorMessage);
@@ -151,7 +155,9 @@ class ErrorHandler {
    * @returns {any} Valor formatado para retorno
    */
   static handleError(error, context, fallbackReturn = null) {
-    SecureLogger.error(`Erro em ${context}:`, error);
+    if (globalThis.SecureLogger) {
+      globalThis.SecureLogger.error(`Erro em ${context}:`, error);
+    }
     return fallbackReturn ?? this.formatError(error, context);
   }
 

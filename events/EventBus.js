@@ -81,6 +81,12 @@ class EventBus {
   }
 }
 
+// Expor em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.EventBus = EventBus;
+}
+
+// Expor para CommonJS (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = EventBus;
 }

@@ -85,6 +85,12 @@ class AppState {
       lastAskedQuestionNormalized: null,
     };
 
+    // Recriar proxy após reset
+    this.createHistoryProxy();
+
+    // Proxy para history para interceptar pushes diretos em testes e runtime
+    this.createHistoryProxy();
+
     this.metrics = {
       audioStartTime: null,
       llmStartTime: null,
@@ -97,6 +103,34 @@ class AppState {
     this.llm = {
       selectedProvider: 'openai', // Provider padrão
     };
+  }
+
+  // Cria um proxy para questionsHistory que reseta currentQuestion quando
+  // itens são adicionados via push/unshift (compatibilidade com testes e uso direto)
+  createHistoryProxy() {
+    const app = this;
+    const arr = this.interview.questionsHistory;
+    const handler = {
+      get(target, prop, receiver) {
+        const value = Reflect.get(target, prop, receiver);
+        // Interceptar chamadas de método 'push' e 'unshift'
+        if (prop === 'push' || prop === 'unshift') {
+          return function (...args) {
+            const res = Array.prototype[prop].apply(target, args);
+            try {
+              app.resetCurrentQuestion();
+            } catch (e) {
+              // ignore
+            }
+            return res;
+          };
+        }
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    };
+    const proxy = new Proxy(arr, handler);
+    this.interview.questionsHistory = proxy;
+    return proxy;
   }
 
   // ============================================
@@ -365,6 +399,12 @@ class AppState {
   }
 }
 
+// Expor em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.AppState = AppState;
+}
+
+// Expor para CommonJS (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = AppState;
 }

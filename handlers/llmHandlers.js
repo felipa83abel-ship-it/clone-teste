@@ -6,8 +6,6 @@
  * 3. handleLLMBatch() - modo normal
  */
 
-const Logger = require('../utils/Logger.js');
-
 /**
  * Valida requisição de LLM
  * @param {any} appState - Estado da app (AppState instance)
@@ -60,7 +58,7 @@ async function handleLLMStream(
   llmManager,
   turnId = null
 ) {
-  Logger.debug(
+  globalThis.Logger.debug(
     'Inicializando Stream LLM',
     { questionId, turnId, text, textLength: text.length },
     false
@@ -99,7 +97,7 @@ async function handleLLMStream(
     appState.metrics.llmEndTime = Date.now();
     appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
 
-    Logger.debug(
+    globalThis.Logger.debug(
       '⚡ Stream LLM finalizado',
       {
         duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
@@ -112,7 +110,7 @@ async function handleLLMStream(
       streamedText,
     });
   } catch (error) {
-    Logger.error('Erro em handleLLMStream', { error: error.message });
+    globalThis.Logger.error('Erro em handleLLMStream', { error: error.message });
     eventBus.emit('error', error.message);
     throw error;
   }
@@ -122,7 +120,11 @@ async function handleLLMStream(
  * Manipula resposta em modo batch (normal)
  */
 async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
-  Logger.debug('Inicializando Batch LLM', { questionId, text, textLength: text.length }, true);
+  globalThis.Logger.debug(
+    'Inicializando Batch LLM',
+    { questionId, text, textLength: text.length },
+    true
+  );
 
   appState.metrics.llmStartTime = Date.now();
 
@@ -139,7 +141,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 
     appState.metrics.llmEndTime = Date.now();
 
-    Logger.debug(
+    globalThis.Logger.debug(
       '⚡ Batch LLM finalizado',
       {
         duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
@@ -152,7 +154,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
       response,
     });
   } catch (error) {
-    Logger.error('Erro em handleLLMBatch', { error: error.message });
+    globalThis.Logger.error('Erro em handleLLMBatch', { error: error.message });
     eventBus.emit('error', error.message);
     throw error;
   }
@@ -163,3 +165,10 @@ module.exports = {
   handleLLMStream,
   handleLLMBatch,
 };
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.validateLLMRequest = validateLLMRequest;
+  globalThis.handleLLMStream = handleLLMStream;
+  globalThis.handleLLMBatch = handleLLMBatch;
+}

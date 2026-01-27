@@ -2,16 +2,15 @@
 // QUESTION HELPERS
 // Funções utilitárias para manipulação de perguntas
 /* ================================ */
-
-const Logger = require('../../utils/Logger.js');
+// Logger carregado globalmente via index.html
 
 /**
  * Normaliza texto para comparação
  * Remove pontuação, converte para lowercase, remove espaços extras
  */
 function normalizeForCompare(t) {
-  Logger.debug('Início da função: "normalizeForCompare"');
-  Logger.debug('Fim da função: "normalizeForCompare"');
+  globalThis.Logger.debug('Início da função: "normalizeForCompare"');
+  globalThis.Logger.debug('Fim da função: "normalizeForCompare"');
   return (t || '')
     .toLowerCase()
     .replaceAll(/[?!.\n\r]/g, '')
@@ -30,7 +29,7 @@ function finalizeQuestion(text) {
  * Reseta a pergunta atual
  */
 function resetCurrentQuestion(appState) {
-  Logger.debug('Início da função: "resetCurrentQuestion"');
+  globalThis.Logger.debug('Início da função: "resetCurrentQuestion"');
 
   appState.interview.currentQuestion = {
     text: '',
@@ -42,27 +41,36 @@ function resetCurrentQuestion(appState) {
     promotedToHistory: false,
   };
 
-  Logger.debug('Fim da função: "resetCurrentQuestion"');
+  globalThis.Logger.debug('Fim da função: "resetCurrentQuestion"');
 }
 
 /**
  * Verifica se uma pergunta já foi respondida pelo ID
  */
 function findAnswerByQuestionId(appState, questionId) {
-  Logger.debug('Início da função: "findAnswerByQuestionId"');
+  globalThis.Logger.debug('Início da função: "findAnswerByQuestionId"');
 
   if (!questionId) {
-    Logger.debug('Fim da função: "findAnswerByQuestionId"');
+    globalThis.Logger.debug('Fim da função: "findAnswerByQuestionId"');
     return false;
   }
 
-  Logger.debug('Fim da função: "findAnswerByQuestionId"');
+  globalThis.Logger.debug('Fim da função: "findAnswerByQuestionId"');
   return appState.interview.answeredQuestions.has(questionId);
 }
 
 /**
  * Exportar helpers
  */
+// Expor em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.normalizeForCompare = normalizeForCompare;
+  globalThis.finalizeQuestion = finalizeQuestion;
+  globalThis.resetCurrentQuestion = resetCurrentQuestion;
+  globalThis.findAnswerByQuestionId = findAnswerByQuestionId;
+}
+
+// Expor para CommonJS (Node.js)
 module.exports = {
   normalizeForCompare,
   finalizeQuestion,

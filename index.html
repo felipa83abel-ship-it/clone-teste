@@ -614,6 +614,7 @@
     </div>
 
     <!-- ==================== UTILIDADES ==================== -->
+    <script src="./utils/constants.js"></script>
     <script src="./utils/Logger.js"></script>
     <script src="./utils/ErrorHandler.js"></script>
     <script src="./utils/SecureLogger.js"></script>
@@ -625,17 +626,31 @@
     <!-- ==================== ESTRATÉGIAS E ORQUESTRADORES ==================== -->
     <script src="./strategies/STTStrategy.js"></script>
     <script src="./llm/LLMManager.js"></script>
+    <script src="./llm/handlers/openai-handler.js"></script>
+    <script src="./llm/handlers/gemini-handler.js"></script>
 
-    <!-- ==================== CONTROLLERS (Lógica pura) ==================== -->
-    <script src="./controllers/audio/audio-controller.js"></script>
-    <script src="./controllers/question/question-controller.js"></script>
-    <script src="./controllers/screenshot/screenshot-controller.js"></script>
-    <script src="./controllers/modes/mode-manager.js"></script>
+    <!-- ==================== STT PROVIDERS ==================== -->
+    <script src="./stt/stt-deepgram.js"></script>
+    <script src="./stt/stt-vosk.js"></script>
+    <script src="./stt/stt-whisper.js"></script>
+
+    <!-- ==================== AUDIO MONITOR ==================== -->
+    <script src="./audio/volume-audio-monitor.js"></script>
+
+    <!-- ==================== LLM HANDLERS ==================== -->
+    <script src="./handlers/llmHandlers.js"></script>
 
     <!-- ==================== UTILS DOM E HELPERS ==================== -->
     <script src="./utils/DOM-Registry.js"></script>
     <script src="./utils/ui-elements-registry.js"></script>
     <script src="./utils/renderer-helpers.js"></script>
+
+    <!-- ==================== CONTROLLERS (Lógica pura) ==================== -->
+    <script src="./controllers/audio/audio-controller.js"></script>
+    <script src="./controllers/question/question-helpers.js"></script>
+    <script src="./controllers/question/question-controller.js"></script>
+    <script src="./controllers/screenshot/screenshot-controller.js"></script>
+    <script src="./controllers/modes/mode-manager.js"></script>
 
     <!-- ==================== MANAGERS (ANTES de ConfigManager) ==================== -->
     <script src="./controllers/config/managers/ApiKeyManager.js"></script>

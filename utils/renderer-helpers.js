@@ -2,36 +2,31 @@
 // RENDERER HELPERS
 // Funções utilitárias gerais do renderer
 /* ================================ */
-
-const { ipcRenderer } = require('electron');
-const Logger = require('../utils/Logger.js');
-
-// Variáveis injetadas
-let appState;
-let eventBus;
+// ipcRenderer passado em deps.ipcRenderer
+// Logger é carregado como script global no index.html
 
 /**
  * Inicializar renderer-helpers
  */
 function initRendererHelpers(deps) {
-  appState = deps.appState;
-  eventBus = deps.eventBus;
+  // Guardar referências em globalThis para evitar conflitos de escopo
+  globalThis._rendererHelpersDeps = deps;
 }
 
 /**
  * Atualiza a mensagem de status na UI
  */
 function updateStatusMessage(message) {
-  Logger.debug('Início da função: "updateStatusMessage"');
-  eventBus.emit('statusUpdate', { message });
-  Logger.debug('Fim da função: "updateStatusMessage"');
+  globalThis.globalThis.Logger.debug('Início da função: "updateStatusMessage"');
+  globalThis.eventBus.emit('statusUpdate', { message });
+  globalThis.globalThis.Logger.debug('Fim da função: "updateStatusMessage"');
 }
 
 /**
  * Limpa todas as seleções visuais
  */
 function clearAllSelections() {
-  eventBus.emit('clearAllSelections', {});
+  globalThis.eventBus.emit('clearAllSelections', {});
 }
 
 /**
@@ -51,15 +46,15 @@ async function resetAppState() {
 
   try {
     // 1️⃣ CHUNK 1: Parar autoplay e áudio
-    if (appState.audio.isRunning) {
+    if (globalThis.appState.audio.isRunning) {
       console.log('🎤 Parando captura de áudio...');
-      appState.audio.isRunning = false;
+      globalThis.appState.audio.isRunning = false;
     }
     console.log('✅ Autoplay do mock parado');
     await releaseThread();
 
     // 2️⃣ CHUNK 2: Limpar perguntas e respostas
-    appState.interview.currentQuestion = {
+    globalThis.appState.interview.currentQuestion = {
       text: '',
       lastUpdate: 0,
       finalized: false,
@@ -71,22 +66,22 @@ async function resetAppState() {
       interimText: '',
     };
     // Esvaziar completamente o histórico de perguntas
-    appState.interview.questionsHistory.splice(0);
-    appState.interview.answeredQuestions.clear();
-    appState.selectedId = null;
+    globalThis.appState.interview.questionsHistory.splice(0);
+    globalThis.appState.interview.answeredQuestions.clear();
+    globalThis.appState.selectedId = null;
     console.log('✅ Perguntas e respostas limpas');
     console.log(
-      `📊 Histórico de perguntas: ${appState.interview.questionsHistory.length} item(ns)`
+      `📊 Histórico de perguntas: ${globalThis.appState.interview.questionsHistory.length} item(ns)`
     );
     await releaseThread();
 
     // 3️⃣ CHUNK 3: Limpar estado LLM e métricas
-    appState.interview.interviewTurnId = 0;
-    appState.globalQuestionCounter = 0;
-    appState.interview.llmAnsweredTurnId = null;
-    appState.interview.llmRequestedTurnId = null;
-    appState.interview.llmRequestedQuestionId = null;
-    appState.metrics = {
+    globalThis.appState.interview.interviewTurnId = 0;
+    globalThis.appState.globalQuestionCounter = 0;
+    globalThis.appState.interview.llmAnsweredTurnId = null;
+    globalThis.appState.interview.llmRequestedTurnId = null;
+    globalThis.appState.interview.llmRequestedQuestionId = null;
+    globalThis.appState.metrics = {
       audioStartTime: null,
       llmStartTime: null,
       llmEndTime: null,
@@ -99,15 +94,17 @@ async function resetAppState() {
     await releaseThread();
 
     // 4️⃣ CHUNK 4: Limpar screenshots
-    if (appState.audio.capturedScreenshots.length > 0) {
-      console.log(`🗑️ Limpando ${appState.audio.capturedScreenshots.length} screenshot(s)...`);
-      appState.audio.capturedScreenshots = [];
-      eventBus.emit('screenshotBadgeUpdate', {
+    if (globalThis.appState.audio.capturedScreenshots.length > 0) {
+      console.log(
+        `🗑️ Limpando ${globalThis.appState.audio.capturedScreenshots.length} screenshot(s)...`
+      );
+      globalThis.appState.audio.capturedScreenshots = [];
+      globalThis.eventBus.emit('screenshotBadgeUpdate', {
         count: 0,
         visible: false,
       });
       try {
-        await ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
+        await globalThis._rendererHelpersDeps.ipcRenderer.invoke('CLEANUP_SCREENSHOTS');
       } catch (err) {
         console.warn('⚠️ Erro ao limpar screenshots no sistema:', err);
       }
@@ -116,28 +113,28 @@ async function resetAppState() {
     await releaseThread();
 
     // 5️⃣ CHUNK 5: Limpar flags
-    appState.audio.isCapturing = false;
-    appState.audio.isAnalyzing = false;
+    globalThis.appState.audio.isCapturing = false;
+    globalThis.appState.audio.isAnalyzing = false;
     console.log('✅ Flags resetadas');
     await releaseThread();
 
     // 6️⃣ CHUNK 6: Atualizar UI - Perguntas
-    eventBus.emit('currentQuestionUpdate', {
+    globalThis.eventBus.emit('currentQuestionUpdate', {
       text: '',
       isSelected: false,
     });
-    eventBus.emit('questionsHistoryUpdate', []);
+    globalThis.eventBus.emit('questionsHistoryUpdate', []);
     console.log('✅ Perguntas UI limpa');
     await releaseThread();
 
     // 7️⃣ CHUNK 7: Atualizar UI - Transcrições e Respostas
-    eventBus.emit('transcriptionCleared');
-    eventBus.emit('answersCleared');
+    globalThis.eventBus.emit('transcriptionCleared');
+    globalThis.eventBus.emit('answersCleared');
     console.log('✅ Transcrições e respostas UI limpas');
     await releaseThread();
 
     // 8️⃣ CHUNK 8: Atualizar UI - Botão Listen
-    eventBus.emit('listenButtonToggle', {
+    globalThis.eventBus.emit('listenButtonToggle', {
       isRunning: false,
       buttonText: '🎤 Começar a Ouvir... (Ctrl+D)',
     });
@@ -145,7 +142,7 @@ async function resetAppState() {
     await releaseThread();
 
     // 9️⃣ CHUNK 9: Atualizar UI - Status
-    eventBus.emit('statusUpdate', {
+    globalThis.eventBus.emit('statusUpdate', {
       status: 'ready',
       message: '✅ Pronto',
     });
@@ -172,6 +169,23 @@ async function resetAppState() {
 /**
  * Exportar helpers
  */
+// Expor em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.updateStatusMessage = updateStatusMessage;
+  globalThis.clearAllSelections = clearAllSelections;
+  globalThis.releaseThread = releaseThread;
+  globalThis.resetAppState = resetAppState;
+  // Expor objeto com todos os helpers
+  globalThis.rendererHelpers = {
+    initRendererHelpers,
+    updateStatusMessage,
+    clearAllSelections,
+    releaseThread,
+    resetAppState,
+  };
+}
+
+// Expor para CommonJS (Node.js)
 module.exports = {
   initRendererHelpers,
   updateStatusMessage,

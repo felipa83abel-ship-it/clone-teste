@@ -197,6 +197,15 @@ const NormalModeHandlers = {
 // EXPORTAR
 // ============================================
 
+// Expor em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.ModeManager = ModeManager;
+  globalThis.MODES = MODES;
+  globalThis.InterviewModeHandlers = InterviewModeHandlers;
+  globalThis.NormalModeHandlers = NormalModeHandlers;
+}
+
+// Expor para CommonJS (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
     ModeManager,

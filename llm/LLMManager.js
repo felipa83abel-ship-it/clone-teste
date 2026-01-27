@@ -28,8 +28,7 @@
  * LLM.register('openai', openaiHandler);
  * const response = await LLM.complete('openai', messages);
  */
-
-const Logger = require('../utils/Logger.js');
+// Logger carregado globalmente via index.html
 
 class LLMManager {
   /**
@@ -46,10 +45,12 @@ class LLMManager {
       backoffMultiplier: options.backoffMultiplier || 2,
     };
 
-    Logger.info('LLMManager inicializado', {
-      timeout: this.config.timeout,
-      maxRetries: this.config.maxRetries,
-    });
+    if (globalThis.Logger) {
+      globalThis.Logger.info('LLMManager inicializado', {
+        timeout: this.config.timeout,
+        maxRetries: this.config.maxRetries,
+      });
+    }
   }
 
   /**
@@ -76,10 +77,12 @@ class LLMManager {
       },
     };
 
-    Logger.info(`✅ LLM registrado: ${name}`, {
-      timeout: this.handlers[name].config.timeout,
-      maxRetries: this.handlers[name].config.maxRetries,
-    });
+    if (globalThis.Logger) {
+      globalThis.Logger.info(`✅ LLM registrado: ${name}`, {
+        timeout: this.handlers[name].config.timeout,
+        maxRetries: this.handlers[name].config.maxRetries,
+      });
+    }
   }
 
   /**
@@ -146,7 +149,7 @@ class LLMManager {
         const isLastAttempt = attempt === config.maxRetries;
         const isRetryable = this._isRetryableError(error);
 
-        Logger.warn(`🔄 Tentativa ${attempt + 1} falhou`, {
+        globalThis.Logger.warn(`🔄 Tentativa ${attempt + 1} falhou`, {
           error: error.message,
           isRetryable,
           maxRetries: config.maxRetries,
@@ -195,7 +198,7 @@ class LLMManager {
     const handler = this.getHandler(model);
     const config = this.getHandlerConfig(model);
 
-    Logger.info(`📤 Complete LLM: ${model}`, {
+    globalThis.Logger.info(`📤 Complete LLM: ${model}`, {
       messagesCount: messages.length,
       timeout: config.timeout,
     });
@@ -205,10 +208,10 @@ class LLMManager {
         return await this._withTimeout(handler.complete(messages), config.timeout);
       }, config);
 
-      Logger.info(`✅ Complete LLM concluído: ${model}`);
+      globalThis.Logger.info(`✅ Complete LLM concluído: ${model}`);
       return result;
     } catch (error) {
-      Logger.error(`❌ Erro em complete(${model})`, {
+      globalThis.Logger.error(`❌ Erro em complete(${model})`, {
         error: error.message,
         stack: error.stack,
       });
@@ -223,7 +226,7 @@ class LLMManager {
     const handler = this.getHandler(model);
     const config = this.getHandlerConfig(model);
 
-    Logger.info(`📤 Stream LLM: ${model}`, {
+    globalThis.Logger.info(`📤 Stream LLM: ${model}`, {
       messagesCount: messages.length,
       timeout: config.timeout,
     });
@@ -232,10 +235,10 @@ class LLMManager {
       // Para stream, timeout se aplica à inicialização, não ao stream completo
       const streamGenerator = await this._withTimeout(handler.stream(messages), config.timeout);
 
-      Logger.info(`✅ Stream LLM iniciado: ${model}`);
+      globalThis.Logger.info(`✅ Stream LLM iniciado: ${model}`);
       return streamGenerator;
     } catch (error) {
-      Logger.error(`❌ Erro em stream(${model})`, {
+      globalThis.Logger.error(`❌ Erro em stream(${model})`, {
         error: error.message,
         stack: error.stack,
       });
@@ -244,6 +247,12 @@ class LLMManager {
   }
 }
 
+// Expor em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.LLMManager = LLMManager;
+}
+
+// Expor para CommonJS (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = LLMManager;
 }

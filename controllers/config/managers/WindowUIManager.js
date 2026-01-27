@@ -2,7 +2,7 @@
 /* global Logger */
 
 /**
- * WindowConfigManager - Gerencia configurações de janela
+ * WindowUIManager - Gerencia configurações de janela
  *
  * Responsabilidades:
  *   - Dark mode toggle
@@ -16,7 +16,7 @@
  *   - CSS: aplicar classe dark (body.dark)
  *   - RendererAPI: setWindowOpacity(), startWindowDrag()
  */
-class WindowConfigManager {
+class WindowUIManager {
   /**
    * @param {ConfigManager} configManager - Referência ao orquestrador
    * @param {IpcRenderer} ipc - Comunicação com main.js
@@ -27,14 +27,14 @@ class WindowConfigManager {
     this.ipc = ipc;
     this.eventBus = eventBus;
 
-    Logger.debug('🪟 WindowConfigManager criado', false);
+    Logger.debug('🪟 WindowUIManager criado', false);
   }
 
   /**
    * Inicializa listeners e restaura estado
    */
   async initialize() {
-    Logger.debug('🚀 WindowConfigManager.initialize()', false);
+    Logger.debug('🚀 WindowUIManager.initialize()', false);
     await this.restoreState();
     this.#initWindowListeners();
     await this.initClickThroughController();
@@ -45,7 +45,7 @@ class WindowConfigManager {
    */
   async restoreState() {
     Logger.debug('Início da função: "restoreState"');
-    Logger.debug('📂 WindowConfigManager.restoreState()', false);
+    Logger.debug('📂 WindowUIManager.restoreState()', false);
     this.restoreUserPreferences();
   }
 
@@ -436,4 +436,10 @@ class WindowConfigManager {
   // ==========================================
 }
 
-module.exports = WindowConfigManager;
+// Exportar classe para CommonJS
+module.exports = WindowUIManager;
+
+// Exportar para globalThis (para acesso via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.WindowUIManager = WindowUIManager;
+}

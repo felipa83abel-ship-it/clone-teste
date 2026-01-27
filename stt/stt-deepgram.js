@@ -20,32 +20,20 @@
 //	IMPORTS
 /* ================================ */
 
-const { ipcRenderer } = require('electron');
-const EventBus = require('../events/EventBus.js');
-const { getVADEngine } = require('./vad-engine');
+// ipcRenderer será inicializado por renderer.js
+// Usar função getter para lazy evaluation
+const getIpcRenderer = () => globalThis.ipcRenderer;
+const getVADEngine = () => globalThis.vadEngine;
 
 // 🔥 INSTÂNCIA DE EVENTBUS LOCAL
-const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda nao carregou
+const getEventBus = () => globalThis.eventBus;
 
 /* ================================ */
 //	CONSTANTES
 /* ================================ */
 
 // Configuração Geral
-const INPUT = 'input';
-const OUTPUT = 'output';
 const USE_DEEPGRAM_MOCK = false; // true para simulação sem conexão real com Deepgram
-
-// Configuração de Áudio 16kHz
-const AUDIO_SAMPLE_RATE = 16000; // 16kHz
-
-// AudioWorkletProcessor
-const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor'; // Nome
-const AUDIO_WORKLET_PROCESSOR_PATH = './stt/stt-audio-worklet-processor.js'; // Path relativo a index.html
-
-// Detecção de silêncio
-const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
-const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 // Configuração Deepgram
 const DEEPGRAM_CONFIG = {
@@ -289,7 +277,7 @@ function initDeepgramWSMock() {
 }
 
 // Inicializa WebSocket Deepgram com parâmetros genericos (input/output))
-async function initDeepgramWS(source = INPUT) {
+async function initDeepgramWS(source = globalThis.INPUT) {
   const existingWS = deepgramState[source]?.ws ? deepgramState[source].ws() : null;
 
   if (existingWS && existingWS.readyState === WebSocket.OPEN) {
@@ -298,7 +286,7 @@ async function initDeepgramWS(source = INPUT) {
   }
 
   // Pega chave Deepgram salva
-  const apiKey = await ipcRenderer.invoke('GET_API_KEY', 'deepgram');
+  const apiKey = await getIpcRenderer().invoke('GET_API_KEY', 'deepgram');
   if (!apiKey) {
     throw new Error('❌ Chave Deepgram não configurada. Configure em "API e Modelos"');
   }
@@ -522,7 +510,9 @@ async function startDeepgram(source, UIElements) {
 
   const cfg = config[source];
   if (!cfg) {
-    throw new Error(`❌ Source inválido: ${source}. Use ${INPUT} ou ${OUTPUT}`);
+    throw new Error(
+      `❌ Source inválido: ${source}. Use ${globalThis.INPUT} ou ${globalThis.OUTPUT}`
+    );
   }
 
   const vars = deepgramState[source];
@@ -566,9 +556,9 @@ async function startDeepgram(source, UIElements) {
 
     // Cria AudioContext 16kHz para processamento em tempo real (VAD)
     const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
-      sampleRate: AUDIO_SAMPLE_RATE,
+      sampleRate: globalThis.AUDIO_SAMPLE_RATE,
     });
-    await audioContext.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
+    await audioContext.audioWorklet.addModule(globalThis.AUDIO_WORKLET_PROCESSOR_PATH);
 
     // Cria MediaStreamSource e guarda via deepgramState
     const mediaSource = audioContext.createMediaStreamSource(stream);
@@ -580,7 +570,7 @@ async function startDeepgram(source, UIElements) {
     hpf.Q.value = HPF_Q_FACTOR;
 
     // Inicia AudioWorklet para captura e processamento de áudio em tempo real
-    const processor = new AudioWorkletNode(audioContext, STT_AUDIO_WORKLET_PROCESSOR);
+    const processor = new AudioWorkletNode(audioContext, globalThis.STT_AUDIO_WORKLET_PROCESSOR);
     processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
     processor.port.onmessage = (event) => {
       // Processa mensagens do AudioWorklet (audioData e volumeUpdate separadamente)
@@ -654,7 +644,10 @@ async function processIncomingAudioMessageDeepgram(source, data) {
 // Trata detecção de silêncio com VAD ou fallback
 function handleSilenceDetectionDeepgram(source, percent) {
   const vars = deepgramState[source];
-  const silenceTimeout = source === INPUT ? SILENCE_TIMEOUT_INPUT : SILENCE_TIMEOUT_OUTPUT;
+  const silenceTimeout =
+    source === globalThis.INPUT
+      ? globalThis.SILENCE_TIMEOUT_INPUT
+      : globalThis.SILENCE_TIMEOUT_OUTPUT;
   const now = Date.now();
 
   // Decisão principal: VAD se disponível, senão fallback por volume
@@ -707,7 +700,7 @@ function handleSilenceDetectionDeepgram(source, percent) {
 /* ================================ */
 
 // Processa mensagens do Deepgram (final ou parcial)
-function handleDeepgramMessage(result, source = INPUT) {
+function handleDeepgramMessage(result, source = globalThis.INPUT) {
   const transcript = result.channel?.alternatives?.[0]?.transcript || '';
   const isFinal = result.is_final || false;
 
@@ -776,7 +769,7 @@ function handleFinalDeepgramMessage(source, transcript) {
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
   // Emite volume para UI
-  const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+  const ev = source === globalThis.INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
   getEventBus().emit(ev, { percent });
 }
 
@@ -804,13 +797,15 @@ function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
-  const interimId = source === INPUT ? 'deepgram-interim-input' : 'deepgram-interim-output';
+  const interimId =
+    source === globalThis.INPUT ? 'deepgram-interim-input' : 'deepgram-interim-output';
   getEventBus().emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
-  const interimId = source === INPUT ? 'deepgram-interim-input' : 'deepgram-interim-output';
+  const interimId =
+    source === globalThis.INPUT ? 'deepgram-interim-input' : 'deepgram-interim-output';
   getEventBus().emit('updateInterim', {
     id: interimId,
     speaker: author,
@@ -821,7 +816,7 @@ function updateInterim(source, transcript, author) {
 // Atualiza CURRENT question (apenas para output)
 function updateCurrentQuestion(source, transcript, isInterim = false) {
   const vars = deepgramState[source];
-  if (source === OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
+  if (source === globalThis.OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
     globalThis.RendererAPI.handleCurrentQuestion(vars.author, transcript, {
       isInterim,
       shouldFinalizeAskCurrent: vars.shouldFinalizeAskCurrent,
@@ -1036,9 +1031,6 @@ function stopDeepgram(source) {
 // DEBUG LOG DEEPGRAM
 /* ================================ */
 
-// ========== DEBUG LOGGING (Consolidado em Logger.js) ==========
-const Logger = require('../utils/Logger.js');
-
 /**
  * Log de debug padronizado para stt-deepgram.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
@@ -1066,7 +1058,7 @@ function debugLogDeepgram(...args) {
   );
 
   // Registrar em Logger para histórico de debug
-  Logger.debug(`[stt-deepgram] ${cleanArgs.join(' ')}`, { timeStr });
+  globalThis.Logger.debug(`[stt-deepgram] ${cleanArgs.join(' ')}`, { timeStr });
 }
 
 /* ================================ */
@@ -1080,11 +1072,13 @@ async function startAudioDeepgram(UIElements) {
   try {
     // Inicializa VAD Engine (singleton)
     vad = getVADEngine();
-    Logger.debug(`✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`);
+    globalThis.Logger.debug(
+      `✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`
+    );
 
     // 🌊 Deepgram: Inicia INPUT/OUTPUT
-    if (UIElements.inputSelect?.value) await startDeepgram(INPUT, UIElements);
-    if (UIElements.outputSelect?.value) await startDeepgram(OUTPUT, UIElements);
+    if (UIElements.inputSelect?.value) await startDeepgram(globalThis.INPUT, UIElements);
+    if (UIElements.outputSelect?.value) await startDeepgram(globalThis.OUTPUT, UIElements);
   } catch (error) {
     console.error('❌ Erro ao iniciar Deepgram:', error);
     throw error;
@@ -1097,8 +1091,8 @@ async function startAudioDeepgram(UIElements) {
 function stopAudioDeepgram() {
   try {
     // 🌊 Deepgram: Para INPUT e OUTPUT
-    stopDeepgram(INPUT);
-    stopDeepgram(OUTPUT);
+    stopDeepgram(globalThis.INPUT);
+    stopDeepgram(globalThis.OUTPUT);
     debugLogDeepgram('🛑 Deepgram completamente parado', true);
   } catch (error) {
     console.error('❌ Erro ao parar Deepgram:', error);
@@ -1110,7 +1104,7 @@ function stopAudioDeepgram() {
  */
 async function switchDeviceDeepgram(source, newDeviceId) {
   try {
-    Logger.debug(
+    globalThis.Logger.debug(
       `🔄 [switchDeviceDeepgram] Início: source=${source}, newDeviceId="${newDeviceId}"`
     );
     const result = await changeDeviceDeepgram(source, newDeviceId);
@@ -1130,3 +1124,10 @@ module.exports = {
   stopAudioDeepgram,
   switchDeviceDeepgram,
 };
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.startAudioDeepgram = startAudioDeepgram;
+  globalThis.stopAudioDeepgram = stopAudioDeepgram;
+  globalThis.switchDeviceDeepgram = switchDeviceDeepgram;
+}

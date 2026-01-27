@@ -2,78 +2,62 @@
 /* global HTMLElement */
 
 /* ================================ */
-//	IMPORTES E DEPENDÊNCIAS
+//	DEPENDÊNCIAS GLOBAIS (Carregadas via <script> no index.html)
 /* ================================ */
+// Todas as classes abaixo estão disponíveis em globalThis
+// Carregamento de módulos em: index.html
+// - Logger, ErrorHandler, SecureLogger
+// - AppState, EventBus
+// - STTStrategy, LLMManager
+// - Controllers (audio, question, screenshot, modes)
+// - Managers (ApiKey, AudioDevice, ModelSelection, ScreenConfig, PrivacyConfig, WindowUI, HomeUI)
+// - ConfigManager
+// - UI Helpers e Registry
 
+// Modules via ipcRenderer (do Electron)
 const { ipcRenderer } = require('electron');
-const { marked } = require('marked');
-const hljs = require('highlight.js');
-const {
-  startAudioDeepgram,
-  stopAudioDeepgram,
-  switchDeviceDeepgram,
-} = require('./stt/stt-deepgram.js'); // reorganizado em pasta stt/
-const { startAudioVosk, stopAudioVosk, switchDeviceVosk } = require('./stt/stt-vosk.js'); // reorganizado em pasta stt/
-const {
-  startAudioWhisper,
-  stopAudioWhisper,
-  switchDeviceWhisper,
-} = require('./stt/stt-whisper.js'); // reorganizado em pasta stt/
-const {
-  startAudioVolumeMonitor,
-  stopAudioVolumeMonitor,
-  switchAudioVolumeDevice,
-} = require('./audio/volume-audio-monitor.js');
 
-/* ================================ */
-//	🎯 NOVAS CLASSES (Refatoração Fase 2)
-/* ================================ */
-const AppState = require('./state/AppState.js');
-const EventBus = require('./events/EventBus.js');
-const Logger = require('./utils/Logger.js');
-const mockRunner = require('./testing/mock-runner.js'); // 🎭 Mock para teste em MODE_DEBUG
-const STTStrategy = require('./strategies/STTStrategy.js');
-const LLMManager = require('./llm/LLMManager.js');
-const openaiHandler = require('./llm/handlers/openai-handler.js');
-const geminiHandler = require('./llm/handlers/gemini-handler.js');
-const {
-  validateLLMRequest,
-  handleLLMStream,
-  handleLLMBatch,
-} = require('./handlers/llmHandlers.js');
-const {
-  ModeManager,
-  MODES,
-  InterviewModeHandlers,
-  NormalModeHandlers,
-} = require('./controllers/modes/mode-manager.js');
+// 🎯 Expor ipcRenderer globalmente para uso em ConfigManager e outros controllers
+globalThis._ipc = ipcRenderer;
+globalThis.ipcRenderer = ipcRenderer;
 
-// 🎯 CONTROLADORES (Fase 2 - Decomposição)
-const audioController = require('./controllers/audio/audio-controller.js');
-const questionController = require('./controllers/question/question-controller.js');
-const screenshotController = require('./controllers/screenshot/screenshot-controller.js');
-const rendererHelpers = require('./utils/renderer-helpers.js');
-const uiElementsRegistry = require('./utils/ui-elements-registry.js');
+// 🎯 CARREGAR DEPENDÊNCIAS EXTERNAS para globalThis
+// marked e highlight.js são necessários para renderização de markdown
+try {
+  globalThis.marked = require('marked');
+} catch (err) {
+  globalThis.Logger?.warn('marked não carregado via CommonJS, esperando estar em globalThis', err);
+}
 
-// 🎯 INSTANCIAR
-const appState = new AppState();
-const eventBus = new EventBus();
-const sttStrategy = new STTStrategy();
-const llmManager = new LLMManager();
-const modeManager = new ModeManager(MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
+try {
+  globalThis.hljs = require('highlight.js');
+} catch (err) {
+  globalThis.Logger?.warn(
+    'highlight.js não carregado via CommonJS, esperando estar em globalThis',
+    err
+  );
+}
+
+// 🎯 INSTANCIAR - Usar globalThis para classes carregadas como scripts
+// Expor em globalThis para acesso por outros arquivos carregados como scripts
+globalThis.appState = new globalThis.AppState();
+globalThis.eventBus = new globalThis.EventBus();
+globalThis.sttStrategy = new globalThis.STTStrategy();
+globalThis.llmManager = new globalThis.LLMManager();
+globalThis.modeManager = new globalThis.ModeManager(globalThis.MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
 
 // 🎯 Inicializar renderer-helpers com dependências
-rendererHelpers.initRendererHelpers({
-  appState,
-  eventBus,
+globalThis.rendererHelpers.initRendererHelpers({
+  appState: globalThis.appState,
+  eventBus: globalThis.eventBus,
 });
 
 // 🎯 Inicializar screenshot-controller com dependências
-const { initScreenshotController } = screenshotController;
-initScreenshotController({
+// initScreenshotController está definida em screenshot-controller.js
+globalThis.screenshotController.initScreenshotController({
   ipcRenderer,
-  eventBus,
-  appState,
+  eventBus: globalThis.eventBus,
+  appState: globalThis.appState,
 });
 
 // 🎯 Atribuir funções de screenshot para exposição global
@@ -81,46 +65,54 @@ const {
   captureScreenshot: _captureScreenshot,
   analyzeScreenshots: _analyzeScreenshots,
   clearScreenshots: _clearScreenshots,
-} = screenshotController;
+} = globalThis.screenshotController;
 
 // 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
 const _mockAutoPlayActive = false;
 const _mockScenarioIndex = 0;
 
-// 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (importadas do screenshot-controller)
-const captureScreenshot = _captureScreenshot;
-const analyzeScreenshots = _analyzeScreenshots;
-const clearScreenshots = _clearScreenshots;
+// 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (disponíveis em globalThis a partir de screenshot-controller)
+// Use globalThis.captureScreenshot, globalThis.analyzeScreenshots, globalThis.clearScreenshots
 
 // 🎯 REGISTRAR MODOS
-modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
-modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
+globalThis.globalThis.modeManager.registerMode(
+  globalThis.MODES.INTERVIEW,
+  globalThis.InterviewModeHandlers
+);
+globalThis.globalThis.modeManager.registerMode(
+  globalThis.MODES.NORMAL,
+  globalThis.NormalModeHandlers
+);
 
 // 🎯 REGISTRAR LLMs
-llmManager.register('openai', openaiHandler);
-llmManager.register('google', geminiHandler);
-// NOSONAR // Futuro: llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
+// Instanciar handlers com ipcRenderer
+const openaiHandler = new globalThis.OpenAIHandler(ipcRenderer);
+const geminiHandler = new globalThis.GeminiHandler(ipcRenderer);
+
+globalThis.llmManager.register('openai', openaiHandler);
+globalThis.llmManager.register('google', geminiHandler);
+// NOSONAR // Futuro: globalThis.llmManager.register('anthropic', require('./llm/handlers/anthropic-handler.js'));
 
 // 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
-eventBus.on('llmStreamEnd', (data) => {
-  Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
+globalThis.eventBus.on('llmStreamEnd', (data) => {
+  globalThis.Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
 
   // 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
-  appState.interview.answeredQuestions.add(data.questionId);
+  globalThis.appState.interview.answeredQuestions.add(data.questionId);
 
   // 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
   // Aqui só limpamos o CURRENT para próxima pergunta
-  if (modeManager.is(MODES.INTERVIEW)) {
-    appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
-    resetCurrentQuestion();
-    renderCurrentQuestion();
+  if (globalThis.modeManager.is(globalThis.MODES.INTERVIEW)) {
+    globalThis.appState.interview.llmAnsweredTurnId = globalThis.appState.interview.interviewTurnId;
+    globalThis.resetCurrentQuestion();
+    globalThis.renderCurrentQuestion();
   }
 
-  eventBus.emit('answerStreamEnd', {});
+  globalThis.eventBus.emit('answerStreamEnd', {});
 });
 
-eventBus.on('llmBatchEnd', (data) => {
-  Logger.debug(
+globalThis.eventBus.on('llmBatchEnd', (data) => {
+  globalThis.Logger.debug(
     'LLM Batch finalizado',
     {
       questionId: data.questionId,
@@ -130,21 +122,21 @@ eventBus.on('llmBatchEnd', (data) => {
   );
 
   // 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
-  appState.interview.answeredQuestions.add(data.questionId);
+  globalThis.appState.interview.answeredQuestions.add(data.questionId);
 
   // 🔥 Obter turnId da pergunta no histórico
-  const questionEntry = appState.history.find((q) => q.id === data.questionId);
+  const questionEntry = globalThis.appState.history.find((q) => q.id === data.questionId);
   const turnId = questionEntry?.turnId || null;
 
-  eventBus.emit('answerBatchEnd', {
+  globalThis.eventBus.emit('answerBatchEnd', {
     questionId: data.questionId,
     response: data.response,
     turnId, // 🔥 Incluir turnId para renderizar badge
   });
 });
 
-eventBus.on('error', (error) => {
-  Logger.error('Erro na eventBus', { error });
+globalThis.eventBus.on('error', (error) => {
+  globalThis.Logger.error('Erro na eventBus', { error });
   // 🔥 NOVO: Mostrar erro visual ao usuário
   if (globalThis.configManager?.showError) {
     globalThis.configManager.showError(error);
@@ -287,7 +279,7 @@ const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
  * Registra elementos UI no registry centralizado
  * DELEGADO para uiElementsRegistry
  */
-const registerUIElements = (elements) => uiElementsRegistry.register(elements);
+const registerUIElements = (elements) => globalThis.uiElementsRegistry?.register(elements);
 
 /* ================================ */
 //	MONITORAMENTO DE VOLUME
@@ -297,24 +289,24 @@ const registerUIElements = (elements) => uiElementsRegistry.register(elements);
  * Escuta evento de mudança de dispositivo
  * Emitido pelo config-manager
  */
-eventBus.on('audioDeviceChanged', async (_data) => {
+globalThis.eventBus.on('audioDeviceChanged', async (_data) => {
   try {
-    const sttModel = getConfiguredSTTModel();
-    Logger.info('audioDeviceChanged', { model: sttModel, type: _data.type });
+    const sttModel = globalThis.RendererAPI?.getConfiguredSTTModel?.() || 'error';
+    globalThis.Logger.info('audioDeviceChanged', { model: sttModel, type: _data.type });
 
     if (!_data?.type) {
-      Logger.warn('Dados inválidos para mudança de dispositivo', _data);
+      globalThis.Logger.warn('Dados inválidos para mudança de dispositivo', _data);
       return;
     }
 
-    if (!appState.audio.isRunning) {
-      Logger.warn('STT não está ativo, ignorando mudança de dispositivo');
+    if (!globalThis.appState.audio.isRunning) {
+      globalThis.Logger.warn('STT não está ativo, ignorando mudança de dispositivo');
       return;
     }
 
-    await sttStrategy.switchDevice(sttModel, _data.type, _data.deviceId);
+    await globalThis.sttStrategy.switchDevice(sttModel, _data.type, _data.deviceId);
   } catch (error) {
-    Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });
+    globalThis.Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });
   }
 });
 
@@ -330,142 +322,66 @@ eventBus.on('audioDeviceChanged', async (_data) => {
  */
 function _sortAnswersByTurnId() {
   // Emite evento para HomeUIManager lidar com reordenação
-  eventBus.emit('sortAnswersByTurnId');
+  globalThis.eventBus.emit('sortAnswersByTurnId');
 }
 
 /**
  * Obtém o modelo STT configurado via config-manager
- * @returns {string} Nome do modelo STT ou 'error'
+ * DELEGADO: Função disponível em globalThis.RendererAPI.getConfiguredSTTModel
+ * (Implementação em ConfigManager)
  */
-function getConfiguredSTTModel() {
-  try {
-    if (!globalThis.configManager?.config) {
-      console.warn('⚠️ configManager não disponível no escopo global');
-      return 'error'; // fallback
-    }
-
-    const config = globalThis.configManager.config;
-    const activeProvider = config.api?.activeProvider;
-    const sttModel = config.api?.[activeProvider]?.selectedSTTModel;
-
-    if (!sttModel) {
-      console.warn(`⚠️ Modelo STT não configurado para ${activeProvider}`);
-      return 'error'; // fallback
-    }
-
-    return sttModel;
-  } catch (err) {
-    console.error('❌ Erro ao obter modelo STT da config:', err);
-    return 'error'; // fallback
-  }
-}
 
 /**
  * Reseta o estado da pergunta atual (CURRENT)
+ * DELEGADO: resetCurrentQuestion está em question-helpers.js e exportado em globalThis
  */
-function resetCurrentQuestion() {
-  Logger.debug('Início da função: "resetCurrentQuestion"');
-
-  appState.interview.currentQuestion = {
-    text: '',
-    lastUpdate: 0,
-    finalized: false,
-    promotedToHistory: false,
-    isBeingAnswered: false,
-    lastUpdateTime: null,
-    createdAt: null,
-    finalText: '',
-    interimText: '',
-  };
-
-  Logger.debug('Fim da função: "resetCurrentQuestion"');
-}
 
 /**
  * Funções de pergunta (delegadas ao question-controller)
+ * Disponíveis em globalThis após carregamento de question-controller.js
  */
-const {
-  renderQuestionsHistory,
-  renderCurrentQuestion,
-  handleQuestionClick,
-  handleCurrentQuestion,
-  findAnswerByQuestionId,
-} = questionController;
+// Não fazer destructuring - usar globalThis diretamente
+// renderQuestionsHistory, renderCurrentQuestion, handleQuestionClick, handleCurrentQuestion, findAnswerByQuestionId
 
 /**
  * Retorna o texto da pergunta selecionada (CURRENT ou do histórico)
- * @returns {string} Texto da pergunta selecionada
+ * DELEGADO: getSelectedQuestionText está em question-controller.js e exportado em globalThis
  */
-function getSelectedQuestionText() {
-  Logger.debug('Início da função: "getSelectedQuestionText"');
-  Logger.debug('Fim da função: "getSelectedQuestionText"');
-
-  // 1️⃣ Se existe seleção explícita
-  if (appState.selectedId === CURRENT_QUESTION_ID) {
-    return appState.interview.currentQuestion.text;
-  }
-
-  if (appState.selectedId) {
-    const q = appState.history.find((q) => q.id === appState.selectedId);
-    if (q?.text) return q.text;
-  }
-
-  // 2️⃣ Fallback: CURRENT (se tiver texto)
-  if (
-    appState.interview.currentQuestion.text &&
-    appState.interview.currentQuestion.text.trim().length > 0
-  ) {
-    return appState.interview.currentQuestion.text;
-  }
-
-  return '';
-}
 
 /**
  * Normaliza texto para comparação
- * Remove pontuação, converte para lowercase, remove espaços extras
- * @param {string} t - Texto a normalizar
- * @returns {string} Texto normalizado
+ * DELEGADO: normalizeForCompare está em question-helpers.js e exportado em globalThis
  */
-function normalizeForCompare(t) {
-  Logger.debug('Início da função: "normalizeForCompare"');
-  Logger.debug('Fim da função: "normalizeForCompare"');
-  return (t || '')
-    .toLowerCase()
-    .replaceAll(/[?!.\n\r]/g, '')
-    .replaceAll(/\s+/g, ' ')
-    .trim();
-}
 
 /**
 /**
  * Funções utilitárias (delegadas ao renderer-helpers e question-controller)
+ * Disponíveis em globalThis após carregamento dos respectivos arquivos
  */
-const { updateStatusMessage, clearAllSelections } = rendererHelpers;
-const { closeCurrentQuestionForced, getNavigableQuestionIds: getNavQuestionIds } =
-  questionController;
+// Não fazer destructuring - usar globalThis diretamente
+// updateStatusMessage, clearAllSelections, closeCurrentQuestionForced, getNavigableQuestionIds
 
 /* ================================ */
 //	🎯 REGISTRAR STTs (Refatoração Fase 2)
 /* ================================ */
 
 // Registrar STTs no sttStrategy
-sttStrategy.register('deepgram', {
-  start: startAudioDeepgram,
-  stop: stopAudioDeepgram,
-  switchDevice: switchDeviceDeepgram,
+globalThis.sttStrategy.register('deepgram', {
+  start: globalThis.startAudioDeepgram,
+  stop: globalThis.stopAudioDeepgram,
+  switchDevice: globalThis.switchDeviceDeepgram,
 });
 
-sttStrategy.register('vosk', {
-  start: startAudioVosk,
-  stop: stopAudioVosk,
-  switchDevice: switchDeviceVosk,
+globalThis.sttStrategy.register('vosk', {
+  start: globalThis.startAudioVosk,
+  stop: globalThis.stopAudioVosk,
+  switchDevice: globalThis.switchDeviceVosk,
 });
 
-sttStrategy.register('whisper-cpp-local', {
-  start: startAudioWhisper,
-  stop: stopAudioWhisper,
-  switchDevice: switchDeviceWhisper,
+globalThis.sttStrategy.register('whisper-cpp-local', {
+  start: globalThis.startAudioWhisper,
+  stop: globalThis.stopAudioWhisper,
+  switchDevice: globalThis.switchDeviceWhisper,
 });
 
 /* ================================ */
@@ -474,8 +390,8 @@ sttStrategy.register('whisper-cpp-local', {
 
 /**
  * Toggle do botão de escuta (delegado ao audio-controller)
+ * Disponível em globalThis após carregamento de audio-controller.js
  */
-const { listenToggleBtn } = audioController;
 
 /* ================================ */
 //	RENDERIZAÇÃO E NAVEGAÇÃO DE UI
@@ -511,16 +427,16 @@ const _markedOptions = {
   gfm: true, // GitHub Flavored Markdown
   highlight: function (_code, _lang) {
     // @ts-ignore - highlight.js types não exportam esses métodos publicamente
-    if (_lang && hljs?.getLanguage?.(_lang)) {
+    if (_lang && globalThis.hljs?.getLanguage?.(_lang)) {
       // @ts-ignore
-      return hljs.highlight(_code, { language: _lang }).value;
+      return globalThis.hljs.highlight(_code, { language: _lang }).value;
     }
     // @ts-ignore
-    return hljs.highlightAuto(_code).value;
+    return globalThis.hljs.highlightAuto(_code).value;
   },
 };
-if (marked?.setOptions) {
-  marked.setOptions(_markedOptions);
+if (globalThis.marked?.setOptions) {
+  globalThis.marked.setOptions(_markedOptions);
 }
 
 /* ================================ */
@@ -555,56 +471,72 @@ if (marked?.setOptions) {
  * ✅ REFATORADA: agora é simples e legível!
  * ✅ CENTRALIZADA: Uma única função para todos os LLMs
  * ✅ Não há duplicação de askLLM() por LLM
- * @param {string} questionId - ID da pergunta a responder (padrão: appState.selectedId)
+ * @param {string} questionId - ID da pergunta a responder (padrão: globalThis.appState.selectedId)
  */
 async function askLLM(questionId = null) {
   try {
-    const targetQuestionId = questionId || appState.selectedId;
+    const targetQuestionId = questionId || globalThis.appState.selectedId;
 
     // 1. Validar (antigo validateAskLlmRequest)
     const {
       questionId: validatedId,
       text,
       isCurrent,
-    } = validateLLMRequest(appState, targetQuestionId, getSelectedQuestionText);
-    Logger.debug('Pergunta válida', { questionId: validatedId, textLength: text.length }, false);
+    } = globalThis.validateLLMRequest?.(
+      globalThis.appState,
+      targetQuestionId,
+      globalThis.getSelectedQuestionText
+    ) || {};
+    globalThis.Logger.debug(
+      'Pergunta válida',
+      { questionId: validatedId, textLength: text?.length },
+      false
+    );
 
     // Rastreamento antigo (compatibilidade)
-    const normalizedText = normalizeForCompare(text);
-    appState.metrics.llmStartTime = Date.now();
+    const normalizedText = globalThis.normalizeForCompare?.(text) || text;
+    globalThis.appState.metrics.llmStartTime = Date.now();
 
     if (isCurrent) {
-      appState.interview.llmRequestedTurnId = appState.interview.interviewTurnId;
-      appState.interview.llmRequestedQuestionId = CURRENT_QUESTION_ID;
-      appState.interview.lastAskedQuestionNormalized = normalizedText;
+      globalThis.appState.interview.llmRequestedTurnId =
+        globalThis.appState.interview.interviewTurnId;
+      globalThis.appState.interview.llmRequestedQuestionId = CURRENT_QUESTION_ID;
+      globalThis.appState.interview.lastAskedQuestionNormalized = normalizedText;
     }
 
     // 2. Rotear por modo (não por LLM!)
-    const isInterviewMode = modeManager.is(MODES.INTERVIEW);
+    const isInterviewMode = globalThis.modeManager.is(globalThis.MODES.INTERVIEW);
 
     // Obter turnId da pergunta para passar ao LLM
-    const questionEntry = appState.history.find((q) => q.id === targetQuestionId);
+    const questionEntry = globalThis.appState.history.find((q) => q.id === targetQuestionId);
     const turnId = questionEntry?.turnId || null;
 
     if (isInterviewMode) {
-      await handleLLMStream(
-        appState,
+      await globalThis.handleLLMStream?.(
+        globalThis.appState,
         validatedId,
         text,
         SYSTEM_PROMPT,
-        eventBus,
-        llmManager,
+        globalThis.eventBus,
+        globalThis.llmManager,
         turnId
       );
     } else {
-      await handleLLMBatch(appState, validatedId, text, SYSTEM_PROMPT, eventBus, llmManager);
+      await globalThis.handleLLMBatch?.(
+        globalThis.appState,
+        validatedId,
+        text,
+        SYSTEM_PROMPT,
+        globalThis.eventBus,
+        globalThis.llmManager
+      );
     }
     // O llmManager sabe qual LLM usar (OpenAI, Gemini, etc)
     // Sem duplicação de código!
   } catch (error) {
-    Logger.error('Erro em askLLM', { error: error.message });
-    eventBus.emit('error', error.message);
-    updateStatusMessage(`❌ ${error.message}`);
+    globalThis.Logger.error('Erro em askLLM', { error: error.message });
+    globalThis.eventBus.emit('error', error.message);
+    globalThis.updateStatusMessage(`❌ ${error.message}`);
   }
 }
 
@@ -618,8 +550,8 @@ async function askLLM(questionId = null) {
 
 /**
  * Libera a thread e reseta o app (delegado ao renderer-helpers)
+ * Disponível em globalThis após carregamento de renderer-helpers.js
  */
-const { resetAppState } = rendererHelpers;
 
 //	DEBUG LOG RENDERER
 /* ================================ */
@@ -640,51 +572,51 @@ const { resetAppState } = rendererHelpers;
  */
 const RendererAPI = {
   // Áudio - Gravação
-  listenToggleBtn,
+  listenToggleBtn: globalThis.listenToggleBtn,
   askLLM,
   // 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
   get isAudioRunning() {
-    return appState.audio.isRunning;
+    return globalThis.appState.audio.isRunning;
   },
 
   // Áudio - Monitoramento de volume
-  startAudioVolumeMonitor,
-  stopAudioVolumeMonitor,
-  switchAudioVolumeDevice,
+  startAudioVolumeMonitor: globalThis.startAudioVolumeMonitor,
+  stopAudioVolumeMonitor: globalThis.stopAudioVolumeMonitor,
+  switchAudioVolumeDevice: globalThis.switchAudioVolumeDevice,
 
   // Entrevista - Reset (centralizado em resetAppState)
-  resetAppState,
+  resetAppState: globalThis.resetAppState,
 
   // Modo
   changeMode: (mode) => {
-    modeManager.setMode(mode);
+    globalThis.modeManager.setMode(mode);
     console.log(`📌 Modo alterado via RendererAPI: ${mode}`);
     // 🔥 NOTA: STT continua rodando em ambos modos
     // ENTREVISTA: Auto-responde quando silêncio detectado
     // PADRÃO: Espera clique/Ctrl+Enter para responder
     // A mudança de modo não deve parar o STT
   },
-  getMode: () => modeManager.getMode(),
+  getMode: () => globalThis.modeManager.getMode(),
 
   // Questions
-  handleCurrentQuestion,
-  handleQuestionClick,
+  handleCurrentQuestion: (...args) => globalThis.handleCurrentQuestion?.(...args),
+  handleQuestionClick: (e) => globalThis.handleQuestionClick?.(e),
 
   // 🔥 NOVO: Expor selectedQuestionId via getter para atalhos em config-manager.js
   get selectedId() {
-    return appState.selectedId;
+    return globalThis.appState.selectedId;
   },
 
   // UI
   // 🔥 MOVED: applyOpacity foi para config-manager.js
   updateMockBadge: (show) => {
-    eventBus.emit('screenshotBadgeUpdate', { visible: show });
+    globalThis.eventBus.emit('screenshotBadgeUpdate', { visible: show });
   },
   setMockToggle: (checked) => {
     APP_CONFIG.MODE_DEBUG = checked;
   },
   setModeSelect: (mode) => {
-    eventBus.emit('modeSelectUpdate', { mode });
+    globalThis.eventBus.emit('modeSelectUpdate', { mode });
   },
 
   // Drag
@@ -710,7 +642,7 @@ const RendererAPI = {
    */
   setWindowOpacity: (opacity) => {
     // Emit event for WindowUIManager to handle DOM updates
-    eventBus.emit('windowOpacityUpdate', { opacity: Math.max(0, Math.min(1, opacity)) });
+    globalThis.eventBus.emit('windowOpacityUpdate', { opacity: Math.max(0, Math.min(1, opacity)) });
     return Promise.resolve();
   },
   /**
@@ -743,13 +675,15 @@ const RendererAPI = {
     Object.assign(APP_CONFIG, config);
     // 🎭 Inicializa mock interceptor se MODE_DEBUG estiver ativo
     if (APP_CONFIG.MODE_DEBUG) {
-      mockRunner.initMockInterceptor({
-        eventBus,
-        captureScreenshot,
-        analyzeScreenshots,
-        APP_CONFIG,
-      });
-      Logger.info('✅ Mock interceptor inicializado para MODE_DEBUG');
+      if (globalThis.mockRunner) {
+        globalThis.mockRunner.initMockInterceptor({
+          eventBus: globalThis.eventBus,
+          captureScreenshot: globalThis.captureScreenshot,
+          analyzeScreenshots: globalThis.analyzeScreenshots,
+          APP_CONFIG,
+        });
+      }
+      globalThis.Logger.info('✅ Mock interceptor inicializado para MODE_DEBUG');
     }
   },
   getAppConfig: () => APP_CONFIG,
@@ -760,10 +694,10 @@ const RendererAPI = {
    * @param {string} direction - 'up' ou 'down'
    */
   navigateQuestions: (direction) => {
-    const all = getNavQuestionIds();
+    const all = globalThis.getNavigableQuestionIds?.() || [];
     if (all.length === 0) return;
 
-    let index = all.indexOf(appState.selectedId);
+    let index = all.indexOf(globalThis.appState.selectedId);
     if (index === -1) {
       // Nenhuma seleção: começa do começo ou do fim
       index = direction === 'up' ? all.length - 1 : 0;
@@ -775,18 +709,18 @@ const RendererAPI = {
       index = Math.max(0, Math.min(index, all.length - 1));
     }
 
-    appState.selectedId = all[index];
-    clearAllSelections();
-    renderQuestionsHistory();
-    renderCurrentQuestion();
+    globalThis.appState.selectedId = all[index];
+    globalThis.clearAllSelections();
+    globalThis.renderQuestionsHistory();
+    globalThis.renderCurrentQuestion();
 
     if (APP_CONFIG.MODE_DEBUG) {
       const msg =
         direction === 'up'
           ? '🧪 Ctrl+ArrowUp detectado (teste)'
           : '🧪 Ctrl+ArrowDown detectado (teste)';
-      updateStatusMessage(msg);
-      console.log('📌 Atalho Selecionou:', appState.selectedId);
+      globalThis.updateStatusMessage(msg);
+      console.log('📌 Atalho Selecionou:', globalThis.appState.selectedId);
     }
   },
 
@@ -825,10 +759,10 @@ const RendererAPI = {
   },
 
   // 📸 NOVO: Screenshot functions
-  captureScreenshot,
-  analyzeScreenshots,
-  clearScreenshots,
-  getScreenshotCount: () => appState.audio.capturedScreenshots.length,
+  captureScreenshot: globalThis.captureScreenshot,
+  analyzeScreenshots: globalThis.analyzeScreenshots,
+  clearScreenshots: globalThis.clearScreenshots,
+  getScreenshotCount: () => globalThis.appState.audio.capturedScreenshots.length,
 
   // 📸 NOVO: Screenshot shortcuts
   onCaptureScreenshot: (callback) => {
@@ -847,17 +781,28 @@ const RendererAPI = {
   // ==========================================
   // EXPORTAR DEPENDÊNCIAS PARA AUDIO CONTROLLER
   // ==========================================
-  sttStrategy,
-  modeManager,
-  MODES,
-  getConfiguredSTTModel,
-  updateStatusMessage,
-  closeCurrentQuestionForced,
-  findAnswerByQuestionId,
+  sttStrategy: globalThis.sttStrategy,
+  modeManager: globalThis.modeManager,
+  MODES: globalThis.MODES,
+  getConfiguredSTTModel: () => {
+    // Obtém o modelo STT configurado via configManager
+    try {
+      const config = globalThis.configManager?.config;
+      if (!config) return 'error';
+      const activeProvider = config.api?.activeProvider;
+      return config.api?.[activeProvider]?.selectedSTTModel || 'error';
+    } catch (err) {
+      globalThis.Logger?.error('Erro ao obter STT model:', err);
+      return 'error';
+    }
+  },
+  updateStatusMessage: globalThis.updateStatusMessage,
+  closeCurrentQuestionForced: globalThis.closeCurrentQuestionForced,
+  findAnswerByQuestionId: globalThis.findAnswerByQuestionId,
   initAudioController: (deps) => {
-    const { initAudioController: initAudioCtrl } = audioController;
-    if (typeof initAudioCtrl === 'function') {
-      initAudioCtrl(deps);
+    // initAudioController é exportado em globalThis por audio-controller.js
+    if (typeof globalThis.initAudioController === 'function') {
+      globalThis.initAudioController(deps);
     }
   },
 };
@@ -870,16 +815,10 @@ if (typeof module !== 'undefined' && module.exports) {
 // 🎭 Exporta para o escopo global (usado em mocks e testes)
 if (typeof globalThis !== 'undefined') {
   globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
-  globalThis.eventBus = eventBus; // 🎭 Exporta EventBus singleton para todos os módulos
-  globalThis.appState = appState; // 🎭 Exporta appState para audio-controller e outros
-  globalThis.runMockAutoPlay = () => mockRunner.runMockAutoPlay(); // 🎭 Exportar Mock
-  globalThis._ipc = ipcRenderer; // 🎭 Exporta ipcRenderer para ConfigManager e Managers
-  globalThis.Logger = Logger; // 🎭 Exporta Logger para classes carregadas via <script>
-  globalThis.clearAllSelections = clearAllSelections; // 🎭 Exporta clearAllSelections como fallback
-  globalThis.modeManager = modeManager; // 🎭 Exporta modeManager para question-controller e outros
-  globalThis.MODES = MODES; // 🎭 Exporta MODES para acesso em contextos de fallback
-  globalThis.updateStatusMessage = updateStatusMessage; // 🎭 Exporta updateStatusMessage para question-controller
+  // eventBus, appState, modeManager, Logger, MODES já foram exportados no início do arquivo
+  globalThis.runMockAutoPlay = () => globalThis.mockRunner?.runMockAutoPlay(); // 🎭 Exportar Mock
+  globalThis.clearAllSelections = globalThis.clearAllSelections || (() => {}); // 🎭 Fallback
   globalThis.askLLM = askLLM; // 🎭 Exporta askLLM para question-controller
-  globalThis.renderCurrentQuestion = renderCurrentQuestion; // 🎭 Exporta renderCurrentQuestion para listeners
-  globalThis.renderQuestionsHistory = renderQuestionsHistory; // 🎭 Exporta renderQuestionsHistory para listeners
+  // renderCurrentQuestion, renderQuestionsHistory, updateStatusMessage e clearAllSelections já são exportados
+  // por seus respectivos módulos (question-controller.js e renderer-helpers.js)
 }

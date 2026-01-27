@@ -14,12 +14,12 @@
  * Estrutura pronta para adicionar Gemini, Anthropic, etc.
  * Basta criar gemini-handler.js com mesmo padrão!
  */
-const Logger = require('../../utils/Logger.js');
-const { ipcRenderer } = require('electron');
+// Logger e ipcRenderer carregados globalmente via index.html
 
 class OpenAIHandler {
-  constructor() {
-    this.logger = Logger;
+  constructor(ipcRenderer) {
+    this.ipcRenderer = ipcRenderer;
+    this.logger = globalThis.Logger;
     this.model = 'gpt-4o-mini';
   }
 
@@ -57,25 +57,25 @@ class OpenAIHandler {
    */
   async complete(messages) {
     try {
-      Logger.info('📤 OpenAI complete() iniciado', {
+      this.logger.info('📤 OpenAI complete() iniciado', {
         model: this.model,
         messagesCount: messages.length,
       });
 
-      const response = await ipcRenderer.invoke('ask-llm', messages);
+      const response = await this.ipcRenderer.invoke('ask-llm', messages);
 
       if (!response) {
         throw new Error('Resposta vazia da API OpenAI');
       }
 
-      Logger.info('✅ OpenAI complete() concluído', {
+      this.logger.info('✅ OpenAI complete() concluído', {
         responseLength: response.length || 0,
       });
 
       return response;
     } catch (error) {
       const userMessage = this._mapErrorMessage(error);
-      Logger.error('❌ Erro OpenAI complete:', {
+      this.logger.error('❌ Erro OpenAI complete:', {
         error: error.message,
         code: error.code,
         userMessage,
@@ -109,12 +109,12 @@ class OpenAIHandler {
 
     const onEnd = () => {
       state.isEnd = true;
-      Logger.debug('🏁 Stream OpenAI finalizado');
+      this.logger.debug('🏁 Stream OpenAI finalizado');
     };
 
     const onError = (_, error) => {
       const userMessage = this._mapErrorMessage(error);
-      Logger.error('❌ Erro durante stream OpenAI:', {
+      this.logger.error('❌ Erro durante stream OpenAI:', {
         error: error.message || error,
         userMessage,
       });
@@ -122,12 +122,12 @@ class OpenAIHandler {
       state.isEnd = true;
     };
 
-    ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
-    ipcRenderer.once('LLM_STREAM_END', onEnd);
-    ipcRenderer.once('LLM_STREAM_ERROR', onError);
+    this.ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
+    this.ipcRenderer.once('LLM_STREAM_END', onEnd);
+    this.ipcRenderer.once('LLM_STREAM_ERROR', onError);
 
     try {
-      Logger.debug(
+      this.logger.debug(
         '📤 OpenAI stream() iniciado',
         {
           model: this.model,
@@ -138,9 +138,9 @@ class OpenAIHandler {
       );
 
       // Invocar stream no main process
-      ipcRenderer.invoke('ask-llm-stream', messages).catch((err) => {
+      this.ipcRenderer.invoke('ask-llm-stream', messages).catch((err) => {
         const userMessage = this._mapErrorMessage(err);
-        Logger.error('❌ Erro ao invocar ask-llm-stream:', {
+        this.logger.error('❌ Erro ao invocar ask-llm-stream:', {
           error: err.message,
           userMessage,
         });
@@ -164,16 +164,24 @@ class OpenAIHandler {
         }
       }
 
-      Logger.debug('✅ OpenAI stream() concluído', false);
+      this.logger.debug('✅ OpenAI stream() concluído', false);
     } finally {
       // Limpar listeners para evitar memory leaks
-      ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
-      ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
-      ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
+      this.ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
+      this.ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
+      this.ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
     }
   }
 }
 
+// Não instancia aqui - será instanciado em renderer.js com ipcRenderer
+
+// Expor a classe em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.OpenAIHandler = OpenAIHandler;
+}
+
+// Expor para CommonJS (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = new OpenAIHandler();
+  module.exports = OpenAIHandler;
 }

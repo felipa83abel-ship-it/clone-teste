@@ -20,30 +20,13 @@
 
 const { spawn } = require('node:child_process');
 const _path = require('node:path');
-const EventBus = require('../events/EventBus.js');
-const { getVADEngine } = require('./vad-engine');
 
 // 🔥 INSTÂNCIA DE EVENTBUS LOCAL
-const getEventBus = () => globalThis.eventBus || new EventBus(); // Fallback se renderer ainda nao carregou
+const eventBus = globalThis.eventBus;
 
 /* ================================ */
 //	CONSTANTES
 /* ================================ */
-
-// Configuração Geral
-const INPUT = 'input';
-const OUTPUT = 'output';
-
-// Configuração de Áudio 16kHz
-const AUDIO_SAMPLE_RATE = 16000; // 16kHz
-
-// AudioWorkletProcessor
-const STT_AUDIO_WORKLET_PROCESSOR = 'stt-audio-worklet-processor'; // Nome
-const AUDIO_WORKLET_PROCESSOR_PATH = './stt/stt-audio-worklet-processor.js'; // Path relativo a index.html
-
-// Detecção de silêncio
-const SILENCE_TIMEOUT_INPUT = 500; // ms para entrada (microfone)
-const SILENCE_TIMEOUT_OUTPUT = 700; // ms para saída (sistema)
 
 // Configuração Vosk
 const VOSK_CONFIG = {
@@ -55,7 +38,7 @@ const VOSK_CONFIG = {
 /* ================================ */
 
 // VAD Engine
-let vad = null;
+globalThis.vad = globalThis.vad || null;
 
 // voskState mantém seu próprio estado interno
 const voskState = {
@@ -354,7 +337,9 @@ async function startVosk(source, UIElements) {
 
   const cfg = config[source];
   if (!cfg) {
-    throw new Error(`❌ Source inválido: ${source}. Use ${INPUT} ou ${OUTPUT}`);
+    throw new Error(
+      `❌ Source inválido: ${source}. Use ${globalThis.INPUT} ou ${globalThis.OUTPUT}`
+    );
   }
 
   const vars = voskState[source];
@@ -393,15 +378,15 @@ async function startVosk(source, UIElements) {
 
     // Cria AudioContext 16kHz para processamento em tempo real (VAD)
     const audioContext = new (globalThis.AudioContext || globalThis.webkitAudioContext)({
-      sampleRate: AUDIO_SAMPLE_RATE,
+      sampleRate: globalThis.AUDIO_SAMPLE_RATE,
     });
-    await audioContext.audioWorklet.addModule(AUDIO_WORKLET_PROCESSOR_PATH);
+    await audioContext.audioWorklet.addModule(globalThis.AUDIO_WORKLET_PROCESSOR_PATH);
 
     // Cria MediaStreamSource e guarda via voskState
     const mediaSource = audioContext.createMediaStreamSource(stream);
 
     // Inicia AudioWorklet para captura e processamento de áudio em tempo real
-    const processor = new AudioWorkletNode(audioContext, STT_AUDIO_WORKLET_PROCESSOR);
+    const processor = new AudioWorkletNode(audioContext, globalThis.STT_AUDIO_WORKLET_PROCESSOR);
     processor.port.postMessage({ type: 'setThreshold', threshold: cfg.threshold });
     processor.port.onmessage = (event) => {
       // Processa mensagens do AudioWorklet (audioData e volumeUpdate separadamente)
@@ -476,7 +461,7 @@ async function onAudioChunkVosk(source, data, vars) {
     const msg = {
       type: 'transcribe',
       format: 'pcm',
-      rate: AUDIO_SAMPLE_RATE,
+      rate: globalThis.AUDIO_SAMPLE_RATE,
       audio: audioBase64,
     };
 
@@ -496,7 +481,10 @@ async function onAudioChunkVosk(source, data, vars) {
 // Trata detecção de silêncio com VAD ou fallback
 function handleSilenceDetectionVosk(source, percent) {
   const vars = voskState[source];
-  const silenceTimeout = source === INPUT ? SILENCE_TIMEOUT_INPUT : SILENCE_TIMEOUT_OUTPUT;
+  const silenceTimeout =
+    source === globalThis.INPUT
+      ? globalThis.SILENCE_TIMEOUT_INPUT
+      : globalThis.SILENCE_TIMEOUT_OUTPUT;
   const now = Date.now();
 
   // Decisão principal: VAD se disponível, senão fallback por volume
@@ -556,7 +544,7 @@ function handleSilenceDetectionVosk(source, percent) {
 /* ================================ */
 
 // Processa mensagens do Vosk (final ou parcial)
-function handleVoskMessage(result, source = INPUT) {
+function handleVoskMessage(result, source = globalThis.INPUT) {
   if (result?.isFinal && result?.final?.trim()) {
     handleFinalVoskMessage(source, result.final);
   } else if (result?.partial?.trim()) {
@@ -624,13 +612,13 @@ function handleFinalVoskMessage(source, transcript) {
 // Atualiza volume recebido do AudioWorklet
 function handleVolumeUpdate(source, percent) {
   // Emite volume para UI
-  const ev = source === INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
-  getEventBus().emit(ev, { percent });
+  const ev = source === globalThis.INPUT ? 'inputVolumeUpdate' : 'outputVolumeUpdate';
+  eventBus.emit(ev, { percent });
 }
 
 // Adiciona transcrição com placeholder ao UI
 function addTranscriptPlaceholder(author, placeholderId, timeStr) {
-  getEventBus().emit('transcriptAdd', {
+  eventBus.emit('transcriptAdd', {
     author,
     text: '...',
     timeStr,
@@ -641,7 +629,7 @@ function addTranscriptPlaceholder(author, placeholderId, timeStr) {
 
 // Preenche placeholder com transcrição final
 function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
-  getEventBus().emit('placeholderFulfill', {
+  eventBus.emit('placeholderFulfill', {
     speaker: author,
     text: transcript,
     placeholderId,
@@ -652,14 +640,14 @@ function fillTranscriptPlaceholder(author, transcript, placeholderId, metrics) {
 
 // Limpa interim transcript do UI
 function clearInterim(source) {
-  const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-  getEventBus().emit('clearInterim', { id: interimId });
+  const interimId = source === globalThis.INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
+  eventBus.emit('clearInterim', { id: interimId });
 }
 
 // Atualiza interim transcript no UI
 function updateInterim(source, transcript, author) {
-  const interimId = source === INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
-  getEventBus().emit('updateInterim', {
+  const interimId = source === globalThis.INPUT ? 'vosk-interim-input' : 'vosk-interim-output';
+  eventBus.emit('updateInterim', {
     id: interimId,
     speaker: author,
     text: transcript,
@@ -669,7 +657,7 @@ function updateInterim(source, transcript, author) {
 // Atualiza CURRENT question (apenas para output)
 function updateCurrentQuestion(source, transcript, isInterim = false) {
   const vars = voskState[source];
-  if (source === OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
+  if (source === globalThis.OUTPUT && globalThis.RendererAPI?.handleCurrentQuestion) {
     globalThis.RendererAPI.handleCurrentQuestion(vars.author, transcript, {
       isInterim,
       shouldFinalizeAskCurrent: vars.shouldFinalizeAskCurrent,
@@ -826,9 +814,6 @@ async function stopVosk(source) {
 // DEBUG LOG VOSK
 /* ================================ */
 
-// ========== DEBUG LOGGING (Consolidado em Logger.js) ==========
-const Logger = require('../utils/Logger.js');
-
 /**
  * Log de debug padronizado para stt-vosk.js
  * Por padrão nunca loga, se quiser mostrar é só passar true.
@@ -856,7 +841,7 @@ function debugLogVosk(...args) {
   );
 
   // Registrar em Logger para histórico de debug
-  Logger.debug(`[stt-vosk] ${cleanArgs.join(' ')}`, { timeStr });
+  globalThis.Logger.debug(`[stt-vosk] ${cleanArgs.join(' ')}`, { timeStr });
 }
 
 /* ================================ */
@@ -869,12 +854,14 @@ function debugLogVosk(...args) {
 async function startAudioVosk(UIElements) {
   try {
     // Inicializa VAD Engine (singleton)
-    vad = getVADEngine();
-    debugLogVosk(`✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`, true);
+    debugLogVosk(
+      `✅ VAD Engine inicializado - Status: ${JSON.stringify(globalThis.VADEngine.getStatus())}`,
+      true
+    );
 
     // 🔥 Vosk: Inicia INPUT/OUTPUT
-    if (UIElements.inputSelect?.value) await startVosk(INPUT, UIElements);
-    if (UIElements.outputSelect?.value) await startVosk(OUTPUT, UIElements);
+    if (UIElements.inputSelect?.value) await startVosk(globalThis.INPUT, UIElements);
+    if (UIElements.outputSelect?.value) await startVosk(globalThis.OUTPUT, UIElements);
   } catch (error) {
     console.error('❌ Erro ao iniciar Vosk:', error);
     throw error;
@@ -887,8 +874,8 @@ async function startAudioVosk(UIElements) {
 function stopAudioVosk() {
   try {
     // 🔥 Vosk: Para INPUT e OUTPUT
-    stopVosk(INPUT);
-    stopVosk(OUTPUT);
+    stopVosk(globalThis.INPUT);
+    stopVosk(globalThis.OUTPUT);
     debugLogVosk('🛑 Vosk completamente parado', true);
   } catch (error) {
     console.error('❌ Erro ao parar Vosk:', error);
@@ -921,3 +908,10 @@ module.exports = {
   stopAudioVosk,
   switchDeviceVosk,
 };
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.startAudioVosk = startAudioVosk;
+  globalThis.stopAudioVosk = stopAudioVosk;
+  globalThis.switchDeviceVosk = switchDeviceVosk;
+}

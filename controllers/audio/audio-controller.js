@@ -3,27 +3,16 @@
 // Gerencia captura, processamento e métricas de áudio
 /* ================================ */
 // @ts-nocheck
-// CommonJS imports com destructuring que TypeScript não resolve bem
+// Dependências carregadas globalmente via index.html
 
-const Logger = require('../../utils/Logger.js');
-// @ts-ignore - destructuring com CommonJS
-const { _AppState } = require('../../state/AppState.js');
-const _EventBus = require('../../events/EventBus.js');
-
-// As variáveis globais são passadas como dependências
-let appState;
-let eventBus;
-let sttStrategy;
 let globalConfig; // Referência ao configManager global
 let UIElements;
 let _CURRENT_QUESTION_ID;
 let _modeManager;
 let _MODES;
 
-// Importes para buscar configuração
-let getConfiguredSTTModel;
-let closeCurrentQuestionForced;
-let updateStatusMessage;
+// getConfiguredSTTModel vem de globalThis.RendererAPI (definida em renderer.js / ConfigManager)
+// closeCurrentQuestionForced vem de globalThis (definida em question-controller.js)
 let _findAnswerByQuestionId;
 
 /**
@@ -31,33 +20,21 @@ let _findAnswerByQuestionId;
  * @param {Object} deps - Dependências do sistema
  */
 function initAudioController(deps) {
-  appState = deps.appState;
-  eventBus = deps.eventBus;
-  sttStrategy = deps.sttStrategy;
-  globalConfig = deps.globalConfig;
-  UIElements = deps.UIElements;
-  _CURRENT_QUESTION_ID = deps.CURRENT_QUESTION_ID;
-  _modeManager = deps.modeManager;
-  _MODES = deps.MODES;
-
-  // Funções externas
-  getConfiguredSTTModel = deps.getConfiguredSTTModel;
-  closeCurrentQuestionForced = deps.closeCurrentQuestionForced;
-  updateStatusMessage = deps.updateStatusMessage;
-  _findAnswerByQuestionId = deps.findAnswerByQuestionId;
+  // Guardar referências em globalThis
+  globalThis._audioControllerDeps = deps;
 }
 
 /**
  * Inicia captura de áudio
  */
 async function startAudio() {
-  const sttModel = getConfiguredSTTModel();
-  Logger.info('startAudio', { model: sttModel });
+  const sttModel = globalThis.RendererAPI?.getConfiguredSTTModel?.() || 'error';
+  globalThis.Logger.info('startAudio', { model: sttModel });
 
   try {
-    await sttStrategy.start(sttModel, UIElements);
+    await globalThis.sttStrategy.start(sttModel, UIElements);
   } catch (error) {
-    Logger.error('Erro ao iniciar áudio', { error: error.message });
+    globalThis.Logger.error('Erro ao iniciar áudio', { error: error.message });
     throw error;
   }
 }
@@ -67,15 +44,15 @@ async function startAudio() {
  */
 async function stopAudio() {
   // Fecha pergunta atual se estava aberta
-  if (appState.interview.currentQuestion.text) closeCurrentQuestionForced();
+  if (globalThis.appState.interview.currentQuestion.text) globalThis.closeCurrentQuestionForced();
 
-  const sttModel = getConfiguredSTTModel();
-  Logger.info('stopAudio', { model: sttModel });
+  const sttModel = globalThis.RendererAPI?.getConfiguredSTTModel?.() || 'error';
+  globalThis.Logger.info('stopAudio', { model: sttModel });
 
   try {
-    await sttStrategy.stop(sttModel);
+    await globalThis.sttStrategy.stop(sttModel);
   } catch (error) {
-    Logger.error('Erro ao parar áudio', { error: error.message });
+    globalThis.Logger.error('Erro ao parar áudio', { error: error.message });
   }
 }
 
@@ -83,55 +60,58 @@ async function stopAudio() {
  * Toggle do botão de iniciar/parar escuta (Ctrl+D)
  */
 async function listenToggleBtn() {
-  Logger.debug('Início da função: "listenToggleBtn"');
+  globalThis.Logger.debug('Início da função: "listenToggleBtn"');
 
-  if (!appState.audio.isRunning) {
-    Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
+  if (!globalThis.appState.audio.isRunning) {
+    globalThis.Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
 
     // 🔥 VALIDAÇÃO 1: Modelo de IA ativo
     const { active: hasModel, model: activeModel } = hasActiveModel();
-    Logger.debug(`📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`, false);
+    globalThis.Logger.debug(
+      `📊 DEBUG: hasModel = ${hasModel}, activeModel = ${activeModel}`,
+      false
+    );
 
     if (!hasModel) {
       const errorMsg = 'Ative um modelo de IA antes de começar a ouvir';
-      eventBus.emit('error', errorMsg);
+      globalThis.eventBus.emit('error', errorMsg);
       return;
     }
 
     // 🔥 VALIDAÇÃO 2: Dispositivo de áudio de SAÍDA (obrigatório para ouvir a reunião)
-    const hasOutputDevice = UIElements.outputSelect?.value;
-    Logger.debug(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
+    const hasOutputDevice = UIElements?.outputSelect?.value;
+    globalThis.Logger.debug(`📊 DEBUG: hasOutputDevice = ${hasOutputDevice}`, false);
 
     if (!hasOutputDevice) {
       const errorMsg = 'Selecione um dispositivo de áudio (output) para ouvir a reunião';
-      // @ts-ignore - Logger.warn aceita string ou boolean, segundo signature
-      Logger.warn(`⚠️ ${errorMsg}`);
-      // @ts-ignore - Logger.debug também tem overloads
-      Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
-      eventBus.emit('error', errorMsg);
+      // @ts-ignore - globalThis.Logger.warn aceita string ou boolean, segundo signature
+      globalThis.Logger.warn(`⚠️ ${errorMsg}`);
+      // @ts-ignore - globalThis.Logger.debug também tem overloads
+      globalThis.Logger.debug('📡 DEBUG: Emitindo onError:', errorMsg);
+      globalThis.eventBus.emit('error', errorMsg);
       return;
     }
   }
 
-  // Inverte o estado de appState.audio.isRunning
-  appState.audio.isRunning = !appState.audio.isRunning;
-  const buttonText = appState.audio.isRunning
+  // Inverte o estado de globalThis.appState.audio.isRunning
+  globalThis.appState.audio.isRunning = !globalThis.appState.audio.isRunning;
+  const buttonText = globalThis.appState.audio.isRunning
     ? 'Parar a Escuta... (Ctrl+d)'
     : 'Começar a Ouvir... (Ctrl+d)';
-  const statusMsg = appState.audio.isRunning ? 'Status: ouvindo...' : 'Status: parado';
+  const statusMsg = globalThis.appState.audio.isRunning ? 'Status: ouvindo...' : 'Status: parado';
 
   // Emite o evento 'onListenButtonToggle' para atualizar o botão de escuta
-  eventBus.emit('listenButtonToggle', {
-    isRunning: appState.audio.isRunning,
+  globalThis.eventBus.emit('listenButtonToggle', {
+    isRunning: globalThis.appState.audio.isRunning,
     buttonText,
   });
 
   // Atualiza o status da escuta na tela
-  updateStatusMessage(statusMsg);
+  globalThis.updateStatusMessage(statusMsg);
 
-  await (appState.audio.isRunning ? startAudio() : stopAudio());
+  await (globalThis.appState.audio.isRunning ? startAudio() : stopAudio());
 
-  Logger.debug('Fim da função: "listenToggleBtn"');
+  globalThis.Logger.debug('Fim da função: "listenToggleBtn"');
 }
 
 /**
@@ -139,7 +119,7 @@ async function listenToggleBtn() {
  * @returns {object} { active: boolean, model: string|null }
  */
 function hasActiveModel() {
-  Logger.debug('Início da função: "hasActiveModel"');
+  globalThis.Logger.debug('Início da função: "hasActiveModel"');
   if (!globalConfig) {
     console.warn('⚠️ ConfigManager não inicializado ainda');
     return { active: false, model: null };
@@ -160,7 +140,7 @@ function hasActiveModel() {
     }
   }
 
-  Logger.debug('Fim da função: "hasActiveModel"');
+  globalThis.Logger.debug('Fim da função: "hasActiveModel"');
   return { active: false, model: null };
 }
 
@@ -168,9 +148,9 @@ function hasActiveModel() {
  * Registra métricas de transcrição
  */
 function logTranscriptionMetrics() {
-  if (!appState.metrics) return;
+  if (!globalThis.appState.metrics) return;
 
-  const metrics = appState.metrics;
+  const metrics = globalThis.appState.metrics;
   const now = Date.now();
   const elapsed = now - metrics.startTime;
 
@@ -183,9 +163,9 @@ function logTranscriptionMetrics() {
     `❌ Falhas: ${metrics.sttFailures}\n` +
     `🔄 Última atualização: ${new Date(metrics.lastUpdate).toLocaleTimeString()}\n`;
 
-  // @ts-ignore - Logger.info tem overloads, aceitando (title, message)
-  Logger.info('Métricas de Transcrição', message);
-  eventBus.emit('metricsUpdated', metrics);
+  // @ts-ignore - globalThis.Logger.info tem overloads, aceitando (title, message)
+  globalThis.Logger.info('Métricas de Transcrição', message);
+  globalThis.eventBus.emit('metricsUpdated', metrics);
 }
 
 /**
@@ -199,3 +179,9 @@ module.exports = {
   hasActiveModel,
   logTranscriptionMetrics,
 };
+
+// Exportar para globalThis (para acesso de scripts carregados via <script> tag)
+if (typeof globalThis !== 'undefined') {
+  globalThis.listenToggleBtn = listenToggleBtn;
+  globalThis.initAudioController = initAudioController;
+}

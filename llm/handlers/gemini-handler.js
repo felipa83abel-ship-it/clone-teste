@@ -10,21 +10,23 @@
  *
  * Segue o mesmo padrão de openai-handler para garantir compatibilidade
  */
-
-const Logger = require('../../utils/Logger.js');
-const { ipcRenderer } = require('electron');
+// Logger carregado globalmente via index.html
 
 class GeminiHandler {
   initialized = false;
-  logger = Logger;
+  logger = globalThis.Logger;
   model = 'gemini-pro';
+
+  constructor(ipcRenderer) {
+    this.ipcRenderer = ipcRenderer;
+  }
 
   /**
    * Inicializar handler (apenas marca como pronto, main.js cuida do client)
    */
   async initialize() {
     this.initialized = true;
-    Logger.info('✅ Gemini handler pronto (via IPC)');
+    this.logger.info('✅ Gemini handler pronto (via IPC)');
   }
 
   /**
@@ -64,25 +66,25 @@ class GeminiHandler {
    */
   async complete(messages) {
     try {
-      Logger.info('📤 Gemini complete() iniciado', {
+      this.logger.info('📤 Gemini complete() iniciado', {
         model: this.model,
         messagesCount: messages.length,
       });
 
-      const response = await ipcRenderer.invoke('ask-gemini', messages);
+      const response = await this.ipcRenderer.invoke('ask-gemini', messages);
 
       if (!response) {
         throw new Error('Resposta vazia da API Gemini');
       }
 
-      Logger.info('✅ Gemini complete() concluído', {
+      this.logger.info('✅ Gemini complete() concluído', {
         responseLength: response.length || 0,
       });
 
       return response;
     } catch (error) {
       const userMessage = this._mapErrorMessage(error);
-      Logger.error('❌ Erro Gemini complete:', {
+      this.logger.error('❌ Erro Gemini complete:', {
         error: error.message,
         code: error.code,
         userMessage,
@@ -116,12 +118,12 @@ class GeminiHandler {
 
     const onEnd = () => {
       state.isEnd = true;
-      Logger.debug('🏁 Stream Gemini finalizado');
+      this.logger.debug('🏁 Stream Gemini finalizado');
     };
 
     const onError = (_, error) => {
       const userMessage = this._mapErrorMessage(error);
-      Logger.error('❌ Erro durante stream Gemini:', {
+      this.logger.error('❌ Erro durante stream Gemini:', {
         error: error.message || error,
         userMessage,
       });
@@ -130,20 +132,20 @@ class GeminiHandler {
     };
 
     // Registra ouvintes temporários
-    ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
-    ipcRenderer.once('LLM_STREAM_END', onEnd);
-    ipcRenderer.once('LLM_STREAM_ERROR', onError);
+    this.ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
+    this.ipcRenderer.once('LLM_STREAM_END', onEnd);
+    this.ipcRenderer.once('LLM_STREAM_ERROR', onError);
 
     try {
-      Logger.info('📤 Gemini stream() iniciado', {
+      this.logger.info('📤 Gemini stream() iniciado', {
         model: this.model,
         messagesCount: messages.length,
       });
 
       // Inicia o stream no Main
-      ipcRenderer.invoke('ask-gemini-stream', messages).catch((err) => {
+      this.ipcRenderer.invoke('ask-gemini-stream', messages).catch((err) => {
         const userMessage = this._mapErrorMessage(err);
-        Logger.error('❌ Erro ao invocar ask-gemini-stream:', {
+        this.logger.error('❌ Erro ao invocar ask-gemini-stream:', {
           error: err.message,
           userMessage,
         });
@@ -165,20 +167,28 @@ class GeminiHandler {
         }
       }
 
-      Logger.info('✅ Gemini stream() concluído');
+      this.logger.info('✅ Gemini stream() concluído');
     } catch (error) {
       // Error já foi mapeado em onError, apenas relança
-      Logger.error('❌ Erro em Gemini.stream()', { error: error.message });
+      this.logger.error('❌ Erro em Gemini.stream()', { error: error.message });
       throw error;
     } finally {
       // Remove ouvintes para evitar vazamento de memória e duplicatas
-      ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
-      ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
-      ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
+      this.ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);
+      this.ipcRenderer.removeListener('LLM_STREAM_END', onEnd);
+      this.ipcRenderer.removeListener('LLM_STREAM_ERROR', onError);
     }
   }
 }
 
+// Não instancia aqui - será instanciado em renderer.js com ipcRenderer
+
+// Expor a classe em globalThis para uso em browser
+if (typeof globalThis !== 'undefined') {
+  globalThis.GeminiHandler = GeminiHandler;
+}
+
+// Expor para CommonJS (Node.js)
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = new GeminiHandler();
+  module.exports = GeminiHandler;
 }
