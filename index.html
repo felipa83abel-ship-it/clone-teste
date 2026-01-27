@@ -679,10 +679,19 @@
     <!-- WINDOW Section -->
     <script src="./controllers/sections/window/WindowUIManager.js"></script>
 
+    <!-- ==================== REGISTRIES (Orquestração de Serviços) ==================== -->
+    <script src="./services/stt/stt-registry.js"></script>
+    <script src="./controllers/modes/modes-registry.js"></script>
+    <script src="./services/llm/llm-registry.js"></script>
+    <script src="./services/llm/system-prompt.js"></script>
+
+    <!-- ==================== LLM CONTROLLER (Lógica de Requisição LLM) ==================== -->
+    <script src="./controllers/llm/llm-controller.js"></script>
+
     <!-- ==================== CONFIG MANAGER (Orquestrador) ==================== -->
     <script src="./controllers/config/ConfigManager.js"></script>
 
-    <!-- ==================== RENDERER (Lógica de Negócio) ==================== -->
+    <!-- ==================== RENDERER (Orquestração & RendererAPI) ==================== -->
     <script src="./renderer.js"></script>
 
     <!-- ==================== INICIALIZAÇÃO ==================== -->

@@ -1,170 +1,121 @@
 // @ts-check
 /* global HTMLElement */
 
-/* ================================ */
-//	DEPENDÊNCIAS GLOBAIS (Carregadas via <script> no index.html)
-/* ================================ */
-// Todas as classes abaixo estão disponíveis em globalThis
-// Carregamento de módulos em: index.html
-// - Logger, ErrorHandler, SecureLogger
-// - AppState, EventBus
-// - STTStrategy, LLMManager
-// - Controllers (audio, question, screenshot, modes)
-// - Managers (ApiKey, AudioDevice, ModelSelection, ScreenConfig, PrivacyConfig, WindowUI, HomeUI)
-// - ConfigManager
-// - UI Helpers e Registry
+/**
+ * ================================
+ * RENDERER.JS - Orquestração do Renderer Process
+ * ================================
+ *
+ * Responsabilidades:
+ * 1. Carregar dependências globais
+ * 2. Instanciar classes principais
+ * 3. Inicializar registries de serviços
+ * 4. Proteção contra captura de tela
+ * 5. Expor RendererAPI (ponte com main.js)
+ *
+ * O que NÃO está aqui (movido):
+ * - askLLM() → controllers/llm/llm-controller.js
+ * - STT registration → services/stt/stt-registry.js
+ * - Mode registration → controllers/modes/modes-registry.js
+ * - LLM registration → services/llm/llm-registry.js
+ * - EventBus listeners → Espalhados nos controllers
+ * - SYSTEM_PROMPT → services/llm/system-prompt.js
+ */
 
-// Modules via ipcRenderer (do Electron)
+// ================================
+// SEÇÃO 1: DEPENDÊNCIAS EXTERNAS
+// ================================
+
 const { ipcRenderer } = require('electron');
 
-// 🎯 Expor ipcRenderer globalmente para uso em ConfigManager e outros controllers
+// Expor ipcRenderer globalmente
 globalThis._ipc = ipcRenderer;
 globalThis.ipcRenderer = ipcRenderer;
 
-// 🎯 CARREGAR DEPENDÊNCIAS EXTERNAS para globalThis
-// marked e highlight.js são necessários para renderização de markdown
+// Carregar dependências externas (marked, highlight.js)
 try {
   globalThis.marked = require('marked');
 } catch (err) {
-  globalThis.Logger?.warn('marked não carregado via CommonJS, esperando estar em globalThis', err);
+  globalThis.Logger?.warn('marked não carregado via CommonJS', err);
 }
 
 try {
   globalThis.hljs = require('highlight.js');
 } catch (err) {
-  globalThis.Logger?.warn(
-    'highlight.js não carregado via CommonJS, esperando estar em globalThis',
-    err
-  );
+  globalThis.Logger?.warn('highlight.js não carregado via CommonJS', err);
 }
 
-// 🎯 INSTANCIAR - Usar globalThis para classes carregadas como scripts
-// Expor em globalThis para acesso por outros arquivos carregados como scripts
+// ================================
+// SEÇÃO 2: INSTANCIAR CLASSES GLOBAIS
+// ================================
+
 globalThis.appState = new globalThis.AppState();
 globalThis.eventBus = new globalThis.EventBus();
 globalThis.sttStrategy = new globalThis.STTStrategy();
 globalThis.llmManager = new globalThis.LLMManager();
-globalThis.modeManager = new globalThis.ModeManager(globalThis.MODES.INTERVIEW); // 🔧 Modo padrão: INTERVIEW
+globalThis.modeManager = new globalThis.ModeManager(globalThis.MODES.INTERVIEW);
 
-// 🎯 Inicializar renderer-helpers com dependências
+console.log('✅ Classes principais instanciadas');
+
+// ================================
+// SEÇÃO 3: INICIALIZAR HELPERS
+// ================================
+
 globalThis.rendererHelpers.initRendererHelpers({
   appState: globalThis.appState,
   eventBus: globalThis.eventBus,
 });
 
-// 🎯 Inicializar screenshot-controller com dependências
-// initScreenshotController está definida em screenshot-controller.js
 globalThis.screenshotController.initScreenshotController({
   ipcRenderer,
   eventBus: globalThis.eventBus,
   appState: globalThis.appState,
 });
 
-// 🎯 Atribuir funções de screenshot para exposição global
+// Atribuir funções de screenshot para exposição global
 const {
   captureScreenshot: _captureScreenshot,
   analyzeScreenshots: _analyzeScreenshots,
   clearScreenshots: _clearScreenshots,
 } = globalThis.screenshotController;
 
-// 🎯 VARIÁVEIS DO MOCK (manipuladas por mock-runner.js)
-const _mockAutoPlayActive = false;
-const _mockScenarioIndex = 0;
+// ================================
+// SEÇÃO 4: INICIALIZAR REGISTRIES
+// ================================
 
-// 🎯 FUNÇÕES DE CAPTURA DE SCREENSHOT (disponíveis em globalThis a partir de screenshot-controller)
-// Use globalThis.captureScreenshot, globalThis.analyzeScreenshots, globalThis.clearScreenshots
+// Registrar STTs (deepgram, vosk, whisper)
+if (typeof globalThis.initializeSTTRegistry === 'function') {
+  globalThis.initializeSTTRegistry(globalThis.sttStrategy);
+}
 
-// 🎯 REGISTRAR MODOS
-globalThis.globalThis.modeManager.registerMode(
-  globalThis.MODES.INTERVIEW,
-  globalThis.InterviewModeHandlers
-);
-globalThis.globalThis.modeManager.registerMode(
-  globalThis.MODES.NORMAL,
-  globalThis.NormalModeHandlers
-);
+// Registrar Modes (INTERVIEW, NORMAL)
+if (typeof globalThis.initializeModesRegistry === 'function') {
+  globalThis.initializeModesRegistry(globalThis.modeManager);
+}
 
-// 🎯 REGISTRAR LLMs
-// Instanciar handlers com ipcRenderer
-const openaiHandler = new globalThis.OpenAIHandler(ipcRenderer);
-const geminiHandler = new globalThis.GeminiHandler(ipcRenderer);
+// Registrar LLMs (OpenAI, Gemini)
+if (typeof globalThis.initializeLLMRegistry === 'function') {
+  globalThis.initializeLLMRegistry(globalThis.llmManager, ipcRenderer);
+}
 
-globalThis.llmManager.register('openai', openaiHandler);
-globalThis.llmManager.register('google', geminiHandler);
-// NOSONAR // Futuro: globalThis.llmManager.register('anthropic', require('./services/llm/handlers/anthropic-handler.js'));
+console.log('✅ Registries inicializados');
 
-// 🎯 REGISTRAR LISTENERS DA EVENTBUS (para LLM)
-globalThis.eventBus.on('llmStreamEnd', (data) => {
-  globalThis.Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
+// ================================
+// SEÇÃO 5: PROTEÇÃO CONTRA CAPTURA DE TELA
+// ================================
 
-  // 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
-  globalThis.appState.interview.answeredQuestions.add(data.questionId);
-
-  // 🔥 [MODO ENTREVISTA] Pergunta já foi promovida em finalizeCurrentQuestion
-  // Aqui só limpamos o CURRENT para próxima pergunta
-  if (globalThis.modeManager.is(globalThis.MODES.INTERVIEW)) {
-    globalThis.appState.interview.llmAnsweredTurnId = globalThis.appState.interview.interviewTurnId;
-    globalThis.resetCurrentQuestion();
-    globalThis.renderCurrentQuestion();
-  }
-
-  globalThis.eventBus.emit('answerStreamEnd', {});
-});
-
-globalThis.eventBus.on('llmBatchEnd', (data) => {
-  globalThis.Logger.debug(
-    'LLM Batch finalizado',
-    {
-      questionId: data.questionId,
-      responseLength: data.response?.length || 0,
-    },
-    false
-  );
-
-  // 🔥 MARCAR COMO RESPONDIDA - essencial para bloquear re-perguntas
-  globalThis.appState.interview.answeredQuestions.add(data.questionId);
-
-  // 🔥 Obter turnId da pergunta no histórico
-  const questionEntry = globalThis.appState.history.find((q) => q.id === data.questionId);
-  const turnId = questionEntry?.turnId || null;
-
-  globalThis.eventBus.emit('answerBatchEnd', {
-    questionId: data.questionId,
-    response: data.response,
-    turnId, // 🔥 Incluir turnId para renderizar badge
-  });
-});
-
-globalThis.eventBus.on('error', (error) => {
-  globalThis.Logger.error('Erro na eventBus', { error });
-  // 🔥 NOVO: Mostrar erro visual ao usuário
-  if (globalThis.configManager?.showError) {
-    globalThis.configManager.showError(error);
-  }
-});
-
-/* ================================ */
-//	PROTEÇÃO CONTRA CAPTURA DE TELA
-/* ================================ */
-
-/**
- * Proteção contra captura de tela externa
- * Desabilita/limita APIs usadas por Zoom, Teams, Meet, OBS, Discord, Snipping Tool, etc.
- */
 (function protectAgainstScreenCapture() {
-  // ✅ Desabilita getDisplayMedia (usado por Zoom, Meet, Teams para capturar)
   if (navigator?.mediaDevices?.getDisplayMedia) {
     navigator.mediaDevices.getDisplayMedia = async function (..._args) {
-      console.warn('🔐 BLOQUEADO: Tentativa de usar getDisplayMedia (captura de tela externa)');
+      console.warn('🔐 BLOQUEADO: getDisplayMedia (captura externa)');
       throw new Error('Screen capture not available in this window');
     };
   }
 
-  // ✅ Desabilita captureStream (usado para captura de janela)
   if (globalThis.HTMLCanvasElement?.prototype.captureStream) {
     Object.defineProperty(globalThis.HTMLCanvasElement.prototype, 'captureStream', {
       value: function (_this) {
-        console.warn('🔐 BLOQUEADO: Tentativa de usar Canvas.captureStream()');
+        console.warn('🔐 BLOQUEADO: Canvas.captureStream()');
         throw new Error('Capture stream not available');
       },
       writable: false,
@@ -172,16 +123,12 @@ globalThis.eventBus.on('error', (error) => {
     });
   }
 
-  // ✅ Intercepta getUserMedia para avisar sobre tentativas de captura de áudio
   if (navigator?.mediaDevices?.getUserMedia) {
     const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
     navigator.mediaDevices.getUserMedia = async function (_constraints) {
       if (_constraints?.video) {
-        console.warn('🔐 AVISO: Tentativa de usar getUserMedia com vídeo detectada');
-        // Ainda permite áudio, mas bloqueia vídeo para captura
-        if (_constraints.video) {
-          delete _constraints.video;
-        }
+        console.warn('🔐 AVISO: Tentativa de getUserMedia com vídeo');
+        delete _constraints.video;
       }
       return originalGetUserMedia(_constraints);
     };
@@ -190,47 +137,21 @@ globalThis.eventBus.on('error', (error) => {
   console.log('✅ Proteção contra captura externa ativada');
 })();
 
-/* ================================ */
-//	CONSTANTES
-/* ================================ */
-
-const SYSTEM_PROMPT = `
-Você é um assistente para entrevistas técnicas de Java. Responda como candidato.
-Regras de resposta (priorize sempre estas):
-- Seja natural e conciso: responda em no máximo 1–2 frases curtas.
-- Use linguagem coloquial e direta, como alguém explicando rapidamente verbalmente.
-- Evite listas longas, exemplos extensos ou parágrafos detalhados.
-- Não comece com cumprimentos ou palavras de preenchimento (ex.: "Claro", "Ok").
-- Quando necessário, entregue um exemplo mínimo de 1 linha apenas.
-`;
-
-/* ================================ */
-//	ESTADO GLOBAL
-/* ================================ */
+// ================================
+// SEÇÃO 6: CONSTANTES
+// ================================
 
 const APP_CONFIG = {
-  MODE_DEBUG: false, // ← alterado via config-manager.js (true = modo mock)
+  MODE_DEBUG: false, // Alterado via config-manager.js
 };
 
-const CURRENT_QUESTION_ID = 'CURRENT'; // ID da pergunta atual
-
-/* ================================ */
-//	SISTEMA DE CALLBACKS E UI ELEMENTS
-/* ================================ */
+// ================================
+// SEÇÃO 7: LISTENERS DE EVENTOS (EventBus)
+// ================================
 
 /**
- * Registra elementos UI no registry centralizado
- * DELEGADO para uiElementsRegistry
- */
-const registerUIElements = (elements) => globalThis.uiElementsRegistry?.register(elements);
-
-/* ================================ */
-//	MONITORAMENTO DE VOLUME
-/* ================================ */
-
-/**
- * Escuta evento de mudança de dispositivo
- * Emitido pelo config-manager
+ * Listener: audioDeviceChanged
+ * Disparado quando usuário muda dispositivo de áudio
  */
 globalThis.eventBus.on('audioDeviceChanged', async (_data) => {
   try {
@@ -243,204 +164,108 @@ globalThis.eventBus.on('audioDeviceChanged', async (_data) => {
     }
 
     if (!globalThis.appState.audio.isRunning) {
-      globalThis.Logger.warn('STT não está ativo, ignorando mudança de dispositivo');
+      globalThis.Logger.warn('STT não está ativo, ignorando mudança');
       return;
     }
 
     await globalThis.sttStrategy.switchDevice(sttModel, _data.type, _data.deviceId);
   } catch (error) {
-    globalThis.Logger.error('Erro ao processar mudança de dispositivo', { error: error.message });
+    globalThis.Logger.error('Erro ao processar mudança de dispositivo', error);
   }
 });
 
-/* Compatibilidade: antigo onUIChange também suporta audioDeviceChanged */
-
-/* ================================ */
-//	FUNÇÕES UTILITÁRIAS (HELPERS)
-/* ================================ */
-
-/* ================================ */
-//	🎯 REGISTRAR STTs (Refatoração Fase 2)
-/* ================================ */
-
-// Registrar STTs no sttStrategy
-globalThis.sttStrategy.register('deepgram', {
-  start: globalThis.startAudioDeepgram,
-  stop: globalThis.stopAudioDeepgram,
-  switchDevice: globalThis.switchDeviceDeepgram,
-});
-
-globalThis.sttStrategy.register('vosk', {
-  start: globalThis.startAudioVosk,
-  stop: globalThis.stopAudioVosk,
-  switchDevice: globalThis.switchDeviceVosk,
-});
-
-globalThis.sttStrategy.register('whisper-cpp-local', {
-  start: globalThis.startAudioWhisper,
-  stop: globalThis.stopAudioWhisper,
-  switchDevice: globalThis.switchDeviceWhisper,
-});
-
-/* ================================ */
-//	CONTROLE DE ÁUDIO
-/* ================================ */
-
 /**
- * Toggle do botão de escuta (delegado ao audio-controller)
- * Disponível em globalThis após carregamento de audio-controller.js
+ * Listener: llmStreamEnd
+ * Disparado quando streaming de LLM termina
  */
+globalThis.eventBus.on('llmStreamEnd', (data) => {
+  globalThis.Logger.debug('LLM Stream finalizado', { questionId: data.questionId }, false);
 
-/* ================================ */
-//	RENDERIZAÇÃO E NAVEGAÇÃO DE UI
-/* ================================ */
+  globalThis.appState.interview.answeredQuestions.add(data.questionId);
 
-/**
- * Configuração do Marked.js para renderização de Markdown
- * @type {any}
- */
-const _markedOptions = {
-  breaks: true,
-  gfm: true, // GitHub Flavored Markdown
-  highlight: function (_code, _lang) {
-    // @ts-ignore - highlight.js types não exportam esses métodos publicamente
-    if (_lang && globalThis.hljs?.getLanguage?.(_lang)) {
-      // @ts-ignore
-      return globalThis.hljs.highlight(_code, { language: _lang }).value;
-    }
-    // @ts-ignore
-    return globalThis.hljs.highlightAuto(_code).value;
-  },
-};
-if (globalThis.marked?.setOptions) {
-  globalThis.marked.setOptions(_markedOptions);
-}
-
-/* ================================ */
-//	SISTEMA LLM
-/* ================================ */
-
-/**
- * Envia pergunta selecionada ao LLM (qualquer provider)
- * ✅ REFATORADA: agora é simples e legível!
- * ✅ CENTRALIZADA: Uma única função para todos os LLMs
- * ✅ Não há duplicação de askLLM() por LLM
- * @param {string} questionId - ID da pergunta a responder (padrão: globalThis.appState.selectedId)
- */
-async function askLLM(questionId = null) {
-  try {
-    const targetQuestionId = questionId || globalThis.appState.selectedId;
-
-    // 1. Validar (antigo validateAskLlmRequest)
-    const {
-      questionId: validatedId,
-      text,
-      isCurrent,
-    } = globalThis.validateLLMRequest?.(
-      globalThis.appState,
-      targetQuestionId,
-      globalThis.getSelectedQuestionText
-    ) || {};
-    globalThis.Logger.debug(
-      'Pergunta válida',
-      { questionId: validatedId, textLength: text?.length },
-      false
-    );
-
-    // Rastreamento antigo (compatibilidade)
-    const normalizedText = globalThis.normalizeForCompare?.(text) || text;
-    globalThis.appState.metrics.llmStartTime = Date.now();
-
-    if (isCurrent) {
-      globalThis.appState.interview.llmRequestedTurnId =
-        globalThis.appState.interview.interviewTurnId;
-      globalThis.appState.interview.llmRequestedQuestionId = CURRENT_QUESTION_ID;
-      globalThis.appState.interview.lastAskedQuestionNormalized = normalizedText;
-    }
-
-    // 2. Rotear por modo (não por LLM!)
-    const isInterviewMode = globalThis.modeManager.is(globalThis.MODES.INTERVIEW);
-
-    // Obter turnId da pergunta para passar ao LLM
-    const questionEntry = globalThis.appState.history.find((q) => q.id === targetQuestionId);
-    const turnId = questionEntry?.turnId || null;
-
-    if (isInterviewMode) {
-      await globalThis.handleLLMStream?.(
-        globalThis.appState,
-        validatedId,
-        text,
-        SYSTEM_PROMPT,
-        globalThis.eventBus,
-        globalThis.llmManager,
-        turnId
-      );
-    } else {
-      await globalThis.handleLLMBatch?.(
-        globalThis.appState,
-        validatedId,
-        text,
-        SYSTEM_PROMPT,
-        globalThis.eventBus,
-        globalThis.llmManager
-      );
-    }
-    // O llmManager sabe qual LLM usar (OpenAI, Gemini, etc)
-    // Sem duplicação de código!
-  } catch (error) {
-    globalThis.Logger.error('Erro em askLLM', { error: error.message });
-    globalThis.eventBus.emit('error', error.message);
-    globalThis.updateStatusMessage(`❌ ${error.message}`);
+  if (globalThis.modeManager.is(globalThis.MODES.INTERVIEW)) {
+    globalThis.appState.interview.llmAnsweredTurnId = globalThis.appState.interview.interviewTurnId;
+    globalThis.resetCurrentQuestion();
+    globalThis.renderCurrentQuestion();
   }
-}
 
-/* ================================ */
-//	EXPORTAÇÃO PUBLIC API (RendererAPI)
-/* ================================ */
+  globalThis.eventBus.emit('answerStreamEnd', {});
+});
 
 /**
- * API Pública exposta do Renderer
- * Métodos públicos que podem ser chamados de fora
+ * Listener: llmBatchEnd
+ * Disparado quando batch de LLM termina
+ */
+globalThis.eventBus.on('llmBatchEnd', (data) => {
+  globalThis.Logger.debug('LLM Batch finalizado', {
+    questionId: data.questionId,
+    responseLength: data.response?.length || 0,
+  });
+
+  globalThis.appState.interview.answeredQuestions.add(data.questionId);
+
+  const questionEntry = globalThis.appState.history.find((q) => q.id === data.questionId);
+  const turnId = questionEntry?.turnId || null;
+
+  globalThis.eventBus.emit('answerBatchEnd', {
+    questionId: data.questionId,
+    response: data.response,
+    turnId,
+  });
+});
+
+/**
+ * Listener: error
+ * Disparado quando erro ocorre na eventBus
+ */
+globalThis.eventBus.on('error', (error) => {
+  globalThis.Logger.error('Erro na eventBus', { error });
+  if (globalThis.configManager?.showError) {
+    globalThis.configManager.showError(error);
+  }
+});
+
+// ================================
+// SEÇÃO 8: RENDERER API (Ponte com Main.js)
+// ================================
+
+/**
+ * RendererAPI - Interface pública entre renderer e main process
+ *
+ * Expõe métodos que podem ser chamados de:
+ * - Dentro do renderer (via globalThis)
+ * - Controllers e managers (via globalThis.RendererAPI)
+ * - main.js (via ipcRenderer)
  */
 const RendererAPI = {
-  // Áudio - Gravação
+  // Audio
   listenToggleBtn: globalThis.listenToggleBtn,
-  askLLM,
-  // 🔥 Estado de transcrição (usado pelo audio-volume-monitor.js)
+  askLLM: globalThis.askLLM,
   get isAudioRunning() {
     return globalThis.appState.audio.isRunning;
   },
-
-  // Áudio - Monitoramento de volume
   startAudioVolumeMonitor: globalThis.startAudioVolumeMonitor,
   stopAudioVolumeMonitor: globalThis.stopAudioVolumeMonitor,
   switchAudioVolumeDevice: globalThis.switchAudioVolumeDevice,
 
-  // Entrevista - Reset (centralizado em resetAppState)
+  // Entrevista
   resetAppState: globalThis.resetAppState,
 
   // Modo
   changeMode: (mode) => {
     globalThis.modeManager.setMode(mode);
-    console.log(`📌 Modo alterado via RendererAPI: ${mode}`);
-    // 🔥 NOTA: STT continua rodando em ambos modos
-    // ENTREVISTA: Auto-responde quando silêncio detectado
-    // PADRÃO: Espera clique/Ctrl+Enter para responder
-    // A mudança de modo não deve parar o STT
+    console.log(`📌 Modo alterado: ${mode}`);
   },
   getMode: () => globalThis.modeManager.getMode(),
 
-  // Questions
+  // Perguntas
   handleCurrentQuestion: (...args) => globalThis.handleCurrentQuestion?.(...args),
   handleQuestionClick: (e) => globalThis.handleQuestionClick?.(e),
-
-  // 🔥 NOVO: Expor selectedQuestionId via getter para atalhos em config-manager.js
   get selectedId() {
     return globalThis.appState.selectedId;
   },
 
   // UI
-  // 🔥 MOVED: applyOpacity foi para config-manager.js
   updateMockBadge: (show) => {
     globalThis.eventBus.emit('screenshotBadgeUpdate', { visible: show });
   },
@@ -451,92 +276,56 @@ const RendererAPI = {
     globalThis.eventBus.emit('modeSelectUpdate', { mode });
   },
 
-  // Drag
-  /**
-   * Inicializa drag handle para movimento de janela
-   * MOVIDA PARA: config-manager.js
-   */
-
-  // Click-through
+  // Drag & Window
   setClickThrough: (enabled) => {
     ipcRenderer.send('SET_CLICK_THROUGH', enabled);
   },
-  /**
-   * Inicia movimento de janela via drag
-   */
   startWindowDrag: () => {
     return ipcRenderer.invoke('START_WINDOW_DRAG');
   },
-  /**
-   * Define opacidade da janela
-   * ✅ REMOVIDO: DOM manipulation moved to WindowUIManager
-   * @param {number} opacity - Valor de 0 a 1
-   */
   setWindowOpacity: (opacity) => {
-    // Emit event for WindowUIManager to handle DOM updates
-    globalThis.eventBus.emit('windowOpacityUpdate', { opacity: Math.max(0, Math.min(1, opacity)) });
+    globalThis.eventBus.emit('windowOpacityUpdate', {
+      opacity: Math.max(0, Math.min(1, opacity)),
+    });
     return Promise.resolve();
   },
-  /**
-   * Atualiza botão de click-through
-   * @param {boolean} enabled - Se click-through está ativo
-   * @param {Element} btnToggle - Botão a atualizar
-   */
   updateClickThroughButton: (enabled, btnToggle) => {
-    if (!btnToggle) return;
-    if (btnToggle instanceof HTMLElement) {
-      // @ts-ignore - style/title são propriedades HTMLElement padrão
-      btnToggle.style.opacity = enabled ? '0.5' : '1';
-      btnToggle.title = enabled
-        ? 'Click-through ATIVO (clique para desativar)'
-        : 'Click-through INATIVO (clique para ativar)';
-      console.log(
-        '🎨 Botão atualizado - opacity:',
-        btnToggle instanceof HTMLElement ? btnToggle.style.opacity : 'N/A'
-      );
-    }
+    if (!btnToggle || !(btnToggle instanceof HTMLElement)) return;
+    btnToggle.style.opacity = enabled ? '0.5' : '1';
+    btnToggle.title = enabled
+      ? 'Click-through ATIVO (clique para desativar)'
+      : 'Click-through INATIVO (clique para ativar)';
   },
 
-  // UI Registration
+  // UI Registry
   registerUIElements: (elements) => {
-    registerUIElements(elements);
+    globalThis.uiElementsRegistry?.register(elements);
   },
 
-  // API Key
+  // Config
   setAppConfig: (config) => {
     Object.assign(APP_CONFIG, config);
-    // 🎭 Inicializa mock interceptor se MODE_DEBUG estiver ativo
-    if (APP_CONFIG.MODE_DEBUG) {
-      if (globalThis.mockRunner) {
-        globalThis.mockRunner.initMockInterceptor({
-          eventBus: globalThis.eventBus,
-          captureScreenshot: globalThis.captureScreenshot,
-          analyzeScreenshots: globalThis.analyzeScreenshots,
-          APP_CONFIG,
-        });
-      }
-      globalThis.Logger.info('✅ Mock interceptor inicializado para MODE_DEBUG');
+    if (APP_CONFIG.MODE_DEBUG && globalThis.mockRunner) {
+      globalThis.mockRunner.initMockInterceptor({
+        eventBus: globalThis.eventBus,
+        captureScreenshot: globalThis.captureScreenshot,
+        analyzeScreenshots: globalThis.analyzeScreenshots,
+        APP_CONFIG,
+      });
+      globalThis.Logger.info('✅ Mock interceptor inicializado');
     }
   },
   getAppConfig: () => APP_CONFIG,
 
-  // Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut IPC)
-  /**
-   * Navega entre perguntas
-   * @param {string} direction - 'up' ou 'down'
-   */
+  // Navegação
   navigateQuestions: (direction) => {
     const all = globalThis.getNavigableQuestionIds?.() || [];
     if (all.length === 0) return;
 
     let index = all.indexOf(globalThis.appState.selectedId);
     if (index === -1) {
-      // Nenhuma seleção: começa do começo ou do fim
       index = direction === 'up' ? all.length - 1 : 0;
     } else {
-      // 🔥 CORRIGIDO: Lógica normal (agora que getNavigableQuestionIds retorna ordem visual correta)
-      // 'up' = subir visualmente = diminuir índice
-      // 'down' = descer visualmente = aumentar índice
       index += direction === 'up' ? -1 : 1;
       index = Math.max(0, Math.min(index, all.length - 1));
     }
@@ -547,12 +336,8 @@ const RendererAPI = {
     globalThis.renderCurrentQuestion();
 
     if (APP_CONFIG.MODE_DEBUG) {
-      const msg =
-        direction === 'up'
-          ? '🧪 Ctrl+ArrowUp detectado (teste)'
-          : '🧪 Ctrl+ArrowDown detectado (teste)';
+      const msg = direction === 'up' ? '🧪 Ctrl+Up' : '🧪 Ctrl+Down';
       globalThis.updateStatusMessage(msg);
-      console.log('📌 Atalho Selecionou:', globalThis.appState.selectedId);
     }
   },
 
@@ -561,7 +346,6 @@ const RendererAPI = {
     ipcRenderer.on('API_KEY_UPDATED', callback);
   },
   onToggleAudio: (callback) => {
-    // Começar a ouvir / Parar de ouvir (Ctrl+D)
     ipcRenderer.on('CMD_TOGGLE_AUDIO', callback);
   },
   onAskLlm: (callback) => {
@@ -573,51 +357,40 @@ const RendererAPI = {
   onLlmStreamEnd: (callback) => {
     ipcRenderer.on('LLM_STREAM_END', callback);
   },
-  /**
-   * Envia erro do renderer para main
-   * @param {Error | any} error - Erro a enviar
-   */
   sendRendererError: (error) => {
     try {
       console.error('RENDERER ERROR', error instanceof Error ? error.message : error);
       ipcRenderer.send('RENDERER_ERROR', {
         message: error instanceof Error ? error.message : String(error),
-        // @ts-ignore - error pode ter propriedades customizadas
-        stack: error instanceof Error ? error.stack : error?.error?.stack || null,
+        stack: error instanceof Error ? error.stack : null,
       });
     } catch (err) {
       console.error('Falha ao enviar RENDERER_ERROR', err);
     }
   },
 
-  // 📸 NOVO: Screenshot functions
+  // Screenshots
   captureScreenshot: globalThis.captureScreenshot,
   analyzeScreenshots: globalThis.analyzeScreenshots,
   clearScreenshots: globalThis.clearScreenshots,
   getScreenshotCount: () => globalThis.appState.audio.capturedScreenshots.length,
-
-  // 📸 NOVO: Screenshot shortcuts
   onCaptureScreenshot: (callback) => {
     ipcRenderer.on('CMD_CAPTURE_SCREENSHOT', callback);
   },
   onAnalyzeScreenshots: (callback) => {
     ipcRenderer.on('CMD_ANALYZE_SCREENSHOTS', callback);
   },
-  // Navegacao de perguntas (Ctrl+Shift+ArrowUp/Down via globalShortcut)
   onNavigateQuestions: (callback) => {
     ipcRenderer.on('CMD_NAVIGATE_QUESTIONS', (_, direction) => {
       callback(direction);
     });
   },
 
-  // ==========================================
-  // EXPORTAR DEPENDÊNCIAS PARA AUDIO CONTROLLER
-  // ==========================================
+  // Dependências para Audio Controller
   sttStrategy: globalThis.sttStrategy,
   modeManager: globalThis.modeManager,
   MODES: globalThis.MODES,
   getConfiguredSTTModel: () => {
-    // Obtém o modelo STT configurado via configManager
     try {
       const config = globalThis.configManager?.config;
       if (!config) return 'error';
@@ -632,25 +405,21 @@ const RendererAPI = {
   closeCurrentQuestionForced: globalThis.closeCurrentQuestionForced,
   findAnswerByQuestionId: globalThis.findAnswerByQuestionId,
   initAudioController: (deps) => {
-    // initAudioController é exportado em globalThis por audio-controller.js
     if (typeof globalThis.initAudioController === 'function') {
       globalThis.initAudioController(deps);
     }
   },
 };
 
+// Exportar RendererAPI
 if (typeof module !== 'undefined' && module.exports) {
-  // Node.js / CommonJS export
   module.exports = RendererAPI;
 }
 
-// 🎭 Exporta para o escopo global (usado em mocks e testes)
 if (typeof globalThis !== 'undefined') {
-  globalThis.RendererAPI = RendererAPI; // 🎭 Exporta API para escopo global
-  // eventBus, appState, modeManager, Logger, MODES já foram exportados no início do arquivo
-  globalThis.runMockAutoPlay = () => globalThis.mockRunner?.runMockAutoPlay(); // 🎭 Exportar Mock
-  globalThis.clearAllSelections = globalThis.clearAllSelections || (() => {}); // 🎭 Fallback
-  globalThis.askLLM = askLLM; // 🎭 Exporta askLLM para question-controller
-  // renderCurrentQuestion, renderQuestionsHistory, updateStatusMessage e clearAllSelections já são exportados
-  // por seus respectivos módulos (question-controller.js e renderer-helpers.js)
+  globalThis.RendererAPI = RendererAPI;
+  globalThis.runMockAutoPlay = () => globalThis.mockRunner?.runMockAutoPlay();
+  globalThis.clearAllSelections = globalThis.clearAllSelections || (() => {});
 }
+
+console.log('✅ RendererAPI inicializada com sucesso');

@@ -331,50 +331,6 @@ class ConfigManager {
   }
 
   // ==========================================
-  // MÉTODOS UI (A MOVER DO ORIGINAL)
-  // ==========================================
-
-  /**
-   * Registra elementos UI para acesso em renderer.js
-   */
-  registerUIElements() {
-    // Métodos do DOM já estão nos Managers
-    console.log('📋 ConfigManager.registerUIElements()');
-  }
-
-  /**
-   * Registra callbacks do renderer (EventBus listeners)
-   */
-  registerRendererCallbacks() {
-    // Callbacks movidos para Managers individuais
-    console.log('📡 ConfigManager.registerRendererCallbacks()');
-  }
-
-  /**
-   * Registra listeners de DOM (menu, tabs, etc)
-   */
-  registerDOMEventListeners() {
-    // Listeners de DOM estão em cada Manager (#initXxxListeners)
-    console.log('🖱️  ConfigManager.registerDOMEventListeners()');
-  }
-
-  /**
-   * Registra listeners de IPC
-   */
-  registerIPCListeners() {
-    // IPC listeners gerenciados por main.js
-    console.log('🔌 ConfigManager.registerIPCListeners()');
-  }
-
-  /**
-   * Registra error handlers globais
-   */
-  registerErrorHandlers() {
-    // Error handlers centralizados em ErrorHandler.js
-    console.log('⚠️  ConfigManager.registerErrorHandlers()');
-  }
-
-  // ==========================================
   // UTILITÁRIOS
   // ==========================================
 
@@ -470,18 +426,6 @@ class ConfigManager {
     this.saveConfig();
 
     Logger.debug('Fim da função: "saveSection"');
-  }
-
-  /**
-   * Salva um campo individual
-   * @param {string} fieldId - ID do campo
-   * @param {*} value - Valor a salvar
-   */
-  saveField(fieldId, value) {
-    Logger.debug(`Salvando campo: ${fieldId} = ${value}`);
-    // Este método pode ser expandido conforme necessário
-    // Por enquanto, apenas loga a operação
-    console.log(`📝 Campo ${fieldId} = ${value}`);
   }
 
   /**
