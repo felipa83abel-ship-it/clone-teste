@@ -176,9 +176,6 @@ class TopBarManager {
   }
 
   /**
-   * A
-
-  /**
    * Atualiza slider de opacidade (UI)
    */
   #updateOpacityUI(opacity) {

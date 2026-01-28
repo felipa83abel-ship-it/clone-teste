@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /**
  * 🌊 DEEPGRAM STT (Speech-to-Text) - MÓDULO INDEPENDENTE
  *
@@ -682,7 +685,7 @@ const {
     const effectiveSpeech = useVADDecision ? !!vars._lastIsSpeech : percent > 0;
 
     debugLogDeepgram(
-      `🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
+      `[${source}] - 🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
       false
     );
 
@@ -695,7 +698,7 @@ const {
         vars.noiseStopTime = null;
 
         debugLogDeepgram(
-          `🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`,
+          `[${source}] 🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`,
           true
         );
       }
@@ -714,7 +717,10 @@ const {
         vars.shouldFinalizeAskCurrent = true;
         vars.noiseStopTime = Date.now();
 
-        debugLogDeepgram(`🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`, true);
+        debugLogDeepgram(
+          `[${source}] 🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`,
+          true
+        );
 
         // Dispara finalize apenas uma vez
         sendDeepgramFinalize(source);
@@ -1090,7 +1096,7 @@ const {
     );
 
     // Registrar em Logger para histórico de debug
-    globalThis.Logger.debug(`[stt-deepgram] ${cleanArgs.join(' ')}`, { timeStr });
+    Logger.debug(`[stt-deepgram] ${cleanArgs.join(' ')}`, { timeStr });
   }
 
   /* ================================ */
@@ -1104,9 +1110,7 @@ const {
     try {
       // Inicializa VAD Engine (singleton)
       vad = getVADEngine();
-      globalThis.Logger.debug(
-        `✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`
-      );
+      Logger.debug(`✅ VAD Engine inicializado - Status: ${JSON.stringify(vad.getStatus())}`);
 
       // 🌊 Deepgram: Inicia INPUT/OUTPUT
       if (UIElements.inputSelect?.value) await startDeepgram(globalThis.INPUT, UIElements);
@@ -1136,7 +1140,7 @@ const {
    */
   async function switchDeviceDeepgram(source, newDeviceId) {
     try {
-      globalThis.Logger.debug(
+      Logger.debug(
         `🔄 [switchDeviceDeepgram] Início: source=${source}, newDeviceId="${newDeviceId}"`
       );
       const result = await changeDeviceDeepgram(source, newDeviceId);

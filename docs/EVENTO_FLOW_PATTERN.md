@@ -144,7 +144,7 @@ this.eventBus.on('transcriptionAdd', ({ _questionId, text }) => {
 │  handleLLMStream() (llmHandlers.js:70) │
 │  - Abre conexão OpenAI streaming       │
 │  - Por cada token recebido:            │
-│    emite: 'answerStreamChunk'          │
+│    emite: 'answerStream'          │
 │  - Ao fim: emite 'answerStreamEnd'     │
 └────────────┬───────────────────────────┘
              │
@@ -158,7 +158,7 @@ this.eventBus.on('transcriptionAdd', ({ _questionId, text }) => {
      ▼             ▼                 ▼
 ┌────────────────────────────────────────┐
 │  HomeUIManager LISTENS (Multiple)      │
-│  - answerStreamChunk: append text      │
+│  - answerStream: append text      │
 │  - answerStreamEnd: finalize answer    │
 │  - Renderiza token por token (smooth) │
 └────────────────────────────────────────┘
@@ -168,7 +168,7 @@ this.eventBus.on('transcriptionAdd', ({ _questionId, text }) => {
 
 ```javascript
 // ❌ EMISSOR (llmHandlers.js:89)
-eventBus.emit('answerStreamChunk', {
+eventBus.emit('answerStream', {
   questionId: validQuestionId,
   text: chunk.choices[0].delta.content,
   turnId: turnId
@@ -182,7 +182,7 @@ eventBus.emit('answerStreamEnd', {
 });
 
 // ✅ OUVINTE (HomeUIManager.js:520)
-this.eventBus.on('answerStreamChunk', (data) => {
+this.eventBus.on('answerStream', (data) => {
   // Append token progressivamente ao texto da resposta
   const answerElement = document.querySelector(`[data-answer-id="${data.questionId}"]`);
   if (answerElement) {
@@ -272,7 +272,7 @@ globalThis.eventBus.on('windowOpacityUpdate', (data) => {
 
 | Evento | Emissor | Ouvinte(s) | Dados |
 |--------|---------|-----------|-------|
-| **answerStreamChunk** | llmHandlers.js:89 | HomeUIManager.js:520 | `{ questionId, text, turnId }` |
+| **answerStream** | llmHandlers.js:89 | HomeUIManager.js:520 | `{ questionId, text, turnId }` |
 | **answerStreamEnd** | llmHandlers.js:108 | HomeUIManager.js:572 | `{ questionId, response, turnId }` |
 | **answerBatchEnd** | llmHandlers.js (batch mode) | HomeUIManager | `{ questionId, response, turnId }` |
 | **llmStreamEnd** | llmHandlers.js:108 | renderer.js:97 | `{}` |
@@ -377,7 +377,7 @@ EventBus.js:35 📡 Listener registrado: windowOpacityUpdate
 6. handleLLMStream() [llmHandlers.js:70]
    ├─ Abre conexão OpenAI com streaming
    └─ Por cada token:
-       ├─ Emite: 'answerStreamChunk'
+       ├─ Emite: 'answerStream'
        └─ HomeUIManager escuta e renderiza token
    ↓
 7. Token streaming finalizado
@@ -416,7 +416,7 @@ eventBus.on('statusUpdate', ({ message }) => {
 ### 3. Eventos com Múltiplos Campos
 ```javascript
 // Emissor
-eventBus.emit('answerStreamChunk', {
+eventBus.emit('answerStream', {
   questionId: '12345',
   text: 'Java é...',
   turnId: 1,
@@ -424,7 +424,7 @@ eventBus.emit('answerStreamChunk', {
 });
 
 // Ouvinte
-eventBus.on('answerStreamChunk', ({ questionId, text, turnId }) => {
+eventBus.on('answerStream', ({ questionId, text, turnId }) => {
   // Usar os campos
 });
 ```

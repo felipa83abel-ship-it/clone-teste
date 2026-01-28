@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /* ================================ */
 // SCREENSHOT CONTROLLER
 // Gerencia captura e análise de screenshots
@@ -7,7 +10,6 @@
 if (!globalThis._screenshotControllerLoaded) {
   globalThis._screenshotControllerLoaded = true;
 
-  // Logger carregado globalmente via index.html
   // ipcRenderer passado como dependência em initScreenshotController
 
   /**
@@ -25,7 +27,7 @@ if (!globalThis._screenshotControllerLoaded) {
    */
   async function captureScreenshot() {
     if (globalThis.appState.audio.isCapturing) {
-      globalThis.Logger.debug('⏳ Captura já em andamento...', false);
+      Logger.debug('⏳ Captura já em andamento...', false);
       return;
     }
 
@@ -36,7 +38,7 @@ if (!globalThis._screenshotControllerLoaded) {
       const result = await globalThis._screenshotControllerIpc.invoke('CAPTURE_SCREENSHOT');
 
       if (!result.success) {
-        globalThis.Logger.warn('⚠️ Falha na captura:', result.error);
+        Logger.warn('⚠️ Falha na captura:', result.error);
         globalThis.updateStatusMessage(`❌ ${result.error}`);
         globalThis.eventBus.emit('screenshotBadgeUpdate', {
           count: globalThis.appState.audio.capturedScreenshots.length,
@@ -53,8 +55,8 @@ if (!globalThis._screenshotControllerLoaded) {
         size: result.size,
       });
 
-      globalThis.Logger.debug(`✅ Screenshot capturado: ${result.filename}`, true);
-      globalThis.Logger.debug(
+      Logger.debug(`✅ Screenshot capturado: ${result.filename}`, true);
+      Logger.debug(
         `📦 Total em memória: ${globalThis.appState.audio.capturedScreenshots.length}`,
         true
       );
@@ -68,7 +70,7 @@ if (!globalThis._screenshotControllerLoaded) {
         visible: true,
       });
     } catch (error) {
-      globalThis.Logger.error('❌ Erro ao capturar screenshot:', error);
+      Logger.error('❌ Erro ao capturar screenshot:', error);
       globalThis.updateStatusMessage('❌ Erro na captura');
     } finally {
       globalThis.appState.audio.isCapturing = false;
@@ -80,12 +82,12 @@ if (!globalThis._screenshotControllerLoaded) {
    */
   async function analyzeScreenshots() {
     if (globalThis.appState.audio.isAnalyzing) {
-      globalThis.Logger.debug('Análise já em andamento', true);
+      Logger.debug('Análise já em andamento', true);
       return;
     }
 
     if (globalThis.appState.audio.capturedScreenshots.length === 0) {
-      globalThis.Logger.warn('Nenhum screenshot para analisar');
+      Logger.warn('Nenhum screenshot para analisar');
       globalThis.updateStatusMessage(
         '⚠️ Nenhum screenshot para analisar (capture com Ctrl+Shift+F)'
       );
@@ -101,7 +103,7 @@ if (!globalThis._screenshotControllerLoaded) {
       // Extrai caminhos dos arquivos
       const filepaths = globalThis.appState.audio.capturedScreenshots.map((s) => s.filepath);
 
-      globalThis.Logger.info('Enviando para análise', { count: filepaths.length });
+      Logger.info('Enviando para análise', { count: filepaths.length });
 
       // Envia para main.js
       const result = await globalThis._screenshotControllerIpc.invoke(
@@ -110,7 +112,7 @@ if (!globalThis._screenshotControllerLoaded) {
       );
 
       if (!result.success) {
-        globalThis.Logger.error('Falha na análise', { error: result.error });
+        Logger.error('Falha na análise', { error: result.error });
         globalThis.updateStatusMessage(`❌ ${result.error}`);
         return;
       }
@@ -138,14 +140,14 @@ if (!globalThis._screenshotControllerLoaded) {
       const analysisText = result.analysis;
       const tokens = analysisText.split(/(\s+|[.,!?;:\-()[\]{}\n])/g).filter((t) => t.length > 0);
 
-      globalThis.Logger.info('Simulando stream', { tokenCount: tokens.length });
+      Logger.info('Simulando stream', { tokenCount: tokens.length });
 
       // Emite tokens via eventBus (consistente com askLLM)
       let accumulated = '';
       for (const token of tokens) {
         accumulated += token;
 
-        globalThis.eventBus.emit('answerStreamChunk', {
+        globalThis.eventBus.emit('answerStream', {
           questionId: questionId,
           token: token,
           accum: accumulated,
@@ -155,11 +157,11 @@ if (!globalThis._screenshotControllerLoaded) {
         await new Promise((resolve) => setTimeout(resolve, 2));
       }
 
-      globalThis.Logger.info('Análise concluída');
+      Logger.info('Análise concluída');
       globalThis.updateStatusMessage('✅ Análise concluída');
 
       // Limpa screenshots após análise
-      globalThis.Logger.info('Limpando screenshots', {
+      Logger.info('Limpando screenshots', {
         count: globalThis.appState.audio.capturedScreenshots.length,
       });
       globalThis.appState.audio.capturedScreenshots = [];
@@ -173,7 +175,7 @@ if (!globalThis._screenshotControllerLoaded) {
       // Força limpeza no sistema
       await globalThis._screenshotControllerIpc.invoke('CLEANUP_SCREENSHOTS');
     } catch (error) {
-      globalThis.Logger.error('Erro ao analisar screenshots', { error: error.message });
+      Logger.error('Erro ao analisar screenshots', { error: error.message });
       globalThis.updateStatusMessage('❌ Erro na análise');
     } finally {
       globalThis.appState.audio.isAnalyzing = false;

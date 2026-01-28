@@ -159,7 +159,7 @@ class TopBarManager {
 
 **Eventos que Escuta:**
 - `transcriptAdd` → atualizar transcrição
-- `answerStreamChunk` → adicionar token de resposta
+- `answerStream` → adicionar token de resposta
 - `answerStreamEnd` → finalizar resposta
 - `questionUpdate` → atualizar pergunta atual
 - `historyClear` → limpar histórico
@@ -473,7 +473,7 @@ Ordem completa no index.html:
 ├─────────────────────────┼─────────────────┼─────────────────┤
 │ transcriptAdd           │ renderer.js     │ HomeUIManager   │
 ├─────────────────────────┼─────────────────┼─────────────────┤
-│ answerStreamChunk       │ renderer.js     │ HomeUIManager   │
+│ answerStream       │ renderer.js     │ HomeUIManager   │
 ├─────────────────────────┼─────────────────┼─────────────────┤
 │ apiKeySaved             │ ApiKeyManager   │ renderer.js     │
 ├─────────────────────────┼─────────────────┼─────────────────┤

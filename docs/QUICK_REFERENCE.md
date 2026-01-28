@@ -21,7 +21,7 @@ audio-controller.js → emit('listenButtonToggle')
 stt-deepgram/vosk/whisper → emit('transcriptAdd')
 
 // LLM - Resposta chega token por token
-llmHandlers.js → emit('answerStreamChunk')
+llmHandlers.js → emit('answerStream')
                 emit('answerStreamEnd')
 
 // CONFIGURAÇÃO - User muda slider
@@ -50,7 +50,7 @@ any-component.js → emit('error')
 │    LLM API streaming starts             │
 │                                         │
 │ 4. TOKENS ARRIVE                        │
-│    ↓ emit('answerStreamChunk')         │
+│    ↓ emit('answerStream')         │
 │    HomeUIManager appends to DOM         │
 │                                         │
 │ 5. DONE                                 │
@@ -126,7 +126,7 @@ class MyManager {
 |--------|---------|----------|-------|
 | `listenButtonToggle` | audio-ctrl | HomeUI | `{isRunning, buttonText}` |
 | `transcriptAdd` | STT | HomeUI | `{questionId, text, author}` |
-| `answerStreamChunk` | llmHandlers | HomeUI | `{questionId, text, turnId}` |
+| `answerStream` | llmHandlers | HomeUI | `{questionId, text, turnId}` |
 | `answerStreamEnd` | llmHandlers | HomeUI | `{questionId, response, turnId}` |
 | `statusUpdate` | helpers | HomeUI | `{message}` |
 | `error` | ANY | renderer | `message` |

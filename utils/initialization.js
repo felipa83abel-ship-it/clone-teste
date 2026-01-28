@@ -1,6 +1,5 @@
-// @ts-nocheck
-
-/* global ConfigManager, Logger */
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger, ConfigManager */
 
 /**
  * initialization.js
@@ -98,8 +97,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     Logger?.debug('✅ Aplicação pronta para uso');
   } catch (error) {
     console.error('❌ Erro na inicialização:', error);
-    if (globalThis.Logger) {
-      globalThis.Logger.error('Erro de inicialização', error);
-    }
   }
 });

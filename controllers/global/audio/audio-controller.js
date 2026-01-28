@@ -71,8 +71,6 @@ async function stopAudio() {
  * Toggle do botão de iniciar/parar escuta (Ctrl+D)
  */
 async function listenToggleBtn() {
-  Logger.debug('Início da função: "listenToggleBtn"');
-
   if (!globalThis.appState.audio.isRunning) {
     Logger.debug('🎤 listenToggleBtn: Tentando INICIAR escuta...', true);
 
@@ -116,8 +114,6 @@ async function listenToggleBtn() {
   globalThis.updateStatusMessage(statusMsg);
 
   await (globalThis.appState.audio.isRunning ? startAudio() : stopAudio());
-
-  Logger.debug('Fim da função: "listenToggleBtn"');
 }
 
 /**
@@ -125,7 +121,6 @@ async function listenToggleBtn() {
  * @returns {object} { active: boolean, model: string|null }
  */
 function hasActiveModel() {
-  Logger.debug('Início da função: "hasActiveModel"');
   if (!globalConfig) {
     console.warn('⚠️ ConfigManager não inicializado ainda');
     return { active: false, model: null };
@@ -146,7 +141,6 @@ function hasActiveModel() {
     }
   }
 
-  Logger.debug('Fim da função: "hasActiveModel"');
   return { active: false, model: null };
 }
 

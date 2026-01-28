@@ -14,7 +14,7 @@ O projeto usa um sistema **Pub/Sub (Publish/Subscribe)** centralizado chamado `E
 |-----------|---------|------------------|-----------|
 | **Audio** | audio-controller.js | `listenButtonToggle` | Click/Ctrl+D |
 | **STT** | stt-deepgram.js, stt-vosk.js, stt-whisper.js | `transcriptAdd`, `updateInterim`, `placeholderFulfill`, `clearInterim` | Em tempo real |
-| **LLM** | llmHandlers.js | `answerStreamChunk`, `answerStreamEnd`, `llmStreamEnd`, `answerBatchEnd` | Durante streaming |
+| **LLM** | llmHandlers.js | `answerStream`, `answerStreamEnd`, `llmStreamEnd`, `answerBatchEnd` | Durante streaming |
 | **UI** | renderer.js, renderer-helpers.js | `statusUpdate`, `windowOpacityUpdate`, `sortAnswersByTurnId`, `error` | User actions |
 | **Questions** | question-controller.js | `currentQuestionUpdate`, `questionsHistoryUpdate` | Navigate/Select |
 | **Config** | PrivacyConfigManager.js, ScreenConfigManager.js | `PRIVACY_CONFIG_CHANGED`, `SCREENSHOT_CONFIG_CHANGED` | Config change |
@@ -67,7 +67,7 @@ askLLM() validates and calls handleLLMStream()
 OpenAI streaming starts
         ↓
 For each token received:
-  → emit 'answerStreamChunk'
+  → emit 'answerStream'
   → HomeUIManager appends to DOM
         ↓
 On complete:
@@ -76,7 +76,7 @@ On complete:
 ```
 
 **Events Envolvidos**:
-- `answerStreamChunk` (repeated)
+- `answerStream` (repeated)
 - `answerStreamEnd`
 - `llmStreamEnd`
 
@@ -172,7 +172,7 @@ T3: User interacts
 
 | Evento | De | Para | Dados |
 |--------|-----|------|-------|
-| `answerStreamChunk` | llmHandlers | HomeUIManager | `{ questionId, text, turnId }` |
+| `answerStream` | llmHandlers | HomeUIManager | `{ questionId, text, turnId }` |
 | `answerStreamEnd` | llmHandlers | HomeUIManager | `{ questionId, response, turnId }` |
 | `llmStreamEnd` | llmHandlers | renderer | `{}` |
 | `answerBatchEnd` | llmHandlers | HomeUIManager | `{ questionId, response, turnId }` |
@@ -289,7 +289,7 @@ Sempre registre listeners ANTES de qualquer código que possa emitir eventos.
 
 ### 2️⃣ **Nomes Únicos**
 Use nomes de evento descritivos e únicos. Exemplo:
-- ✅ `answerStreamChunk` (claro)
+- ✅ `answerStream` (claro)
 - ❌ `update` (vago)
 
 ### 3️⃣ **Dados Estruturados**

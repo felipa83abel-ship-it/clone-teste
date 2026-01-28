@@ -9,9 +9,9 @@
  * @class Logger
  * @description Logger centralizado com níveis e controle de debug
  * @example
- * globalThis.Logger.info('Iniciando app', { version: '1.0' });
- * globalThis.Logger.debug('Debug info', { value: 42 }, true); // show=true para ativar
- * globalThis.Logger.error('Erro crítico', { code: 500 });
+ * Logger.info('Iniciando app', { version: '1.0' });
+ * Logger.debug('Debug info', { value: 42 }, true); // show=true para ativar
+ * Logger.error('Erro crítico', { code: 500 });
  */
 class Logger {
   static get levels() {
@@ -49,7 +49,7 @@ class Logger {
    * @returns {void}
    */
   static debug(message, data = {}, show = false) {
-    // Se 'data' é um booleano, é o flag 'show' (compatibilidade: globalThis.Logger.debug(msg, true))
+    // Se 'data' é um booleano, é o flag 'show' (compatibilidade: Logger.debug(msg, true))
     if (typeof data === 'boolean') {
       show = data;
       data = {};
@@ -106,11 +106,7 @@ class Logger {
   }
 }
 
-// Exportar globalmente para uso em scripts do navegador
-if (typeof globalThis !== 'undefined') {
-  globalThis.Logger = Logger;
-}
-
+// Exportar como módulo CommonJS
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = Logger;
 }

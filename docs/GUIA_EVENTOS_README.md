@@ -182,7 +182,7 @@ Se `emit()` acontecer ANTES de `on()`:
 
 ### LLM Response
 ```
-'answerStreamChunk'      → Token chega (repete)
+'answerStream'      → Token chega (repete)
 'answerStreamEnd'        → Resposta completa
 'llmStreamEnd'           → Stream finalizado
 'answerBatchEnd'         → Modo batch (sem streaming)
@@ -266,7 +266,7 @@ globalThis.eventBus.emit('test-event', { msg: 'World' })
 Total de Eventos Definidos:  18+
 Emissores Únicos:            8 (audio, stt, llm, ui, config, etc)
 Ouvintes Únicos:             3 (HomeUIManager, WindowUIManager, renderer.js)
-Eventos mais Frequentes:     answerStreamChunk (1000+/min durante streaming)
+Eventos mais Frequentes:     answerStream (1000+/min durante streaming)
 Listeners Simultâneos:       Até 10 para o mesmo evento
 Ordem de Importância:        CRÍTICA (listeners ANTES de emitters!)
 ```

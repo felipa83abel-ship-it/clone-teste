@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /**
  * llmHandlers - Handlers separados para LLM (genérico)
  *
@@ -58,7 +61,7 @@ async function handleLLMStream(
   llmManager,
   turnId = null
 ) {
-  globalThis.Logger.debug(
+  Logger.debug(
     'Inicializando Stream LLM',
     { questionId, turnId, text, textLength: text.length },
     false
@@ -86,7 +89,7 @@ async function handleLLMStream(
       streamedText += token;
       appState.metrics.llmFirstTokenTime = appState.metrics.llmFirstTokenTime || Date.now();
 
-      eventBus.emit('answerStreamChunk', {
+      eventBus.emit('answerStream', {
         questionId,
         turnId, // 🔥 Incluir turnId para UI
         token,
@@ -97,7 +100,7 @@ async function handleLLMStream(
     appState.metrics.llmEndTime = Date.now();
     appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
 
-    globalThis.Logger.debug(
+    Logger.debug(
       '⚡ Stream LLM finalizado',
       {
         duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
@@ -110,7 +113,7 @@ async function handleLLMStream(
       streamedText,
     });
   } catch (error) {
-    globalThis.Logger.error('Erro em handleLLMStream', { error: error.message });
+    Logger.error('Erro em handleLLMStream', { error: error.message });
     eventBus.emit('error', error.message);
     throw error;
   }
@@ -120,11 +123,7 @@ async function handleLLMStream(
  * Manipula resposta em modo batch (normal)
  */
 async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
-  globalThis.Logger.debug(
-    'Inicializando Batch LLM',
-    { questionId, text, textLength: text.length },
-    true
-  );
+  Logger.debug('Inicializando Batch LLM', { questionId, text, textLength: text.length }, true);
 
   appState.metrics.llmStartTime = Date.now();
 
@@ -141,7 +140,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
 
     appState.metrics.llmEndTime = Date.now();
 
-    globalThis.Logger.debug(
+    Logger.debug(
       '⚡ Batch LLM finalizado',
       {
         duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
@@ -154,7 +153,7 @@ async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBu
       response,
     });
   } catch (error) {
-    globalThis.Logger.error('Erro em handleLLMBatch', { error: error.message });
+    Logger.error('Erro em handleLLMBatch', { error: error.message });
     eventBus.emit('error', error.message);
     throw error;
   }

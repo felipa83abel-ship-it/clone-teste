@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /**
  * LLM Controller - Lógica de requisição ao LLM
  *
@@ -31,11 +34,7 @@ async function askLLM(questionId = null) {
       globalThis.getSelectedQuestionText
     ) || {};
 
-    globalThis.Logger.debug(
-      'Pergunta validada',
-      { questionId: validatedId, textLength: text?.length },
-      false
-    );
+    Logger.debug('Pergunta validada', { questionId: validatedId, textLength: text?.length }, false);
 
     // 2. Rastreamento
     const normalizedText = globalThis.normalizeForCompare?.(text) || text;
@@ -77,7 +76,7 @@ async function askLLM(questionId = null) {
       );
     }
   } catch (error) {
-    globalThis.Logger.error('Erro em askLLM', { error: error.message });
+    Logger.error('Erro em askLLM', { error: error.message });
     globalThis.eventBus.emit('error', error.message);
     globalThis.updateStatusMessage?.(`❌ ${error.message}`);
   }

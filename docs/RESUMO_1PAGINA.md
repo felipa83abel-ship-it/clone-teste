@@ -73,7 +73,7 @@ COMPONENTE A                COMPONENTE B
 │     → 'updateInterim'            │
 │                                  │
 │ 3️⃣  llmHandlers.js               │
-│     → 'answerStreamChunk'        │
+│     → 'answerStream'        │
 │     → 'answerStreamEnd'          │
 │                                  │
 │ 4️⃣  renderer.js                  │
@@ -139,7 +139,7 @@ T=150ms User clica "Ask"
 
 T=160ms Token 1 chega
   ↓
-  📤 Emit: 'answerStreamChunk'
+  📤 Emit: 'answerStream'
   ↓
   📥 Listen: HomeUIManager
   ↓
@@ -147,7 +147,7 @@ T=160ms Token 1 chega
 
 T=170ms Token 2 chega
   ↓
-  📤 Emit: 'answerStreamChunk'
+  📤 Emit: 'answerStream'
   ↓
   📥 Listen: HomeUIManager
   ↓
@@ -195,7 +195,7 @@ T=400ms Stream finaliza
 | 2 | `transcriptAdd` | STT | HomeUI | Texto chega |
 | 3 | `updateInterim` | STT | HomeUI | Texto parcial |
 | 4 | `placeholderFulfill` | STT | HomeUI | Texto final |
-| 5 | `answerStreamChunk` | LLM | HomeUI | Token chega |
+| 5 | `answerStream` | LLM | HomeUI | Token chega |
 | 6 | `answerStreamEnd` | LLM | HomeUI | Resposta ok |
 | 7 | `windowOpacityUpdate` | renderer | WindowUI | Slider move |
 | 8 | `statusUpdate` | helpers | HomeUI | Status muda |

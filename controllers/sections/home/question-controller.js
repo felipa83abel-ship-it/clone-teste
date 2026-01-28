@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /* ================================ */
 // QUESTION CONTROLLER
 // Gerencia renderização, navegação e manipulação de perguntas
@@ -6,6 +9,8 @@
 // ⚠️ Evitar redeclaração de variáveis do módulo
 if (!globalThis._questionControllerLoaded) {
   globalThis._questionControllerLoaded = true;
+
+  //const Logger = globalThis?.Logger;
 
   // Dependências carregadas globalmente via index.html
   // question-helpers funções (finalizeQuestion, resetCurrentQuestion, findAnswerByQuestionId)
@@ -32,7 +37,6 @@ if (!globalThis._questionControllerLoaded) {
   const _findAnswerByQuestionId = globalThis._findAnswerByQuestionId;
 
   const updateStatusMessage = globalThis?.updateStatusMessage;
-  const Logger = globalThis?.Logger;
   const getAppState = () => globalThis?.appState; // Usar getter para lazy evaluation
 
   // MODES, CURRENT_QUESTION_ID, ENABLE_INTERVIEW_TIMING_DEBUG_METRICS vêm de globalThis ou deps
@@ -52,8 +56,6 @@ if (!globalThis._questionControllerLoaded) {
    * Renderiza o histórico de perguntas
    */
   function renderQuestionsHistory() {
-    Logger.debug('Início da função: "renderQuestionsHistory"');
-
     const state = getAppState();
     const eventBusGlobal = globalThis.eventBus;
 
@@ -81,16 +83,12 @@ if (!globalThis._questionControllerLoaded) {
     eventBusGlobal.emit('scrollToQuestion', {
       questionId: state.selectedId,
     });
-
-    Logger.debug('Fim da função: "renderQuestionsHistory"');
   }
 
   /**
    * Renderiza a pergunta atual (CURRENT)
    */
   function renderCurrentQuestion() {
-    Logger.debug('Início da função: "renderCurrentQuestion"');
-
     const state = getAppState();
     const eventBusGlobal = globalThis.eventBus;
 
@@ -118,8 +116,6 @@ if (!globalThis._questionControllerLoaded) {
     };
 
     eventBusGlobal.emit('currentQuestionUpdate', questionData);
-
-    Logger.debug('Fim da função: "renderCurrentQuestion"');
   }
 
   /**
@@ -234,7 +230,7 @@ if (!globalThis._questionControllerLoaded) {
       renderQuestionsHistory();
       renderCurrentQuestion();
 
-      Logger.debug('🔥 CURRENT promovido para histórico');
+      Logger.debug('🔥 CURRENT promovido para histórico', false);
 
       // 🔥 CRÍTICO: Só responder automaticamente em modo ENTREVISTA quando clicado
       // (Em modo PADRÃO, o clique SEM silêncio não deve responder)
@@ -246,7 +242,6 @@ if (!globalThis._questionControllerLoaded) {
   }
 
   function handleQuestionClick(questionId) {
-    Logger.debug('Início da função: "handleQuestionClick"');
     const state = getAppState();
     state.selectedId = questionId;
     const clearFunc = globalThis.clearAllSelections;
@@ -263,36 +258,33 @@ if (!globalThis._questionControllerLoaded) {
 
     // Check conditions in order
     if (checkIfAnswered(questionId)) {
-      Logger.debug('Fim da função: "handleQuestionClick" (pergunta já respondida)');
+      Logger.debug('"handleQuestionClick" (pergunta já respondida)', false);
       return;
     }
 
     if (checkIfIncomplete(questionId)) {
-      Logger.debug('Fim da função: "handleQuestionClick" (pergunta incompleta)');
+      Logger.debug('"handleQuestionClick" (pergunta incompleta)', false);
       return;
     }
 
     if (checkIfLLMAlreadyAnswered(questionId)) {
-      Logger.debug('Fim da função: "handleQuestionClick" (LLM já respondeu)');
+      Logger.debug('"handleQuestionClick" (LLM já respondeu)', false);
       return;
     }
 
     if (processCurrentQuestion(questionId)) {
-      Logger.debug('Fim da função: "handleQuestionClick" (CURRENT promovido)');
+      Logger.debug('"handleQuestionClick" (CURRENT promovido)', false);
       return;
     }
 
     const askLLMGlobal = globalThis.askLLM;
     askLLMGlobal();
-    Logger.debug('Fim da função: "handleQuestionClick"');
   }
 
   /**
    * Retorna o texto da pergunta selecionada
    */
   function getSelectedQuestionText() {
-    Logger.debug('Início da função: "getSelectedQuestionText"');
-
     const state = getAppState();
     if (state.selectedId === globalThis._questionControllerDeps.CURRENT_QUESTION_ID) {
       return state.interview.currentQuestion.text;
@@ -310,7 +302,6 @@ if (!globalThis._questionControllerLoaded) {
       return state.interview.currentQuestion.text;
     }
 
-    Logger.debug('Fim da função: "getSelectedQuestionText"');
     return '';
   }
 
@@ -318,8 +309,6 @@ if (!globalThis._questionControllerLoaded) {
    * Finaliza a pergunta atual para histórico
    */
   function finalizeCurrentQuestion() {
-    Logger.debug(`🎯 finalizeCurrentQuestion() CHAMADA - shouldFinalizeAskCurrent recebido`, true);
-
     const state = getAppState();
     const modeManagerGlobal = globalThis.modeManager;
     const MODESGlobal = globalThis.MODES;
@@ -327,17 +316,18 @@ if (!globalThis._questionControllerLoaded) {
 
     // 🔥 DEBUG: Verificar qual modo está ativo
     const currentModeCheck = modeManagerGlobal.is(MODESGlobal.INTERVIEW);
-    console.log(
-      `🎯 [DEBUG finalizeCurrentQuestion] Modo: ${modeManagerGlobal.getMode()} | isINTERVIEW=${currentModeCheck}`
+    Logger.debug(
+      `🎯 [DEBUG finalizeCurrentQuestion] Modo: ${modeManagerGlobal.getMode()} | isINTERVIEW=${currentModeCheck}`,
+      false
     );
 
     if (!state.interview.currentQuestion.text?.trim()) {
-      console.log('⚠️ Sem texto para finalizar');
+      Logger.warn('⚠️ Sem texto para finalizar');
       return;
     }
 
     if (state.interview.currentQuestion.finalized) {
-      console.log('⛔ Pergunta já finalizada');
+      Logger.warn('⛔ Pergunta já finalizada');
       return;
     }
 
@@ -513,8 +503,9 @@ if (!globalThis._questionControllerLoaded) {
       }
 
       if (shouldFinalize) {
-        console.log(
-          `🎯 [DEBUG handleCurrentQuestion] Modo=${isInterviewMode ? 'INTERVIEW' : 'STANDARD'} Finalizando - shouldFinalizeAskCurrent=${options.shouldFinalizeAskCurrent}, fromUserAction=${options.fromUserAction}, isFinal=${isFinalMessage}, hasText=${!!hasText}`
+        Logger.debug(
+          `🎯 [DEBUG handleCurrentQuestion] Modo=${isInterviewMode ? 'INTERVIEW' : 'STANDARD'} Finalizando - shouldFinalizeAskCurrent=${options.shouldFinalizeAskCurrent}, fromUserAction=${options.fromUserAction}, isFinal=${isFinalMessage}, hasText=${!!hasText}`,
+          false
         );
         finalizeCurrentQuestion();
       }

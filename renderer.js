@@ -198,6 +198,7 @@ globalThis.eventBus.on('llmStreamEnd', (data) => {
   }
 
   globalThis.eventBus.emit('answerStreamEnd', {});
+  globalThis.eventBus.emit('sortAnswersByTurnId', {});
 });
 
 /**

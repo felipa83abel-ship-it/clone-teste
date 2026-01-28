@@ -58,7 +58,7 @@ RENDERER PROCESS (index.html)
 │  │                                                       │
 │  │  Events (40+):                                        │
 │  │  • UI events: listenButtonToggle, statusUpdate       │
-│  │  • Data events: transcriptionAdd, answerStreamChunk  │
+│  │  • Data events: transcriptionAdd, answerStream  │
 │  │  • State events: currentQuestionUpdate               │
 │  └──────────────────────────────────────────────────────┘
 │                          ↓ eventBus.on()
@@ -86,7 +86,7 @@ RENDERER PROCESS (index.html)
 │  │  │    • answersCleared → clear answers DOM     │      │
 │  │  │    • currentQuestionUpdate → question DOM   │      │
 │  │  │    • questionsHistoryUpdate → history DOM   │      │
-│  │  │    • answerStreamChunk → stream update      │      │
+│  │  │    • answerStream → stream update      │      │
 │  │  │    • answerBatchEnd → complete response    │      │
 │  │  │    • answerStreamEnd → mark complete        │      │
 │  │  │  Size: 588 lines (was 388 +200 from PHASE  │      │
@@ -262,9 +262,9 @@ main.js receives ask-llm-stream
     ↓
 renderer.js receives LLM_STREAM_CHUNK (via IPC channel)
     ├─ Updates appState.currentAnswer += chunk
-    └─ eventBus.emit('answerStreamChunk', { text: chunk })
+    └─ eventBus.emit('answerStream', { text: chunk })
     ↓
-HomeManager listens to answerStreamChunk
+HomeManager listens to answerStream
     ├─ Appends text to answer DOM
     └─ Updates #answersHistory div (streaming effect)
     ↓
@@ -306,16 +306,16 @@ FINAL STATE:
 ```javascript
 // ❌ WRONG (before PHASE 10.2)
 renderer.js:
-  eventBus.on('answerStreamChunk', ({ text }) => {
+  eventBus.on('answerStream', ({ text }) => {
     document.getElementById('answer').innerHTML += text;
   });
 
 // ✅ CORRECT (after PHASE 10.2)
 renderer.js:
-  eventBus.emit('answerStreamChunk', { text });
+  eventBus.emit('answerStream', { text });
 
 HomeManager.js:
-  this.eventBus.on('answerStreamChunk', ({ text }) => {
+  this.eventBus.on('answerStream', ({ text }) => {
     const elem = document.getElementById('answer');
     elem.innerHTML += text;
   });
@@ -485,9 +485,9 @@ main.js: OpenAI streaming
     └─ For each token: ipcRenderer.send('LLM_STREAM_CHUNK', token)
     ↓
 renderer.js: receives chunks
-    └─ eventBus.emit('answerStreamChunk', { text: token })
+    └─ eventBus.emit('answerStream', { text: token })
     ↓
-HomeManager: listens to answerStreamChunk
+HomeManager: listens to answerStream
     └─ Updates DOM with streaming text
     ↓
 Stream complete
@@ -765,7 +765,7 @@ Changes:
     - transcriptionCleared (10 lines)
     - answersCleared (8 lines)
     - currentQuestionUpdate (28 lines)
-    - answerStreamChunk (54 lines)
+    - answerStream (54 lines)
     - answerBatchEnd (52 lines)
     - answerStreamEnd (8 lines)
     - questionsHistoryUpdate (48 lines)

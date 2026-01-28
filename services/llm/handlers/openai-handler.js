@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /**
  * OpenAI Handler - Interface padronizada para OpenAI
  *
@@ -14,12 +17,11 @@
  * Estrutura pronta para adicionar Gemini, Anthropic, etc.
  * Basta criar gemini-handler.js com mesmo padrão!
  */
-// Logger e ipcRenderer carregados globalmente via index.html
+// ipcRenderer carregados globalmente via index.html
 
 class OpenAIHandler {
   constructor(ipcRenderer) {
     this.ipcRenderer = ipcRenderer;
-    this.logger = globalThis.Logger;
     this.model = 'gpt-4o-mini';
   }
 
@@ -57,7 +59,7 @@ class OpenAIHandler {
    */
   async complete(messages) {
     try {
-      this.logger.info('📤 OpenAI complete() iniciado', {
+      Logger.info('📤 OpenAI complete() iniciado', {
         model: this.model,
         messagesCount: messages.length,
       });
@@ -68,14 +70,14 @@ class OpenAIHandler {
         throw new Error('Resposta vazia da API OpenAI');
       }
 
-      this.logger.info('✅ OpenAI complete() concluído', {
+      Logger.info('✅ OpenAI complete() concluído', {
         responseLength: response.length || 0,
       });
 
       return response;
     } catch (error) {
       const userMessage = this._mapErrorMessage(error);
-      this.logger.error('❌ Erro OpenAI complete:', {
+      Logger.error('❌ Erro OpenAI complete:', {
         error: error.message,
         code: error.code,
         userMessage,
@@ -109,12 +111,12 @@ class OpenAIHandler {
 
     const onEnd = () => {
       state.isEnd = true;
-      this.logger.debug('🏁 Stream OpenAI finalizado');
+      Logger.debug('🏁 Stream OpenAI finalizado');
     };
 
     const onError = (_, error) => {
       const userMessage = this._mapErrorMessage(error);
-      this.logger.error('❌ Erro durante stream OpenAI:', {
+      Logger.error('❌ Erro durante stream OpenAI:', {
         error: error.message || error,
         userMessage,
       });
@@ -127,7 +129,7 @@ class OpenAIHandler {
     this.ipcRenderer.once('LLM_STREAM_ERROR', onError);
 
     try {
-      this.logger.debug(
+      Logger.debug(
         '📤 OpenAI stream() iniciado',
         {
           model: this.model,
@@ -140,7 +142,7 @@ class OpenAIHandler {
       // Invocar stream no main process
       this.ipcRenderer.invoke('ask-llm-stream', messages).catch((err) => {
         const userMessage = this._mapErrorMessage(err);
-        this.logger.error('❌ Erro ao invocar ask-llm-stream:', {
+        Logger.error('❌ Erro ao invocar ask-llm-stream:', {
           error: err.message,
           userMessage,
         });
@@ -164,7 +166,7 @@ class OpenAIHandler {
         }
       }
 
-      this.logger.debug('✅ OpenAI stream() concluído', false);
+      Logger.debug('✅ OpenAI stream() concluído', false);
     } finally {
       // Limpar listeners para evitar memory leaks
       this.ipcRenderer.removeListener('LLM_STREAM_CHUNK', onChunk);

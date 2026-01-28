@@ -1,16 +1,18 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /* ================================ */
 // QUESTION HELPERS
 // Funções utilitárias para manipulação de perguntas
 /* ================================ */
-// Logger carregado globalmente via index.html
 
 /**
  * Normaliza texto para comparação
  * Remove pontuação, converte para lowercase, remove espaços extras
  */
 function normalizeForCompare(t) {
-  globalThis.Logger.debug('Início da função: "normalizeForCompare"');
-  globalThis.Logger.debug('Fim da função: "normalizeForCompare"');
+  Logger.debug('Início da função: "normalizeForCompare"');
+  Logger.debug('Fim da função: "normalizeForCompare"');
   return (t || '')
     .toLowerCase()
     .replaceAll(/[?!.\n\r]/g, '')
@@ -29,7 +31,7 @@ function finalizeQuestion(text) {
  * Reseta a pergunta atual
  */
 function resetCurrentQuestion(appState) {
-  globalThis.Logger.debug('Início da função: "resetCurrentQuestion"');
+  Logger.debug('Início da função: "resetCurrentQuestion"');
 
   appState.interview.currentQuestion = {
     text: '',
@@ -41,21 +43,21 @@ function resetCurrentQuestion(appState) {
     promotedToHistory: false,
   };
 
-  globalThis.Logger.debug('Fim da função: "resetCurrentQuestion"');
+  Logger.debug('Fim da função: "resetCurrentQuestion"');
 }
 
 /**
  * Verifica se uma pergunta já foi respondida pelo ID
  */
 function findAnswerByQuestionId(appState, questionId) {
-  globalThis.Logger.debug('Início da função: "findAnswerByQuestionId"');
+  Logger.debug('Início da função: "findAnswerByQuestionId"');
 
   if (!questionId) {
-    globalThis.Logger.debug('Fim da função: "findAnswerByQuestionId"');
+    Logger.debug('Fim da função: "findAnswerByQuestionId"');
     return false;
   }
 
-  globalThis.Logger.debug('Fim da função: "findAnswerByQuestionId"');
+  Logger.debug('Fim da função: "findAnswerByQuestionId"');
   return appState.interview.answeredQuestions.has(questionId);
 }
 

@@ -97,7 +97,7 @@ appState.selectedId       // pergunta selecionada
 
 // EventBus: Sistema de eventos único
 eventBus.on('transcriptAdd', data => {...})
-eventBus.emit('answerStreamChunk', {...})
+eventBus.emit('answerStream', {...})
 
 // ModeManager: Lógica de modo
 modeManager.is(MODES.INTERVIEW)   // checking modo
@@ -106,7 +106,7 @@ modeManager.handle('onQuestionFinalize', ...)  // delegação
 
 **Event Listeners Consolidados** (linhas 42-85):
 
-- `answerStreamChunk`: Streamer chunking para UI (INTERVIEW mode)
+- `answerStream`: Streamer chunking para UI (INTERVIEW mode)
 - `llmStreamEnd`: Marca como respondida, limpa pergunta atual
 - `llmBatchEnd`: Marca como respondida, emite answerBatchEnd para UI
 - `error`: Handler global de erros
@@ -172,7 +172,7 @@ modeManager.handle('onAnswerRequest', questionId); // routing lógica
 
 #### config-manager.js (DOM & UI Events)
 
-- Gerencia DOM (listener para `transcriptAdd`, `answerBatchEnd`, `answerStreamChunk`)
+- Gerencia DOM (listener para `transcriptAdd`, `answerBatchEnd`, `answerStream`)
 - Renderiza markdown com `marked.parse()`
 - Renderiza badges com `turn-id-badge`
 - Persiste configurações em localStorage + electron-store
@@ -186,7 +186,7 @@ modeManager.handle('onAnswerRequest', questionId); // routing lógica
 | Evento                   | Origem      | Destino        | Payload                          |
 | ------------------------ | ----------- | -------------- | -------------------------------- |
 | `transcriptAdd`          | STT modules | config-manager | `{text, duration, timestamp}`    |
-| `answerStreamChunk`      | renderer.js | config-manager | `{questionId, chunk, turnId}`    |
+| `answerStream`      | renderer.js | config-manager | `{questionId, chunk, turnId}`    |
 | `answerBatchEnd`         | renderer.js | config-manager | `{questionId, response, turnId}` |
 | `questionsHistoryUpdate` | renderer.js | config-manager | `{questions}`                    |
 | `error`                  | Any module  | renderer.js    | `{message, error}`               |
@@ -574,7 +574,7 @@ Renderizado em HTML com markdown (marked.js) + syntax highlight (highlight.js).
 
 ---
 
-## ��� FASE 9: REFATORAÇÃO DE CONFIGURAÇÃO (JAN 2026)
+## ��� FASE 9: REFATORAÇÃO DE CONFIGURAÇÃO (JAN 2026)
 
 ### Objetivo
 
@@ -715,7 +715,7 @@ class ApiKeyManager {
 
 ---
 
-**Status FINAL**: ��� **ARQUITETURA COMPLETA E VALIDADA**
+**Status FINAL**: ��� **ARQUITETURA COMPLETA E VALIDADA**
 
 - ✅ ConfigManager em local correto (`controllers/config/ConfigManager.js`)
 - ✅ Estrutura temática em `controllers/` para toda lógica

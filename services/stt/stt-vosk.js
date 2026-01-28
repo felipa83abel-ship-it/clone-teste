@@ -1,3 +1,6 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /**
  * 🔥 VOSK STT (Speech-to-Text) - MÓDULO INDEPENDENTE
  *
@@ -523,7 +526,7 @@ const {
     const effectiveSpeech = useVADDecision ? !!vars._lastIsSpeech : percent > 0;
 
     debugLogVosk(
-      `🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
+      `[${source}] - 🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
       false
     );
 
@@ -535,7 +538,10 @@ const {
         const noiseDuration = vars.noiseStartTime - vars.noiseStopTime;
         vars.noiseStopTime = null;
 
-        debugLogVosk(`🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`, true);
+        debugLogVosk(
+          `[${source}] 🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`,
+          true
+        );
       }
 
       vars.inSilence = false;
@@ -552,15 +558,8 @@ const {
         vars.shouldFinalizeAskCurrent = true;
         vars.noiseStopTime = Date.now();
 
-        const timestamp = new Date().toLocaleTimeString('pt-BR', {
-          hour12: false,
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit',
-          fractionalSecondDigits: 3,
-        });
         debugLogVosk(
-          `⏰ [${timestamp}] 🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) - shouldFinalizeAskCurrent=TRUE *****`,
+          `[${source}] 🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) - shouldFinalizeAskCurrent=TRUE *****`,
           true
         );
 
@@ -888,7 +887,7 @@ const {
     );
 
     // Registrar em Logger para histórico de debug
-    globalThis.Logger.debug(`[stt-vosk] ${cleanArgs.join(' ')}`, { timeStr });
+    Logger.debug(`[stt-vosk] ${cleanArgs.join(' ')}`, { timeStr });
   }
 
   /* ================================ */

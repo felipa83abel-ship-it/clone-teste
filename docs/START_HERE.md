@@ -71,7 +71,7 @@ renderer.js (1755 linhas)
 └── Exporta window.RendererAPI ........... Bridge para config-manager
 
 config-manager.js (2626 linhas)
-├── Listeners para EventBus ............... answerStreamChunk, answerBatchEnd
+├── Listeners para EventBus ............... answerStream, answerBatchEnd
 ├── DOM rendering ......................... Markdown, badges, scroll
 ├── localStorage + electron-store ........ Persistência segura
 └── UI Tabs .............................. Geral, API, Áudio, Privacidade

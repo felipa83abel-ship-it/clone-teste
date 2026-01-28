@@ -40,7 +40,7 @@ Uma documentação **PROFISSIONAL**, **COMPLETA** e **MULTI-PERSPECTIVA** sobre 
    └─ emit('clearInterim')
 
 3. llmHandlers.js
-   ├─ emit('answerStreamChunk')
+   ├─ emit('answerStream')
    ├─ emit('answerStreamEnd')
    ├─ emit('llmStreamEnd')
    └─ emit('answerBatchEnd')
@@ -80,7 +80,7 @@ Uma documentação **PROFISSIONAL**, **COMPLETA** e **MULTI-PERSPECTIVA** sobre 
    on('listenButtonToggle')       → Atualiza botão
    on('statusUpdate')             → Mostra status
    on('transcriptionAdd')         → Renderiza texto
-   on('answerStreamChunk')        → Append token ao DOM
+   on('answerStream')        → Append token ao DOM
    on('answerStreamEnd')          → Finaliza resposta
    on('currentQuestionUpdate')    → Destaca pergunta
    on('questionsHistoryUpdate')   → Renderiza histórico
@@ -162,7 +162,7 @@ UI ATUALIZA em tempo real
 │                                                   │
 │ T=160: Primeiro token chega                      │
 │ ├─ "Sim,"                                        │
-│ └─ EMIT: 'answerStreamChunk'                    │
+│ └─ EMIT: 'answerStream'                    │
 │    │                                             │
 │    └─→ EventBus                                  │
 │        │                                         │
@@ -194,7 +194,7 @@ UI ATUALIZA em tempo real
 | `listenButtonToggle` | audio-ctrl | HomeUI | User clica mic |
 | `transcriptAdd` | STT | HomeUI | Texto chega |
 | `updateInterim` | STT | HomeUI | Texto parcial |
-| `answerStreamChunk` | llmHandlers | HomeUI | Token chega (repete) |
+| `answerStream` | llmHandlers | HomeUI | Token chega (repete) |
 | `answerStreamEnd` | llmHandlers | HomeUI | Resposta completa |
 | `windowOpacityUpdate` | renderer | WindowUI | User move slider |
 | `statusUpdate` | helpers | HomeUI | Status muda |

@@ -115,7 +115,7 @@ await globalThis.configManager.initializeController();
 ```javascript
 // ✅ CORRETO:
 eventBus.emit('transcriptionAdd', { text: 'Nova transcrição' });
-eventBus.emit('answerStreamChunk', { chunk: 'Resposta...' });
+eventBus.emit('answerStream', { chunk: 'Resposta...' });
 eventBus.emit('interviewEnded', { turnId: 5 });
 ```
 
@@ -164,7 +164,7 @@ async initializeController() {
 **Listeners:**
 ```javascript
 this.eventBus.on('transcriptionAdd', ...)
-this.eventBus.on('answerStreamChunk', ...)
+this.eventBus.on('answerStream', ...)
 this.eventBus.on('answerBatchEnd', ...)
 this.eventBus.on('listenButtonToggle', ...)
 ```
@@ -246,7 +246,7 @@ this.eventBus.on('listenButtonToggle', ...)
 4. main.js envia para renderer.js via ipc
    ↓
 5. renderer.js emite:
-   eventBus.emit('answerStreamChunk', { chunk: 'A res...' })
+   eventBus.emit('answerStream', { chunk: 'A res...' })
    ↓
 6. HomeUIManager escuta e atualiza #answersHistory
    ↓

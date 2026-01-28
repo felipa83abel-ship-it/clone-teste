@@ -107,7 +107,7 @@
 
 [T=100ms] OpenAI API conecta e inicia streaming
         │
-        ├─ EMIT: 'answerStreamChunk' (token 1)
+        ├─ EMIT: 'answerStream' (token 1)
         │  Dados: { questionId: 'Q1', text: 'Sim,', turnId: 1 }
         │  │
         │  └─ LISTEN: HomeUIManager.js:520
@@ -119,7 +119,7 @@
 
 [T=120ms] Token 2 arrives
         │
-        ├─ EMIT: 'answerStreamChunk'
+        ├─ EMIT: 'answerStream'
         │  Dados: { questionId: 'Q1', text: ' Java', turnId: 1 }
         │  │
         │  └─ LISTEN: HomeUIManager.js:520
@@ -130,7 +130,7 @@
 
 [T=140ms] Token 3 arrives
         │
-        ├─ EMIT: 'answerStreamChunk'
+        ├─ EMIT: 'answerStream'
         │  Dados: { questionId: 'Q1', text: ' é', turnId: 1 }
         │
         └─ Resultado: 'Sim, Java é'
@@ -139,7 +139,7 @@
 
 [T=500ms] Último token recebido
         │
-        ├─ EMIT: 'answerStreamChunk'
+        ├─ EMIT: 'answerStream'
         │  Dados: { questionId: 'Q1', text: '.', turnId: 1 }
         │
         └─ Resultado: 'Sim, Java é uma linguagem compilada ou interpretada, tecnicamente é compilada para bytecode...'
@@ -485,7 +485,7 @@ User clica na pergunta 1 para selecioná-la
 |---------|--------|---------|---------|-----------|
 | User pede transcrição | `listenButtonToggle` | audio-ctrl | HomeUI | Botão muda estado |
 | STT envia texto | `transcriptAdd` | STT | HomeUI | Texto renderizado |
-| LLM envia token | `answerStreamChunk` | llmHandlers | HomeUI | Token adicionado ao DOM |
+| LLM envia token | `answerStream` | llmHandlers | HomeUI | Token adicionado ao DOM |
 | Stream finalizado | `answerStreamEnd` | llmHandlers | HomeUI | Resposta completa |
 | User move slider | `windowOpacityUpdate` | renderer | WindowUI | Opacidade sincronizada |
 | User clica limpar | `questionsHistoryUpdate` | helpers | HomeUI | Histórico vazio |

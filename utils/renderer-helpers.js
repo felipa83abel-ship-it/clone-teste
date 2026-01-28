@@ -1,11 +1,11 @@
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
+
 /* ================================ */
 // RENDERER HELPERS
 // Funções utilitárias gerais do renderer
 /* ================================ */
-// @ts-nocheck
-/* global Logger */
 // ipcRenderer passado em deps.ipcRenderer
-// Logger é carregado como script global no index.html
 
 /**
  * Inicializar renderer-helpers
@@ -19,9 +19,9 @@ function initRendererHelpers(deps) {
  * Atualiza a mensagem de status na UI
  */
 function updateStatusMessage(message) {
-  globalThis.Logger?.debug('Início da função: "updateStatusMessage"');
+  Logger?.debug('Início da função: "updateStatusMessage"');
   globalThis.eventBus.emit('statusUpdate', { message });
-  globalThis.Logger?.debug('Fim da função: "updateStatusMessage"');
+  Logger?.debug('Fim da função: "updateStatusMessage"');
 }
 
 /**

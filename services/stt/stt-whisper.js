@@ -1,4 +1,5 @@
-// @ts-nocheck
+// @ts-nocheck - TypeScript em CommonJS não consegue resolver globals injetadas dinamicamente no DOM
+/* global Logger */
 // ffmpeg import causa erros de type em node_modules
 
 /**
@@ -716,7 +717,7 @@ const {
     const effectiveSpeech = useVADDecision ? !!vars._lastIsSpeech : percent > 0;
 
     debugLogWhisper(
-      `🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
+      `[${source}] - 🔍 VAD ${source}: ${vars._lastIsSpeech ? 'speech' : 'silence'} - 🔊 volume: ${percent.toFixed(2)}%`,
       false
     );
 
@@ -729,7 +730,7 @@ const {
         vars.noiseStopTime = null;
 
         debugLogWhisper(
-          `🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`,
+          `[${source}] 🟢 🟢 🟢 ***** 🔊 Fala real detectada após (${noiseDuration}ms) *****`,
           true
         );
       }
@@ -748,7 +749,10 @@ const {
         vars.shouldFinalizeAskCurrent = true;
         vars.noiseStopTime = Date.now();
 
-        debugLogWhisper(`🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`, true);
+        debugLogWhisper(
+          `[${source}] 🔴 🔴 🔴 ***** 🔇 Silêncio estável detectado (${elapsed}ms) *****`,
+          true
+        );
 
         // Dispara finalize apenas uma vez
         mediaRecorder.stop();
@@ -1032,7 +1036,7 @@ const {
     );
 
     // Registrar em Logger para histórico de debug
-    globalThis.Logger.debug(`[stt-whisper] ${cleanArgs.join(' ')}`, { timeStr });
+    Logger.debug(`[stt-whisper] ${cleanArgs.join(' ')}`, { timeStr });
   }
 
   /* ================================ */

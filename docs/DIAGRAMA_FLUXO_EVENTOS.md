@@ -65,7 +65,7 @@ USER PRESSES Ctrl+Enter (or clicks Ask button)
         │  └──→ handleLLMStream() [llmHandlers.js]
         │      ├─ OpenAI streaming API
         │      ├─ For each token chunk:
-        │      │  └─ Emit: 'answerStreamChunk' ← [4] TOKEN RECEIVED
+        │      │  └─ Emit: 'answerStream' ← [4] TOKEN RECEIVED
         │      │     └─ HomeUIManager appends to DOM
         │      │
         │      └─ On completion:
@@ -178,7 +178,7 @@ USER CHANGES CONFIG (Privacy, Screenshot, Window)
    │  ├─ OpenAI client streaming
    │  └─ For each token:
    │
-   ├─ Emit: 'answerStreamChunk'
+   ├─ Emit: 'answerStream'
    │  ├─ Data: { questionId, text, turnId }
    │  └─ Receiver: HomeUIManager
    │     └─ Append token to DOM (real-time)
@@ -214,7 +214,7 @@ USER CHANGES CONFIG (Privacy, Screenshot, Window)
 │ 3 │ transcriptAdd            │ STT provider    │ HomeUIManager   │
 │ 4 │ updateInterim            │ STT provider    │ HomeUIManager   │
 │ 5 │ placeholderFulfill       │ STT provider    │ HomeUIManager   │
-│ 6 │ answerStreamChunk        │ llmHandlers     │ HomeUIManager   │
+│ 6 │ answerStream        │ llmHandlers     │ HomeUIManager   │
 │ 7 │ answerStreamEnd          │ llmHandlers     │ HomeUIManager   │
 │ 8 │ llmStreamEnd             │ llmHandlers     │ renderer        │
 │ 9 │ sortAnswersByTurnId      │ renderer        │ HomeUIManager   │
@@ -320,7 +320,7 @@ ANY COMPONENT ENCOUNTERS ERROR
 ├──────────────────────────────────────────────────────┤
 │ • Notificar sobre mudanças (desacoplar)             │
 │ • Desencadear ações em outros componentes           │
-│ • Exemplo: 'transcriptAdd', 'answerStreamChunk'    │
+│ • Exemplo: 'transcriptAdd', 'answerStream'    │
 │                                                       │
 │ ✅ eventBus.emit('listenButtonToggle')              │
 │ ✅ eventBus.emit('transcriptAdd')                   │
@@ -375,7 +375,7 @@ T=1: Parse HTML, Load Scripts in Order
      │     └─ #initUIEventBusListeners()
      │        ├─ eventBus.on('statusUpdate', callback)
      │        ├─ eventBus.on('transcriptionAdd', callback)
-     │        ├─ eventBus.on('answerStreamChunk', callback)
+     │        ├─ eventBus.on('answerStream', callback)
      │        └─ eventBus.on(...) × 10 more
      │           └─ 📡 ALL LISTENERS REGISTERED
      │     }
@@ -389,7 +389,7 @@ T=1: Parse HTML, Load Scripts in Order
      │
      ├─ <script src="./handlers/llmHandlers.js">
      │  └─ When LLM streams token:
-     │     └─ eventBus.emit('answerStreamChunk', {...})
+     │     └─ eventBus.emit('answerStream', {...})
      │        └─ ✅ HomeUIManager is listening! Token rendered!
      │
      ├─ <script src="./renderer.js">
@@ -470,11 +470,11 @@ Example:
   ✅ CORRECT
      constructor() {
        this.onAnswerChunk = (data) => { ... };
-       eventBus.on('answerStreamChunk', this.onAnswerChunk);
+       eventBus.on('answerStream', this.onAnswerChunk);
      }
      
      cleanup() {
-       eventBus.off('answerStreamChunk', this.onAnswerChunk);
+       eventBus.off('answerStream', this.onAnswerChunk);
      }
 
 ```

@@ -34,6 +34,7 @@ class WindowUIManager {
    */
   async initialize() {
     Logger.debug('🚀 WindowUIManager.initialize()', false);
+    this.#initMenuNavigation();
     this.#initEventBusListeners();
     this.#initWindowListeners();
     await this.initClickThroughController();
@@ -93,10 +94,6 @@ class WindowUIManager {
     Logger.debug('✅ Preferências restauradas', false);
     Logger.debug('Fim da função: "restoreUserPreferences"');
   }
-
-  // ==========================================
-  // MÉTODOS PÚBLICOS
-  // ==========================================
 
   /**
    * Inicializa drag handle da janela
@@ -169,6 +166,50 @@ class WindowUIManager {
   // ==========================================
   // MÉTODOS PRIVADOS
   // ==========================================
+
+  /**
+   * Registra listeners para navegação do menu lateral
+   */
+  #initMenuNavigation() {
+    console.log('>>> #initMenuNavigation INICIADO');
+    Logger.debug('🎯 WindowUIManager.#initMenuNavigation');
+
+    // Registrar listeners para cada item do menu
+    document.querySelectorAll('.menu-item[data-tab]').forEach((menuItem) => {
+      menuItem.addEventListener('click', () => {
+        try {
+          const tabName = menuItem.dataset.tab;
+          console.log(`>>> Menu item clicado: ${tabName}`);
+
+          // Remover classe active de todos os items
+          document.querySelectorAll('.menu-item').forEach((item) => {
+            item.classList.remove('active');
+          });
+
+          // Adicionar classe active ao item clicado
+          menuItem.classList.add('active');
+
+          // Esconder todas as seções
+          document.querySelectorAll('.config-section').forEach((section) => {
+            section.classList.remove('active');
+          });
+
+          // Mostrar a seção correspondente
+          const targetSection = DOM.get(tabName);
+          if (targetSection) {
+            targetSection.classList.add('active');
+            console.log(`>>> Seção ativada: ${tabName}`);
+          } else {
+            console.warn(`>>> Seção não encontrada: ${tabName}`);
+          }
+        } catch (error) {
+          console.error('>>> ERRO ao navegar menu:', error);
+        }
+      });
+    });
+
+    console.log('>>> #initMenuNavigation COMPLETO');
+  }
 
   /**
    * Registra listeners em elementos de janela

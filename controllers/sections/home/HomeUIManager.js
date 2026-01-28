@@ -26,9 +26,7 @@ class HomeUIManager {
    * Inicializa listeners do HOME
    */
   async initialize() {
-    console.log('🏠🏠🏠 HomeManager.initialize() INICIADO 🏠🏠🏠');
-    Logger.debug('🏠 HomeManager: Iniciando');
-    this.#initMenuNavigation();
+    Logger.debug('🏠🏠🏠 HomeManager: Iniciando 🏠🏠🏠', true);
     this.#initTabSwitching();
     this.#initMockToggle();
     this.#initResetHomeButton();
@@ -36,8 +34,7 @@ class HomeUIManager {
     this.#initQuestionsHistoryListener();
     this.#initUIEventBusListeners();
     await this.restoreState();
-    Logger.debug('🏠 HomeManager: Inicialização completa');
-    console.log('🏠🏠🏠 HomeManager.initialize() COMPLETO 🏠🏠🏠');
+    Logger.debug('🏠🏠🏠 HomeManager.initialize() COMPLETO 🏠🏠🏠', true);
   }
 
   /**
@@ -89,49 +86,6 @@ class HomeUIManager {
   // MÉTODOS PRIVADOS
   // ==========================================
 
-  /**
-   * Registra listeners para navegação do menu lateral
-   */
-  #initMenuNavigation() {
-    console.log('>>> #initMenuNavigation INICIADO');
-    Logger.debug('🏠 HomeManager: #initMenuNavigation');
-
-    // Registrar listeners para cada item do menu
-    document.querySelectorAll('.menu-item[data-tab]').forEach((menuItem) => {
-      menuItem.addEventListener('click', () => {
-        try {
-          const tabName = menuItem.dataset.tab;
-          console.log(`>>> Menu item clicado: ${tabName}`);
-
-          // Remover classe active de todos os items
-          document.querySelectorAll('.menu-item').forEach((item) => {
-            item.classList.remove('active');
-          });
-
-          // Adicionar classe active ao item clicado
-          menuItem.classList.add('active');
-
-          // Esconder todas as seções
-          document.querySelectorAll('.config-section').forEach((section) => {
-            section.classList.remove('active');
-          });
-
-          // Mostrar a seção correspondente
-          const targetSection = DOM.get(tabName);
-          if (targetSection) {
-            targetSection.classList.add('active');
-            console.log(`>>> Seção ativada: ${tabName}`);
-          } else {
-            console.warn(`>>> Seção não encontrada: ${tabName}`);
-          }
-        } catch (error) {
-          console.error('>>> ERRO ao navegar menu:', error);
-        }
-      });
-    });
-
-    console.log('>>> #initMenuNavigation COMPLETO');
-  }
   #initMockToggle() {
     Logger.debug('🏠 HomeManager: #initMockToggle');
     const mockToggle = DOM.get('mockToggle');
@@ -196,18 +150,15 @@ class HomeUIManager {
    * Registra listeners dos botões de ação (listen, ask llm, close)
    */
   #initActionButtonListeners() {
-    console.log('>>> #initActionButtonListeners INICIADO');
-    Logger.debug('🏠 HomeManager: #initActionButtonListeners');
+    Logger.debug('🏠 HomeManager: #initActionButtonListeners', true);
 
     // Listen button
     console.log('>>> Registrando listenBtn...');
     this.registerElementListener('listenBtn', 'click', () => {
       try {
-        console.log('>>> listenBtn CLICADO!');
+        console.log('>>> listenBtn CLICADO - chamando listenToggleBtn()...');
         if (globalThis.RendererAPI?.listenToggleBtn) {
-          console.log('>>> Chamando listenToggleBtn()...');
           globalThis.RendererAPI.listenToggleBtn();
-          console.log('>>> listenToggleBtn() chamado com sucesso');
         } else {
           console.warn('>>> listenToggleBtn NÃO EXISTE em RendererAPI!');
         }
@@ -220,11 +171,9 @@ class HomeUIManager {
     console.log('>>> Registrando askLlmBtn...');
     this.registerElementListener('askLlmBtn', 'click', () => {
       try {
-        console.log('>>> askLlmBtn CLICADO!');
+        console.log('>>> askLlmBtn CLICADO - chamando askLLM()...');
         if (globalThis.RendererAPI?.askLLM) {
-          console.log('>>> Chamando askLLM()...');
           globalThis.RendererAPI.askLLM();
-          console.log('>>> askLLM() chamado com sucesso');
         } else {
           console.warn('>>> askLLM NÃO EXISTE em RendererAPI!');
         }
@@ -303,7 +252,7 @@ class HomeUIManager {
    * Registra listeners para questions history
    */
   #initQuestionsHistoryListener() {
-    Logger.debug('🏠 HomeManager: #initQuestionsHistoryListener');
+    Logger.debug('🏠 HomeManager: #initQuestionsHistoryListener', false);
     const questionsHistoryBox = DOM.get('questionsHistory');
     if (questionsHistoryBox) {
       questionsHistoryBox.addEventListener('click', (e) => {
@@ -322,7 +271,6 @@ class HomeUIManager {
    */
   #initTabSwitching() {
     Logger.debug('🏠 HomeManager: #initTabSwitching');
-    console.log('>>> #initTabSwitching INICIADO');
 
     document.querySelectorAll('.tab-button').forEach((button) => {
       button.addEventListener('click', (e) => {
@@ -371,7 +319,7 @@ class HomeUIManager {
       });
     });
 
-    console.log('>>> #initTabSwitching COMPLETO');
+    Logger.debug('🏠 HomeManager: #initTabSwitching COMPLETO', true);
   }
 
   /**
@@ -379,21 +327,22 @@ class HomeUIManager {
    * Isto centraliza TODOS os listeners de DOM que estavam espalhados em renderer.js
    */
   #initUIEventBusListeners() {
-    console.log('>>> #initUIEventBusListeners INICIADO - Centralizando listeners de DOM');
-    Logger.debug('🏠 HomeManager: #initUIEventBusListeners');
+    Logger.debug('🏠 HomeManager: #initUIEventBusListeners', true);
 
     // ==========================================
     // LISTENER: inputVolumeUpdate
     // Atualiza VU meter de entrada em tempo real
     // ==========================================
     this.eventBus.on('inputVolumeUpdate', ({ percent }) => {
+      const newPercent = globalThis.appState.audio.isRunning ? percent : 0;
+
       const inputVu = DOM.get('inputVu');
-      if (inputVu) inputVu.style.width = percent + '%';
+      if (inputVu) inputVu.style.width = newPercent + '%';
 
       const inputVuHome = DOM.get('inputVuHome');
-      if (inputVuHome) inputVuHome.style.width = percent + '%';
+      if (inputVuHome) inputVuHome.style.width = newPercent + '%';
 
-      Logger.debug(`📊 Input Volume atualizado: ${percent}%`, false);
+      Logger.debug(`📊 Input Volume atualizado: ${newPercent}%`, false);
     });
 
     // ==========================================
@@ -401,13 +350,15 @@ class HomeUIManager {
     // Atualiza VU meter de saída em tempo real
     // ==========================================
     this.eventBus.on('outputVolumeUpdate', ({ percent }) => {
+      const newPercent = globalThis.appState.audio.isRunning ? percent : 0;
+
       const outputVu = DOM.get('outputVu');
-      if (outputVu) outputVu.style.width = percent + '%';
+      if (outputVu) outputVu.style.width = newPercent + '%';
 
       const outputVuHome = DOM.get('outputVuHome');
-      if (outputVuHome) outputVuHome.style.width = percent + '%';
+      if (outputVuHome) outputVuHome.style.width = newPercent + '%';
 
-      Logger.debug(`📊 Output Volume atualizado: ${percent}%`, false);
+      Logger.debug(`📊 Output Volume atualizado: ${newPercent}%`, false);
     });
 
     // ==========================================
@@ -419,7 +370,7 @@ class HomeUIManager {
       if (listenBtn) {
         listenBtn.textContent = buttonText;
         listenBtn.classList.toggle('listening', isRunning);
-        console.log(`🎨 Botão listen atualizado: "${buttonText}" (listening: ${isRunning})`);
+        Logger.debug(`🎨 Botão listen atualizado: "${buttonText}" (listening: ${isRunning})`, true);
       } else {
         console.warn('⚠️ Elemento listenBtn não encontrado no DOM');
       }
@@ -428,16 +379,7 @@ class HomeUIManager {
       const homeVuMeters = document.querySelector('.home-vu-meters');
       if (homeVuMeters) {
         homeVuMeters.classList.toggle('listening', isRunning);
-        console.log(`🎨 .home-vu-meters atualizado (listening: ${isRunning})`);
-      }
-
-      // Se parou de capturar, resetar volume na home para 0
-      if (!isRunning) {
-        const inputVuHome = DOM.get('inputVuHome');
-        if (inputVuHome) inputVuHome.style.width = '0%';
-
-        const outputVuHome = DOM.get('outputVuHome');
-        if (outputVuHome) outputVuHome.style.width = '0%';
+        Logger.debug(`🎨 .home-vu-meters atualizado (listening: ${isRunning})`, false);
       }
     });
 
@@ -449,7 +391,7 @@ class HomeUIManager {
       const statusDiv = DOM.get('statusDiv');
       if (statusDiv) {
         statusDiv.textContent = message;
-        console.log(`📊 Status atualizado: "${message}"`);
+        Logger.debug(`📊 Status atualizado: "${message}"`, false);
       }
     });
 
@@ -463,14 +405,18 @@ class HomeUIManager {
         console.warn(`⚠️ Elemento ${elementId || 'conversation'} não encontrado`);
         return;
       }
+
       // Adiciona placeholder vazio que será preenchido depois
       const div = document.createElement('div');
       div.id = placeholderId;
       div.className = 'transcript-item placeholder';
-      div.setAttribute('data-is-placeholder', 'true');
-      div.innerHTML = `<span style="color:#999">[${timeStr}]</span> <strong>${author}:</strong> <span class="placeholder-text">...</span>`;
+      div.dataset.isPlaceholder = 'true';
+      div.innerHTML = `<span style="color:#999">[${timeStr}]</span> <strong>${author}:</strong> <span class="placeholder-text">${text}</span>`;
       transcriptBox.appendChild(div);
-      console.log(`📝 Transcrição placeholder adicionado (${author})`);
+      Logger.debug(`📝 Transcrição placeholder adicionado (${author})`, false);
+
+      // 📜 Auto-scroll para acompanhar a fala em tempo real
+      requestAnimationFrame(() => autoScroll('transcriptionContainer'));
     });
 
     // ==========================================
@@ -494,8 +440,28 @@ class HomeUIManager {
       // Atualiza texto interim
       const ts = new Date().toLocaleTimeString();
       interimElement.innerHTML = `<span style="color:#999">[${ts}]</span> <strong>${speaker}:</strong> <span style="font-style:italic;color:#888">${text}</span>`;
-      console.log(`⏳ Interim atualizado (${speaker}): ${text.substring(0, 30)}...`);
+      Logger.debug(`⏳ Interim atualizado (${speaker}): ${text.substring(0, 30)}...`, false);
+
+      // 📜 Auto-scroll para acompanhar a fala em tempo real
+      requestAnimationFrame(() => autoScroll('transcriptionContainer'));
     });
+
+    /**
+     *  Auto-scroll helper
+     */
+    function autoScroll(containerId) {
+      const container = DOM.get(containerId);
+      if (!container) return;
+
+      // Só rola se já estiver perto do fim
+      const isNearBottom =
+        container.scrollTop + container.clientHeight >= container.scrollHeight - 100;
+
+      if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
+        Logger.debug('📜 Auto-scroll executado', { scrollTop: container.scrollTop }, false);
+      }
+    }
 
     // ==========================================
     // LISTENER: placeholderFulfill
@@ -506,10 +472,10 @@ class HomeUIManager {
       if (placeholder) {
         placeholder.classList.remove('placeholder');
         placeholder.classList.add('final');
-        placeholder.setAttribute('data-is-placeholder', 'false');
+        placeholder.dataset.isPlaceholder = 'false';
         const ts = new Date().toLocaleTimeString();
         placeholder.innerHTML = `<span style="color:#999">[${ts}]</span> <strong>${speaker}:</strong> ${text}`;
-        console.log(`✅ Placeholder preenchido (${speaker}): ${text.substring(0, 30)}...`);
+        Logger.debug(`✅ Placeholder preenchido (${speaker}): ${text.substring(0, 30)}...`, false);
       } else {
         console.warn(`⚠️ Placeholder ${placeholderId} não encontrado`);
       }
@@ -523,7 +489,7 @@ class HomeUIManager {
       const interimElement = document.getElementById(id);
       if (interimElement) {
         interimElement.remove();
-        console.log(`🗑️ Interim removido: ${id}`);
+        Logger.debug(`🗑️ Interim removido: ${id}`, false);
       }
     });
 
@@ -576,7 +542,10 @@ class HomeUIManager {
           <span class="question-text">${text}</span>
         </div>
       `;
-      console.log(`🎯 Pergunta atual atualizada: "${text?.substring(0, 30) || '(vazio)'}..."`);
+      Logger.debug(
+        `🎯 Pergunta atual atualizada: "${text?.substring(0, 30) || '(vazio)'}..."`,
+        false
+      );
     });
 
     // ==========================================
@@ -640,7 +609,10 @@ class HomeUIManager {
 
           questionsHistoryBox.appendChild(questionBlock);
         });
-        console.log(`📋 Histórico de perguntas renderizado (${historyData.length} perguntas)`);
+        Logger.debug(
+          `📋 Histórico de perguntas renderizado (${historyData.length} perguntas)`,
+          false
+        );
       }
     });
 
@@ -656,7 +628,7 @@ class HomeUIManager {
         );
         if (questionBlock) {
           questionBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          console.log(`📍 Rolou para pergunta: ${questionId}`);
+          Logger.debug(`📍 Rolou para pergunta: ${questionId}`, false);
         }
       }
     });
@@ -671,50 +643,76 @@ class HomeUIManager {
         questionsHistoryBox.querySelectorAll('.question-block').forEach((block) => {
           block.classList.remove('selected');
         });
-        console.log('🧹 Seleção de perguntas limpa');
+        Logger.debug('🧹 Seleção de perguntas limpa', false);
       }
     });
 
     // ==========================================
-    // LISTENER: answerStreamChunk
+    // LISTENER: answerStream
     // Streaming de resposta (token por token)
     // ==========================================
-    this.eventBus.on('answerStreamChunk', (data) => {
+    this.eventBus.on('answerStream', (data) => {
       const { token, questionId, turnId } = data;
       const answersHistory = DOM.get('answersHistory');
 
       if (!token) return; // Ignorar tokens vazios
+      if (!answersHistory) return; // Se não houver histórico, sai
 
-      if (answersHistory) {
-        // Procurar elemento de resposta existente
-        let answerBlock = answersHistory.querySelector(`[data-question-id="${questionId}"]`);
+      // Procurar elemento de resposta existente
+      let answerBlock = answersHistory.querySelector(`[data-question-id="${questionId}"]`);
 
-        if (!answerBlock) {
-          // Criar novo bloco se não existir
-          answerBlock = document.createElement('div');
-          answerBlock.className = 'answer-block active';
-          answerBlock.dataset.questionId = questionId;
-          if (turnId) {
-            answerBlock.dataset.turnId = turnId;
-          }
+      // Se existir, adicionar token ao final do conteúdo
+      if (answerBlock) {
+        // Adicionar token ao fim (streaming)
+        const answerContent = answerBlock.querySelector('.answer-content');
+        if (answerContent) {
+          answerContent.innerHTML += token;
+        }
 
-          // Adicionar badge turn-id
-          const turnIdBadgeHtml = turnId
-            ? `<span class="turn-id-badge answer">${turnId}</span>`
-            : '';
+        return;
+      }
 
-          answerBlock.innerHTML = `
+      // Se não existir, criar novo bloco de resposta
+      answerBlock = document.createElement('div');
+      answerBlock.className = 'answer-block selected-answer';
+      answerBlock.dataset.questionId = questionId;
+      if (turnId) {
+        answerBlock.dataset.turnId = turnId;
+      }
+
+      // Adicionar badge turn-id
+      const turnIdBadgeHtml = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
+
+      answerBlock.innerHTML = `
             ${turnIdBadgeHtml}
             <div class="answer-content">${token}</div>
           `;
 
-          answersHistory.appendChild(answerBlock);
-        } else {
-          // Adicionar token ao fim (streaming)
-          const answerContent = answerBlock.querySelector('.answer-content');
-          if (answerContent) {
-            answerContent.innerHTML += token;
-          }
+      // 🎨 Destaque: remover de outros
+      answersHistory.querySelectorAll('.answer-block.selected-answer').forEach((el) => {
+        el.classList.remove('selected-answer');
+      });
+
+      // Inserir NO TOPO
+      answersHistory.insertBefore(answerBlock, answersHistory.firstChild);
+
+      // Auto-scroll para topo
+      answerBlock.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
+    });
+
+    // ==========================================
+    // LISTENER: answerStreamEnd
+    // Indica fim do streaming
+    // ==========================================
+    this.eventBus.on('answerStreamEnd', (_) => {
+      const answersHistory = DOM.get('answersHistory');
+      if (answersHistory) {
+        const lastAnswer = answersHistory.querySelector('.answer-block:first-child');
+        if (lastAnswer) {
+          answersHistory.querySelectorAll('.answer-block').forEach((el) => {
+            el.classList.add('complete');
+          });
+          Logger.debug('✅ Stream de resposta finalizado', true);
         }
       }
     });
@@ -741,7 +739,7 @@ class HomeUIManager {
         } else {
           // Criar novo bloco de resposta
           const answerBlock = document.createElement('div');
-          answerBlock.className = 'answer-block active';
+          answerBlock.className = 'answer-block';
           answerBlock.dataset.questionId = questionId;
 
           // Construir HTML com badge turn-id
@@ -760,24 +758,10 @@ class HomeUIManager {
           answersHistory.appendChild(answerBlock);
         }
 
-        console.log(
-          `✅ Resposta completa renderizada (questionId: ${questionId}, turnId: ${turnId})`
+        Logger.debug(
+          `✅ Resposta completa renderizada (questionId: ${questionId}, turnId: ${turnId})`,
+          true
         );
-      }
-    });
-
-    // ==========================================
-    // LISTENER: answerStreamEnd
-    // Indica fim do streaming
-    // ==========================================
-    this.eventBus.on('answerStreamEnd', (_) => {
-      const answersHistory = DOM.get('answersHistory');
-      if (answersHistory) {
-        const lastAnswer = answersHistory.querySelector('.answer-block:last-child');
-        if (lastAnswer) {
-          lastAnswer.classList.add('complete');
-          console.log('✅ Stream de resposta finalizado');
-        }
       }
     });
 
@@ -809,7 +793,7 @@ class HomeUIManager {
       answerBlocks.forEach((block) => {
         answersHistoryBox.appendChild(block);
       });
-      console.log('🔄 Respostas reordenadas por turnId');
+      Logger.debug('🔄 Respostas reordenadas por turnId', false);
     });
 
     // ==========================================
@@ -833,14 +817,17 @@ class HomeUIManager {
         // Rolar para resposta se solicitado
         if (shouldScroll) {
           answerBlock.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-          console.log(`📌 Resposta selecionada e visível: ${questionId}`);
+          Logger.debug(`📌 Resposta selecionada e visível: ${questionId}`, true);
         } else {
-          console.log(`📌 Resposta selecionada: ${questionId}`);
+          Logger.debug(`📌 Resposta selecionada: ${questionId}`, true);
         }
       }
     });
 
-    console.log('>>> #initUIEventBusListeners COMPLETO - Todos os listeners de DOM centralizados');
+    Logger.debug(
+      '>>> #initUIEventBusListeners COMPLETO - Todos os listeners de DOM centralizados',
+      true
+    );
   }
 }
 
