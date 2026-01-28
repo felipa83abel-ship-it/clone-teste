@@ -243,6 +243,9 @@ class AudioDeviceManager {
         // Para monitoramento antigo e inicia novo
         this.stopMonitoring('input');
         await this.startMonitoring('input');
+
+        // 🔥 Emitir evento para STT trocar dispositivo (se estiver rodando)
+        this.eventBus.emit('audioDeviceChanged', { type: 'input', deviceId: inputSelect.value });
       });
     }
 
@@ -254,6 +257,9 @@ class AudioDeviceManager {
         // Para monitoramento antigo e inicia novo
         this.stopMonitoring('output');
         await this.startMonitoring('output');
+
+        // 🔥 Emitir evento para STT trocar dispositivo (se estiver rodando)
+        this.eventBus.emit('audioDeviceChanged', { type: 'output', deviceId: outputSelect.value });
       });
     }
 
