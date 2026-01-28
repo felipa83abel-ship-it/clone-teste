@@ -324,30 +324,6 @@ const RendererAPI = {
     MODE_DEBUG: globalThis.isMockDebugMode || false,
   }),
 
-  // Navegação
-  navigateQuestions: (direction) => {
-    const all = globalThis.getNavigableQuestionIds?.() || [];
-    if (all.length === 0) return;
-
-    let index = all.indexOf(globalThis.appState.selectedId);
-    if (index === -1) {
-      index = direction === 'up' ? all.length - 1 : 0;
-    } else {
-      index += direction === 'up' ? -1 : 1;
-      index = Math.max(0, Math.min(index, all.length - 1));
-    }
-
-    globalThis.appState.selectedId = all[index];
-    globalThis.clearAllSelections();
-    globalThis.renderQuestionsHistory();
-    globalThis.renderCurrentQuestion();
-
-    if (globalThis.isMockDebugMode) {
-      const msg = direction === 'up' ? '🧪 Ctrl+Up' : '🧪 Ctrl+Down';
-      globalThis.updateStatusMessage(msg);
-    }
-  },
-
   // IPC Listeners
   onApiKeyUpdated: (callback) => {
     ipcRenderer.on('API_KEY_UPDATED', callback);

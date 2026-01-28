@@ -199,9 +199,9 @@ class HomeUIManager {
           }
         }
       });
-      console.log('   ✅ Listener para CMD_TOGGLE_AUDIO (Ctrl+D) registrado');
+      console.log('✅ Listener para CMD_TOGGLE_AUDIO (Ctrl+D) registrado');
     } else {
-      console.warn('   ⚠️ RendererAPI.onToggleAudio não disponível');
+      console.warn('⚠️ RendererAPI.onToggleAudio não disponível');
     }
 
     // Atalho Ctrl+Enter: Ask LLM (Enviar pergunta)
@@ -221,28 +221,47 @@ class HomeUIManager {
           }
         }
       });
-      console.log('   ✅ Listener para CMD_ASK_LLM (Ctrl+Enter) registrado');
+      console.log('✅ Listener para CMD_ASK_LLM (Ctrl+Enter) registrado');
     } else {
-      console.warn('   ⚠️ RendererAPI.onAskLlm não disponível');
+      console.warn('⚠️ RendererAPI.onAskLlm não disponível');
     }
 
-    // 🔥 NOVO: Atalho Ctrl+Shift+Up/Down: Navegar entre perguntas
+    // 🔥 Atalho Ctrl+Shift+Up/Down: Navegar entre perguntas
     if (globalThis.RendererAPI?.onNavigateQuestions) {
       globalThis.RendererAPI.onNavigateQuestions((direction) => {
-        console.log(
-          `🧭 Atalho Ctrl+Shift+${direction === 'up' ? '↑' : '↓'} acionado - navegando ${direction}`
-        );
-        if (globalThis.RendererAPI?.navigateQuestions) {
-          try {
-            globalThis.RendererAPI.navigateQuestions(direction);
-          } catch (error) {
-            console.error('❌ Erro ao navegar perguntas:', error);
-          }
+        console.log(`🧭 Ctrl+Shift+${direction === 'up' ? '↑' : '↓'} acionado`);
+
+        const all = globalThis.getNavigableQuestionIds?.() || [];
+        console.log(`🧭 IDs navegáveis:`, all);
+
+        if (all.length === 0) {
+          console.log('📭 Nenhuma pergunta para navegar');
+          return;
         }
+
+        let index = all.indexOf(globalThis.appState.selectedId);
+        console.log(`🧭 Índice atual:`, index, `(seleção: ${globalThis.appState.selectedId})`);
+
+        if (index === -1) {
+          index = direction === 'up' ? all.length - 1 : 0;
+        } else {
+          index += direction === 'up' ? -1 : 1;
+          index = (index + all.length) % all.length; // Circular wrapping
+        }
+
+        const nextId = all[index];
+        console.log(`🧭 Navegando para índice ${index}/${all.length}: ${nextId}`);
+
+        // Apenas atualizar seleção visual
+        globalThis.appState.selectedId = nextId;
+        globalThis.clearAllSelections?.();
+        globalThis.renderQuestionsHistory?.();
+        globalThis.renderCurrentQuestion?.();
+        console.log(`✅ Seleção atualizada para: ${nextId}`);
       });
-      console.log('   ✅ Listener para CMD_NAVIGATE_QUESTIONS (Ctrl+Shift+Up/Down) registrado');
+      console.log('✅ Listener para CMD_NAVIGATE_QUESTIONS (Ctrl+Shift+Up/Down) registrado');
     } else {
-      console.warn('   ⚠️ RendererAPI.onNavigateQuestions não disponível');
+      console.warn('⚠️ RendererAPI.onNavigateQuestions não disponível');
     }
 
     console.log('>>> #initActionButtonListeners COMPLETO');
@@ -336,9 +355,6 @@ class HomeUIManager {
     this.eventBus.on('inputVolumeUpdate', ({ percent }) => {
       const newPercent = globalThis.appState.audio.isRunning ? percent : 0;
 
-      const inputVu = DOM.get('inputVu');
-      if (inputVu) inputVu.style.width = newPercent + '%';
-
       const inputVuHome = DOM.get('inputVuHome');
       if (inputVuHome) inputVuHome.style.width = newPercent + '%';
 
@@ -351,9 +367,6 @@ class HomeUIManager {
     // ==========================================
     this.eventBus.on('outputVolumeUpdate', ({ percent }) => {
       const newPercent = globalThis.appState.audio.isRunning ? percent : 0;
-
-      const outputVu = DOM.get('outputVu');
-      if (outputVu) outputVu.style.width = newPercent + '%';
 
       const outputVuHome = DOM.get('outputVuHome');
       if (outputVuHome) outputVuHome.style.width = newPercent + '%';
