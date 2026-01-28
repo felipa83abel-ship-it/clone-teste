@@ -132,6 +132,12 @@ class GeminiHandler {
       state.isEnd = true;
     };
 
+    // 🔥 IMPORTANTE: Limpar listeners antigos para evitar acúmulo de tokens
+    // Problema: Se houver múltiplas requisições rápidas, listeners antigos processam novos chunks
+    this.ipcRenderer.removeAllListeners('LLM_STREAM_CHUNK');
+    this.ipcRenderer.removeAllListeners('LLM_STREAM_END');
+    this.ipcRenderer.removeAllListeners('LLM_STREAM_ERROR');
+
     // Registra ouvintes temporários
     this.ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
     this.ipcRenderer.once('LLM_STREAM_END', onEnd);

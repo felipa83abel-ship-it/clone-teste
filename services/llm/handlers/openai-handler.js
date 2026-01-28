@@ -64,7 +64,7 @@ class OpenAIHandler {
         messagesCount: messages.length,
       });
 
-      const response = await this.ipcRenderer.invoke('ask-llm', messages);
+      const response = await this.ipcRenderer.invoke('ask-openaI', messages);
 
       if (!response) {
         throw new Error('Resposta vazia da API OpenAI');
@@ -124,6 +124,12 @@ class OpenAIHandler {
       state.isEnd = true;
     };
 
+    // 🔥 IMPORTANTE: Limpar listeners antigos para evitar acúmulo de tokens
+    // Problema: Se houver múltiplas requisições rápidas, listeners antigos processam novos chunks
+    this.ipcRenderer.removeAllListeners('LLM_STREAM_CHUNK');
+    this.ipcRenderer.removeAllListeners('LLM_STREAM_END');
+    this.ipcRenderer.removeAllListeners('LLM_STREAM_ERROR');
+
     this.ipcRenderer.on('LLM_STREAM_CHUNK', onChunk);
     this.ipcRenderer.once('LLM_STREAM_END', onEnd);
     this.ipcRenderer.once('LLM_STREAM_ERROR', onError);
@@ -140,7 +146,7 @@ class OpenAIHandler {
       );
 
       // Invocar stream no main process
-      this.ipcRenderer.invoke('ask-llm-stream', messages).catch((err) => {
+      this.ipcRenderer.invoke('ask-openaI-stream', messages).catch((err) => {
         const userMessage = this._mapErrorMessage(err);
         Logger.error('❌ Erro ao invocar ask-llm-stream:', {
           error: err.message,

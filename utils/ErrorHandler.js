@@ -40,7 +40,7 @@ class ErrorHandler {
   /**
    * Formata erro para retorno seguro
    * @param {Error} error - Erro original
-   * @param {string} context - Contexto onde ocorreu (ex: 'handleAskLLM')
+   * @param {string} context - Contexto onde ocorreu (ex: 'handleAskOpenaI')
    * @returns {Object} {success: false, error: string, type: string, details?: any}
    */
   static formatError(error, context = 'Unknown') {

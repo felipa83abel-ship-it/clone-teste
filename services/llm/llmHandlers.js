@@ -91,9 +91,9 @@ async function handleLLMStream(
 
       eventBus.emit('answerStream', {
         questionId,
-        turnId, // 🔥 Incluir turnId para UI
         token,
         accum: streamedText,
+        turnId, // 🔥 Incluir turnId para UI
       });
     }
 

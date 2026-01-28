@@ -182,7 +182,7 @@ async function handleSaveApiKey(_, { provider, apiKey }) {
 ### Exemplo 2: Tratamento de Erro de API
 
 ```javascript
-async function handleAskLLM(_, messages) {
+async function handleAskOpenaI(_, messages) {
   try {
     ErrorHandler.validateInput(messages, 'messages', 'array');
     await ensureOpenAIClient();
@@ -195,7 +195,7 @@ async function handleAskLLM(_, messages) {
     return response.choices[0].message.content;
   } catch (error) {
     // ErrorHandler detecta automaticamente como APIError ou AuthenticationError
-    return ErrorHandler.handleError(error, 'handleAskLLM');
+    return ErrorHandler.handleError(error, 'handleAskOpenaI');
   }
 }
 ```

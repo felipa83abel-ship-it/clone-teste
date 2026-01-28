@@ -649,10 +649,10 @@ class HomeUIManager {
 
     // ==========================================
     // LISTENER: answerStream
-    // Streaming de resposta (token por token)
+    // Streaming de resposta (token por token) com markdown
     // ==========================================
     this.eventBus.on('answerStream', (data) => {
-      const { token, questionId, turnId } = data;
+      const { questionId, token, accum, turnId } = data;
       const answersHistory = DOM.get('answersHistory');
 
       if (!token) return; // Ignorar tokens vazios
@@ -661,12 +661,22 @@ class HomeUIManager {
       // Procurar elemento de resposta existente
       let answerBlock = answersHistory.querySelector(`[data-question-id="${questionId}"]`);
 
-      // Se existir, adicionar token ao final do conteúdo
+      // Se existir, atualizar conteúdo com markdown
       if (answerBlock) {
-        // Adicionar token ao fim (streaming)
         const answerContent = answerBlock.querySelector('.answer-content');
         if (answerContent) {
-          answerContent.innerHTML += token;
+          // Usar 'accum' (acumulado) ao invés de apenas token para markdown correto
+          const fullText = accum || answerContent.textContent + token;
+          try {
+            // Renderizar markdown com marked
+            const htmlContent = globalThis.marked?.parse(fullText) || fullText;
+            // Usar .innerHTML para renderizar HTML do markdown
+            answerContent.innerHTML = htmlContent;
+          } catch (error) {
+            // Fallback: Se markdown falhar, usar texto plano
+            answerContent.textContent = fullText;
+            Logger?.error('Erro ao renderizar markdown', { error });
+          }
         }
 
         return;
@@ -683,9 +693,17 @@ class HomeUIManager {
       // Adicionar badge turn-id
       const turnIdBadgeHtml = turnId ? `<span class="turn-id-badge answer">${turnId}</span>` : '';
 
+      // 🔥 Renderizar primeiro token como markdown
+      let initialContent = token || '';
+      try {
+        initialContent = globalThis.marked?.parse(initialContent) || initialContent;
+      } catch (error) {
+        Logger?.warn('Erro ao renderizar markdown inicial', { error });
+      }
+
       answerBlock.innerHTML = `
             ${turnIdBadgeHtml}
-            <div class="answer-content">${token}</div>
+            <div class="answer-content">${initialContent}</div>
           `;
 
       // 🎨 Destaque: remover de outros
@@ -719,7 +737,7 @@ class HomeUIManager {
 
     // ==========================================
     // LISTENER: answerBatchEnd
-    // Resposta completa (batch/completions)
+    // Resposta completa (batch/completions) com markdown
     // ==========================================
     this.eventBus.on('answerBatchEnd', (data) => {
       const { questionId, response, turnId } = data;
@@ -730,9 +748,17 @@ class HomeUIManager {
           `[data-question-id="${questionId}"] .answer-content`
         );
 
+        // 🔥 Renderizar resposta como markdown
+        let htmlContent = response;
+        try {
+          htmlContent = globalThis.marked?.parse(response) || response;
+        } catch (error) {
+          Logger?.error('Erro ao renderizar markdown em batch', { error });
+        }
+
         if (answerEl) {
           // Atualizar resposta existente
-          answerEl.innerHTML = response;
+          answerEl.innerHTML = htmlContent;
           if (turnId) {
             answerEl.dataset.turnId = turnId;
           }
@@ -751,7 +777,7 @@ class HomeUIManager {
           answerBlock.innerHTML = `
             ${turnIdBadgeHtml}
             <div class="answer-content" ${turnId ? `data-turn-id="${turnId}"` : ''}>
-              ${response}
+              ${htmlContent}
             </div>
           `;
 

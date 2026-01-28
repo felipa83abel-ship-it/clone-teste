@@ -377,8 +377,8 @@ async function handleInitializeApiClient(_, apiKey) {
 
 function registerLLMHandlers() {
   // OpenAI handlers
-  ipcMain.handle('ask-llm', handleAskLLM);
-  ipcMain.handle('ask-llm-stream', handleAskLLMStream);
+  ipcMain.handle('ask-openaI', handleAskOpenaI);
+  ipcMain.handle('ask-openaI-stream', handleAskOpenaIStream);
 
   // Gemini handlers
   ipcMain.handle('ask-gemini', handleAskGemini);
@@ -421,7 +421,7 @@ async function ensureGeminiClient() {
  * @param {Array} messages - Histórico de mensagens
  * @returns {string} Resposta do modelo
  */
-async function handleAskLLM(_, messages) {
+async function handleAskOpenaI(_, messages) {
   try {
     ErrorHandler.validateInput(messages, 'messages', 'array');
     await ensureOpenAIClient();
@@ -444,7 +444,7 @@ async function handleAskLLM(_, messages) {
       openaiClient = null;
       error.message = 'Chave da API inválida para LLM. Verifique as configurações.';
     }
-    return ErrorHandler.handleError(error, 'handleAskLLM');
+    return ErrorHandler.handleError(error, 'handleAskOpenaI');
   }
 }
 
@@ -454,7 +454,7 @@ async function handleAskLLM(_, messages) {
  * @param {Event} event - Evento IPC com referência à janela
  * @param {Array} messages - Histórico de mensagens
  */
-async function handleAskLLMStream(event, messages) {
+async function handleAskOpenaIStream(event, messages) {
   const win = BrowserWindow.fromWebContents(event.sender);
 
   try {
@@ -495,7 +495,7 @@ async function handleAskLLMStream(event, messages) {
         'Chave da API inválida. Configure na seção "API e Modelos".'
       );
     } else {
-      ErrorHandler.handleError(error, 'handleAskLLMStream');
+      ErrorHandler.handleError(error, 'handleAskOpenaIStream');
       win.webContents.send('LLM_STREAM_ERROR', error.message);
     }
   }

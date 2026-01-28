@@ -316,7 +316,7 @@ function initMockInterceptor(context) {
     }
 
     // Intercepta ask-llm-stream quando MODE_DEBUG
-    if (channel === 'ask-llm-stream' && rendererContext.isMockDebugMode) {
+    if (channel === 'ask-openaI-stream' && rendererContext.isMockDebugMode) {
       console.log('🎭 [MOCK] Interceptando ask-llm-stream...');
 
       // Obtém a pergunta do primeiro argumento (array de mensagens)

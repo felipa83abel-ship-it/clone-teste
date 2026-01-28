@@ -228,7 +228,7 @@ const response = await openaiHandler.complete(messages);
 
 ```
 1️⃣  UI (controllers/sections/home/) 
-    → Emite evento: 'ask-llm'
+    → Emite evento: 'ask-openaI'
 
 2️⃣  Entrada (adapters/in/handlers/llm-handler.js)
     → Valida a pergunta
