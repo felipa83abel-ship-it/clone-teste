@@ -109,17 +109,17 @@ describe('EventBus', () => {
       const errorCallback = jest.fn(() => {
         throw new Error('Test error');
       });
-      const normalCallback = jest.fn();
+      const standardCallback = jest.fn();
 
       eventBus.on('test-event', errorCallback);
-      eventBus.on('test-event', normalCallback);
+      eventBus.on('test-event', standardCallback);
 
       expect(() => {
         eventBus.emit('test-event', 'data');
       }).not.toThrow();
 
-      // Normal callback should still be called despite previous error
-      expect(normalCallback).toHaveBeenCalled();
+      // Standard callback should still be called despite previous error
+      expect(standardCallback).toHaveBeenCalled();
     });
   });
 

@@ -298,7 +298,7 @@ class ConfigManager {
         logLevel: 'info',
       },
       ui: {
-        interviewMode: 'INTERVIEW',
+        interviewMode: 'STANDARD',
         opacity: 0.75,
         clickThroughEnabled: false,
       },

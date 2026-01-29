@@ -69,7 +69,7 @@ try {
 //	CONSTANTES
 /* ================================ */
 
-const USE_FAKE_STREAM_LLM = true; // 🤖 Mude para true para ativar os testes sem LLM real 🤖
+const USE_FAKE_STREAM_LLM = false; // 🤖 Mude para true para ativar os testes sem LLM real 🤖
 
 /* ================================ */
 //	ESTADO GLOBAL

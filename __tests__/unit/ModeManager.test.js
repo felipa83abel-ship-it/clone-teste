@@ -2,7 +2,7 @@ const {
   ModeManager,
   MODES,
   InterviewModeHandlers,
-  NormalModeHandlers,
+  StandardModeHandlers,
 } = require('../../controllers/modes/mode-manager');
 
 describe('ModeManager', () => {
@@ -11,7 +11,7 @@ describe('ModeManager', () => {
   beforeEach(() => {
     modeManager = new ModeManager(MODES.INTERVIEW);
     modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
-    modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
+    modeManager.registerMode(MODES.STANDARD, StandardModeHandlers);
   });
 
   describe('Initialization', () => {
@@ -21,14 +21,14 @@ describe('ModeManager', () => {
 
     test('should register modes with handlers', () => {
       expect(modeManager.handlers[MODES.INTERVIEW]).toBeDefined();
-      expect(modeManager.handlers[MODES.NORMAL]).toBeDefined();
+      expect(modeManager.handlers[MODES.STANDARD]).toBeDefined();
     });
   });
 
   describe('Mode Management', () => {
     test('should change mode', () => {
-      modeManager.setMode(MODES.NORMAL);
-      expect(modeManager.getMode()).toBe(MODES.NORMAL);
+      modeManager.setMode(MODES.STANDARD);
+      expect(modeManager.getMode()).toBe(MODES.STANDARD);
 
       modeManager.setMode(MODES.INTERVIEW);
       expect(modeManager.getMode()).toBe(MODES.INTERVIEW);
@@ -36,11 +36,11 @@ describe('ModeManager', () => {
 
     test('should check if in specific mode', () => {
       expect(modeManager.is(MODES.INTERVIEW)).toBe(true);
-      expect(modeManager.is(MODES.NORMAL)).toBe(false);
+      expect(modeManager.is(MODES.STANDARD)).toBe(false);
 
-      modeManager.setMode(MODES.NORMAL);
+      modeManager.setMode(MODES.STANDARD);
       expect(modeManager.is(MODES.INTERVIEW)).toBe(false);
-      expect(modeManager.is(MODES.NORMAL)).toBe(true);
+      expect(modeManager.is(MODES.STANDARD)).toBe(true);
     });
 
     test('should throw error when changing to unregistered mode', () => {
@@ -61,8 +61,8 @@ describe('ModeManager', () => {
       // Interview mode
       expect(modeManager.canReAsk('question-1')).toBe(false);
 
-      // Normal mode
-      modeManager.setMode(MODES.NORMAL);
+      // Standard mode
+      modeManager.setMode(MODES.STANDARD);
       expect(modeManager.canReAsk('question-1')).toBe(true);
     });
 
@@ -99,27 +99,27 @@ describe('ModeManager', () => {
     });
   });
 
-  describe('Normal Mode Handlers', () => {
+  describe('Standard Mode Handlers', () => {
     beforeEach(() => {
-      modeManager.setMode(MODES.NORMAL);
+      modeManager.setMode(MODES.STANDARD);
     });
 
-    test('should validate non-empty questions in normal mode', () => {
+    test('should validate non-empty questions in standard mode', () => {
       const validQuestion = 'Some question';
       expect(modeManager.validateQuestion(validQuestion)).toBe(true);
     });
 
-    test('should not validate empty/whitespace questions in normal mode', () => {
+    test('should not validate empty/whitespace questions in standard mode', () => {
       const result = modeManager.validateQuestion('');
       expect(!result).toBe(true);
     });
 
-    test('should allow re-asking questions in normal mode', () => {
+    test('should allow re-asking questions in standard mode', () => {
       expect(modeManager.canReAsk('any-id')).toBe(true);
     });
 
-    test('should render normal mode state', () => {
-      expect(modeManager.renderModeState()).toBe('normal');
+    test('should render standard mode state', () => {
+      expect(modeManager.renderModeState()).toBe('standard');
     });
   });
 
@@ -148,9 +148,9 @@ describe('ModeManager', () => {
       expect(modeManager.is(MODES.INTERVIEW)).toBe(true);
       expect(modeManager.canReAsk(questionId)).toBe(false);
 
-      // Switch to normal
-      modeManager.setMode(MODES.NORMAL);
-      expect(modeManager.is(MODES.NORMAL)).toBe(true);
+      // Switch to standard mode
+      modeManager.setMode(MODES.STANDARD);
+      expect(modeManager.is(MODES.STANDARD)).toBe(true);
       expect(modeManager.canReAsk(questionId)).toBe(true);
 
       // Switch back to interview

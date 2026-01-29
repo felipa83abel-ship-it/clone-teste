@@ -78,7 +78,7 @@ class DOMRegistry {
     askLlmBtn: '#askLlmBtn',
 
     // STATUS E MENSAGENS
-    statusDiv: '#status-div',
+    statusDiv: '#status',
 
     // VU METERS
     inputVu: '#inputVu',

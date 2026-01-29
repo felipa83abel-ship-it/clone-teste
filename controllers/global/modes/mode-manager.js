@@ -1,5 +1,5 @@
 /**
- * ModeManager - Centraliza lógica de modo (Interview/Normal)
+ * ModeManager - Centraliza lógica de modo (Interview/STANDARD)
  * Elimina ~15+ chamadas espalhadas a ModeController.isInterviewMode()
  *
  * Padrão: Strategy Pattern + Delegation
@@ -7,7 +7,7 @@
  */
 
 const MODES = {
-  NORMAL: 'NORMAL',
+  STANDARD: 'STANDARD',
   INTERVIEW: 'INTERVIEW',
 };
 
@@ -19,7 +19,7 @@ class ModeManager {
 
   /**
    * Registra handlers para um modo específico
-   * @param {string} modeName - Nome do modo (INTERVIEW, NORMAL)
+   * @param {string} modeName - Nome do modo (INTERVIEW, STANDARD, etc)
    * @param {object} handlers - Objeto com métodos específicos do modo
    */
   registerMode(modeName, handlers) {
@@ -62,6 +62,15 @@ class ModeManager {
    */
   is(modeName) {
     return this.currentMode === modeName;
+  }
+
+  /**
+   * Obtém a estratégia (handler) de um modo específico
+   * @param {string} modeName - Nome do modo
+   * @returns {object} Estratégia do modo
+   */
+  getStrategy(modeName) {
+    return this.handlers[modeName] || null;
   }
 
   /**
@@ -159,36 +168,36 @@ const InterviewModeHandlers = {
 };
 
 // ============================================
-// MODO NORMAL: Modo normal (sem modo entrevista)
+// MODO STANDARD: Modo standard (sem modo entrevista)
 // ============================================
-const NormalModeHandlers = {
+const StandardModeHandlers = {
   onQuestionFinalize(_question) {
-    // No modo normal: apenas consolida, não incrementa turnId
+    // No modo standard: apenas consolida, não incrementa turnId
     return true;
   },
 
   onAnswerStreamEnd(_data) {
-    // No modo normal: sem rastreamento de turno
+    // No modo standard: sem rastreamento de turno
     return true;
   },
 
   onQuestionClick(_questionId) {
-    // No modo normal: sempre permite perguntar
+    // No modo standard: sempre permite perguntar
     return true;
   },
 
   canReAsk(_questionId) {
-    // Modo normal: sempre permite re-perguntar
+    // Modo standard: sempre permite re-perguntar
     return true;
   },
 
   renderModeState() {
-    // Renderizar estado normal
-    return 'normal';
+    // Renderizar estado standard
+    return 'standard';
   },
 
   validateQuestion(_question) {
-    // Modo normal: aceita qualquer pergunta com texto
+    // Modo standard: aceita qualquer pergunta com texto
     return _question && _question.trim().length > 0;
   },
 };
@@ -202,7 +211,7 @@ if (typeof globalThis !== 'undefined') {
   globalThis.ModeManager = ModeManager;
   globalThis.MODES = MODES;
   globalThis.InterviewModeHandlers = InterviewModeHandlers;
-  globalThis.NormalModeHandlers = NormalModeHandlers;
+  globalThis.StandardModeHandlers = StandardModeHandlers;
 }
 
 // Expor para CommonJS (Node.js)
@@ -211,6 +220,6 @@ if (typeof module !== 'undefined' && module.exports) {
     ModeManager,
     MODES,
     InterviewModeHandlers,
-    NormalModeHandlers,
+    StandardModeHandlers,
   };
 }

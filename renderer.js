@@ -53,7 +53,7 @@ globalThis.appState = new globalThis.AppState();
 globalThis.eventBus = new globalThis.EventBus();
 globalThis.sttStrategy = new globalThis.STTStrategy();
 globalThis.llmManager = new globalThis.LLMManager();
-globalThis.modeManager = new globalThis.ModeManager(globalThis.MODES.INTERVIEW);
+globalThis.modeManager = new globalThis.ModeManager(globalThis.MODES.STANDARD);
 
 // Inicializar VAD Engine (singleton para STT)
 try {
@@ -97,7 +97,7 @@ if (typeof globalThis.initializeSTTRegistry === 'function') {
   globalThis.initializeSTTRegistry(globalThis.sttStrategy);
 }
 
-// Registrar Modes (INTERVIEW, NORMAL)
+// Registrar Modes (INTERVIEW, STANDARD)
 if (typeof globalThis.initializeModesRegistry === 'function') {
   globalThis.initializeModesRegistry(globalThis.modeManager);
 }
@@ -108,6 +108,31 @@ if (typeof globalThis.initializeLLMRegistry === 'function') {
 }
 
 console.log('✅ Registries inicializados');
+
+// ================================
+// SEÇÃO 4B: INICIALIZAR MODE CONTROLLER
+// ================================
+
+// 🔥 NOVO: Registrar estratégias de modo
+if (
+  typeof globalThis.StandardModeStrategy !== 'undefined' &&
+  typeof globalThis.InterviewModeStrategy !== 'undefined'
+) {
+  globalThis.modeManager.registerMode(globalThis.MODES.STANDARD, globalThis.StandardModeStrategy);
+  globalThis.modeManager.registerMode(globalThis.MODES.INTERVIEW, globalThis.InterviewModeStrategy);
+  console.log('✅ Mode Strategies registradas');
+}
+
+// 🔥 NOVO: Inicializar ModeController (orquestrador)
+if (typeof globalThis.ModeController !== 'undefined') {
+  globalThis.modeController = new globalThis.ModeController(
+    globalThis.modeManager,
+    globalThis.eventBus
+  );
+  console.log('✅ ModeController inicializado');
+} else {
+  console.warn('⚠️ ModeController não carregado');
+}
 
 // ================================
 // SEÇÃO 5: PROTEÇÃO CONTRA CAPTURA DE TELA
@@ -191,6 +216,11 @@ globalThis.eventBus.on('llmStreamEnd', (data) => {
 
   globalThis.appState.interview.answeredQuestions.add(data.questionId);
 
+  // 🔥 RE-RENDERIZAR histórico para atualizar classe "answered"
+  if (globalThis.renderQuestionsHistory) {
+    globalThis.renderQuestionsHistory();
+  }
+
   if (globalThis.modeManager.is(globalThis.MODES.INTERVIEW)) {
     globalThis.appState.interview.llmAnsweredTurnId = globalThis.appState.interview.interviewTurnId;
     globalThis.appState.resetCurrentQuestion();
@@ -212,6 +242,11 @@ globalThis.eventBus.on('llmBatchEnd', (data) => {
   });
 
   globalThis.appState.interview.answeredQuestions.add(data.questionId);
+
+  // 🔥 RE-RENDERIZAR histórico para atualizar classe "answered"
+  if (globalThis.renderQuestionsHistory) {
+    globalThis.renderQuestionsHistory();
+  }
 
   const questionEntry = globalThis.appState.history.find((q) => q.id === data.questionId);
   const turnId = questionEntry?.turnId || null;

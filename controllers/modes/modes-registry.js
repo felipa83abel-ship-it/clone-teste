@@ -2,7 +2,7 @@
  * Modes Registry - Registro centralizado de modos de operação
  *
  * Responsabilidades:
- * - Registrar modos disponíveis (INTERVIEW, NORMAL)
+ * - Registrar modos disponíveis (INTERVIEW, STANDARD)
  * - Expor função de registro para fácil extensão
  *
  * Uso:
@@ -20,8 +20,8 @@ function initializeModesRegistry(modeManager) {
   // Registra modo INTERVIEW
   modeManager.registerMode(globalThis.MODES.INTERVIEW, globalThis.InterviewModeHandlers);
 
-  // Registra modo NORMAL
-  modeManager.registerMode(globalThis.MODES.NORMAL, globalThis.NormalModeHandlers);
+  // Registra modo STANDARD
+  modeManager.registerMode(globalThis.MODES.STANDARD, globalThis.StandardModeHandlers);
 
   console.log('✅ Modos registrados com sucesso');
 }

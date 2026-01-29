@@ -7,7 +7,7 @@
  * Responsabilidades:
  * - askLLM() - função central de requisição ao LLM
  * - Validação de requisições
- * - Roteamento por modo (INTERVIEW vs NORMAL)
+ * - Roteamento por modo (INTERVIEW vs STANDARD)
  */
 
 const CURRENT_QUESTION_ID = 'CURRENT';

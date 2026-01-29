@@ -4,7 +4,7 @@ const {
   ModeManager,
   MODES,
   InterviewModeHandlers,
-  NormalModeHandlers,
+  StandardModeHandlers,
 } = require('../../controllers/modes/mode-manager');
 
 describe('Integration Tests - Core Systems', () => {
@@ -17,7 +17,7 @@ describe('Integration Tests - Core Systems', () => {
     appState = new AppState();
     modeManager = new ModeManager(MODES.INTERVIEW);
     modeManager.registerMode(MODES.INTERVIEW, InterviewModeHandlers);
-    modeManager.registerMode(MODES.NORMAL, NormalModeHandlers);
+    modeManager.registerMode(MODES.STANDARD, StandardModeHandlers);
   });
 
   describe('EventBus Functionality', () => {
@@ -66,8 +66,8 @@ describe('Integration Tests - Core Systems', () => {
     test('should switch between modes', () => {
       expect(modeManager.getMode()).toBe(MODES.INTERVIEW);
 
-      modeManager.setMode(MODES.NORMAL);
-      expect(modeManager.getMode()).toBe(MODES.NORMAL);
+      modeManager.setMode(MODES.STANDARD);
+      expect(modeManager.getMode()).toBe(MODES.STANDARD);
 
       modeManager.setMode(MODES.INTERVIEW);
       expect(modeManager.getMode()).toBe(MODES.INTERVIEW);
@@ -77,8 +77,8 @@ describe('Integration Tests - Core Systems', () => {
       // Interview mode - cannot re-ask
       expect(modeManager.canReAsk('q1')).toBe(false);
 
-      // Switch to normal mode - can re-ask
-      modeManager.setMode(MODES.NORMAL);
+      // Switch to standard mode - can re-ask
+      modeManager.setMode(MODES.STANDARD);
       expect(modeManager.canReAsk('q1')).toBe(true);
     });
 
@@ -90,8 +90,8 @@ describe('Integration Tests - Core Systems', () => {
       expect(modeManager.validateQuestion(validQuestion)).toBe(true);
       expect(!modeManager.validateQuestion(emptyQuestion)).toBe(true);
 
-      // Normal mode
-      modeManager.setMode(MODES.NORMAL);
+      // Standard mode
+      modeManager.setMode(MODES.STANDARD);
       expect(modeManager.validateQuestion(validQuestion)).toBe(true);
       expect(!modeManager.validateQuestion(emptyQuestion)).toBe(true);
     });
@@ -128,8 +128,8 @@ describe('Integration Tests - Core Systems', () => {
       const modeCallback = jest.fn();
       eventBus.on('mode-changed', modeCallback);
 
-      modeManager.setMode(MODES.NORMAL);
-      eventBus.emit('mode-changed', { newMode: MODES.NORMAL });
+      modeManager.setMode(MODES.STANDARD);
+      eventBus.emit('mode-changed', { newMode: MODES.STANDARD });
 
       expect(modeCallback).toHaveBeenCalled();
     });
@@ -156,8 +156,8 @@ describe('Integration Tests - Core Systems', () => {
       expect(modeManager.canReAsk('q1')).toBe(false);
       expect(modeManager.validateQuestion(question)).toBe(true);
 
-      // Normal mode - permissive
-      modeManager.setMode(MODES.NORMAL);
+      // Standard mode - permissive
+      modeManager.setMode(MODES.STANDARD);
       expect(modeManager.canReAsk('q1')).toBe(true);
       expect(modeManager.validateQuestion(question)).toBe(true);
     });
@@ -222,18 +222,18 @@ describe('Integration Tests - Core Systems', () => {
       const errorCallback = jest.fn(() => {
         throw new Error('Listener error');
       });
-      const normalCallback = jest.fn();
+      const standardCallback = jest.fn();
 
       eventBus.on('test-event', errorCallback);
-      eventBus.on('test-event', normalCallback);
+      eventBus.on('test-event', standardCallback);
 
       // Should not throw
       expect(() => {
         eventBus.emit('test-event', 'data');
       }).not.toThrow();
 
-      // Normal callback should still execute
-      expect(normalCallback).toHaveBeenCalled();
+      // Standard callback should still execute
+      expect(standardCallback).toHaveBeenCalled();
     });
   });
 });

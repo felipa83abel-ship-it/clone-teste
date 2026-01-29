@@ -117,7 +117,7 @@ if (!globalThis._screenshotControllerLoaded) {
         return;
       }
 
-      // Renderiza resposta do LLM como se fosse uma pergunta normal
+      // Renderiza resposta do LLM como se fosse uma pergunta stream normal
       const questionText = `📸 Análise de ${globalThis.appState.audio.capturedScreenshots.length} screenshot(s)`;
       const questionId = String(globalThis.appState.history.length + 1);
 

@@ -74,7 +74,7 @@ if (!globalThis._questionControllerLoaded) {
         turnId: q.turnId,
         text: label,
         isIncomplete: q.incomplete,
-        isAnswered: q.answered,
+        isAnswered: state.interview.answeredQuestions.has(q.id),
         isSelected: q.id === state.selectedId,
       };
     });
@@ -207,13 +207,13 @@ if (!globalThis._questionControllerLoaded) {
       const newId = state.getNextQuestionId();
 
       // 🔥 UNIFICADO: Usar o mesmo contador global (newId) para turnId em TODOS os modos
-      // Evita duplicação entre INTERVIEW e NORMAL modes
+      // Evita duplicação entre INTERVIEW e STANDARD modes
       const globalTurnId = Number.parseInt(newId);
 
       if (modeManagerGlobal.is(MODESGlobal.INTERVIEW)) {
         state.interview.interviewTurnId++;
       }
-      // Não precisa usar interviewTurnId em NORMAL mode - usa globalTurnId para ambos
+      // Não precisa usar interviewTurnId em STANDARD mode - usa globalTurnId para ambos
       state.interview.currentQuestion.turnId = globalTurnId;
 
       state.history.push({
@@ -306,20 +306,14 @@ if (!globalThis._questionControllerLoaded) {
   }
 
   /**
-   * Finaliza a pergunta atual para histórico
+   * Finaliza a pergunta atual para histórico (NEUTRO - sem conhecer modo)
+   * Emite evento para ModeController decidir o que fazer
    */
   function finalizeCurrentQuestion() {
     const state = getAppState();
-    const modeManagerGlobal = globalThis.modeManager;
-    const MODESGlobal = globalThis.MODES;
-    const askLLMGlobal = globalThis.askLLM;
+    const eventBusGlobal = globalThis.eventBus;
 
-    // 🔥 DEBUG: Verificar qual modo está ativo
-    const currentModeCheck = modeManagerGlobal.is(MODESGlobal.INTERVIEW);
-    Logger.debug(
-      `🎯 [DEBUG finalizeCurrentQuestion] Modo: ${modeManagerGlobal.getMode()} | isINTERVIEW=${currentModeCheck}`,
-      false
-    );
+    Logger.debug('🔥 finalizeCurrentQuestion: Iniciando...', false);
 
     if (!state.interview.currentQuestion.text?.trim()) {
       Logger.warn('⚠️ Sem texto para finalizar');
@@ -331,66 +325,46 @@ if (!globalThis._questionControllerLoaded) {
       return;
     }
 
-    if (modeManagerGlobal.is(MODESGlobal.INTERVIEW)) {
-      state.interview.currentQuestion.text = _finalizeQuestion(
-        state.interview.currentQuestion.text
-      );
-      state.interview.currentQuestion.lastUpdateTime = Date.now();
-      state.interview.currentQuestion.finalized = true;
+    // 🔥 NEUTRALIZAR: Finalizar pergunta
+    state.interview.currentQuestion.text = _finalizeQuestion(state.interview.currentQuestion.text);
+    state.interview.currentQuestion.lastUpdateTime = Date.now();
+    state.interview.currentQuestion.finalized = true;
 
-      // 🔥 CRÍTICO: Usar getNextQuestionId() para garantir IDs únicos e sequenciais
-      const newId = state.getNextQuestionId();
+    // 🔥 CRÍTICO: Usar getNextQuestionId() para garantir IDs únicos e sequenciais
+    const newId = state.getNextQuestionId();
+    const globalTurnId = Number.parseInt(newId);
 
-      // 🔥 UNIFICADO: Usar o mesmo contador global (newId) para turnId em TODOS os modos
-      const globalTurnId = Number.parseInt(newId);
-      state.interview.interviewTurnId++;
-      state.interview.currentQuestion.turnId = globalTurnId;
+    // 🔥 UNIFICADO: Mesmo contador para todos os modos
+    state.interview.currentQuestion.turnId = globalTurnId;
 
-      state.history.push({
-        id: newId,
-        text: state.interview.currentQuestion.text,
-        turnId: globalTurnId, // 🔥 ID unificado baseado no contador global
-        createdAt: state.interview.currentQuestion.createdAt || Date.now(),
-        lastUpdateTime: state.interview.currentQuestion.lastUpdateTime || Date.now(),
+    // 🔥 Incrementar em AMBOS os modos (INTERVIEW incrementa depois via strategy)
+    state.interview.interviewTurnId++;
+
+    // 🔥 ADICIONAR AO HISTÓRICO (NEUTRO)
+    state.history.push({
+      id: newId,
+      text: state.interview.currentQuestion.text,
+      turnId: globalTurnId,
+      createdAt: state.interview.currentQuestion.createdAt || Date.now(),
+      lastUpdateTime: state.interview.currentQuestion.lastUpdateTime || Date.now(),
+    });
+
+    state.interview.currentQuestion.promotedToHistory = true;
+    _resetCurrentQuestion(state);
+
+    state.selectedId = newId;
+    renderQuestionsHistory();
+    renderCurrentQuestion();
+
+    Logger.debug('✅ Pergunta finalizada e promovida ao histórico', false);
+
+    // 🔥 DELEGAÇÃO: Emitir evento para ModeController/Strategy decidir
+    if (eventBusGlobal) {
+      eventBusGlobal.emit('questionFinalized', {
+        questionId: newId,
+        state: state,
       });
-
-      state.interview.currentQuestion.promotedToHistory = true;
-      _resetCurrentQuestion(state);
-
-      state.selectedId = newId;
-      renderQuestionsHistory();
-      renderCurrentQuestion();
-
-      if (
-        state.interview.llmRequestedTurnId !== state.interview.interviewTurnId &&
-        state.interview.llmAnsweredTurnId !== state.interview.interviewTurnId
-      ) {
-        askLLMGlobal(newId);
-      }
-
-      return;
-    }
-
-    if (!modeManagerGlobal.is(MODESGlobal.INTERVIEW)) {
-      // 🔥 CRÍTICO: Usar getNextQuestionId() para garantir IDs únicos e sequenciais
-      const newId = state.getNextQuestionId();
-      const globalTurnId = Number.parseInt(newId); // 🔥 Usar o mesmo contador global
-
-      state.history.push({
-        id: newId,
-        text: state.interview.currentQuestion.text,
-        turnId: globalTurnId, // 🔥 ID unificado baseado no contador global
-        createdAt: state.interview.currentQuestion.createdAt || Date.now(),
-        lastUpdateTime:
-          state.interview.currentQuestion.lastUpdateTime ||
-          state.interview.currentQuestion.createdAt ||
-          Date.now(),
-      });
-
-      state.selectedId = newId;
-      _resetCurrentQuestion(state);
-      renderQuestionsHistory();
-      renderCurrentQuestion();
+      Logger.debug('✅ Evento questionFinalized emitido para ModeController', false);
     }
   }
 
@@ -483,31 +457,26 @@ if (!globalThis._questionControllerLoaded) {
 
       renderCurrentQuestion();
 
-      // 🔥 CRÍTICO: Respeitar modo ao decidir se finaliza com silêncio
-      // INTERVIEW: Finaliza automaticamente ao detectar silêncio (shouldFinalizeAskCurrent=TRUE)
-      // STANDARD: Só finaliza com clique/atalho, NÃO com silêncio
+      // 🔥 NEUTRO: Apenas verificar se tem que finalizar
+      // ModeController vai decidir o que fazer depois
       const isFinalMessage = !options.isInterim;
       const hasText = state.interview.currentQuestion.text?.trim();
-      const isInterviewMode = modeManagerGlobal?.is(MODESGlobal.INTERVIEW);
+      const shouldFinalizeBasedOnSilence =
+        options.shouldFinalizeAskCurrent && isFinalMessage && hasText;
+      const shouldFinalizeBasedOnUserAction = options.fromUserAction && isFinalMessage && hasText;
 
-      // 🔥 FIX: Em STANDARD mode, ignora shouldFinalizeAskCurrent (silêncio)
-      // Só finaliza se chegou via clique/atalho (options.fromUserAction=true)
-      let shouldFinalize = false;
-      if (isInterviewMode) {
-        // INTERVIEW: Finaliza com silêncio OU se é mensagem final com texto
-        shouldFinalize =
-          (options.shouldFinalizeAskCurrent || (isFinalMessage && hasText)) && isFinalMessage;
-      } else {
-        // STANDARD: Só finaliza se explicitamente requisitado (não por silêncio)
-        shouldFinalize = options.fromUserAction && isFinalMessage && hasText;
-      }
-
-      if (shouldFinalize) {
+      // 🔥 DELEGAÇÃO: Se deve finalizar por silêncio OU ação do usuário, delegar para ModeController
+      // ModeController vai consultar a estratégia para decidir se realmente finaliza
+      if (shouldFinalizeBasedOnSilence || shouldFinalizeBasedOnUserAction) {
+        // Emitir evento para ModeController decidir baseado no modo
+        eventBusGlobal.emit('silenceDetectedOrUserAction', {
+          isFromSilence: shouldFinalizeBasedOnSilence,
+          isFromUserAction: shouldFinalizeBasedOnUserAction,
+        });
         Logger.debug(
-          `🎯 [DEBUG handleCurrentQuestion] Modo=${isInterviewMode ? 'INTERVIEW' : 'STANDARD'} Finalizando - shouldFinalizeAskCurrent=${options.shouldFinalizeAskCurrent}, fromUserAction=${options.fromUserAction}, isFinal=${isFinalMessage}, hasText=${!!hasText}`,
+          `🎯 Silêncio/Ação detectada - delegando para ModeController (silêncio=${shouldFinalizeBasedOnSilence}, userAction=${shouldFinalizeBasedOnUserAction})`,
           false
         );
-        finalizeCurrentQuestion();
       }
     }
   }

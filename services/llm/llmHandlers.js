@@ -5,8 +5,8 @@
  * llmHandlers - Handlers separados para LLM (genérico)
  *
  * 1. validateLLMRequest() - validação
- * 2. handleLLMStream() - modo entrevista
- * 3. handleLLMBatch() - modo normal
+ * 2. handleLLMStream() - modo INTERVIEW
+ * 3. handleLLMBatch() - modo STANDARD
  */
 
 /**
@@ -120,7 +120,7 @@ async function handleLLMStream(
 }
 
 /**
- * Manipula resposta em modo batch (normal)
+ * Manipula resposta em modo batch (STANDARD)
  */
 async function handleLLMBatch(appState, questionId, text, SYSTEM_PROMPT, eventBus, llmManager) {
   Logger.debug('Inicializando Batch LLM', { questionId, text, textLength: text.length }, true);

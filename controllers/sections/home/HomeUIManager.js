@@ -578,7 +578,14 @@ class HomeUIManager {
 
       // Renderizar cada pergunta no DOM
       if (Array.isArray(historyData)) {
-        historyData.forEach((question) => {
+        // 🔥 GARANTIR ORDEM DESC por ID (maior em cima)
+        const sortedHistory = [...historyData].sort((a, b) => {
+          const aId = Number.parseInt(a.id);
+          const bId = Number.parseInt(b.id);
+          return bId - aId; // DESC: maior primeiro
+        });
+
+        sortedHistory.forEach((question) => {
           const questionBlock = document.createElement('div');
 
           // Classe base: question-block
@@ -727,6 +734,9 @@ class HomeUIManager {
       // Inserir NO TOPO
       answersHistory.insertBefore(answerBlock, answersHistory.firstChild);
 
+      // 🔥 Reordenar respostas por turnId DESC
+      globalThis.eventBus.emit('sortAnswersByTurnId');
+
       // Auto-scroll para topo
       answerBlock.parentElement?.scrollTo?.({ top: 0, behavior: 'smooth' });
     });
@@ -794,13 +804,17 @@ class HomeUIManager {
             </div>
           `;
 
-          answersHistory.appendChild(answerBlock);
+          // 🔥 Inserir NO TOPO (descendente)
+          answersHistory.insertBefore(answerBlock, answersHistory.firstChild);
         }
 
         Logger.debug(
           `✅ Resposta completa renderizada (questionId: ${questionId}, turnId: ${turnId})`,
           true
         );
+
+        // 🔥 Reordenar respostas por turnId DESC
+        globalThis.eventBus.emit('sortAnswersByTurnId');
       }
     });
 
@@ -860,6 +874,18 @@ class HomeUIManager {
         } else {
           Logger.debug(`📌 Resposta selecionada: ${questionId}`, true);
         }
+      }
+    });
+
+    // ==========================================
+    // LISTENER: modeStartedResponding
+    // Indica que modo começou a responder (LLM)
+    // ==========================================
+    this.eventBus.on('modeStartedResponding', ({ questionId }) => {
+      const statusDiv = DOM.get('statusDiv');
+      if (statusDiv) {
+        statusDiv.textContent = '🤖 Gerando resposta...';
+        Logger.debug(`🤖 Modo começou a responder (questionId: ${questionId})`, true);
       }
     });
 

@@ -48,8 +48,13 @@ class TopBarManager {
       this.applyOpacity(savedOpacity);
 
       // Restaurar modo de entrevista
-      const savedMode = this.configManager.config.ui?.interviewMode || 'INTERVIEW';
+      const savedMode = this.configManager.config.ui?.interviewMode || 'STANDARD';
       this.#updateModeUI(savedMode);
+      // 🔥 CRÍTICO: Atualizar modeManager também
+      if (globalThis.modeManager) {
+        globalThis.modeManager.setMode(savedMode);
+        console.log(`✅ Modo restaurado: ${savedMode}`);
+      }
     } catch (error) {
       Logger.error('Erro ao restaurar estado TopBar', error);
     }
@@ -62,10 +67,13 @@ class TopBarManager {
     console.log('🔄 TopBarManager.reset()');
     this.configManager.config.ui = {
       opacity: 0.75,
-      interviewMode: 'INTERVIEW',
+      interviewMode: 'STANDARD',
     };
     this.#updateOpacityUI(0.75);
-    this.#updateModeUI('INTERVIEW');
+    this.#updateModeUI('STANDARD');
+    if (globalThis.modeManager) {
+      globalThis.modeManager.setMode('STANDARD');
+    }
   }
 
   /**
@@ -145,6 +153,12 @@ class TopBarManager {
       interviewModeSelect.addEventListener('change', (e) => {
         const mode = e.target.value;
         console.log('📌 interviewModeSelect changed:', mode);
+
+        // 🔥 CRÍTICO: Alterar modo em tempo real
+        if (globalThis.modeManager) {
+          globalThis.modeManager.setMode(mode);
+          console.log(`✅ Modo alterado para: ${mode}`);
+        }
 
         // Salvar estado em config.ui
         if (!this.configManager.config.ui) this.configManager.config.ui = {};

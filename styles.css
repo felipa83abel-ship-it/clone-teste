@@ -488,8 +488,21 @@ body {
   background: rgba(var(--color-green-rgb), 0.15);
 }
 
-.selected-question {
-  border: 2px solid rgba(var(--color-active-rgb), var(--app-opacity)) !important;
+/* Pergunta não respondida - estilo interim amarelo */
+.question-block:not(.answered) {
+  border-left: 4px solid rgba(255, 235, 59, 0.5);
+  background: rgba(255, 235, 59, 0.12);
+}
+
+/* Pergunta selecionada - mesmo padrão da resposta selecionada (azul) */
+.question-block.selected-question {
+  border-left: 6px solid rgba(var(--color-active-rgb), 1) !important;
+  background: rgba(var(--color-active-rgb), 0.2) !important;
+  padding-left: 8px;
+  box-shadow:
+    inset -3px 0 0 0 rgba(var(--color-active-rgb), 0.5),
+    0 0 8px rgba(var(--color-active-rgb), 0.3) !important;
+  border-bottom: 2px solid rgba(var(--color-active-rgb), 0.4) !important;
 }
 
 /* 🏷️ BADGES - Indicadores de status das perguntas */
