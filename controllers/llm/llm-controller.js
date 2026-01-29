@@ -20,10 +20,12 @@ const CURRENT_QUESTION_ID = 'CURRENT';
  * @param {string} questionId - ID da pergunta a responder (padrão: globalThis.appState.selectedId)
  */
 async function askLLM(questionId = null) {
+  const startTime = performance.now();
   try {
     const targetQuestionId = questionId || globalThis.appState.selectedId;
 
     // 1. Validar requisição
+    const validationStart = performance.now();
     const {
       questionId: validatedId,
       text,
@@ -33,6 +35,7 @@ async function askLLM(questionId = null) {
       targetQuestionId,
       globalThis.getSelectedQuestionText
     ) || {};
+    const validationTime = performance.now() - validationStart;
 
     Logger.debug('Pergunta validada', { questionId: validatedId, textLength: text?.length }, false);
 
@@ -55,6 +58,7 @@ async function askLLM(questionId = null) {
     const turnId = questionEntry?.turnId || null;
 
     // 4. Executar handler apropriado
+    const handlerStart = performance.now();
     if (isInterviewMode) {
       await globalThis.handleLLMStream?.(
         globalThis.appState,
@@ -75,6 +79,13 @@ async function askLLM(questionId = null) {
         globalThis.llmManager
       );
     }
+    const handlerTime = performance.now() - handlerStart;
+    const totalTime = performance.now() - startTime;
+
+    globalThis.Logger?.debug(
+      `⏱️ Timing askLLM: validation=${validationTime.toFixed(0)}ms, handler=${handlerTime.toFixed(0)}ms, total=${totalTime.toFixed(0)}ms`,
+      true
+    );
   } catch (error) {
     Logger.error('Erro em askLLM', { error: error.message });
     globalThis.eventBus.emit('error', error.message);

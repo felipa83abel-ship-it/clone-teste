@@ -466,11 +466,14 @@ async function handleAskOpenaIStream(event, messages) {
   }
 
   try {
+    const apiStartTime = Date.now();
+    const messagesCount = messages.length;
     let stream;
 
     if (USE_FAKE_STREAM_LLM) {
       stream = fakeStreamLLM();
     } else {
+      const apiCallStart = Date.now();
       stream = await openaiClient.chat.completions.create({
         model: 'gpt-4o-mini',
         messages,
@@ -479,9 +482,11 @@ async function handleAskOpenaIStream(event, messages) {
       });
     }
 
+    let tokenCount = 0;
     for await (const chunk of stream) {
       const token = chunk.choices?.[0]?.delta?.content;
       if (token) {
+        tokenCount++;
         win.webContents.send('LLM_STREAM_CHUNK', token);
       }
     }

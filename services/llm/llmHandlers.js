@@ -61,6 +61,7 @@ async function handleLLMStream(
   llmManager,
   turnId = null
 ) {
+  const startTime = performance.now();
   Logger.debug(
     'Inicializando Stream LLM',
     { questionId, turnId, text, textLength: text.length },
@@ -79,14 +80,32 @@ async function handleLLMStream(
 
   try {
     // Chamar stream do handler
-    const streamGenerator = await handler.stream([
+    const streamStartTime = performance.now();
+
+    // Log de construção de mensagens
+    const messagesConstructStart = performance.now();
+    const messagesArray = [
       { role: 'system', content: SYSTEM_PROMPT },
       { role: 'user', content: text },
-    ]);
+    ];
+    const messageSize = JSON.stringify(messagesArray).length;
+    const messageSizeKB = (messageSize / 1024).toFixed(2);
+    const messagesConstructTime = performance.now() - messagesConstructStart;
+    globalThis.Logger?.debug(
+      `⏱️ Mensagens construídas em ${messagesConstructTime.toFixed(1)}ms (${messageSize} chars, ${messageSizeKB}KB)`,
+      false
+    );
+
+    const streamGenerator = await handler.stream(messagesArray);
+    const streamInitTime = performance.now() - streamStartTime;
+
+    globalThis.Logger?.debug(`⏱️ Stream iniciado em ${streamInitTime.toFixed(0)}ms`, false);
 
     // Iterar tokens
+    let tokenCount = 0;
     for await (const token of streamGenerator) {
       streamedText += token;
+      tokenCount++;
       appState.metrics.llmFirstTokenTime = appState.metrics.llmFirstTokenTime || Date.now();
 
       eventBus.emit('answerStream', {
@@ -100,12 +119,10 @@ async function handleLLMStream(
     appState.metrics.llmEndTime = Date.now();
     appState.interview.llmAnsweredTurnId = appState.interview.interviewTurnId;
 
-    Logger.debug(
-      '⚡ Stream LLM finalizado',
-      {
-        duration: appState.metrics.llmEndTime - appState.metrics.llmStartTime,
-      },
-      true
+    const totalTime = performance.now() - startTime;
+    globalThis.Logger?.debug(
+      `⚡ Stream LLM finalizado: ${tokenCount} tokens em ${(appState.metrics.llmEndTime - appState.metrics.llmStartTime).toFixed(0)}ms (total: ${totalTime.toFixed(0)}ms)`,
+      false
     );
 
     eventBus.emit('llmStreamEnd', {
