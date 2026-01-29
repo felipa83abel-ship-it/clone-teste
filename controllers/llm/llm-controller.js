@@ -84,7 +84,7 @@ async function askLLM(questionId = null) {
 
     globalThis.Logger?.debug(
       `⏱️ Timing askLLM: validation=${validationTime.toFixed(0)}ms, handler=${handlerTime.toFixed(0)}ms, total=${totalTime.toFixed(0)}ms`,
-      true
+      false
     );
   } catch (error) {
     Logger.error('Erro em askLLM', { error: error.message });
