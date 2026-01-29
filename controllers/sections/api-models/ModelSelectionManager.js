@@ -42,6 +42,7 @@ class ModelSelectionManager {
     await this.restoreState();
     this.#initModelToggleListeners();
     this.#initModelSelectListeners();
+    this.#initApiKeyUpdatedListener();
   }
 
   /**
@@ -141,6 +142,13 @@ class ModelSelectionManager {
       if (!savedKey || savedKey.length < 10) {
         console.log(`⚠️ Não é possível ativar o modelo ${model} sem chave válida`);
         this.configManager.showError(`Configure a API key de ${model} antes de ativar`);
+
+        // 🔥 Se estava marcado como ativo mas sem chave, desativa
+        if (this.configManager.config.api[model]?.enabled === true) {
+          this.configManager.config.api[model].enabled = false;
+          this.updateModelStatusUI();
+          this.configManager.saveConfig();
+        }
         return;
       }
 
@@ -255,6 +263,38 @@ class ModelSelectionManager {
         });
       }
     });
+  }
+
+  /**
+   * 🔥 NOVO: Listener para quando API key é atualizada (salva ou deletada)
+   * Atualiza a UI dos modelos para refletir se está ativo ou desativado
+   */
+  #initApiKeyUpdatedListener() {
+    console.log('🎯 ModelSelectionManager.#initApiKeyUpdatedListener()');
+
+    // Usar RendererAPI para registrar listener IPC
+    if (globalThis.RendererAPI?.onApiKeyUpdated) {
+      globalThis.RendererAPI.onApiKeyUpdated(() => {
+        console.log('📡 API_KEY_UPDATED recebido - atualizando UI dos modelos');
+
+        // Re-renderizar o status visual dos modelos
+        this.updateModelStatusUI();
+
+        // Se um modelo estava ativo e a chave foi deletada, desativar
+        const providers = ['openai', 'google', 'openrouter'];
+        providers.forEach(async (provider) => {
+          if (this.configManager.config.api[provider]?.enabled) {
+            const savedKey = await this.ipc.invoke('GET_API_KEY', provider);
+            if (!savedKey || savedKey.length < 10) {
+              console.warn(`⚠️ Chave de ${provider} foi deletada - desativando modelo`);
+              this.configManager.config.api[provider].enabled = false;
+              this.updateModelStatusUI();
+              this.configManager.saveConfig();
+            }
+          }
+        });
+      });
+    }
   }
 }
 

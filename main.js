@@ -1067,7 +1067,7 @@ async function bootstrapApp() {
 
   console.log('✅ Aplicação inicializada com sucesso');
 }
-bootstrapApp();
+bootstrapApp(); // NOSONAR
 
 /**
  * Registra atalhos globais do sistema (Ctrl+D, Ctrl+Enter, etc)
