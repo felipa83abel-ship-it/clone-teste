@@ -905,7 +905,7 @@ const {
           `🛑 Device vazio para ${source.toUpperCase()}, parando Deepgram... (deviceId="${newDeviceId}")`,
           false
         );
-        stopDeepgram(source);
+        await stopDeepgram(source);
         return;
       }
 
@@ -930,7 +930,7 @@ const {
         );
         try {
           // Para completamente o Deepgram anterior
-          stopDeepgram(source);
+          await stopDeepgram(source);
           // Aguarda um pouco para liberar recursos
           await new Promise((resolve) => setTimeout(resolve, 300));
           // Reinicia com novo dispositivo

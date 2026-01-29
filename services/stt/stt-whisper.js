@@ -892,7 +892,7 @@ const {
           `🛑 Device vazio para ${source.toUpperCase()}, parando Whisper... (deviceId="${newDeviceId}")`,
           false
         );
-        stopWhisper(source);
+        await stopWhisper(source);
         return;
       }
 
@@ -917,7 +917,7 @@ const {
         );
         try {
           // Para completamente o Whisper anterior
-          stopWhisper(source);
+          await stopWhisper(source);
           // Aguarda um pouco para liberar recursos
           await new Promise((resolve) => setTimeout(resolve, 300));
           // Reinicia com novo dispositivo
