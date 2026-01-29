@@ -110,11 +110,6 @@ class ModeController {
       const context = {
         eventBus: this.eventBus,
         modeManager: this.modeManager,
-        Logger: globalThis.Logger || {
-          debug: console.log,
-          error: console.error,
-          warn: console.warn,
-        },
         askLLM: globalThis.askLLM,
         state: globalThis.appState,
       };
@@ -143,11 +138,6 @@ class ModeController {
       const context = {
         eventBus: this.eventBus,
         modeManager: this.modeManager,
-        Logger: globalThis.Logger || {
-          debug: console.log,
-          error: console.error,
-          warn: console.warn,
-        },
         state: globalThis.appState,
       };
 
@@ -174,11 +164,6 @@ class ModeController {
       const context = {
         eventBus: this.eventBus,
         modeManager: this.modeManager,
-        Logger: globalThis.Logger || {
-          debug: console.log,
-          error: console.error,
-          warn: console.warn,
-        },
         state: globalThis.appState,
       };
 
@@ -203,11 +188,6 @@ class ModeController {
       const context = {
         eventBus: this.eventBus,
         modeManager: this.modeManager,
-        Logger: globalThis.Logger || {
-          debug: console.log,
-          error: console.error,
-          warn: console.warn,
-        },
         state: globalThis.appState,
       };
 

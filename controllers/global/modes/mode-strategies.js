@@ -24,16 +24,16 @@ const StandardModeStrategy = {
    * Standard: Promove automaticamente mas NÃO responde
    */
   onQuestionFinalized(context, data) {
-    const { eventBus, Logger } = context;
-    const { questionId, state } = data;
+    const { eventBus, state } = context;
+    const { questionId } = data;
 
-    Logger.debug('📝 STANDARD MODE: Pergunta finalizada', false);
+    globalThis.Logger?.debug('📝 STANDARD MODE: Pergunta finalizada', false);
 
     // Emitir que histórico foi atualizado (HomeUIManager renderiza)
     eventBus.emit('questionsHistoryUpdate', this._buildHistoryData(state));
     eventBus.emit('currentQuestionUpdate', this._buildCurrentQuestionData(state));
 
-    Logger.debug('📝 STANDARD MODE: Aguardando ação do usuário (clique/atalho)', false);
+    globalThis.Logger?.debug('📝 STANDARD MODE: Aguardando ação do usuário (clique/atalho)', false);
     // ❌ NÃO emite answerStream, answerBatchEnd ou qualquer resposta
   },
 
@@ -41,8 +41,7 @@ const StandardModeStrategy = {
    * Quando resposta do LLM termina (só se usuário clicou para responder)
    */
   onAnswerStreamEnd(context, data) {
-    const { Logger } = context;
-    Logger.debug('✅ STANDARD MODE: Resposta finalizada', false);
+    globalThis.Logger?.debug('✅ STANDARD MODE: Resposta finalizada', false);
     // Standard não faz nada especial aqui
   },
 
@@ -50,8 +49,7 @@ const StandardModeStrategy = {
    * Quando usuário clica em uma pergunta
    */
   onQuestionClick(context, data) {
-    const { Logger } = context;
-    Logger.debug('🖱️ STANDARD MODE: Pergunta clicada', false);
+    globalThis.Logger?.debug('🖱️ STANDARD MODE: Pergunta clicada', false);
     // Standard permite clicar sempre
     return true;
   },
@@ -109,17 +107,17 @@ const InterviewModeStrategy = {
    * Entrevista: Promove E responde automaticamente
    */
   onQuestionFinalized(context, data) {
-    const { eventBus, Logger, askLLM } = context;
+    const { eventBus, askLLM } = context;
     const { questionId, state } = data;
 
-    Logger.debug('🎬 INTERVIEW MODE: Pergunta finalizada', false);
+    globalThis.Logger?.debug('🎬 INTERVIEW MODE: Pergunta finalizada', false);
 
     // Emitir que histórico foi atualizado
     eventBus.emit('questionsHistoryUpdate', this._buildHistoryData(state));
     eventBus.emit('currentQuestionUpdate', this._buildCurrentQuestionData(state));
 
     // 🔥 ENTREVISTA: Responder automaticamente
-    Logger.debug('🎬 INTERVIEW MODE: Respondendo automaticamente...', false);
+    globalThis.Logger?.debug('🎬 INTERVIEW MODE: Respondendo automaticamente...', false);
     eventBus.emit('modeStartedResponding', { questionId });
 
     if (typeof askLLM === 'function') {
@@ -131,8 +129,8 @@ const InterviewModeStrategy = {
    * Quando resposta do LLM termina
    */
   onAnswerStreamEnd(context, data) {
-    const { state, Logger } = context;
-    Logger.debug('✅ INTERVIEW MODE: Resposta finalizada, incrementando turnId', false);
+    const { state } = context;
+    globalThis.Logger?.debug('✅ INTERVIEW MODE: Resposta finalizada, incrementando turnId', false);
 
     // Atualizar turnId respondido
     if (state && state.interview) {
@@ -144,8 +142,7 @@ const InterviewModeStrategy = {
    * Quando usuário clica em uma pergunta
    */
   onQuestionClick(context, data) {
-    const { Logger } = context;
-    Logger.debug('🖱️ INTERVIEW MODE: Pergunta clicada', false);
+    globalThis.Logger?.debug('🖱️ INTERVIEW MODE: Pergunta clicada', false);
     // Entrevista permite clicar
     return true;
   },
